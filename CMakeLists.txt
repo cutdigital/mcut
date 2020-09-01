@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(mcut VERSION 1.0)
 
-option(MCUT_USE_NATIVE_FLOATING_POINT_NUMBERS "Build with 'long double' as native real number type" ON)
-option(MCUT_BUILD_AS_SHARED_LIB "Build as a shared .dll/.so library" ON)
+option(MCUT_USE_NATIVE_FLOATING_POINT_NUMBERS "Exact geometric math" ON)
+option(MCUT_BUILD_AS_SHARED_LIB ".dll/.so" ON)
 
 ### Require out-of-source builds
 file(TO_CMAKE_PATH "${PROJECT_BINARY_DIR}/CMakeLists.txt" LOC_PATH)
