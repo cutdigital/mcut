@@ -2,16 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(mcut VERSION 1.0)
 
-option(MCUT_ARBITRARY_PRECISION_NUMBERS "Exact geometric math" OFF)
-# TODO: see https://cmake.org/cmake/help/v3.17/guide/user-interaction/index.html#setting-build-variables
+option(MCUT_ARBITRARY_PRECISION_NUMBERS "exact math" OFF)
 option(MCUT_BUILD_AS_SHARED_LIB ".dll/.so" ON)
-
-### Require out-of-source builds
-file(TO_CMAKE_PATH "${PROJECT_BINARY_DIR}/CMakeLists.txt" LOC_PATH)
-
-if(EXISTS "${LOC_PATH}")
-    message(FATAL_ERROR "You cannot build in a source directory.")
-endif()
 
 set ( CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set ( CMAKE_CXX_STANDARD_REQUIRED True)
@@ -19,23 +11,8 @@ set ( CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set ( CMAKE_RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set ( CMAKE_LIBRARY_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
-#
-# Compiler settings
-#
-if(MSVC)
-	#if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
-	#	string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-	#else()
-	#	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
-	#endif()
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
-endif()
+set (src_files ${CMAKE_CURRENT_SOURCE_DIR}/src/mcut.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/halfedge_mesh.cpp)
 
-set (mcut_src_dir ${CMAKE_CURRENT_SOURCE_DIR}/src)
-set (src_files ${mcut_src_dir}/mcut.cpp ${mcut_src_dir}/kernel.cpp ${mcut_src_dir}/halfedge_mesh.cpp)
-
-# TODO: see https://cmake.org/cmake/help/v3.17/guide/user-interaction/index.html#setting-build-variables
 if (MCUT_BUILD_AS_SHARED_LIB)
 	add_library(mcut SHARED ${src_files})
 else()
@@ -52,6 +29,12 @@ if(MCUT_ARBITRARY_PRECISION_NUMBERS)
   target_compile_definitions(mcut PUBLIC -DARBITRARY_PRECISION_NUMBERS)
 endif()
 
-target_compile_definitions(mcut PUBLIC -D_CRT_SECURE_NO_WARNINGS)
-
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	target_compile_options(mcut PUBLIC -Wall -Wextra)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+	target_compile_options(mcut PUBLIC -w3 -diag-disable:remark)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+	target_compile_options(mcut PUBLIC /W4)
+	target_compile_definitions(mcut PUBLIC -D_CRT_SECURE_NO_WARNINGS)
+endif()
 
