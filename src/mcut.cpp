@@ -4,16 +4,16 @@
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
 #include <cfenv>
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
 
 #include <fstream>
 #include <memory>
 #include <stdio.h>
 #include <string.h>
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags convertRoundingMode(int rm)
 {
     McRoundingModeFlags rmf = MC_ROUNDING_MODE_TO_NEAREST;
@@ -104,7 +104,7 @@ mp_rnd_t convertRoundingMode(McRoundingModeFlags rm)
     }
     return f;
 }
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
 
 struct IndexArrayMesh {
     IndexArrayMesh() { }
@@ -199,7 +199,7 @@ struct McDispatchContextInternal {
 
     void applyPrecisionAndRoundingModeSettings()
     {
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
         if (roundingMode != defaultRoundingMode) {
             std::fesetround(convertRoundingMode(roundingMode));
         }
@@ -220,7 +220,7 @@ struct McDispatchContextInternal {
 
     void revertPrecisionAndRoundingModeSettings()
     {
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
         if (roundingMode != defaultRoundingMode) {
             std::fesetround(convertRoundingMode(defaultRoundingMode));
         }
@@ -240,7 +240,7 @@ struct McDispatchContextInternal {
     }
 };
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(std::fegetround());
 uint32_t McDispatchContextInternal::defaultPrecision = sizeof(mcut::math::real_t) * 8;
 const uint32_t McDispatchContextInternal::minPrecision = McDispatchContextInternal::defaultPrecision;
@@ -250,7 +250,7 @@ McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoun
 uint32_t McDispatchContextInternal::defaultPrecision = high_precision_float_t::get_default_precision();
 const uint32_t McDispatchContextInternal::minPrecision = MPFR_PREC_MIN;
 const uint32_t McDispatchContextInternal::maxPrecision = MPFR_PREC_MAX;
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
 
 std::map<McContext, std::unique_ptr<McDispatchContextInternal>> gDispatchContexts;
 
@@ -1370,7 +1370,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             uint64_t off = 0;
             float* outPtr = reinterpret_cast<float*>(pMem);
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
             uint64_t nelems = (uint64_t)(bytes / sizeof(float));
 
             if (nelems % 3 != 0) {
@@ -1419,7 +1419,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             for (uint32_t i = 0; i < nelems; ++i) {
                 const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
                 const double val_ = static_cast<double>(val);
 #else
             const double val_ = static_cast<double>(val.to_double());
@@ -1437,7 +1437,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         for (int i = 0; i < (int)ccData->indexArrayMesh.numVertices * 3; ++i) {
             const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
             allocatedBytes += (std::to_string(val) + " ").length(); // NOTE: we could cache results of tmp strings
 #else
         allocatedBytes += (val.to_string() + " ").length();
@@ -1462,7 +1462,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             for (uint32_t i = 0; i < ccData->indexArrayMesh.numVertices * 3; ++i) {
                 const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
                 const std::string val_ = std::to_string(val) + " ";
 #else
             const std::string val_ = val.to_string() + " ";

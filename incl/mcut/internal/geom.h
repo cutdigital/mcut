@@ -282,11 +282,11 @@ namespace geom {
         const math::real_t denom = dot_product(normal, dir);
         bool result = false;
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
         if (!(0 == denom)) {
 #else
         if (!math::real_t::is_zero(denom)) {
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
             t = nom / denom;
             // If t in [0..1] compute and return intersection point
             if (t >= 0.0 && t <= 1.0) {

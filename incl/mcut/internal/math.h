@@ -1,10 +1,10 @@
 #ifndef MCUT_MATH_H_
 #define MCUT_MATH_H_
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
-#include <cmath>
-#else
+#if defined(ARBITRARY_PRECISION_NUMBERS)
 #include <mpfr.h>
+#else
+#include <cmath>
 #endif
 
 #include <iostream>
@@ -21,9 +21,8 @@
 namespace mcut {
 namespace math {
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
-    using real_t = long double;
-#else
+#if defined(ARBITRARY_PRECISION_NUMBERS)
+    
     class high_precision_float_t {
     public:
         inline static mp_rnd_t get_default_rounding_mode()
@@ -363,10 +362,11 @@ namespace math {
     }
 
     using real_t = high_precision_float_t;
+#else 
+using real_t = long double;
+#endif // #if defined(ARBITRARY_PRECISION_NUMBERS)
 
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
-
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
     static inline real_t square_root(const real_t& number)
     {
         return std::sqrt(number);
@@ -378,9 +378,9 @@ namespace math {
         mpfr_sqrt(out.get_mpfr_handle(), number.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return out;
     }
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
     static inline real_t absolute_value(const real_t& number)
     {
         return std::fabs(number);
@@ -392,7 +392,7 @@ namespace math {
         mpfr_abs(out.get_mpfr_handle(), number.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return out;
     }
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if defined(ARBITRARY_PRECISION_NUMBERS)
 
     enum sign_t {
         ON_NEGATIVE_SIDE = -1, // left
@@ -404,7 +404,7 @@ namespace math {
         POSITIVE = ON_POSITIVE_SIDE,
     };
 
-#if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#if !defined(ARBITRARY_PRECISION_NUMBERS)
     static inline sign_t sign(const real_t& number)
     {
         int s = (real_t(0) < number) - (number < real_t(0));
@@ -429,7 +429,7 @@ namespace math {
         }
         return result;
     }
-#endif // #if defined(USE_NATIVE_FLOATING_POINT_NUMBERS)
+#endif // #if defined(ARBITRARY_PRECISION_NUMBERS)
 
     class vec2 {
     public:

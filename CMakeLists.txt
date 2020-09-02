@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(mcut VERSION 1.0)
 
-option(MCUT_USE_NATIVE_FLOATING_POINT_NUMBERS "Exact geometric math" ON)
+option(MCUT_ARBITRARY_PRECISION_NUMBERS "Exact geometric math" OFF)
 # TODO: see https://cmake.org/cmake/help/v3.17/guide/user-interaction/index.html#setting-build-variables
 option(MCUT_BUILD_AS_SHARED_LIB ".dll/.so" ON)
 
@@ -48,8 +48,8 @@ if (MCUT_BUILD_AS_SHARED_LIB)
 	set_target_properties(mcut PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
-if(MCUT_USE_NATIVE_FLOATING_POINT_NUMBERS)
-  target_compile_definitions(mcut PUBLIC -DUSE_NATIVE_FLOATING_POINT_NUMBERS)
+if(MCUT_ARBITRARY_PRECISION_NUMBERS)
+  target_compile_definitions(mcut PUBLIC -DARBITRARY_PRECISION_NUMBERS)
 endif()
 
 target_compile_definitions(mcut PUBLIC -D_CRT_SECURE_NO_WARNINGS)
