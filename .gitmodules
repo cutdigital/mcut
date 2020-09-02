@@ -1,3 +1,4 @@
-[submodule "incl/mcut/extern/mcut-headers"]
-	path = incl/mcut/extern/mcut-headers
+
+[submodule "extern/mcut-headers"]
+	path = extern/mcut-headers
 	url = https://github.com/cutdigital/mcut-headers.git
