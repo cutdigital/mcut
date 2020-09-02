@@ -119,7 +119,7 @@ struct IndexArrayMesh {
     std::unique_ptr<mcut::math::real_t[]> pVertices;
     std::unique_ptr<uint32_t[]> pSeamVertexIndices;
     std::unique_ptr<uint32_t[]> pFaceIndices;
-    std::unique_ptr<McFaceSize[]> pFaceSizes;
+    std::unique_ptr<uint32_t[]> pFaceSizes;
     std::unique_ptr<uint32_t[]> pEdges;
 
     uint32_t numVertices = 0;
@@ -259,7 +259,7 @@ McResult indexArrayMeshToHalfedgeMesh(
     mcut::mesh_t& halfedgeMesh,
     const void* pVertices,
     const uint32_t* pFaceIndices,
-    const McFaceSize* pFaceSizes,
+    const uint32_t* pFaceSizes,
     const uint32_t numVertices,
     const uint32_t numFaces)
 {
@@ -350,7 +350,7 @@ McResult indexArrayMeshToHalfedgeMesh(
         std::vector<mcut::vd_t> faceVertices;
         int numFaceVertices = 3; // triangle
 
-        numFaceVertices = ((McFaceSize*)pFaceSizes)[i];
+        numFaceVertices = ((uint32_t*)pFaceSizes)[i];
 
         faceVertices.reserve(numFaceVertices);
 
@@ -512,7 +512,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     MCUT_ASSERT(indexArrayMesh.numFaces > 0);
 
-    indexArrayMesh.pFaceSizes = std::unique_ptr<McFaceSize[]>(new McFaceSize[indexArrayMesh.numFaces]);
+    indexArrayMesh.pFaceSizes = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
     indexArrayMesh.numFaceIndices = 0;
 
     std::vector<std::vector<mcut::vd_t>> gatheredFaces;
@@ -547,14 +547,14 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     for (int i = 0; i < (int)gatheredFaces.size(); ++i) {
         const std::vector<mcut::vd_t>& face = gatheredFaces[i];
-        if (static_cast<std::size_t>(std::numeric_limits<McFaceSize>::max()) < face.size()) {
+        if (static_cast<std::size_t>(std::numeric_limits<uint32_t>::max()) < face.size()) {
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-                std::string("number of vertices in face (") + std::to_string(face.size()) + ") exceeds maximum (" + std::to_string(std::numeric_limits<McFaceSize>::max()) + ")");
+                std::string("number of vertices in face (") + std::to_string(face.size()) + ") exceeds maximum (" + std::to_string(std::numeric_limits<uint32_t>::max()) + ")");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
 
-        indexArrayMesh.pFaceSizes[i] = static_cast<McFaceSize>(face.size());
+        indexArrayMesh.pFaceSizes[i] = static_cast<uint32_t>(face.size());
 
         for (int j = 0; j < (int)face.size(); ++j) {
             const mcut::vd_t vd = face[j];
@@ -936,7 +936,7 @@ bool checkFrontendMesh(
     std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
     const void* pVertices,
     const uint32_t* pFaceIndices,
-    const McFaceSize* pFaceSizes,
+    const uint32_t* pFaceSizes,
     const uint32_t numVertices,
     const uint32_t numFaces)
 {
@@ -982,12 +982,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     McFlags dispatchFlags,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
-    const McFaceSize* pSrcMeshFaceSizes,
+    const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
     const void* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
-    const McFaceSize* pCutMeshFaceSizes,
+    const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces,
     uint32_t numEventInWaitList,
@@ -1501,15 +1501,15 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_SIZE: { // non-triangulated only (don't want to store redundant information)
         if (pMem == nullptr) {
-            *pNumBytes = ccData->indexArrayMesh.numFaces * sizeof(McFaceSize); // each face has a size (num verts)
+            *pNumBytes = ccData->indexArrayMesh.numFaces * sizeof(uint32_t); // each face has a size (num verts)
         } else {
-            if (bytes > ccData->indexArrayMesh.numFaces * sizeof(McFaceSize)) {
+            if (bytes > ccData->indexArrayMesh.numFaces * sizeof(uint32_t)) {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
-            if (bytes % sizeof(McFaceSize) != 0) {
+            if (bytes % sizeof(uint32_t) != 0) {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
