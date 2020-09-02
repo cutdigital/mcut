@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(mcut VERSION 1.0)
 
 option(MCUT_USE_NATIVE_FLOATING_POINT_NUMBERS "Exact geometric math" ON)
+# TODO: see https://cmake.org/cmake/help/v3.17/guide/user-interaction/index.html#setting-build-variables
 option(MCUT_BUILD_AS_SHARED_LIB ".dll/.so" ON)
 
 ### Require out-of-source builds
@@ -42,7 +43,6 @@ else()
 endif()
 
 target_include_directories(mcut PUBLIC ${mcut_include_dir})
-#target_link_libraries(mcut ${EXTRA_LIBS})
 
 if (MCUT_BUILD_AS_SHARED_LIB)
 	set_target_properties(mcut PROPERTIES POSITION_INDEPENDENT_CODE ON)
