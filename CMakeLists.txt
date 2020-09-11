@@ -2,6 +2,9 @@
 # You must provide the following variable:
 #	MCUT_INCLUDE_DIR - the MCUT include directory
 #
+# You can also set the following option (optional):
+#	 MCUT_ARBITRARY_PRECISION_NUMBERS - enable exact arthmetic
+#
 # This script will define the following cache variables:
 # 	MCUT_LIBRARY - the path to the MCUT library
 #
@@ -64,3 +67,4 @@ set (MCUT_LIBRARY $<TARGET_FILE:${library_name}>)
 
 message(STATUS "MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 message(STATUS "MCUT_LIBRARY=${MCUT_LIBRARY}")
+message(STATUS "MCUT_ARBITRARY_PRECISION_NUMBERS=${MCUT_ARBITRARY_PRECISION_NUMBERS}")

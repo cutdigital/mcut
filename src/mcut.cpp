@@ -994,6 +994,21 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const McEvent* waitlist,
     McEvent* event)
 {
+//#define DEMO_BUILD 1 // comment out for full build
+
+#if defined(DEMO_BUILD)
+    if(numSrcMeshFaces > 4 || numCutMeshVertices > 4)
+    {
+        std::fprintf(stdout, 
+        "===============================================================\n"
+        "Thanks for using MCUT. This demo has been restricted to meshes \n"
+        "with 3 or 4 vertices.\n"
+        "Please email contact@cut-digital.com for more information about\n"
+        "obtaining a commercial licence for this product.\n"
+        "================================================================\n");
+        return McResult::MC_NO_ERROR;
+    }
+#endif
     McResult result = McResult::MC_NO_ERROR;
     std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator ctxtIter = gDispatchContexts.find(context);
 
@@ -1039,6 +1054,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         result = McResult::MC_INVALID_CUT_MESH;
         return result;
     }
+
+    // TODO: add another check here to ensure that the source and cut mesh are not exact the save.
+    // i.e. vertex coordinates of one mesh are not colocated with any coordinates in the other mesh
 
     mcut::mesh_t srcMeshInternal;
     result = indexArrayMeshToHalfedgeMesh(
