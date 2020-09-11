@@ -1,6 +1,6 @@
 #
 # You must provide the following variable:
-#	MCUT_INCLUDE_DIR - the MCUT include directory (mcut-headers)
+#	MCUT_INCLUDE_DIR - the MCUT include directory
 #
 # This script will define the following cache variables:
 # 	MCUT_LIBRARY - the path to the MCUT library

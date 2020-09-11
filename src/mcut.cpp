@@ -955,7 +955,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
             memcpy(pMem, reinterpret_cast<const void*>(&McDispatchContextInternal::minPrecision), bytes);
         }
         break;
-    case MC_DEBUG_LAST_LOGGED_MESSAGE:
+    case MC_DEBUG_KERNEL_TRACE:
         if (pMem == nullptr) {
             *pNumBytes = ctxtPtr->lastLoggedDebugDetail.length();
         } else {
