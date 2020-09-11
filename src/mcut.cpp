@@ -205,6 +205,7 @@ struct McDispatchContextInternal {
         }
 
         if (precision != defaultPrecision) {
+            log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "redundant precision change");
             // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
@@ -226,6 +227,7 @@ struct McDispatchContextInternal {
         }
 
         if (precision != defaultPrecision) {
+            log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "redundant precision change");
             // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
@@ -320,7 +322,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
                 vptr_ = std::strchr(vptr, '\n'); // .. find newline char (start of next vertex)
 
-                if (vptr_ == nullptr && i != (numVertices * 3) - 1) { // it not the last entry
+                if (vptr_ == nullptr && i != (numVertices * 3) - 1) { // its not the last entry
                     result = McResult::MC_INVALID_VALUE;
 
                     if (result != McResult::MC_NO_ERROR) {
@@ -610,7 +612,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcSetRoundingMode(McContext context, McFlags rmod
     auto ctxtIter = gDispatchContexts.find(context);
 
     if (ctxtIter == gDispatchContexts.cend()) {
-        std::fprintf(stderr, "err: context undefined");
+        std::fprintf(stderr, "error: context undefined");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -750,6 +752,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mc
 
     const std::unique_ptr<McDispatchContextInternal>& ctxtPtr = ctxtIter->second;
 
+    if (cb == nullptr) {
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "callback parameter NULL");
+        result = McResult::MC_INVALID_VALUE;
+        return result;
+    }
+
     ctxtPtr->debugCallback = cb;
     ctxtPtr->debugCallbackUserParam;
 
@@ -799,13 +807,36 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     const std::unique_ptr<McDispatchContextInternal>& ctxtPtr = ctxtIter->second;
 
-    ctxtPtr->debugSource = 0;
+    // check source parameter
+    bool sourceParamValid = source == MC_DEBUG_SOURCE_API || //
+    source == MC_DEBUG_SOURCE_KERNEL || //
+    source == MC_DEBUG_SOURCE_ALL; 
+
+    if(!sourceParamValid)
+    {
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, "Invalid source parameter value");
+        result = McResult::MC_INVALID_VALUE;
+        return result;
+    }
 
     for (auto i : { McDebugSource::MC_DEBUG_SOURCE_API, McDebugSource::MC_DEBUG_SOURCE_KERNEL }) {
         if ((source & i) && enabled) {
             int n = trailing_zeroes(McDebugSource::MC_DEBUG_SOURCE_ALL & i);
             ctxtPtr->debugSource = set_bit(ctxtPtr->debugSource, n);
         }
+    }
+
+    // check debug type parameter
+    bool typeParamValid = type == MC_DEBUG_TYPE_ERROR || //
+    type == MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR || //
+    type == MC_DEBUG_TYPE_OTHER || //
+    type == MC_DEBUG_TYPE_ALL; 
+
+    if(!typeParamValid)
+    {
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, "Invalid debug type parameter value");
+        result = McResult::MC_INVALID_VALUE;
+        return result;
     }
 
     ctxtPtr->debugType = 0;
@@ -815,6 +846,20 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
             int n = trailing_zeroes(McDebugType::MC_DEBUG_TYPE_ALL & i);
             ctxtPtr->debugType = set_bit(ctxtPtr->debugType, n);
         }
+    }
+
+    // check debug severity parameter
+    bool severityParamValid = type == MC_DEBUG_SEVERITY_HIGH || //
+    type == MC_DEBUG_SEVERITY_MIDIUM || //
+    type == MC_DEBUG_SEVERITY_LOW || //
+    type == MC_DEBUG_SEVERITY_NOTIFICATION ||//
+    type == MC_DEBUG_SEVERITY_ALL; 
+
+    if(!severityParamValid)
+    {
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, "Invalid debug severity parameter value");
+        result = McResult::MC_INVALID_VALUE;
+        return result;
     }
 
     ctxtPtr->debugSeverity = 0;
@@ -945,8 +990,8 @@ bool checkFrontendMesh(
     if (pVertices == nullptr) {
         errmsg = ("undefined vertices");
         result = false;
-    } else if (numVertices == 0) {
-        errmsg = "undefined vertex count";
+    } else if (numVertices < 3) {
+        errmsg = "invalid vertex count";
         result = false;
     } else if (pFaceIndices == nullptr) {
         errmsg = "undefined faces";
@@ -1221,7 +1266,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     // seamed meshes
     // -----------
 
-    // NOTE: seamed meshes are available if there was no partial cut intersection.
+    // NOTE: seamed meshes are available if there was no partial cut intersection (due to constraints imposed by halfedge construction rules).
 
     //  src mesh
 
@@ -1250,8 +1295,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     return result;
 }
-
-// called like opencl: https://www.khronos.org/registry/OpenCL/sdk/1.0/docs/man/xhtml/clGetDeviceIDs.html
 
 MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     const McContext context,
@@ -1320,7 +1363,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     return result;
 }
 
-// called like opencl: https://www.khronos.org/registry/OpenCL/sdk/1.0/docs/man/xhtml/clGetDeviceIDs.html
 McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
     const McBool blocking,
