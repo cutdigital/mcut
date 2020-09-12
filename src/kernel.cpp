@@ -1810,7 +1810,7 @@ void dispatch(output_t& output, const input_t& input)
                 const math::vec3& face_A_halfedge_target_vertex = ps.vertex(face_A_halfedge_target_descr);
                 //auto result = CGAL::intersection(segment, plane);
                 math::vec3 intersection_point;
-                math::real_t tparam = 0; // how far along the halfedge the intersection point is.
+                math::real_t tparam = 0.0; // how far along the halfedge the intersection point is.
 
                 bool have_plane_intersection = geom::intersect_plane_with_segment(
                     intersection_point,
@@ -8646,8 +8646,8 @@ void dispatch(output_t& output, const input_t& input)
 #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
                 unseparated_stitching_CCs.clear();
 //unseparated_stitching_CCs.erase(unseparated_stitching_CCs.begin(), unseparated_stitching_CCs.begin() + unseparated_stitching_CCs.size() - 1);
-#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING \
-    //std::cout << "**2" <<std::endl;                    \
+#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 
+
     // save meshes and dump
 
                 // std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_location_t> > >

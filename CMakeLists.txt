@@ -3,7 +3,7 @@
 #	MCUT_INCLUDE_DIR - the MCUT include directory
 #
 # You can also set the following option (optional):
-#	 MCUT_ARBITRARY_PRECISION_NUMBERS - enable exact arthmetic
+#	 MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS - enable exact arthmetic
 #
 # This script will define the following cache variables:
 # 	MCUT_LIBRARY - the path to the MCUT library
@@ -11,16 +11,44 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-project(mcut VERSION 1.0)
+# Set default build type to "Release".
+# NOTE: this should be done before the project command since the latter can set
+# CMAKE_BUILD_TYPE itself (it does so for nmake).
+if(NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING
+		"Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+	FORCE)
+endif()
+
+project(mcut VERSION 1.0 LANGUAGES CXX C)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "MCUT version: ${mcut_VERSION}")
 
 #
 # User inputs
 #
-option (MCUT_ARBITRARY_PRECISION_NUMBERS "exact math" OFF)
+option (MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "exact math" OFF)
 option (MCUT_BUILD_AS_SHARED_LIB ".dll/.so" ON)
 
 if(NOT DEFINED MCUT_INCLUDE_DIR)
 	message(SEND_ERROR "MCUT_INCLUDE_DIR unspecified")
+endif()
+
+if(${MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS})
+
+	find_package(MCUT_MPFR REQUIRED)
+
+	set(CMAKE_REQUIRED_INCLUDES "${MCUT_MPFR_INCLUDE_DIR}")
+	set(CMAKE_REQUIRED_LIBRARIES "${MCUT_MPFR_LIBRARY}")
+	unset(CMAKE_REQUIRED_INCLUDES)
+	unset(CMAKE_REQUIRED_LIBRARIES)
+
+	message(STATUS "MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
+	message(STATUS "MCUT_MPFR_LIBRARY=${MCUT_MPFR_LIBRARY}")
 endif()
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC" AND ${MCUT_BUILD_AS_SHARED_LIB})
@@ -40,31 +68,37 @@ set (library_name mcut)
 
 if (MCUT_BUILD_AS_SHARED_LIB)
 	add_library(${library_name} SHARED ${src_files})
+	message(STATUS "${library_name} will be built as a shared library.")
+	set_property(TARGET ${library_name} PROPERTY VERSION "1.0")
+    set_property(TARGET ${library_name} PROPERTY SOVERSION 1)
 else()
 	add_library(${library_name} STATIC ${src_files})
+	message(STATUS "${library_name} will be built as a static library.")
 endif()
 
-target_include_directories(${library_name} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/incl ${MCUT_INCLUDE_DIR})
+target_include_directories(${library_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/incl ${MCUT_INCLUDE_DIR})
 
 if (MCUT_BUILD_AS_SHARED_LIB)
 	set_target_properties(${library_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
-if(MCUT_ARBITRARY_PRECISION_NUMBERS)
-  target_compile_definitions(${library_name} PUBLIC -DARBITRARY_PRECISION_NUMBERS)
+if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+	target_include_directories(${library_name} PRIVATE ${MPFR_INCLUDES})
+	target_compile_definitions(${library_name} PRIVATE -DMCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1)
+	target_link_libraries(${library_name} PRIVATE ${MPFR_LIBRARIES} ${library_name}::MPFR)
 endif()
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-	target_compile_options(${library_name} PUBLIC -Wall -Wextra)
+	target_compile_options(${library_name} PRIVATE -Wall -Wextra)
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
-	target_compile_options(${library_name} PUBLIC -w3 -diag-disable:remark)
+	target_compile_options(${library_name} PRIVATE -w3 -diag-disable:remark)
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
-	target_compile_options(${library_name} PUBLIC /W4)
-	target_compile_definitions(${library_name} PUBLIC -D_CRT_SECURE_NO_WARNINGS)
+	target_compile_options(${library_name} PRIVATE /W4)
+	target_compile_definitions(${library_name} PRIVATE -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 set (MCUT_LIBRARY $<TARGET_FILE:${library_name}>)
 
 message(STATUS "MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 message(STATUS "MCUT_LIBRARY=${MCUT_LIBRARY}")
-message(STATUS "MCUT_ARBITRARY_PRECISION_NUMBERS=${MCUT_ARBITRARY_PRECISION_NUMBERS}")
+message(STATUS "MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS=${MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS}")

@@ -290,9 +290,9 @@ public:
 
     vertex_descriptor_t add_vertex(const math::real_t& x, const math::real_t& y, const math::real_t& z);
 
-#if !defined(ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     vertex_descriptor_t add_vertex(const char* x, const char* y, const char* z);
-#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);
 
     face_descriptor_t add_face(const std::vector<vertex_descriptor_t>& vi);

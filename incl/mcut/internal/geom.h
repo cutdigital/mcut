@@ -76,7 +76,7 @@ namespace geom {
     // http://cs.haifa.ac.il/~gordon/plane.pdf
     void polygon_normal(math::vec3& normal, const math::vec3* vertices, const int num_vertices)
     {
-        normal = math::vec3(0);
+        normal = math::vec3(0.0);
         for (int i = 0; i < num_vertices; ++i) {
             normal = normal + cross_product(vertices[i] - vertices[0], vertices[(i + 1) % num_vertices] - vertices[0]);
         }
@@ -108,7 +108,7 @@ namespace geom {
     {
         MCUT_ASSERT(num_vertices >= 3);
 
-        span = math::vec3(0);
+        span = math::vec3(0.0);
         span_length = 0;
 
         for (int i = 0; i < num_vertices; ++i) {
@@ -244,7 +244,7 @@ namespace geom {
 
         //create a ray (segment) starting from the given point,
         // and to the point outside of polygon.
-        math::vec2 outside(bbox2.m_minimum.x() - 1, bbox2.m_minimum.y());
+        math::vec2 outside(bbox2.m_minimum.x() - math::real_t(1.0), bbox2.m_minimum.y());
 
         int intersections = 0;
 
@@ -282,11 +282,11 @@ namespace geom {
         const math::real_t denom = dot_product(normal, dir);
         bool result = false;
 
-#if !defined(ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         if (!(0 == denom)) {
 #else
         if (!math::real_t::is_zero(denom)) {
-#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
             t = nom / denom;
             // If t in [0..1] compute and return intersection point
             if (t >= 0.0 && t <= 1.0) {

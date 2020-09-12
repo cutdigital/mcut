@@ -1,7 +1,7 @@
 #ifndef MCUT_MATH_H_
 #define MCUT_MATH_H_
 
-#if defined(ARBITRARY_PRECISION_NUMBERS)
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 #include <mpfr.h>
 #else
 #include <cmath>
@@ -21,7 +21,7 @@
 namespace mcut {
 namespace math {
 
-#if defined(ARBITRARY_PRECISION_NUMBERS)
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     
     class high_precision_float_t {
     public:
@@ -35,26 +35,37 @@ namespace math {
             return (mpfr_get_default_prec)(); // 53 bits (from the spec)
         }
 
-        inline void set_default_precision(mp_prec_t prec)
+        inline static void set_default_precision(mp_prec_t prec)
         {
             mpfr_set_default_prec(prec);
         }
 
-        inline void set_default_rounding_mode(mp_rnd_t rnd_mode)
+        inline static void set_default_rounding_mode(mp_rnd_t rnd_mode)
         {
             mpfr_set_default_rounding_mode(rnd_mode);
         }
 
         high_precision_float_t()
         {
-            mpfr_init2(get_mpfr_handle(), get_default_precision());
-            mpfr_set_ld(get_mpfr_handle(), 0.0, get_default_rounding_mode());
+            mpfr_init2(get_mpfr_handle(), high_precision_float_t::get_default_precision());
+            mpfr_set_ld(get_mpfr_handle(), 0.0, high_precision_float_t::get_default_rounding_mode());
         }
 
         high_precision_float_t(const long double& value)
         {
-            mpfr_init2(get_mpfr_handle(), get_default_precision());
-            mpfr_set_ld(get_mpfr_handle(), value, get_default_rounding_mode());
+            mpfr_init2(get_mpfr_handle(), high_precision_float_t::get_default_precision());
+            mpfr_set_ld(get_mpfr_handle(), value, high_precision_float_t::get_default_rounding_mode());
+        }
+
+        high_precision_float_t(const char* value)
+        {
+            mpfr_init2(get_mpfr_handle(), high_precision_float_t::get_default_precision());
+            int ret = mpfr_set_str(get_mpfr_handle(), value, 10, high_precision_float_t::get_default_rounding_mode());
+            if(ret!=0)
+            {
+                std::fprintf(stderr, "mpfr_set_str failed\n");
+                std::abort();
+            }
         }
 
         // Construct high_precision_float_t from mpfr_t structure.
@@ -64,8 +75,8 @@ namespace math {
             if (shared) {
                 std::memcpy(this->get_mpfr_handle(), u.get_mpfr_handle(), sizeof(mpfr_t));
             } else {
-                mpfr_init2(this->get_mpfr_handle(), get_default_precision());
-                mpfr_set(this->get_mpfr_handle(), u.get_mpfr_handle(), get_default_rounding_mode());
+                mpfr_init2(this->get_mpfr_handle(), high_precision_float_t::get_default_precision());
+                mpfr_set(this->get_mpfr_handle(), u.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
             }
         }
 
@@ -226,6 +237,24 @@ namespace math {
             return mpfr_get_ld(get_mpfr_handle(), get_default_rounding_mode());
         }
 
+        inline std::string to_string(const std::string& format = "%e") const
+        {
+            char *s = NULL;
+            std::string out;
+
+            if( !format.empty() )
+            {
+                if(!(mpfr_asprintf(&s, format.c_str(), mpfr_srcptr()) < 0))
+                {
+                    out = std::string(s);
+
+                    mpfr_free_str(s);
+                }
+            }
+
+            return out;
+        }
+
         static inline bool is_nan(const high_precision_float_t& op)
         {
             return (mpfr_nan_p(op.get_mpfr_handle()) != 0);
@@ -247,35 +276,35 @@ namespace math {
 
     inline const high_precision_float_t operator*(const high_precision_float_t& a, const high_precision_float_t& b)
     {
-        high_precision_float_t c(0);
+        high_precision_float_t c(0.0);
         mpfr_mul(c.get_mpfr_handle(), a.get_mpfr_handle(), b.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return c;
     }
 
     inline const high_precision_float_t operator+(const high_precision_float_t& a, const high_precision_float_t& b)
     {
-        high_precision_float_t c(0);
+        high_precision_float_t c(0.0);
         mpfr_add(c.get_mpfr_handle(), a.get_mpfr_handle(), b.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return c;
     }
 
     inline const high_precision_float_t operator-(const high_precision_float_t& a, const high_precision_float_t& b)
     {
-        high_precision_float_t c(0);
+        high_precision_float_t c(0.0);
         mpfr_sub(c.get_mpfr_handle(), a.get_mpfr_handle(), b.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return c;
     }
 
     inline const high_precision_float_t operator/(const high_precision_float_t& a, const high_precision_float_t& b)
     {
-        high_precision_float_t c(0);
+        high_precision_float_t c(0.0);
         mpfr_div(c.get_mpfr_handle(), a.get_mpfr_handle(), b.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return c;
     }
 
     inline const high_precision_float_t operator/(const long double b, const high_precision_float_t& a)
     {
-        high_precision_float_t x(0);
+        high_precision_float_t x(0.0);
         // NOTE: mpfr_ld_div not availale
         mpfr_d_div(x.get_mpfr_handle(), b, a.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return x;
@@ -354,19 +383,12 @@ namespace math {
         return !(a == b);
     }
 
-    static inline high_precision_float_t square_root(const high_precision_float_t& number)
-    {
-        high_precision_float_t out(number);
-        mpfr_sqrt(out.get_mpfr_handle(), number.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
-        return out;
-    }
-
     using real_t = high_precision_float_t;
 #else 
 using real_t = long double;
-#endif // #if defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
-#if !defined(ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     static inline real_t square_root(const real_t& number)
     {
         return std::sqrt(number);
@@ -378,9 +400,9 @@ using real_t = long double;
         mpfr_sqrt(out.get_mpfr_handle(), number.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return out;
     }
-#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
-#if !defined(ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     static inline real_t absolute_value(const real_t& number)
     {
         return std::fabs(number);
@@ -392,7 +414,7 @@ using real_t = long double;
         mpfr_abs(out.get_mpfr_handle(), number.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
         return out;
     }
-#endif // #if defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
     enum sign_t {
         ON_NEGATIVE_SIDE = -1, // left
@@ -404,7 +426,7 @@ using real_t = long double;
         POSITIVE = ON_POSITIVE_SIDE,
     };
 
-#if !defined(ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     static inline sign_t sign(const real_t& number)
     {
         int s = (real_t(0) < number) - (number < real_t(0));
@@ -420,7 +442,7 @@ using real_t = long double;
     static inline sign_t sign(const real_t& number)
     {
         real_t out(number);
-        int s = mpfr_sgn(out.get_mpfr_handle(), number.get_mpfr_handle(), high_precision_float_t::get_default_rounding_mode());
+        int s = mpfr_sgn(number.get_mpfr_handle());
         sign_t result = sign_t::ZERO;
         if (s > 0) {
             result = sign_t::POSITIVE;
@@ -429,7 +451,7 @@ using real_t = long double;
         }
         return result;
     }
-#endif // #if defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
     class vec2 {
     public:

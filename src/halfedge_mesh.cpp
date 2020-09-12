@@ -231,7 +231,7 @@ vertex_descriptor_t mesh_t::add_vertex(const math::real_t& x, const math::real_t
     return tmp.first->first;
 }
 
-#if !defined(ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 vertex_descriptor_t mesh_t::add_vertex(const char* x, const char* y, const char* z)
 {
     // ... convert convert the numerical value embedded in each character-string to a double
@@ -241,7 +241,7 @@ vertex_descriptor_t mesh_t::add_vertex(const char* x, const char* y, const char*
 
     return add_vertex(x_, y_, z_); // register the vertex
 }
-#endif // #if !defined(ARBITRARY_PRECISION_NUMBERS)
+#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1)
 {
