@@ -237,21 +237,22 @@ namespace math {
             return mpfr_get_ld(get_mpfr_handle(), get_default_rounding_mode());
         }
 
-        inline std::string to_string(const std::string& format = "%e") const
+        inline std::string to_string(const std::string& format = "%f") const
         {
-            char *s = NULL;
-            std::string out;
-
-            if( !format.empty() )
+            // NOTE: number of decimal digits in the significand is dependent on the current precision and rounding mode
+            mpfr_exp_t decimalLocation = 0;
+            char *s = mpfr_get_str (NULL, &decimalLocation, 10, 0, get_mpfr_handle(), get_default_rounding_mode());
+            std::string out = std::string(s);
+            if(out[0] == '-') // first char is minus sign
             {
-                if(!(mpfr_asprintf(&s, format.c_str(), mpfr_srcptr()) < 0))
-                {
-                    out = std::string(s);
-
-                    mpfr_free_str(s);
-                }
+                MCUT_ASSERT( mpfr_sgn(get_mpfr_handle()) < 0);
+                // The generated string is a fraction, with an implicit radix point immediately to the left of the 
+                // first digit. For example, the number −3.1416 would be returned as "−31416" in the string and
+                // 1 written at expptr.
+                decimalLocation += 1; // account for minus sign.            
             }
-
+            out.insert(decimalLocation, ".");
+            mpfr_free_str(s);
             return out;
         }
 

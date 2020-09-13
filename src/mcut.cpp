@@ -189,10 +189,10 @@ struct McDispatchContextInternal {
     // defaults
     static McRoundingModeFlags defaultRoundingMode;
     #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    static uint32_t defaultPrecision;
-    static const uint32_t minPrecision;
-    static const uint32_t maxPrecision;
-    uint32_t precision = defaultPrecision;
+    static uint64_t defaultPrecision;
+    static const uint64_t minPrecision;
+    static const uint64_t maxPrecision;
+    uint64_t precision = defaultPrecision;
     #else
 static mpfr_prec_t defaultPrecision;
     static const mpfr_prec_t minPrecision;
@@ -252,9 +252,9 @@ static mpfr_prec_t defaultPrecision;
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(std::fegetround());
-uint32_t McDispatchContextInternal::defaultPrecision = sizeof(mcut::math::real_t) * 8;
-const uint32_t McDispatchContextInternal::minPrecision = McDispatchContextInternal::defaultPrecision;
-const uint32_t McDispatchContextInternal::maxPrecision = McDispatchContextInternal::defaultPrecision;
+uint64_t McDispatchContextInternal::defaultPrecision = sizeof(mcut::math::real_t) * 8;
+const uint64_t McDispatchContextInternal::minPrecision = McDispatchContextInternal::defaultPrecision;
+const uint64_t McDispatchContextInternal::maxPrecision = McDispatchContextInternal::defaultPrecision;
 #else
 McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(mcut::math::high_precision_float_t::get_default_rounding_mode());
 mpfr_prec_t McDispatchContextInternal::defaultPrecision = mcut::math::high_precision_float_t::get_default_precision();
@@ -489,7 +489,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
         mcut::mesh_t::vertex_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
         std::advance(vIter, i);
-        mcut::math::vec3 point = halfedgeMeshInfo.mesh.vertex(*vIter);
+        const mcut::math::vec3& point = halfedgeMeshInfo.mesh.vertex(*vIter);
 
         indexArrayMesh.pVertices[(i * 3u) + 0u] = point.x();
         indexArrayMesh.pVertices[(i * 3u) + 1u] = point.y();
@@ -667,7 +667,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetRoundingMode(McContext context, McFlags* rmo
     return result;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcSetPrecision(McContext context, uint32_t prec)
+MCAPI_ATTR McResult MCAPI_CALL mcSetPrecision(McContext context, uint64_t prec)
 {
     McResult result = MC_NO_ERROR;
 
@@ -698,7 +698,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcSetPrecision(McContext context, uint32_t prec)
     return result;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcGetPrecision(McContext context, uint32_t* prec)
+MCAPI_ATTR McResult MCAPI_CALL mcGetPrecision(McContext context, uint64_t* prec)
 {
     McResult result = MC_NO_ERROR;
 
@@ -822,7 +822,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     if(!sourceParamValid)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, "Invalid source parameter value");
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid source parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -842,7 +842,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     if(!typeParamValid)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, "Invalid debug type parameter value");
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug type parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -858,21 +858,21 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     // check debug severity parameter
     bool severityParamValid = type == MC_DEBUG_SEVERITY_HIGH || //
-    type == MC_DEBUG_SEVERITY_MIDIUM || //
+    type == MC_DEBUG_SEVERITY_MEDIUM || //
     type == MC_DEBUG_SEVERITY_LOW || //
     type == MC_DEBUG_SEVERITY_NOTIFICATION ||//
     type == MC_DEBUG_SEVERITY_ALL; 
 
     if(!severityParamValid)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, "Invalid debug severity parameter value");
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug severity parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
     ctxtPtr->debugSeverity = 0;
 
-    for (auto i : { McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, McDebugSeverity::MC_DEBUG_SEVERITY_MIDIUM, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION }) {
+    for (auto i : { McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION }) {
         if ((severity & i) && enabled) {
             int n = trailing_zeroes(McDebugSeverity::MC_DEBUG_SEVERITY_ALL & i);
             ctxtPtr->debugSeverity = set_bit(ctxtPtr->debugSeverity, n);
@@ -1502,7 +1502,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT: { // arbitrary prec float string
 
         uint64_t allocatedBytes = 0;
-        for (int i = 0; i < (int)ccData->indexArrayMesh.numVertices * 3; ++i) {
+        for (uint32_t i = 0; i < ccData->indexArrayMesh.numVertices * 3; ++i) {
             const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
