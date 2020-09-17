@@ -98,8 +98,8 @@ namespace geom {
 
     void project_point(math::vec2& projected_point, const math::vec3& point, const math::vec3& u, const math::vec3& v)
     {
-        MCUT_ASSERT(length(u) > 0);
-        MCUT_ASSERT(length(v) > 0);
+        MCUT_ASSERT(length(u) > math::real_t(0.0));
+        MCUT_ASSERT(length(v) > math::real_t(0.0));
 
         projected_point = math::vec2(dot_product(point, u), dot_product(point, v));
     }
@@ -109,7 +109,7 @@ namespace geom {
         MCUT_ASSERT(num_vertices >= 3);
 
         span = math::vec3(0.0);
-        span_length = 0;
+        span_length = math::real_t(0.0);
 
         for (int i = 0; i < num_vertices; ++i) {
             for (int j = 0; j < i; ++j) {
@@ -130,7 +130,7 @@ namespace geom {
         math::real_t acy = a.y() - c.y();
         math::real_t bcy = b.y() - c.y();
         math::real_t result = acx * bcy - acy * bcx;
-        return (result == 0 ? 0 : (result > 0 ? 1 : -1));
+        return (result == math::real_t(0.0) ? 0 : (result > math::real_t(0.0) ? 1 : -1));
     }
 
     enum sign_t {
@@ -274,7 +274,7 @@ namespace geom {
         const math::vec3& target)
     {
         MCUT_ASSERT(!(target == source));
-        MCUT_ASSERT(length(normal) != 0);
+        MCUT_ASSERT(length(normal) != math::real_t(0.0));
 
         // Compute the t value for the directed line ab intersecting the plane
         const math::vec3 dir = target - source;
@@ -289,7 +289,7 @@ namespace geom {
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
             t = nom / denom;
             // If t in [0..1] compute and return intersection point
-            if (t >= 0.0 && t <= 1.0) {
+            if (t >= math::real_t(0.0) && t <= math::real_t(1.0)) {
                 point = source + dir * t;
                 result = true;
             }

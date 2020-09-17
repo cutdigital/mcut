@@ -1834,7 +1834,7 @@ void dispatch(output_t& output, const input_t& input)
                     lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;
 
                     if (have_point_in_polygon) {
-                        if (tparam == 0 || tparam == 1) {
+                        if (tparam == math::real_t(0.0) || tparam == math::real_t(1.0)) {
                             // NOTE: if t == 0 or t == 1, then we need to terminate with an error.
                             // This is because 1) our intersection registry formulation requires that
                             // edges completely penetrate/intersect through polygon's area. Also, 2) If any
@@ -2006,7 +2006,7 @@ void dispatch(output_t& output, const input_t& input)
 
                             const math::real_t scalar_prod = math::dot_product(face_B_plane_normal, face_A_halfedge_target_vertex - face_A_halfedge_source_vertex /*m_ihalfedge_segment.to_vector()*/);
 
-                            const bool is_reentrant = (scalar_prod < 0);
+                            const bool is_reentrant = (scalar_prod < math::real_t(0.0));
 
                             if (is_reentrant) {
                                 const bool intersection_registry_exists = pre_existing_copy != mesh_t::null_vertex(); // vertex already registered in intersection registries
@@ -8646,9 +8646,9 @@ void dispatch(output_t& output, const input_t& input)
 #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
                 unseparated_stitching_CCs.clear();
 //unseparated_stitching_CCs.erase(unseparated_stitching_CCs.begin(), unseparated_stitching_CCs.begin() + unseparated_stitching_CCs.size() - 1);
-#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 
+#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
 
-    // save meshes and dump
+                // save meshes and dump
 
                 // std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_location_t> > >
                 //int numInstancesPrev = 0; // Fragment history: an instance is a fragment containing at least one more/less polygon than all other fragments (history)

@@ -1,5 +1,5 @@
 # Originally copied from the MPPP project repository (12 Sept 2020):
-# https://raw.githubusercontent.com/bluescarni/mppp/master/cmake/Findmp%2B%2B_MPFR.cmake
+# https://raw.githubusercontent.com/bluescarni/mppp/master/cmake/Findmp%2B%2B_MPIR.cmake
 
 # Copyright (c) 2006, Laurent Montel, <montel@kde.org>
 # Copyright (c) 2008-2020 Francesco Biscani, <bluescarni@gmail.com>
@@ -28,23 +28,23 @@
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ------------------------------------------------------------------------------------------
 
-if(MCUT_MPFR_INCLUDE_DIR AND MCUT_MPFR_LIBRARY)
+if(MCUT_MPIR_INCLUDE_DIR AND MCUT_MPIR_LIBRARY)
     # Already in cache, be silent
-    set(mcut_MPFR_FIND_QUIETLY TRUE)
+    set(mcut_MPIR_FIND_QUIETLY TRUE)
 endif()
 
-find_path(MCUT_MPFR_INCLUDE_DIR NAMES mpfr.h)
-find_library(MCUT_MPFR_LIBRARY NAMES mpfr)
+find_path(MCUT_MPIR_INCLUDE_DIR NAMES mpir.h gmp.h)
+find_library(MCUT_MPIR_LIBRARY NAMES mpir)
 
 include(FindPackageHandleStandardArgs)
 
-find_package_handle_standard_args(MCUT_MPFR DEFAULT_MSG MCUT_MPFR_INCLUDE_DIR MCUT_MPFR_LIBRARY)
+find_package_handle_standard_args(MCUT_MPIR DEFAULT_MSG MCUT_MPIR_INCLUDE_DIR MCUT_MPIR_LIBRARY)
 
-mark_as_advanced(MCUT_MPFR_INCLUDE_DIR MCUT_MPFR_LIBRARY)
+mark_as_advanced(MCUT_MPIR_INCLUDE_DIR MCUT_MPIR_LIBRARY)
 
 # NOTE: this has been adapted from CMake's FindPNG.cmake.
-if(mcut_MPFR_FOUND AND NOT TARGET mcut::MPFR)
-    add_library(mcut::MPFR UNKNOWN IMPORTED)
-    set_target_properties(mcut::MPFR PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${MCUT_MPFR_INCLUDE_DIR}"
-        IMPORTED_LINK_INTERFACE_LANGUAGES "C" IMPORTED_LOCATION "${MCUT_MPFR_LIBRARY}")
+if(mcut_MPIR_FOUND AND NOT TARGET mcut::MPIR)
+    add_library(mcut::MPIR UNKNOWN IMPORTED)
+    set_target_properties(mcut::MPIR PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${MCUT_MPIR_INCLUDE_DIR}"
+        IMPORTED_LINK_INTERFACE_LANGUAGES "C" IMPORTED_LOCATION "${MCUT_MPIR_LIBRARY}")
 endif()
