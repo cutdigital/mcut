@@ -234,20 +234,20 @@ namespace math {
         std::vector<int> m_entries;
     };
 
-    real_t square_root(const real_t& number);
-    real_t absolute_value(const real_t& number);
-    sign_t sign(const real_t& number);
+    extern real_t square_root(const real_t& number);
+    extern real_t absolute_value(const real_t& number);
+    extern sign_t sign(const real_t& number);
     extern std::ostream& operator<<(std::ostream& os, const vec3& v);
     extern std::ostream& operator<<(std::ostream& os, const matrix_t& m);
     const real_t& min(const real_t& a, const real_t& b);
     const real_t& max(const real_t& a, const real_t& b);
-    bool operator==(const vec3& a, const vec3& b);
-    vec2 compwise_min(const vec2& a, const vec2& b);
-    vec3 compwise_min(const vec3& a, const vec3& b);
-    vec2 compwise_max(const vec2& a, const vec2& b);
-    vec3 compwise_max(const vec3& a, const vec3& b);
-    vec3 cross_product(const vec3& a, const vec3& b);
-    real_t dot_product(const vec3& a, const vec3& b);
+    extern bool operator==(const vec3& a, const vec3& b);
+    extern vec2 compwise_min(const vec2& a, const vec2& b);
+    extern vec3 compwise_min(const vec3& a, const vec3& b);
+    extern vec2 compwise_max(const vec2& a, const vec2& b);
+    extern vec3 compwise_max(const vec3& a, const vec3& b);
+    extern vec3 cross_product(const vec3& a, const vec3& b);
+    extern real_t dot_product(const vec3& a, const vec3& b);
 
     template <typename vector_type>
     typename math::real_t squared_length(const vector_type& v)

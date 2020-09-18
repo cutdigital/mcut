@@ -3,7 +3,7 @@
 namespace mcut {
 namespace math{
 
-    inline real_t square_root(const real_t& number)
+    real_t square_root(const real_t& number)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::sqrt(number);
@@ -14,7 +14,7 @@ namespace math{
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
-inline real_t absolute_value(const real_t& number)
+real_t absolute_value(const real_t& number)
 {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     return std::fabs(number);
@@ -26,7 +26,7 @@ inline real_t absolute_value(const real_t& number)
 }
 
 
-inline sign_t sign(const real_t& number)
+sign_t sign(const real_t& number)
 {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         int s = (real_t(0) < number) - (number < real_t(0));
@@ -66,17 +66,17 @@ inline sign_t sign(const real_t& number)
         return os;
     }
 
-    inline const real_t& min(const real_t& a, const real_t& b)
+    const real_t& min(const real_t& a, const real_t& b)
     {
         return ((b < a) ? b : a);
     }
 
-    inline const real_t& max(const real_t& a, const real_t& b)
+    const real_t& max(const real_t& a, const real_t& b)
     {
         return ((a < b) ? b : a);
     }
 
-    inline bool operator==(const vec3& a, const vec3& b)
+    bool operator==(const vec3& a, const vec3& b)
     {
         return (a.x() == b.x()) && (a.y() == b.y()) && (a.z() == b.z());
     }
