@@ -1206,18 +1206,22 @@ void dispatch(output_t& output, const input_t& input)
         return;
     }
 
+    if(input.verbose){
+        dump_mesh(sm, "src-mesh");
+    }
+
     lg << "check cut-mesh." << std::endl;
     if (check_input_mesh(cs) == false) {
         output.status = status_t::INVALID_CUT_MESH;
         return;
     }
+    if(input.verbose){
+        dump_mesh(cs, "cut-mesh");
+    }
 
     const int sm_vtx_cnt = sm.number_of_vertices();
     const int sm_face_count = sm.number_of_faces();
     const int cs_face_count = cs.number_of_faces();
-
-    dump_mesh(sm, "src-mesh");
-    dump_mesh(cs, "cut-mesh");
 
     const bool sm_is_watertight = mesh_is_closed(sm);
     lg << "src-mesh is watertight = " << sm_is_watertight << std::endl;
@@ -1260,7 +1264,11 @@ void dispatch(output_t& output, const input_t& input)
         MCUT_ASSERT(f != mesh_t::null_face());
     }
 
-    dump_mesh(ps, "polygon-soup");
+    cs_to_ps_vtx.clear(); 
+
+    if(input.verbose){
+        dump_mesh(ps, "polygon-soup");
+    }
 
     const int ps_vtx_cnt = ps.number_of_vertices();
     const int ps_face_cnt = ps.number_of_faces();
@@ -1356,7 +1364,7 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "calculate mesh bounding box" << std::endl;
 
-        geom::bounding_box_t<math::vec3> meshBbox = ps_face_bboxes.at(ps_face_bbox_centres_iter_cbegin->first); // root bounding box
+        geom::bounding_box_t<math::vec3>& meshBbox = ps_face_bboxes.at(ps_face_bbox_centres_iter_cbegin->first); // root bounding box
 
         for (std::map<fd_t, math::vec3>::const_iterator ps_face_bbox_centres_iter = ps_face_bbox_centres_iter_cbegin;
              ps_face_bbox_centres_iter != ps_face_bbox_centres_iter_cend;
@@ -1392,6 +1400,8 @@ void dispatch(output_t& output, const input_t& input)
         lg << "sort morton codes" << std::endl;
 
         bvh_leaf_nodes_array.at(mesh_name).insert(bvh_leaf_nodes_array.at(mesh_name).begin(), unsorted_morton_codes.cbegin(), unsorted_morton_codes.cend()); // copy
+
+        unsorted_morton_codes.clear(); // free
 
         std::sort(
             bvh_leaf_nodes_array.at(mesh_name).begin(),
@@ -1477,6 +1487,8 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
         lg.unindent();
     } // for each mesh BVH
+
+    ps_face_bbox_centres.clear();
 
     ///////////////////////////////////////////////////////////////////////////
     // generate BVH meshes
@@ -1677,6 +1689,10 @@ void dispatch(output_t& output, const input_t& input)
 
         oibvh_traversal_queue.pop(); // rm ct_front_node
     } while (!oibvh_traversal_queue.empty());
+
+    ps_face_bboxes.clear();
+    bvh_internal_nodes_array.clear();
+    bvh_leaf_nodes_array.clear();
 
     lg << "polygon-pairs found = " << intersecting_sm_cs_face_pairs.size() << std::endl;
 
@@ -2193,6 +2209,8 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
     } // for (std::vector<std::pair<fd_t, fd_t> >::const_iterator i = intersecting_sm_cs_face_pairs.cbegin(); i != intersecting_sm_cs_face_pairs.cend(); ++i) {
 
+    intersecting_sm_cs_face_pairs.clear(); // free
+
     if (m0_ivtx_to_ps_faces.empty()) {
         lg.set_reason_for_failure("polygons do not not intersect");
         output.status = status_t::INVALID_MESH_INTERSECTION;
@@ -2228,9 +2246,9 @@ void dispatch(output_t& output, const input_t& input)
         // can happen with case when both the input mesh and cut surface are not watertight
         lg << "note: did not find cut-surface tip re-entrant vertices." << std::endl;
     }
-
+    if(input.verbose){
     dump_mesh(m0, "m0.v"); // containing only vertices (polygon soup vertices and intersection points)
-
+    }
     if (partial_cut_detected) {
 
         MCUT_ASSERT(!cs_is_watertight);
@@ -2317,7 +2335,7 @@ void dispatch(output_t& output, const input_t& input)
     // Conversely, an interior edge lies within the polygon (path along which
     // polygon is clipped).
 
-    std::map<vd_t, std::vector<vd_t>> m0_to_m1_poly_ext_int_edge_vertex;
+    //std::map<vd_t, std::vector<vd_t>> m0_to_m1_poly_ext_int_edge_vertex;
 
     std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices_sorted; // stores ps-edges with more-than 3 coincident vertices
 
@@ -2342,7 +2360,7 @@ void dispatch(output_t& output, const input_t& input)
                 ps_edge_to_vertices_sorted.at(*iter_ps_edge).push_back(std::make_pair(*it, vertex_coordinates));
 
                 if (m0_is_intersection_point(*it, ps_vtx_cnt)) { // is intersection point
-                    m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
+                    //m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
                 }
             }
             lg << std::endl;
@@ -2350,6 +2368,8 @@ void dispatch(output_t& output, const input_t& input)
 
         lg.unindent();
     }
+
+    ps_intersecting_edges.clear();
 
     lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices_sorted.size() << std::endl;
 
@@ -2610,11 +2630,13 @@ void dispatch(output_t& output, const input_t& input)
     }
     lg.unindent();
 
+    ps_edge_to_vertices_sorted.clear(); //free
+
     // NOTE: at this stage we have all vertices ad edges which are needed to clip
     // intersecting polygon in the polygon-soup ("ps").
-
+if(input.verbose){
     dump_mesh(m0, "m0.v.e"); // containing only vertices & edges
-
+}
     ///////////////////////////////////////////////////////////////////////////
     // Find cut-paths (src-mesh openings/holes)
     ///////////////////////////////////////////////////////////////////////////
@@ -2843,6 +2865,10 @@ void dispatch(output_t& output, const input_t& input)
     // final explicit cut-path sequences
     // -----------------------------------------------------------------------
 
+    m0_cutpath_edges.clear();
+    m0_ivtx_to_disjoint_implicit_cutpath_sequence.clear();
+    m0_edge_to_disjoint_implicit_cutpath_sequence.clear();
+
     lg << "create explicit cut-path sequences" << std::endl;
 
     std::vector<std::vector<ed_t>> m0_explicit_cutpath_sequences;
@@ -3031,6 +3057,9 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
         lg.unindent();
     }
+
+    m0_ivtx_to_cutpath_edges.clear();
+    m0_implicit_cutpath_sequences.clear();
 
     lg << "total explicit cut-path sequences = " << m0_explicit_cutpath_sequences.size() << std::endl;
 
@@ -3230,6 +3259,8 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
     }
 
+    m0_explicit_cutpath_terminal_vertices.clear();
+
     int num_explicit_linear_cutpaths = 0;
     int num_explicit_circular_cutpaths = 0;
     std::vector<int> explicit_cutpaths_making_holes;
@@ -3265,6 +3296,8 @@ void dispatch(output_t& output, const input_t& input)
     lg << "total explict cutpaths severing the srcmesh = " << explicit_cutpaths_severing_srcmesh.size() << std::endl;
 
     lg.unindent(); // end of cutpath sequence detection code
+
+    m0_explicit_cutpath_sequence_to_properties.clear();
 
     // NOTE:    at this point we have all vertices, edges, and the lists of
     //          edge sequences identifying the cutpaths
@@ -4545,6 +4578,12 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
     } // for each ps-face to trace
 
+    m0_ivtx_to_ps_faces.clear(); // free
+    ps_iface_to_m0_edge_list.clear(); 
+    ps_to_m0_edges.clear();
+    ps_to_m0_non_intersecting_edge.clear();
+    ps_iface_to_ivtx_list.clear();
+
     // Note: at this stage, we have traced all polygons. This means that any intersecting face in the polygon
     // soup will also now have been clipped.
     //
@@ -4873,6 +4912,9 @@ void dispatch(output_t& output, const input_t& input)
         }
     }
 
+    cs_reg_reentrant_ivtx_list.clear(); // free
+    m0_ivtx_to_explicit_cutpath_sequence.clear();
+
     ///////////////////////////////////////////////////////////////////////////
     // Find the src-mesh polygons (next to cut) which are above and below
     ///////////////////////////////////////////////////////////////////////////
@@ -5016,6 +5058,8 @@ void dispatch(output_t& output, const input_t& input)
             }
         }
     }
+
+    sm_reg_reentrant_ivtx_list.clear();
 
     // Here, we check for the unique case in which we could not find any traced src-mesh
     // polygons along the cut path which could be identified as either "above" (outside)
@@ -5762,6 +5806,13 @@ void dispatch(output_t& output, const input_t& input)
     }
 #endif
 
+    m0_to_ps_vtx.clear();
+    ivtx_to_incoming_hlist.clear();
+    m0_sm_ihe_to_flag.clear();
+    m0_to_m1_vtx.clear();
+    m0_ox_hlist.clear();
+    m1_ivtx_to_h.clear();
+
     //
     // NOTE: at this stage, we have calculated all the vertices, edges, halfedges and meta-data
     // which describes the connectivity of the partitioned (topologically split) src-mesh along
@@ -5837,6 +5888,8 @@ void dispatch(output_t& output, const input_t& input)
         }
     }
 
+    m0_to_m1_he.clear();
+
     // NOTE: at this stage "m1_polygons" contains only src-mesh polygons.
 
     // extract the seam vertices
@@ -5863,15 +5916,17 @@ void dispatch(output_t& output, const input_t& input)
         // there will only be one element of the mesh since "unsealed_connected_components"
         // is empty before calling "extract_connected_components"
         MCUT_ASSERT(mesh_data.size() == 1);
-
+        if(input.verbose){
         dump_mesh(mesh_data.front().first, ("fragment.unsealed." + std::to_string(cc_id) + "." + to_string(mesh_data.front().second.location)).c_str());
-
+        }
         const std::pair<mesh_t, connected_component_info_t>& md = mesh_data.front();
         output_mesh_info_t omi;
         omi.mesh = md.first;
         omi.seam_vertices = std::move(md.second.seam_vertices);
         output.unsealed_cc[md.second.location].emplace_back(std::move(omi));
     }
+
+    unsealed_connected_components.clear();
 
     ///////////////////////////////////////////////////////////////////////////
     // Check if the pipeline needs to terminate at this point
@@ -5898,6 +5953,8 @@ void dispatch(output_t& output, const input_t& input)
         lg << "end" << std::endl;
         return; // exit
     }
+
+    m0_explicit_cutpath_sequences.clear(); // free, no longer needed.
 
     //lg << "finish before sealing!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
     //std::exit(0);
@@ -6021,6 +6078,8 @@ void dispatch(output_t& output, const input_t& input)
     // MapKey=color value (representing the notion of "interior"/"exterior")
     // MapValue=the mesh (copy of "m1") to which corresponding patch(es) will be stitched
     std::map<char, mesh_t> color_to_m1 = { { 'A' /*e.g. "red"*/, m1 }, { 'B' /*e.g. "blue"*/, m1 } };
+    //TODO: m1.free_data();
+
     // Patch (node) colors
     // NOTE: we use the letters 'A' and 'B' just to ensure lexicographical order
     // when we iterate over color_to_patch
@@ -6629,6 +6688,8 @@ void dispatch(output_t& output, const input_t& input)
 
     MCUT_ASSERT(!patches.empty());
 
+    primary_interior_ihalfedge_pool.clear();
+
     ///////////////////////////////////////////////////////////////////////////
     // check for further degeneracy before we proceed further
     ///////////////////////////////////////////////////////////////////////////
@@ -6982,6 +7043,8 @@ void dispatch(output_t& output, const input_t& input)
         } while (!reentrant_ivertex_queue.empty());
     } // if (partial_cut_detected) {
 
+    cs_tip_reentrant_ivtx_list.clear(); // free
+
     ///////////////////////////////////////////////////////////////////////////
     // Infer patch location based on graph coloring
     ///////////////////////////////////////////////////////////////////////////
@@ -7113,6 +7176,9 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     MCUT_ASSERT(!patch_color_label_to_location.empty());
+
+    known_exterior_cs_polygons.clear();
+    cs_poly_to_patch_idx.clear();
 
     // dump
     lg << "color label values (dye)" << std::endl;
@@ -7614,6 +7680,10 @@ void dispatch(output_t& output, const input_t& input)
         }
         lg.unindent();
     }
+
+    patch_to_floating_flag.clear(); // free
+    color_to_cw_patch.clear();
+    patch_to_opposite.clear();
 
     ///////////////////////////////////////////////////////////////////////////
     // Stitch cut-mesh patches into connected components of the src-mesh
@@ -8725,6 +8795,19 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
     } // for each color
 
+    m0_ivtx_to_ps_he.clear(); // free
+    m0_polygons.clear();
+    m0_h_to_ply.clear();
+    m0_to_m1_ihe.clear();
+    m1_polygons.clear();
+    patches.clear();
+    patch_to_seed_interior_ihalfedge_idx.clear();
+    patch_to_seed_interior_ihalfedge_idx.clear();
+    patch_to_seed_poly_idx.clear();
+    color_to_patch.clear();
+    sm_interior_cs_border_vertices.clear();
+    color_to_m0_to_m1_he_instances.clear();
+
     //
     // NOTE: At this stage, all patches of the current have been stitched
     //
@@ -8753,6 +8836,12 @@ void dispatch(output_t& output, const input_t& input)
             extract_connected_components(separated_sealed_CCs, m1_colored, m1_polygons_colored, sm_polygons_below_cs, sm_polygons_above_cs, m1_vertex_to_seam_flag);
         }
     }
+
+    sm_polygons_below_cs.clear(); // free
+    sm_polygons_above_cs.clear();
+    m1_vertex_to_seam_flag.clear();
+    color_to_m1.clear();
+    color_to_m1_polygons.clear();
 
     ///////////////////////////////////////////////////////////////////////////
     // save output and finish
@@ -8784,6 +8873,9 @@ void dispatch(output_t& output, const input_t& input)
             out_sep_CCs[cc_mesh_data.second.location][location].emplace_back(std::move(omi));
         }
     }
+
+    patch_color_label_to_location.clear(); // free
+    color_to_separated_connected_ccsponents.clear();
 
     lg << "end" << std::endl;
 
