@@ -108,7 +108,7 @@ namespace bvh { // This code has not been thoroughly tested!!!
     {
 
         const int t = num_real_leaf_nodes_in_bvh;
-        const int q = bvhNodeImplicitIndex; // queried node
+        //const int q = bvhNodeImplicitIndex; // queried node
         const int li = get_leaf_level_from_real_leaf_count(t);
         const int i = get_rightmost_real_leaf(li, t);
         const int lq = get_level_from_implicit_idx(bvhNodeImplicitIndex);

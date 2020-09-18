@@ -67,7 +67,11 @@ set ( CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set ( CMAKE_RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set ( CMAKE_LIBRARY_OUTPUT_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
-set (src_files ${CMAKE_CURRENT_SOURCE_DIR}/src/mcut.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/halfedge_mesh.cpp)
+set (src_files 	${CMAKE_CURRENT_SOURCE_DIR}/src/mcut.cpp 
+				${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp 
+				${CMAKE_CURRENT_SOURCE_DIR}/src/halfedge_mesh.cpp
+				${CMAKE_CURRENT_SOURCE_DIR}/src/math.cpp
+				${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp)
 set (library_name mcut)
 
 if (MCUT_BUILD_AS_SHARED_LIB)
@@ -94,10 +98,12 @@ endif()
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 	target_compile_options(${library_name} PRIVATE -Wall -Wextra)
+	set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp PROPERTIES COMPILE_FLAGS "-Wno-unused-but-set-variable -Wno-unused-variable")
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
 	target_compile_options(${library_name} PRIVATE -w3 -diag-disable:remark)
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
 	target_compile_options(${library_name} PRIVATE /W4)
+	set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp PROPERTIES COMPILE_FLAGS "/wd4100 /wd4189")
 	target_compile_definitions(${library_name} PRIVATE -D_CRT_SECURE_NO_WARNINGS)
 endif()
 

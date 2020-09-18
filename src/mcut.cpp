@@ -13,6 +13,12 @@
 #include <stdio.h>
 #include <string.h>
 
+// This pragma is placed here until we implement the event synch stuff.
+#if __linux__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags convertRoundingMode(int rm)
 {
@@ -62,7 +68,7 @@ int convertRoundingMode(McRoundingModeFlags rm)
 #else
 McRoundingModeFlags convertRoundingMode(mp_rnd_t rm)
 {
-    McRoundingModeFlags rmf;
+    McRoundingModeFlags rmf = MC_ROUNDING_MODE_TO_NEAREST;
     switch (rm) {
     case MPFR_RNDN:
         rmf = MC_ROUNDING_MODE_TO_NEAREST;
@@ -84,7 +90,7 @@ McRoundingModeFlags convertRoundingMode(mp_rnd_t rm)
 
 mp_rnd_t convertRoundingMode(McRoundingModeFlags rm)
 {
-    mp_rnd_t f;
+    mp_rnd_t f = MPFR_RNDN;
     switch (rm) {
     case MC_ROUNDING_MODE_TO_NEAREST:
         f = MPFR_RNDN;
@@ -166,7 +172,7 @@ struct McDispatchContextInternal {
     // debugging
     // ---------
     pfn_mcDebugOutput_CALLBACK debugCallback = nullptr;
-    void* debugCallbackUserParam = nullptr;
+    const void* debugCallbackUserParam = nullptr;
     McFlags debugSource = 0;
     McFlags debugType = 0;
     McFlags debugSeverity = 0;
@@ -403,7 +409,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
 McResult convert(const mcut::status_t& v)
 {
-    McResult result;
+    McResult result= McResult::MC_NO_ERROR;
     switch (v) {
     case mcut::status_t::SUCCESS:
         result = McResult::MC_NO_ERROR;
@@ -424,10 +430,9 @@ McResult convert(const mcut::status_t& v)
     return result;
 }
 
-McPatchLocation
-convert(const mcut::cut_surface_patch_location_t& v)
+McPatchLocation convert(const mcut::cut_surface_patch_location_t& v)
 {
-    McPatchLocation result;
+    McPatchLocation result = McPatchLocation::MC_PATCH_LOCATION_ALL;
     switch (v) {
     case mcut::cut_surface_patch_location_t::INSIDE:
         result = McPatchLocation::MC_PATCH_LOCATION_INSIDE;
@@ -446,7 +451,7 @@ convert(const mcut::cut_surface_patch_location_t& v)
 
 McFragmentLocation convert(const mcut::connected_component_location_t& v)
 {
-    McFragmentLocation result;
+    McFragmentLocation result = McFragmentLocation::MC_FRAGMENT_LOCATION_ALL;
     switch (v) {
     case mcut::connected_component_location_t::ABOVE:
         result = McFragmentLocation::MC_FRAGMENT_LOCATION_ABOVE;
@@ -599,7 +604,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     indexArrayMesh.pEdges = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numEdgeIndices]);
 
-    for (uint32_t i = 0; i < (int)gatheredEdges.size(); ++i) {
+    for (uint32_t i = 0; i < (uint32_t)gatheredEdges.size(); ++i) {
         const std::pair<mcut::vd_t, mcut::vd_t>& edge = gatheredEdges[i];
         mcut::vd_t v0 = edge.first;
         mcut::vd_t v1 = edge.second;
@@ -767,7 +772,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mc
     }
 
     ctxtPtr->debugCallback = cb;
-    ctxtPtr->debugCallbackUserParam;
+    ctxtPtr->debugCallbackUserParam = userParam;
 
     return result;
 }
@@ -784,7 +789,18 @@ int trailing_zeroes(unsigned int v)
 #ifdef _WIN32
 #pragma warning(default : 4146)
 #endif // #ifdef _WIN32
+
+// dereferencing type-punned pointer will break strict-aliasing rules
+#if __linux__ 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing" 
+#endif
+
     r = (*(uint32_t*)&f >> 23) - 0x7f;
+
+#if __linux__ 
+#pragma GCC diagnostic pop
+#endif
     return r;
 }
 
@@ -857,11 +873,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
     }
 
     // check debug severity parameter
-    bool severityParamValid = type == MC_DEBUG_SEVERITY_HIGH || //
-    type == MC_DEBUG_SEVERITY_MEDIUM || //
-    type == MC_DEBUG_SEVERITY_LOW || //
-    type == MC_DEBUG_SEVERITY_NOTIFICATION ||//
-    type == MC_DEBUG_SEVERITY_ALL; 
+    bool severityParamValid = severity == MC_DEBUG_SEVERITY_HIGH || //
+    severity == MC_DEBUG_SEVERITY_MEDIUM || //
+    severity == MC_DEBUG_SEVERITY_LOW || //
+    severity == MC_DEBUG_SEVERITY_NOTIFICATION ||//
+    severity == MC_DEBUG_SEVERITY_ALL; 
 
     if(!severityParamValid)
     {
@@ -1023,6 +1039,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(const McContext context, uint32_t
     McResult result = McResult::MC_NO_ERROR;
     return result;
 }
+
 
 MCAPI_ATTR McResult MCAPI_CALL mcFinish(const McContext context)
 {
@@ -1186,8 +1203,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
          i != backendOutput.connected_components.cend();
          ++i) {
 
-        const mcut::connected_component_location_t connected_component_location = i->first;
-
         for (std::map<mcut::cut_surface_patch_location_t, std::vector<mcut::output_mesh_info_t>>::const_iterator j = i->second.cbegin();
              j != i->second.cend();
              ++j) {
@@ -1195,7 +1210,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             //const mcut::cut_surface_patch_location_t& cut_surface_patch_location = j->first;
             const std::string cs_patch_loc_str = mcut::to_string(j->first);
 
-            int ccCounter = 0;
             for (std::vector<mcut::output_mesh_info_t>::const_iterator k = j->second.cbegin(); k != j->second.cend(); ++k) {
 
                 std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> frag = std::unique_ptr<McFragmentConnComp, void (*)(McConnCompBase*)>(new McFragmentConnComp, ccDeletorFunc<McFragmentConnComp>);
@@ -1341,7 +1355,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
         (*numConnComps) = 0;
     }
 
-    int gatheredConnCompCounter = 0;
+    uint32_t gatheredConnCompCounter = 0;
 
     for (std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>>::const_iterator i = ctxtPtr->connComps.cbegin();
          i != ctxtPtr->connComps.cend();
@@ -1775,7 +1789,7 @@ McResult MCAPI_CALL mcReleaseConnectedComponents(
 
     const std::unique_ptr<McDispatchContextInternal>& ctxtPtr = ctxtIter->second;
 
-    if (numConnComps > (int32_t)ctxtPtr->connComps.size()) {
+    if (numConnComps > (uint32_t)ctxtPtr->connComps.size()) {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of connected components");
         result = McResult::MC_INVALID_VALUE;
         return result;

@@ -34,22 +34,22 @@ face_descriptor_t mesh_t::null_face()
 // regular member functions
 // ------------------------
 
-const int mesh_t::number_of_vertices() const
+int mesh_t::number_of_vertices() const
 {
     return (int)this->m_vertices.size();
 }
 
-const int mesh_t::number_of_edges() const
+int mesh_t::number_of_edges() const
 {
     return (int)this->m_edges.size();
 }
 
-const int mesh_t::number_of_halfedges() const
+int mesh_t::number_of_halfedges() const
 {
     return (int)this->m_halfedges.size();
 }
 
-const int mesh_t::number_of_faces() const
+int mesh_t::number_of_faces() const
 {
     return (int)this->m_faces.size();
 }

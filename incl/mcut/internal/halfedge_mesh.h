@@ -249,13 +249,13 @@ public:
     // regular member functions
     // ------------------------
 
-    const int number_of_vertices() const;
+     int number_of_vertices() const;
 
-    const int number_of_edges() const;
+     int number_of_edges() const;
 
-    const int number_of_halfedges() const;
+     int number_of_halfedges() const;
 
-    const int number_of_faces() const;
+    int number_of_faces() const;
 
     vertex_descriptor_t source(const halfedge_descriptor_t& h) const;
 

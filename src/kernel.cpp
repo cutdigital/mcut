@@ -353,7 +353,7 @@ mesh_t extract_connected_components(
          traced_sm_polygon_iter != traced_polygons.cend();
          ++traced_sm_polygon_iter) {
 
-        const int polygon_idx = (int)std::distance(traced_polygons.cbegin(), traced_sm_polygon_iter);
+        //const int polygon_idx = (int)std::distance(traced_polygons.cbegin(), traced_sm_polygon_iter);
         const std::vector<hd_t>& traced_polygon = *traced_sm_polygon_iter;
 
         //
@@ -1208,7 +1208,7 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "check cut-mesh." << std::endl;
     if (check_input_mesh(cs) == false) {
-        output.status = status_t::INVALID_SRC_MESH;
+        output.status = status_t::INVALID_CUT_MESH;
         return;
     }
 
@@ -1493,7 +1493,7 @@ void dispatch(output_t& output, const input_t& input)
             const std::vector<geom::bounding_box_t<math::vec3>>& internal_nodes_array = mesh_bvh_iter->second;
             const std::vector<std::pair<fd_t, unsigned int>>& leaf_nodes_array = bvh_leaf_nodes_array.at(mesh_name);
             const int real_leaf_node_count = (int)leaf_nodes_array.size();
-            const int bvh_real_node_count = bvh::get_ostensibly_implicit_bvh_size(real_leaf_node_count);
+            //const int bvh_real_node_count = bvh::get_ostensibly_implicit_bvh_size(real_leaf_node_count);
             const int leaf_level_index = bvh::get_leaf_level_from_real_leaf_count(real_leaf_node_count);
 
             mesh_t bvh_mesh;
@@ -3788,16 +3788,15 @@ void dispatch(output_t& output, const input_t& input)
                 // Note: The minimum possible number of interior halfedges necessary to
                 // apply filtering is 3. ** think 2-teeth concave polygon where both teeth
                 // are partially cut , as shown below:
-                /*   
-                    _     _
-                   / \   / \
-                  /*-*--*-*\
-                 /    \/   \
-                |          |  <-- two-teeth concave polygon
-                ------------
-
-                the asterisk represents intersection vertices
-                */
+                //   
+                //    _     _
+                //   / \   / \.
+                //  /*-*--*-*\.
+                // /    \/   \.
+                //|          |  <-- two-teeth concave polygon
+                //------------
+                //
+                //the asterisk represents intersection vertices
 
                 bool apply_filtering = iedge_set.size() >= 3;
 
@@ -4599,7 +4598,7 @@ void dispatch(output_t& output, const input_t& input)
     // dump traced polygons only if the cut paths are circular or complete linear cuts (prevents us
     // from violating halfedge construction rules, which would happen otherwise)
     bool all_cutpaths_are_circular = (num_explicit_circular_cutpaths == num_explicit_cutpath_sequences);
-    bool all_cutpaths_linear_and_without_making_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == num_explicit_linear_cutpaths);
+    bool all_cutpaths_linear_and_without_making_holes = (num_explicit_circular_cutpaths == 0) && ((int)explicit_cutpaths_severing_srcmesh.size() == num_explicit_linear_cutpaths);
 
     if (cs_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_without_making_holes)) {
 
@@ -6152,7 +6151,7 @@ void dispatch(output_t& output, const input_t& input)
                 const hd_t pool_elem_poly_he_opp = m0.opposite(pool_elem_poly_he);
                 vd_t s = m0.source(pool_elem_poly_he_opp);
                 vd_t t = m0.target(pool_elem_poly_he_opp);
-                const bool is_ihalfedge = m0_is_intersection_point(s, ps_vtx_cnt) || m0_is_intersection_point(t, ps_vtx_cnt);
+                //const bool is_ihalfedge = m0_is_intersection_point(s, ps_vtx_cnt) || m0_is_intersection_point(t, ps_vtx_cnt);
                 //
                 // We are now going to find the cut-mesh polygon which is traced with "pool_elem_poly_he_opp"
                 //
@@ -6648,7 +6647,7 @@ void dispatch(output_t& output, const input_t& input)
              color_to_ccw_patches_iter != color_to_patch.cend();
              ++color_to_ccw_patches_iter) {
 
-            const char color_label = color_to_ccw_patches_iter->first;
+            //const char color_label = color_to_ccw_patches_iter->first;
             const std::vector<int>& colored_patches = color_to_ccw_patches_iter->second;
 
             // for each patch
@@ -8051,15 +8050,20 @@ void dispatch(output_t& output, const input_t& input)
                             // get the "m0" polygons which are traced with the "next" halfedge
                             const std::vector<int>& m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
                             // get reference to src-mesn polygon which is traced with "next" halfedge
-                            const std::vector<int>::const_iterator find_iter = std::find_if(
+                            //const std::vector<int>::const_iterator find_iter = std::find_if(
+                            //    m0_poly_he_coincident_polys.cbegin(),
+                            //    m0_poly_he_coincident_polys.cend(),
+                            //    [&](const int& e) {
+                            //        return (e < traced_sm_polygon_count); // match with src-mesn polygon
+                            //    });
+
+                            // "next" is always incident to a src-mesh polygon
+                            MCUT_ASSERT(std::find_if(
                                 m0_poly_he_coincident_polys.cbegin(),
                                 m0_poly_he_coincident_polys.cend(),
                                 [&](const int& e) {
                                     return (e < traced_sm_polygon_count); // match with src-mesn polygon
-                                });
-
-                            // "next" is always incident to a src-mesh polygon
-                            MCUT_ASSERT(find_iter != m0_poly_he_coincident_polys.cend());
+                                }) != m0_poly_he_coincident_polys.cend());
 
                             //
                             // At this point, we have found the adjacent connected component which is
@@ -8703,8 +8707,7 @@ void dispatch(output_t& output, const input_t& input)
                     // keep only the last (most up-to-date) copy
                     incremental_instances.erase(incremental_instances.cbegin(), incremental_instances.cbegin() + incremental_instances.size() - 1);
                 }
-#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING \
-    //}
+#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 
 
                 ++global_cs_poly_stitch_counter;
                 stitched_poly_counter++;
@@ -8740,7 +8743,7 @@ void dispatch(output_t& output, const input_t& input)
              ++color_to_separated_CCs_iter) {
 
             const char color_label = color_to_separated_CCs_iter->first;
-            const cut_surface_patch_location_t location = patch_color_label_to_location.at(color_label);
+            //const cut_surface_patch_location_t location = patch_color_label_to_location.at(color_label);
             std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>& separated_sealed_CCs = color_to_separated_CCs_iter->second;
 
             mesh_t& m1_colored = color_to_m1.at(color_label);
@@ -8766,7 +8769,7 @@ void dispatch(output_t& output, const input_t& input)
              cc_iter != separated_sealed_CCs.cend();
              ++cc_iter) {
 
-            const int cc_id = (int)cc_iter->first;
+            //const int cc_id = (int)cc_iter->first;
             const std::vector<std::pair<mesh_t, connected_component_info_t>>& cc_instances = cc_iter->second;
             const std::pair<mesh_t, connected_component_info_t>& cc_mesh_data = cc_instances.back(); // last element is the final version which is copy with all polygons stitched
 
