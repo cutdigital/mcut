@@ -34,7 +34,7 @@ if(MCUT_MPIR_INCLUDE_DIR AND MCUT_MPIR_LIBRARY)
 endif()
 
 find_path(MCUT_MPIR_INCLUDE_DIR NAMES mpir.h gmp.h)
-find_library(MCUT_MPIR_LIBRARY NAMES mpir)
+find_library(MCUT_MPIR_LIBRARY NAMES mpir gmp)
 
 include(FindPackageHandleStandardArgs)
 
