@@ -223,13 +223,14 @@ static mpfr_prec_t defaultPrecision;
             // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
-        if (roundingMode != defaultRoundingMode) {
+        // MPFR uses global state which could be potentially polluted other libraries/apps using MCUT
+        //if (roundingMode != defaultRoundingMode) {
             mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(roundingMode));
-        }
+        //}
 
-        if (precision != defaultPrecision) {
+        //if (precision != defaultPrecision) {
             mcut::math::high_precision_float_t::set_default_precision(precision);
-        }
+        //}
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
@@ -245,13 +246,13 @@ static mpfr_prec_t defaultPrecision;
             // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
-        if (roundingMode != defaultRoundingMode) {
+       // if (roundingMode != defaultRoundingMode) {
             mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(defaultRoundingMode));
-        }
+        //}
 
-        if (precision != defaultPrecision) {
+       // if (precision != defaultPrecision) {
             mcut::math::high_precision_float_t::set_default_precision(defaultPrecision);
-        }
+       // }
 #endif
     }
 };
@@ -1175,9 +1176,25 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     // cut!
     // ----
     {
+        /*
+            "Writers of libraries using MPFR should be aware that the application and/or another library
+            used by the application may also use MPFR, so that changing the exponent range, the default
+            precision, or the default rounding mode may have an effect on this other use of MPFR since
+            these data are not duplicated (unless they are in a different thread). Therefore any such value
+            changed in a library function should be restored before the function returns (unless the purpose
+            of the function is to do such a change). Writers of software using MPFR should also be careful
+            when changing such a value if they use a library using MPFR (directly or indirectly), in order
+            to make sure that such a change is compatible with the library."
+
+        */
+       try{
         ctxtPtr->applyPrecisionAndRoundingModeSettings();
         mcut::dispatch(backendOutput, backendInput);
-        ctxtPtr->revertPrecisionAndRoundingModeSettings();
+       }
+       catch(...){
+        throw;
+       }
+       ctxtPtr->revertPrecisionAndRoundingModeSettings();
     }
 
     result = convert(backendOutput.status);
@@ -1314,6 +1331,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh);
     }
+
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+// for the caches and pools, in all threads where MPFR is potentially used
+    mpfr_mp_memory_cleanup();
+#endif
 
     return result;
 }
