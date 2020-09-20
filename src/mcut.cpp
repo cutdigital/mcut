@@ -194,22 +194,21 @@ struct McDispatchContextInternal {
 
     // defaults
     static McRoundingModeFlags defaultRoundingMode;
-    #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     static uint64_t defaultPrecision;
     static const uint64_t minPrecision;
     static const uint64_t maxPrecision;
     uint64_t precision = defaultPrecision;
-    #else
-static mpfr_prec_t defaultPrecision;
+#else
+    static mpfr_prec_t defaultPrecision;
     static const mpfr_prec_t minPrecision;
     static const mpfr_prec_t maxPrecision;
     mpfr_prec_t precision = defaultPrecision;
-    #endif
+#endif
 
     // user values
 
     McRoundingModeFlags roundingMode = defaultRoundingMode;
-    
 
     void applyPrecisionAndRoundingModeSettings()
     {
@@ -225,11 +224,11 @@ static mpfr_prec_t defaultPrecision;
 #else
         // MPFR uses global state which could be potentially polluted other libraries/apps using MCUT
         //if (roundingMode != defaultRoundingMode) {
-            mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(roundingMode));
+        mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(roundingMode));
         //}
 
         //if (precision != defaultPrecision) {
-            mcut::math::high_precision_float_t::set_default_precision(precision);
+        mcut::math::high_precision_float_t::set_default_precision(precision);
         //}
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
@@ -246,13 +245,13 @@ static mpfr_prec_t defaultPrecision;
             // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
-       // if (roundingMode != defaultRoundingMode) {
-            mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(defaultRoundingMode));
+        // if (roundingMode != defaultRoundingMode) {
+        mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(defaultRoundingMode));
         //}
 
-       // if (precision != defaultPrecision) {
-            mcut::math::high_precision_float_t::set_default_precision(defaultPrecision);
-       // }
+        // if (precision != defaultPrecision) {
+        mcut::math::high_precision_float_t::set_default_precision(defaultPrecision);
+        // }
 #endif
     }
 };
@@ -410,7 +409,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
 McResult convert(const mcut::status_t& v)
 {
-    McResult result= McResult::MC_NO_ERROR;
+    McResult result = McResult::MC_NO_ERROR;
     switch (v) {
     case mcut::status_t::SUCCESS:
         result = McResult::MC_NO_ERROR;
@@ -792,14 +791,14 @@ int trailing_zeroes(unsigned int v)
 #endif // #ifdef _WIN32
 
 // dereferencing type-punned pointer will break strict-aliasing rules
-#if __linux__ 
+#if __linux__
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing" 
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
 
     r = (*(uint32_t*)&f >> 23) - 0x7f;
 
-#if __linux__ 
+#if __linux__
 #pragma GCC diagnostic pop
 #endif
     return r;
@@ -834,11 +833,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     // check source parameter
     bool sourceParamValid = source == MC_DEBUG_SOURCE_API || //
-    source == MC_DEBUG_SOURCE_KERNEL || //
-    source == MC_DEBUG_SOURCE_ALL; 
+        source == MC_DEBUG_SOURCE_KERNEL || //
+        source == MC_DEBUG_SOURCE_ALL;
 
-    if(!sourceParamValid)
-    {
+    if (!sourceParamValid) {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid source parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
@@ -853,12 +851,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     // check debug type parameter
     bool typeParamValid = type == MC_DEBUG_TYPE_ERROR || //
-    type == MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR || //
-    type == MC_DEBUG_TYPE_OTHER || //
-    type == MC_DEBUG_TYPE_ALL; 
+        type == MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR || //
+        type == MC_DEBUG_TYPE_OTHER || //
+        type == MC_DEBUG_TYPE_ALL;
 
-    if(!typeParamValid)
-    {
+    if (!typeParamValid) {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug type parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
@@ -875,13 +872,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     // check debug severity parameter
     bool severityParamValid = severity == MC_DEBUG_SEVERITY_HIGH || //
-    severity == MC_DEBUG_SEVERITY_MEDIUM || //
-    severity == MC_DEBUG_SEVERITY_LOW || //
-    severity == MC_DEBUG_SEVERITY_NOTIFICATION ||//
-    severity == MC_DEBUG_SEVERITY_ALL; 
+        severity == MC_DEBUG_SEVERITY_MEDIUM || //
+        severity == MC_DEBUG_SEVERITY_LOW || //
+        severity == MC_DEBUG_SEVERITY_NOTIFICATION || //
+        severity == MC_DEBUG_SEVERITY_ALL;
 
-    if(!severityParamValid)
-    {
+    if (!severityParamValid) {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug severity parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
@@ -1041,7 +1037,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(const McContext context, uint32_t
     return result;
 }
 
-
 MCAPI_ATTR McResult MCAPI_CALL mcFinish(const McContext context)
 {
     McResult result = McResult::MC_NO_ERROR;
@@ -1068,15 +1063,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #define DEMO_BUILD 0 // comment out for full build
 
 #if defined(DEMO_BUILD)
-    if(numSrcMeshFaces > 16 || numCutMeshVertices > 16)
-    {
-        std::fprintf(stdout, 
-        "===============================================================\n"
-        "Thanks for using MCUT. This demo has been restricted to meshes \n"
-        "with 16 vertices.\n"
-        "Please email contact@cut-digital.com for more information about\n"
-        "obtaining a commercial licence for this product.\n"
-        "================================================================\n");
+    if (numSrcMeshFaces > 16 || numCutMeshVertices > 16) {
+        std::fprintf(stdout,
+            "===============================================================\n"
+            "Thanks for using MCUT. This demo has been restricted to meshes \n"
+            "with 16 vertices.\n"
+            "Please email contact@cut-digital.com for more information about\n"
+            "obtaining a commercial licence for this product.\n"
+            "================================================================\n");
         return McResult::MC_NO_ERROR;
     }
 #endif
@@ -1187,14 +1181,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             to make sure that such a change is compatible with the library."
 
         */
-       try{
-        ctxtPtr->applyPrecisionAndRoundingModeSettings();
-        mcut::dispatch(backendOutput, backendInput);
-       }
-       catch(...){
-        throw;
-       }
-       ctxtPtr->revertPrecisionAndRoundingModeSettings();
+        try {
+            ctxtPtr->applyPrecisionAndRoundingModeSettings();
+            mcut::dispatch(backendOutput, backendInput);
+        } catch (...) {
+            throw;
+        }
+        ctxtPtr->revertPrecisionAndRoundingModeSettings();
     }
 
     result = convert(backendOutput.status);
@@ -1333,7 +1326,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
 #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-// for the caches and pools, in all threads where MPFR is potentially used
+    // for the caches and pools, in all threads where MPFR is potentially used
     mpfr_mp_memory_cleanup();
 #endif
 
@@ -1569,7 +1562,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
                 const std::string val_ = std::to_string(val) + " ";
 #else
-            const std::string val_ = val.to_string() + " ";
+                const std::string val_ = val.to_string() + " ";
 #endif
                 if (byteOffset + val_.length() > bytes) {
                     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
