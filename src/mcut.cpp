@@ -1065,15 +1065,15 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const McEvent* waitlist,
     McEvent* event)
 {
-//#define DEMO_BUILD 1 // comment out for full build
+#define DEMO_BUILD 0 // comment out for full build
 
 #if defined(DEMO_BUILD)
-    if(numSrcMeshFaces > 4 || numCutMeshVertices > 4)
+    if(numSrcMeshFaces > 16 || numCutMeshVertices > 16)
     {
         std::fprintf(stdout, 
         "===============================================================\n"
         "Thanks for using MCUT. This demo has been restricted to meshes \n"
-        "with 3 or 4 vertices.\n"
+        "with 16 vertices.\n"
         "Please email contact@cut-digital.com for more information about\n"
         "obtaining a commercial licence for this product.\n"
         "================================================================\n");
