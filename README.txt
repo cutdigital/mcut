@@ -23,3 +23,17 @@ arithmetic libraries (lib/fp) are faster but more susceptible to numerical error
 Both options are generally robust.   
 
 For more information, visit the project page: https://cutdigital.github.io/
+
+===============================================================================
+
+A SUMMARY OF HOW TO USE MCUT IN YOUR PROJECT
+
+This is what you must do in your C or C++ project:
+
+1. Include the file "include/mcut/mcut.h"
+2. Link against one of the provided library files.
+
+For more information on using the API, refer to the documentation and examples.
+    - documentation: https://github.com/cutdigital/mcut-docs/
+    - examples:
+        * tutorials: https://cutdigital.github.io/

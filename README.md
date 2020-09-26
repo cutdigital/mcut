@@ -30,3 +30,9 @@ Copyright (c) 2020- CutDigital Ltd
 For a list of CMake variables (e.g. MCUT target library path), see the topmatter of `mcut/CMakeLists.txt`.
 
 The public headers are provided separately from this project. They can be downloaded [here](https://github.com/cutdigital/mcut-headers.git).
+
+# Using CMake to create a release package
+
+* `cd build`
+* `cmake --install ./package-test --prefix ./ --config Release -DMCUT_INCLUDE_DIR=/home/floyd/mcut-headers ..`
+    - Make sure mcut-headers are up-to-date
