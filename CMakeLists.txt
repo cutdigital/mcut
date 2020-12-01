@@ -1,8 +1,6 @@
 #
-# You must provide the following variable:
-#	MCUT_INCLUDE_DIR - the MCUT include directory
-#
 # This script will define the following cache variables:
+#	MCUT_INCLUDE_DIR - the MCUT include directory
 # 	MCUT_APPROX_MATH_SHARED_LIB_PATH - path to the MCUT shared library (machine precision)
 #   MCUT_APPROX_MATH_STATIC_LIB_PATH - path to the MCUT static library (machine precision)
 # 	MCUT_EXACT_SHARED_LIB_PATH - path to the MCUT shared library (exact precision)
@@ -15,63 +13,57 @@ project(mcut LANGUAGES CXX C)
 set ( DESCRIPTION "2-manifold surface-mesh cutting library." )
 
 if(NOT CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE Release CACHE STRING
-		"Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-	FORCE)
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose build type (None Debug Release RelWithDebInfo MinSizeRel)." FORCE)
 endif()
 
+# ... location of mpfr and mpir (gmp) search modules
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# ### NOTE: *** Adjust VERSION when required ***
-# read 'version' file into a variable (stripping any newlines or spaces)
-file(READ ${CMAKE_CURRENT_SOURCE_DIR}/VERSION.txt versionFile)
-
-if (NOT versionFile)
-    message(FATAL_ERROR "Unable to determine version. RELEASE_VERSON file is missing.")
-endif()
-
-string(STRIP "${versionFile}" VERSION_STRING)
-string(REPLACE "." ";" VERSION_LIST ${VERSION_STRING})
-
-list (GET VERSION_LIST 0 MCUT_MAJOR)
-list (GET VERSION_LIST 1 MCUT_MINOR)
-list (GET VERSION_LIST 2 MCUT_PATCH)
+set(MCUT_MAJOR 1)
+set(MCUT_MINOR 0)
+set(MCUT_PATCH 0)
 
 set( MCUT_VERSION "${MCUT_MAJOR}.${MCUT_MINOR}.${MCUT_PATCH}" )
 
-message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
-message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
-message(STATUS "MCUT version: ${MCUT_VERSION}")
-
-if(NOT DEFINED MCUT_INCLUDE_DIR)
-	message(SEND_ERROR "MCUT_INCLUDE_DIR unspecified")
-endif()
+message(STATUS "[MCUT] version: ${MCUT_VERSION}")
 
 set (CMAKE_CXX_STANDARD 11)
 set (CMAKE_CXX_STANDARD_REQUIRED True)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set (project_API_version_string 1)
-set (project_build_version_string "1.0")
+
+set (project_API_version_string "${MCUT_VERSION}")
+set (project_build_version_string "${MCUT_VERSION}")
 set (project_namespace_name MCUT)
-set (approx_math_shared_lib_name mcut_shared_approx)
-set (approx_math_static_lib_name mcut_static_approx)
-set (exact_math_shared_lib_name mcut_shared_exact)
-set (exact_math_static_lib_name mcut_static_exact)
 
-list(APPEND include_dirs ${CMAKE_CURRENT_SOURCE_DIR}/incl ${MCUT_INCLUDE_DIR})
+option(ENABLE_ARBITRARY_PRECISION_LIB "Build the arbitrary precision library as well" OFF) # OFF by default
 
-#
-# MPFR
-#
-if (MSVC)
-	find_package(MCUT_MPIR REQUIRED) # GMP
-endif()
+# machine-precision-numbers library targets
+set (mpn_shared_lib_name mcut_shared)
+set (mpn_static_lib_name mcut_static)
 
-find_package(MCUT_MPFR REQUIRED)
+# arbitrary-precision-numbers library targets
+if(ENABLE_ARBITRARY_PRECISION_LIB)
+	set (apn_shared_lib_name mcut_shared_exact)
+	set (apn_static_lib_name mcut_static_exact)
 
-list(APPEND include_dirs ${MCUT_MPFR_INCLUDE_DIR} ${MCUT_MPIR_INCLUDE_DIR})
-list(APPEND extra_libs ${MCUT_MPFR_LIBRARY} ${MCUT_MPIR_LIBRARY})
-list(APPEND compilation_flags ${MCUT_MPFR_LIBRARY} ${MCUT_MPIR_LIBRARY})
+	#
+	# find MPFR & MPIR
+	#
+	if (MSVC)
+		message(STATUS "[MCUT] searching for MPIR in system environment")
+		find_package(MCUT_MPIR REQUIRED) # GMP
+	endif()
+
+	find_package(MCUT_MPFR REQUIRED)
+
+	list(APPEND include_dirs ${MCUT_MPFR_INCLUDE_DIR} ${MCUT_MPIR_INCLUDE_DIR}) 
+	list(APPEND extra_libs ${MCUT_MPFR_LIBRARY} ${MCUT_MPIR_LIBRARY}) 
+endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
+
+set (MCUT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
+list(APPEND compilation_flags "")
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 	list(APPEND compilation_flags -Wall -Wextra)
@@ -86,14 +78,14 @@ endif()
 # disable redandant warnings for kernel.cpp
 #
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-	set(kernel_dot_cpp_flags "-Wno-unused-but-set-variable -Wno-unused-variable")
+	set(kernel_source_file_flags "-Wno-unused-but-set-variable -Wno-unused-variable")
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
 	# pass
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
-	set(kernel_dot_cpp_flags "/wd4100 /wd4189")
+	set(kernel_source_file_flags "/wd4100 /wd4189")
 endif()
 
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp PROPERTIES COMPILE_FLAGS ${kernel_dot_cpp_flags})
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp PROPERTIES COMPILE_FLAGS ${kernel_source_file_flags})
 
 set (	project_source_files  
 		${CMAKE_CURRENT_SOURCE_DIR}/src/mcut.cpp 
@@ -102,8 +94,9 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/src/math.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp)
 
+# This function invokes commands which create a library target (static, shared etc.)
 function(create_library_target LIBRARY_TARGET_NAME LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF OUTPUT_FILENAME)
-    message(STATUS "create target: name=${LIBRARY_TARGET_NAME} type=${LIBRARY_TYPE}")
+    message(STATUS "[MCUT] create target: name=${LIBRARY_TARGET_NAME} type=${LIBRARY_TYPE}")
 	
 	add_library(${LIBRARY_TARGET_NAME} ${LIBRARY_TYPE} ${project_source_files})
 
@@ -127,32 +120,36 @@ function(create_library_target LIBRARY_TARGET_NAME LIBRARY_TYPE ARBITRARY_PRECIS
 endfunction()
 
 #
-# approximate math libraries
+# machine-precision numbers builds
 #
-create_library_target(${approx_math_shared_lib_name} SHARED "" mcut-fp) # fixed precision
-create_library_target(${approx_math_static_lib_name} STATIC "" mcut-fp)
+create_library_target(${mpn_shared_lib_name} SHARED "" mcut) 
+create_library_target(${mpn_static_lib_name} STATIC "" mcut)
 
-set (MCUT_APPROX_MATH_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${approx_math_shared_lib_name}>)
-set (MCUT_APPROX_MATH_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${approx_math_static_lib_name}>)
+set (MCUT_APPROX_MATH_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_shared_lib_name}>)
+set (MCUT_APPROX_MATH_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_lib_name}>)
 
 #
-# exact math libraries
+# arbitrary-precision numbers builds
 #
-create_library_target(${exact_math_shared_lib_name} SHARED ${exact_math_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut)
-create_library_target(${exact_math_static_lib_name} STATIC ${exact_math_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut)
+if(ENABLE_ARBITRARY_PRECISION_LIB)
+	create_library_target(${apn_shared_lib_name} SHARED ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
+	create_library_target(${apn_static_lib_name} STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
 
-set (MCUT_EXACT_MATH_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${exact_math_shared_lib_name}>)
-set (MCUT_EXACT_MATH_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${exact_math_static_lib_name}>)
+	set (MCUT_EXACT_MATH_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_shared_lib_name}>)
+	set (MCUT_EXACT_MATH_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_static_lib_name}>)
 
-message(STATUS "MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
-message(STATUS "MCUT_APPROX_MATH_SHARED_LIB_PATH=${MCUT_APPROX_MATH_SHARED_LIB_PATH}")
-message(STATUS "MCUT_APPROX_MATH_STATIC_LIB_PATH=${MCUT_APPROX_MATH_STATIC_LIB_PATH}")
-message(STATUS "MCUT_EXACT_MATH_SHARED_LIB_PATH=${MCUT_EXACT_MATH_SHARED_LIB_PATH}")
-message(STATUS "MCUT_EXACT_MATH_STATIC_LIB_PATH=${MCUT_EXACT_MATH_STATIC_LIB_PATH}")
-message(STATUS "MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
-message(STATUS "MCUT_MPFR_LIBRARY=${MCUT_MPFR_LIBRARY}")
-message(STATUS "MCUT_MPIR_INCLUDE_DIR=${MCUT_MPIR_INCLUDE_DIR}")
-message(STATUS "MCUT_MPIR_LIBRARY=${MCUT_MPIR_LIBRARY}")
+	message(STATUS "[MCUT] MCUT_EXACT_MATH_SHARED_LIB_PATH=${MCUT_EXACT_MATH_SHARED_LIB_PATH}")
+	message(STATUS "[MCUT] MCUT_EXACT_MATH_STATIC_LIB_PATH=${MCUT_EXACT_MATH_STATIC_LIB_PATH}")
+	message(STATUS "[MCUT] MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
+	message(STATUS "[MCUT] MCUT_MPFR_LIBRARY=${MCUT_MPFR_LIBRARY}")
+	message(STATUS "[MCUT] MCUT_MPIR_INCLUDE_DIR=${MCUT_MPIR_INCLUDE_DIR}")
+	message(STATUS "[MCUT] MCUT_MPIR_LIBRARY=${MCUT_MPIR_LIBRARY}")
+
+endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
+
+message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
+message(STATUS "[MCUT] MCUT_APPROX_MATH_SHARED_LIB_PATH=${MCUT_APPROX_MATH_SHARED_LIB_PATH}")
+message(STATUS "[MCUT] MCUT_APPROX_MATH_STATIC_LIB_PATH=${MCUT_APPROX_MATH_STATIC_LIB_PATH}")
 
 
 ########################################################
@@ -165,32 +162,37 @@ message(STATUS "MCUT_MPIR_LIBRARY=${MCUT_MPIR_LIBRARY}")
 # https://gitlab.kitware.com/cmake/community/-/wikis/doc/cpack/Component-Install-With-CPack
 # https://stackoverflow.com/questions/6003374/what-is-cmake-equivalent-of-configure-prefix-dir-make-all-install
 
+#
 # static libs
+#
+if(ENABLE_ARBITRARY_PRECISION_LIB)
+	install(TARGETS ${apn_static_lib_name} 
+			ARCHIVE
+			DESTINATION lib/apn/static
+			COMPONENT static_libraries)
+endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
 
-install(TARGETS ${exact_math_static_lib_name} 
+install(TARGETS ${mpn_static_lib_name}
 		ARCHIVE
-		DESTINATION lib/exact/static
+		DESTINATION lib/mpn/static
 		COMPONENT static_libraries)
-
-install(TARGETS ${approx_math_static_lib_name}
-		ARCHIVE
-		DESTINATION lib/fp/static
-		COMPONENT static_libraries)
-
+#
 # dynamic libs
+#
+if(ENABLE_ARBITRARY_PRECISION_LIB)
+	install(TARGETS ${apn_shared_lib_name}
+			LIBRARY
+			DESTINATION lib/apn/shared
+			COMPONENT dynamic_libraries)
+endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
 
-install(TARGETS ${exact_math_shared_lib_name}
+install(TARGETS ${mpn_shared_lib_name}
 		LIBRARY
-		DESTINATION lib/exact/shared
+		DESTINATION lib/mpn/shared
 		COMPONENT dynamic_libraries)
-
-install(TARGETS ${approx_math_shared_lib_name}
-		LIBRARY
-		DESTINATION lib/fp/shared
-		COMPONENT dynamic_libraries)
-
+#
 # headers
-
+#
 install(FILES ${MCUT_INCLUDE_DIR}/mcut/mcut.h ${MCUT_INCLUDE_DIR}/mcut/platform.h
   		DESTINATION include/mcut
 	  	COMPONENT headers)
@@ -199,12 +201,13 @@ install(FILES
 		${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION.txt 
 		${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt
 		${CMAKE_CURRENT_SOURCE_DIR}/README.txt
-		${CMAKE_CURRENT_SOURCE_DIR}/VERSION.txt
 		${CMAKE_CURRENT_SOURCE_DIR}/CHANGELOG.txt
 		DESTINATION ./
 		COMPONENT text_files)
 
+#
 # notify CPack of the names of all of the components in the project
+#
 set(CPACK_COMPONENTS_ALL static_libraries dynamic_libraries headers text_files) # applications
 
 set(CPACK_COMPONENT_APPLICATIONS_DISPLAY_NAME "MCUT Application")
@@ -221,7 +224,9 @@ set(CPACK_COMPONENT_STATIC_LIBRARIES_DESCRIPTION
 set(CPACK_COMPONENT_HEADERS_DESCRIPTION
   "C/C++ header files for use with MCUT")
 
+#  
 # component dependencies
+#
 set(CPACK_COMPONENT_HEADERS_DEPENDS static_libraries dynamic_libraries)
 
 set(CPACK_COMPONENT_APPLICATIONS_GROUP "Runtime")
