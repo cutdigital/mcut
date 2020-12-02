@@ -1,4 +1,27 @@
-#pragma once
+/**
+ * Copyright (c) 2020-2021 CutDigital Ltd.
+ * All rights reserved.
+ * 
+ * NOTE: This file is licensed under GPL-3.0-or-later (default). 
+ * A commercial license can be purchased from CutDigital Ltd. 
+ *  
+ * License details:
+ * 
+ * (A)  GNU General Public License ("GPL"); a copy of which you should have 
+ *      recieved with this file.
+ * 	    - see also: <http://www.gnu.org/licenses/>
+ * (B)  Commercial license.
+ *      - email: contact@cut-digital.com
+ * 
+ * The commercial license options is for users that wish to use MCUT in 
+ * their products for comercial purposes but do not wish to release their 
+ * software products under the GPL license. 
+ * 
+ * Author(s)     : Floyd M. Chitalu
+ */
+
+#ifndef MCUT_HALFEDGE_MESH_H_
+#define MCUT_HALFEDGE_MESH_H_
 
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
@@ -343,3 +366,5 @@ void write_off(const char* fpath, const mcut::mesh_t& mesh);
 void read_off(mcut::mesh_t& mesh, const char* fpath);
 
 } // namespace mcut
+
+#endif // #ifndef MCUT_HALFEDGE_MESH_H_

@@ -1,38 +1,29 @@
  
-/***************************************************************************
- *
- *  Copyright (C) 2020 - CutDigital Software Limited.
- *  File is licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- *  CutDigital's MCUT headers
- *
- *  mcut.h
- *
- *  Description:
- *    The applications programming interface (API) providing access to  
- *    MCUT library features.
- *
- * Authors:
- *
- *    Floyd M. Chitalu   CutDigital Software Ltd.
- *
- **************************************************************************/
-
+/**
+ * Copyright (c) 2020-2021 CutDigital Ltd.
+ * All rights reserved.
+ * 
+ * NOTE: This file is licensed under GPL-3.0-or-later (default). 
+ * A commercial license can be purchased from CutDigital Ltd. 
+ *  
+ * License details:
+ * 
+ * (A)  GNU General Public License ("GPL"); a copy of which you should have 
+ *      recieved with this file.
+ * 	    - see also: <http://www.gnu.org/licenses/>
+ * (B)  Commercial license.
+ *      - email: contact@cut-digital.com
+ * 
+ * The commercial license options is for users that wish to use MCUT in 
+ * their products for comercial purposes but do not wish to release their 
+ * software products under the GPL license. 
+ * 
+ * Author(s)     : Floyd M. Chitalu
+ */
 /**
  * @file mcut.h
  * @author Floyd M. Chitalu
- * @date 4 Sep 2020
+ * @date 1 Jan 2021
  * 
  * @brief File containing the MCUT applications programming interface (API).
  * 

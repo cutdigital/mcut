@@ -1,8 +1,8 @@
 #
 # This script will define the following cache variables:
 #	MCUT_INCLUDE_DIR - the MCUT include directory
-# 	MCUT_APPROX_MATH_SHARED_LIB_PATH - path to the MCUT shared library (machine precision)
-#   MCUT_APPROX_MATH_STATIC_LIB_PATH - path to the MCUT static library (machine precision)
+# 	MCUT_SHARED_LIB_PATH - path to the MCUT shared library (machine precision)
+#   MCUT_STATIC_LIB_PATH - path to the MCUT static library (machine precision)
 # 	MCUT_EXACT_SHARED_LIB_PATH - path to the MCUT shared library (exact precision)
 #   MCUT_EXACT_STATIC_LIB_PATH - path to the MCUT static library (exact precision)
 
@@ -35,16 +35,16 @@ set (project_API_version_string "${MCUT_VERSION}")
 set (project_build_version_string "${MCUT_VERSION}")
 set (project_namespace_name MCUT)
 
-option(ENABLE_ARBITRARY_PRECISION_LIB "Build the arbitrary precision library as well" OFF) # OFF by default
+option(ENABLE_ARBITRARY_PRECISION_LIB "Build the arbitrary precision library as well" ON) # OFF by default
 
 # machine-precision-numbers library targets
-set (mpn_shared_lib_name mcut_shared)
-set (mpn_static_lib_name mcut_static)
+set (mpn_shared_lib_name mcut-shared)
+set (mpn_static_lib_name mcut-static)
 
 # arbitrary-precision-numbers library targets
 if(ENABLE_ARBITRARY_PRECISION_LIB)
-	set (apn_shared_lib_name mcut_shared_exact)
-	set (apn_static_lib_name mcut_static_exact)
+	set (apn_shared_lib_name mcut-shared-exact)
+	set (apn_static_lib_name mcut-static-exact)
 
 	#
 	# find MPFR & MPIR
@@ -85,14 +85,15 @@ elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
 	set(kernel_source_file_flags "/wd4100 /wd4189")
 endif()
 
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp PROPERTIES COMPILE_FLAGS ${kernel_source_file_flags})
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp PROPERTIES COMPILE_FLAGS ${kernel_source_file_flags})
 
 set (	project_source_files  
-		${CMAKE_CURRENT_SOURCE_DIR}/src/mcut.cpp 
-		${CMAKE_CURRENT_SOURCE_DIR}/src/kernel.cpp 
-		${CMAKE_CURRENT_SOURCE_DIR}/src/halfedge_mesh.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/src/math.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/source/mcut.cpp 
+		${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp 
+		${CMAKE_CURRENT_SOURCE_DIR}/source/halfedge_mesh.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/math.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/geom.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/number.cpp)
 
 # This function invokes commands which create a library target (static, shared etc.)
 function(create_library_target LIBRARY_TARGET_NAME LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF OUTPUT_FILENAME)
@@ -125,8 +126,8 @@ endfunction()
 create_library_target(${mpn_shared_lib_name} SHARED "" mcut) 
 create_library_target(${mpn_static_lib_name} STATIC "" mcut)
 
-set (MCUT_APPROX_MATH_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_shared_lib_name}>)
-set (MCUT_APPROX_MATH_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_lib_name}>)
+set (MCUT_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_shared_lib_name}>)
+set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_lib_name}>)
 
 #
 # arbitrary-precision numbers builds
@@ -135,11 +136,11 @@ if(ENABLE_ARBITRARY_PRECISION_LIB)
 	create_library_target(${apn_shared_lib_name} SHARED ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
 	create_library_target(${apn_static_lib_name} STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
 
-	set (MCUT_EXACT_MATH_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_shared_lib_name}>)
-	set (MCUT_EXACT_MATH_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_static_lib_name}>)
+	set (MCUT_APN_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_shared_lib_name}>)
+	set (MCUT_APN_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_static_lib_name}>)
 
-	message(STATUS "[MCUT] MCUT_EXACT_MATH_SHARED_LIB_PATH=${MCUT_EXACT_MATH_SHARED_LIB_PATH}")
-	message(STATUS "[MCUT] MCUT_EXACT_MATH_STATIC_LIB_PATH=${MCUT_EXACT_MATH_STATIC_LIB_PATH}")
+	message(STATUS "[MCUT] MCUT_APN_SHARED_LIB_PATH=${MCUT_APN_SHARED_LIB_PATH}")
+	message(STATUS "[MCUT] MCUT_APN_STATIC_LIB_PATH=${MCUT_APN_STATIC_LIB_PATH}")
 	message(STATUS "[MCUT] MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
 	message(STATUS "[MCUT] MCUT_MPFR_LIBRARY=${MCUT_MPFR_LIBRARY}")
 	message(STATUS "[MCUT] MCUT_MPIR_INCLUDE_DIR=${MCUT_MPIR_INCLUDE_DIR}")
@@ -148,8 +149,8 @@ if(ENABLE_ARBITRARY_PRECISION_LIB)
 endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
 
 message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
-message(STATUS "[MCUT] MCUT_APPROX_MATH_SHARED_LIB_PATH=${MCUT_APPROX_MATH_SHARED_LIB_PATH}")
-message(STATUS "[MCUT] MCUT_APPROX_MATH_STATIC_LIB_PATH=${MCUT_APPROX_MATH_STATIC_LIB_PATH}")
+message(STATUS "[MCUT] MCUT_SHARED_LIB_PATH=${MCUT_SHARED_LIB_PATH}")
+message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
 
 
 ########################################################
@@ -244,7 +245,7 @@ set (CPACK_PACKAGE_VERSION_MAJOR "${MCUT_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${MCUT_MINOR}")
 set (CPACK_PACKAGE_VERSION_PATCH "${MCUT_PATCH}")
 #set (CPACK_PACKAGE_DESCRIPTION "MCUT (pronounced ‘emcut’) is a tool for cutting meshes.")
-set (CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION.txt)
+#set (CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION.txt)
 set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "MCUT (pronounced ‘emcut’) is a tool for cutting meshes.")
 set (CPACK_PACKAGE_HOMEPAGE_URL "https://cutdigital.github.io/")
 set (CPACK_PACKAGE_INSTALL_DIRECTORY ${CPACK_PACKAGE_NAME})

@@ -1,6 +1,5 @@
 MCUT Version History
 =======================
 
-Version 1.0.0 - 25 September 2020 (initial release)
-    - Added headers 
-    - Added library files with exact ("libmcut.*"), and approximate ("libmcut-fp.*") geometric predicates.
+Version 1.0.0 - 01 January 2021 (initial release)
+    - initial 
