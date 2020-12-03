@@ -1,3 +1,28 @@
+# Copyright (c) 2020-2021 CutDigital Ltd.
+# All rights reserved.
+# 
+# NOTE: This file is licensed under GPL-3.0-or-later (default). 
+# A commercial license can be purchased from CutDigital Ltd. 
+#  
+# License details:
+# 
+# (A)  GNU General Public License ("GPL"); a copy of which you should have 
+#      recieved with this file.
+# 	    - see also: <http://www.gnu.org/licenses/>
+# (B)  Commercial license.
+#      - email: contact@cut-digital.com
+# 
+# The commercial license options is for users that wish to use MCUT in 
+# their products for comercial purposes but do not wish to release their 
+# software products under the GPL license. 
+# 
+# Author(s)     : Floyd M. Chitalu
+#
+############################################################################################
+#
+# You can configure MCUT with the following options:
+#	MCUT_BUILD_THE_DOCS - Configure to build docs with Doxygen
+#	MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB - Build the arbitrary precision library as well
 #
 # This script will define the following cache variables:
 #	MCUT_INCLUDE_DIR - the MCUT include directory
@@ -35,14 +60,18 @@ set (project_API_version_string "${MCUT_VERSION}")
 set (project_build_version_string "${MCUT_VERSION}")
 set (project_namespace_name MCUT)
 
-option(ENABLE_ARBITRARY_PRECISION_LIB "Build the arbitrary precision library as well" ON) # OFF by default
+#
+# User options
+#
+option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by default
+option(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB "Build the arbitrary precision library as well" OFF) # OFF by default
 
 # machine-precision-numbers library targets
 set (mpn_shared_lib_name mcut-shared)
 set (mpn_static_lib_name mcut-static)
 
 # arbitrary-precision-numbers library targets
-if(ENABLE_ARBITRARY_PRECISION_LIB)
+if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 	set (apn_shared_lib_name mcut-shared-exact)
 	set (apn_static_lib_name mcut-static-exact)
 
@@ -58,7 +87,7 @@ if(ENABLE_ARBITRARY_PRECISION_LIB)
 
 	list(APPEND include_dirs ${MCUT_MPFR_INCLUDE_DIR} ${MCUT_MPIR_INCLUDE_DIR}) 
 	list(APPEND extra_libs ${MCUT_MPFR_LIBRARY} ${MCUT_MPIR_LIBRARY}) 
-endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
+endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 
 set (MCUT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -132,7 +161,7 @@ set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_
 #
 # arbitrary-precision numbers builds
 #
-if(ENABLE_ARBITRARY_PRECISION_LIB)
+if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 	create_library_target(${apn_shared_lib_name} SHARED ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
 	create_library_target(${apn_static_lib_name} STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
 
@@ -146,12 +175,35 @@ if(ENABLE_ARBITRARY_PRECISION_LIB)
 	message(STATUS "[MCUT] MCUT_MPIR_INCLUDE_DIR=${MCUT_MPIR_INCLUDE_DIR}")
 	message(STATUS "[MCUT] MCUT_MPIR_LIBRARY=${MCUT_MPIR_LIBRARY}")
 
-endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
+endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 
 message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 message(STATUS "[MCUT] MCUT_SHARED_LIB_PATH=${MCUT_SHARED_LIB_PATH}")
 message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
 
+#
+# documentation
+#
+find_package(Doxygen)
+
+if (DOXYGEN_FOUND)
+    # set input and output files
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
+    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+    # request to configure the file
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+    message("[MCUT] Doxygen build started")
+
+    # note the option ALL which allows to build the docs together with the application
+    add_custom_target( doc_doxygen ALL
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "[MCUT] Generating API documentation with Doxygen"
+        VERBATIM )
+else (DOXYGEN_FOUND)
+  message("[MCUT] Doxygen needs to be installed to generate the doxygen documentation")
+endif (DOXYGEN_FOUND)
 
 ########################################################
 ###                   PACKAGING                      ###
@@ -163,15 +215,17 @@ message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
 # https://gitlab.kitware.com/cmake/community/-/wikis/doc/cpack/Component-Install-With-CPack
 # https://stackoverflow.com/questions/6003374/what-is-cmake-equivalent-of-configure-prefix-dir-make-all-install
 
+# TODO: package documentation files
+
 #
 # static libs
 #
-if(ENABLE_ARBITRARY_PRECISION_LIB)
+if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 	install(TARGETS ${apn_static_lib_name} 
 			ARCHIVE
 			DESTINATION lib/apn/static
 			COMPONENT static_libraries)
-endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
+endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 
 install(TARGETS ${mpn_static_lib_name}
 		ARCHIVE
@@ -180,12 +234,12 @@ install(TARGETS ${mpn_static_lib_name}
 #
 # dynamic libs
 #
-if(ENABLE_ARBITRARY_PRECISION_LIB)
+if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 	install(TARGETS ${apn_shared_lib_name}
 			LIBRARY
 			DESTINATION lib/apn/shared
 			COMPONENT dynamic_libraries)
-endif() # if(ENABLE_ARBITRARY_PRECISION_LIB)
+endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 
 install(TARGETS ${mpn_shared_lib_name}
 		LIBRARY
@@ -247,13 +301,13 @@ set (CPACK_PACKAGE_VERSION_PATCH "${MCUT_PATCH}")
 #set (CPACK_PACKAGE_DESCRIPTION "MCUT (pronounced ‘emcut’) is a tool for cutting meshes.")
 #set (CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION.txt)
 set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "MCUT (pronounced ‘emcut’) is a tool for cutting meshes.")
-set (CPACK_PACKAGE_HOMEPAGE_URL "https://cutdigital.github.io/")
+set (CPACK_PACKAGE_HOMEPAGE_URL "https://mcut.github.io/")
 set (CPACK_PACKAGE_INSTALL_DIRECTORY ${CPACK_PACKAGE_NAME})
 # set (CPACK_PACKAGE_ICON ) 
 set (CPACK_PACKAGE_CHECKSUM SHA256)
 #set (CPACK_PROJECT_CONFIG_FILE ) 
 set (CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt) # must also include in install command
-set (CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.txt)
+set (CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 #set (CPACK_RESOURCE_FILE_WELCOME ${CMAKE_CURRENT_SOURCE_DIR}/WELCOME.txt)
 
 if (WIN32)
