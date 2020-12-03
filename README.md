@@ -2,7 +2,7 @@
 
 _A simple & robust mesh cutting library_ 
 
-Documentation, tutorial and instructions at https://mcut.github.io.
+Documentation, tutorial and instructions at https://cutdigital.github.io/mcut.github.io/.
 
 ## Example
 
