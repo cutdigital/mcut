@@ -11,15 +11,16 @@
  * (A)  GNU General Public License ("GPL"); a copy of which you should have 
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
+ * 
  * (B)  Commercial license.
  *      - email: contact@cut-digital.com
  * 
- * The commercial license options is for users that wish to use MCUT in 
+ * The commercial license option is for users that wish to use MCUT in 
  * their products for comercial purposes but do not wish to release their 
  * software products under the GPL license. 
  * 
- * Author(s)     : Floyd M. Chitalu
  */
+
 /**
  * @file mcut.h
  * @author Floyd M. Chitalu
@@ -28,9 +29,7 @@
  * @brief File containing the MCUT applications programming interface (API).
  * 
  * NOTE: This header file defines all the functionality and accessible features of MCUT.
- * The interface is a standard C API, which is simple and without unnecesary 
- * features. The MCUT API headers are designed to work with all released MCUT 
- * versions.  
+ * The interface is a standard C API.  
  * 
  */
 
