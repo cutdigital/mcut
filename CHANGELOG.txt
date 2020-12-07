@@ -1,5 +1,0 @@
-MCUT Version History
-=======================
-
-Version 1.0.0 - 01 January 2021 (initial release)
-    - initial 

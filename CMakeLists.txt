@@ -20,11 +20,15 @@
 #
 ############################################################################################
 #
-# You can configure MCUT with the following options:
-#	MCUT_BUILD_THE_DOCS - Configure to build docs with Doxygen
-#	MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB - Build the arbitrary precision library as well
+# You can configure MCUT with the following CMake options:
+#
+#	MCUT_BUILD_AS_SHARED_LIB - Build MCUT as a shared/dynamic library (.so/.dll).
+#	MCUT_BUILD_THE_DOCS - Build documentation (explicit dependancy on Doxygen)
+#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS - Build using arbitrary precision numbers (explicit dependancy on MPFR).
+#	MCUT_BUILD_TESTS - Build the tests (implicit dependancy on GoogleTest)
 #
 # This script will define the following cache variables:
+#
 #	MCUT_INCLUDE_DIR - the MCUT include directory
 # 	MCUT_SHARED_LIB_PATH - path to the MCUT shared library (machine precision)
 #   MCUT_STATIC_LIB_PATH - path to the MCUT static library (machine precision)
@@ -64,15 +68,22 @@ set (project_namespace_name MCUT)
 # User options
 #
 option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by default
-option(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB "Build the arbitrary precision library as well" OFF) # OFF by default
+option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" ON)
+option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
+option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
 
+#
 # machine-precision-numbers library targets
+#
 set (mpn_shared_lib_name mcut-shared)
 set (mpn_static_lib_name mcut-static)
 
-# arbitrary-precision-numbers library targets
-if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
-	set (apn_shared_lib_name mcut-shared-exact)
+#
+# arbitrary-precision-numbers library target & dependencies
+#
+if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+	
+set (apn_shared_lib_name mcut-shared-exact)
 	set (apn_static_lib_name mcut-static-exact)
 
 	#
@@ -87,9 +98,14 @@ if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
 
 	list(APPEND include_dirs ${MCUT_MPFR_INCLUDE_DIR} ${MCUT_MPIR_INCLUDE_DIR}) 
 	list(APPEND extra_libs ${MCUT_MPFR_LIBRARY} ${MCUT_MPIR_LIBRARY}) 
-endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
+endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 
+#
+# MCUT compilation variables/settings
+#
 set (MCUT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 
 list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
 list(APPEND compilation_flags "")
@@ -103,9 +119,10 @@ elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
 	list(APPEND preprocessor_defs _CRT_SECURE_NO_WARNINGS)
 endif()
 
-#
+message(STATUS "[MCUT] compilation_flags=${compilation_flags}")
+message(STATUS "[MCUT] preprocessor_defs=${preprocessor_defs}")
+
 # disable redandant warnings for kernel.cpp
-#
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 	set(kernel_source_file_flags "-Wno-unused-but-set-variable -Wno-unused-variable")
 elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
@@ -123,6 +140,10 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/source/math.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/geom.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/number.cpp)
+
+#
+# Create MCUT target(s)
+#
 
 # This function invokes commands which create a library target (static, shared etc.)
 function(create_library_target LIBRARY_TARGET_NAME LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF OUTPUT_FILENAME)
@@ -149,61 +170,72 @@ function(create_library_target LIBRARY_TARGET_NAME LIBRARY_TYPE ARBITRARY_PRECIS
 	endif()
 endfunction()
 
-#
-# machine-precision numbers builds
-#
-create_library_target(${mpn_shared_lib_name} SHARED "" mcut) 
-create_library_target(${mpn_static_lib_name} STATIC "" mcut)
+if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+	#
+	# arbitrary-precision numbers builds
+	#
+	if(MCUT_BUILD_AS_SHARED_LIB)
+		create_library_target(${apn_shared_lib_name} SHARED ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
+		set (MCUT_APN_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_shared_lib_name}>)
+		message(STATUS "[MCUT] MCUT_APN_SHARED_LIB_PATH=${MCUT_APN_SHARED_LIB_PATH}")
+	else()
+		create_library_target(${apn_static_lib_name} STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 libmcut-exact)
+		set (MCUT_APN_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_static_lib_name}>)
+		message(STATUS "[MCUT] MCUT_APN_STATIC_LIB_PATH=${MCUT_APN_STATIC_LIB_PATH}")
+	endif()
 
-set (MCUT_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_shared_lib_name}>)
-set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_lib_name}>)
-
-#
-# arbitrary-precision numbers builds
-#
-if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
-	create_library_target(${apn_shared_lib_name} SHARED ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
-	create_library_target(${apn_static_lib_name} STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
-
-	set (MCUT_APN_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_shared_lib_name}>)
-	set (MCUT_APN_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_static_lib_name}>)
-
-	message(STATUS "[MCUT] MCUT_APN_SHARED_LIB_PATH=${MCUT_APN_SHARED_LIB_PATH}")
-	message(STATUS "[MCUT] MCUT_APN_STATIC_LIB_PATH=${MCUT_APN_STATIC_LIB_PATH}")
 	message(STATUS "[MCUT] MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
 	message(STATUS "[MCUT] MCUT_MPFR_LIBRARY=${MCUT_MPFR_LIBRARY}")
 	message(STATUS "[MCUT] MCUT_MPIR_INCLUDE_DIR=${MCUT_MPIR_INCLUDE_DIR}")
 	message(STATUS "[MCUT] MCUT_MPIR_LIBRARY=${MCUT_MPIR_LIBRARY}")
+else()
+	#
+	# machine-precision numbers builds
+	#
+	if(MCUT_BUILD_AS_SHARED_LIB)
+		create_library_target(${mpn_shared_lib_name} SHARED "" mcut) 
+		set (MCUT_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_shared_lib_name}>)
+		message(STATUS "[MCUT] MCUT_SHARED_LIB_PATH=${MCUT_SHARED_LIB_PATH}")
+	else()
+		create_library_target(${mpn_static_lib_name} STATIC "" libmcut)
+		set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_lib_name}>)
+		message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
+	endif()
+endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 
-endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
-
-message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
-message(STATUS "[MCUT] MCUT_SHARED_LIB_PATH=${MCUT_SHARED_LIB_PATH}")
-message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
+#
+# tests
+#
+if(MCUT_BUILD_TESTS)
+	add_subdirectory(tests)
+endif()
 
 #
 # documentation
 #
-find_package(Doxygen)
 
-if (DOXYGEN_FOUND)
-    # set input and output files
-    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
-    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+if(MCUT_BUILD_THE_DOCS)
+	find_package(Doxygen)
 
-    # request to configure the file
-    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-    message("[MCUT] Doxygen build started")
+	if (DOXYGEN_FOUND)
+		# set input and output files
+		set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
+		set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 
-    # note the option ALL which allows to build the docs together with the application
-    add_custom_target( doc_doxygen ALL
-        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "[MCUT] Generating API documentation with Doxygen"
-        VERBATIM )
-else (DOXYGEN_FOUND)
-  message("[MCUT] Doxygen needs to be installed to generate the doxygen documentation")
-endif (DOXYGEN_FOUND)
+		# request to configure the file
+		configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+		message("[MCUT] Doxygen build started")
+
+		# note the option ALL which allows to build the docs together with the application
+		add_custom_target( doc_doxygen ALL
+			COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+			COMMENT "[MCUT] Generating API documentation with Doxygen"
+			VERBATIM )
+	else (DOXYGEN_FOUND)
+		message("[MCUT] Doxygen needs to be installed to generate the doxygen documentation")
+	endif (DOXYGEN_FOUND)
+endif()
 
 ########################################################
 ###                   PACKAGING                      ###
@@ -217,34 +249,38 @@ endif (DOXYGEN_FOUND)
 
 # TODO: package documentation files
 
-#
-# static libs
-#
-if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
-	install(TARGETS ${apn_static_lib_name} 
-			ARCHIVE
-			DESTINATION lib/apn/static
-			COMPONENT static_libraries)
-endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
+if(MCUT_BUILD_AS_SHARED_LIB)
+	#
+	# dynamic libs
+	#
+	if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+		install(TARGETS ${apn_shared_lib_name}
+				LIBRARY
+				DESTINATION lib/apn/shared
+				COMPONENT dynamic_libraries)
+	else()
+		install(TARGETS ${mpn_shared_lib_name}
+				LIBRARY
+				DESTINATION lib/mpn/shared
+				COMPONENT dynamic_libraries)
+	endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+else()
+	#
+	# static libs
+	#
+	if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+		install(TARGETS ${apn_static_lib_name} 
+				ARCHIVE
+				DESTINATION lib/apn/static
+				COMPONENT static_libraries)
+	else()
+		install(TARGETS ${mpn_static_lib_name}
+				ARCHIVE
+				DESTINATION lib/mpn/static
+				COMPONENT static_libraries)
+	endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+endif()
 
-install(TARGETS ${mpn_static_lib_name}
-		ARCHIVE
-		DESTINATION lib/mpn/static
-		COMPONENT static_libraries)
-#
-# dynamic libs
-#
-if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
-	install(TARGETS ${apn_shared_lib_name}
-			LIBRARY
-			DESTINATION lib/apn/shared
-			COMPONENT dynamic_libraries)
-endif() # if(MCUT_BUILD_ARBITRARY_PRECISION_NUMBERS_LIB)
-
-install(TARGETS ${mpn_shared_lib_name}
-		LIBRARY
-		DESTINATION lib/mpn/shared
-		COMPONENT dynamic_libraries)
 #
 # headers
 #
@@ -253,10 +289,8 @@ install(FILES ${MCUT_INCLUDE_DIR}/mcut/mcut.h ${MCUT_INCLUDE_DIR}/mcut/platform.
 	  	COMPONENT headers)
 	  
 install(FILES 
-		${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION.txt 
 		${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt
-		${CMAKE_CURRENT_SOURCE_DIR}/README.txt
-		${CMAKE_CURRENT_SOURCE_DIR}/CHANGELOG.txt
+		${CMAKE_CURRENT_SOURCE_DIR}/README.md
 		DESTINATION ./
 		COMPONENT text_files)
 
