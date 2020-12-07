@@ -26,6 +26,7 @@
 #	MCUT_BUILD_THE_DOCS - Build documentation (explicit dependancy on Doxygen)
 #	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS - Build using arbitrary precision numbers (explicit dependancy on MPFR).
 #	MCUT_BUILD_TESTS - Build the tests (implicit dependancy on GoogleTest)
+#	MCUT_BUILD_TUTORIALS - Build tutorials
 #
 # This script will define the following cache variables:
 #
@@ -68,23 +69,20 @@ set (project_namespace_name MCUT)
 # User options
 #
 option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by default
-option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" ON)
+option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" OFF)
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
-option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
+option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
+option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 
 #
 # machine-precision-numbers library targets
 #
-set (mpn_shared_lib_name mcut-shared)
-set (mpn_static_lib_name mcut-static)
+set (target_name mcut)
 
 #
 # arbitrary-precision-numbers library target & dependencies
 #
 if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
-	
-set (apn_shared_lib_name mcut-shared-exact)
-	set (apn_static_lib_name mcut-static-exact)
 
 	#
 	# find MPFR & MPIR
@@ -146,26 +144,25 @@ set (	project_source_files
 #
 
 # This function invokes commands which create a library target (static, shared etc.)
-function(create_library_target LIBRARY_TARGET_NAME LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF OUTPUT_FILENAME)
-    message(STATUS "[MCUT] create target: name=${LIBRARY_TARGET_NAME} type=${LIBRARY_TYPE}")
+function(create_library_target LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF)
+    message(STATUS "[MCUT] create target: name=${target_name} type=${LIBRARY_TYPE}")
 	
-	add_library(${LIBRARY_TARGET_NAME} ${LIBRARY_TYPE} ${project_source_files})
+	add_library(${target_name} ${LIBRARY_TYPE} ${project_source_files})
 
-	target_include_directories(${LIBRARY_TARGET_NAME} PRIVATE ${include_dirs})
-	target_link_libraries(${LIBRARY_TARGET_NAME} PRIVATE ${extra_libs})
-	target_compile_options(${LIBRARY_TARGET_NAME} PRIVATE ${compilation_flags})
-	target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE ${preprocessor_defs} ${ARBITRARY_PRECISION_NUMBERS_DEF})
+	target_include_directories(${target_name} PRIVATE ${include_dirs})
+	target_link_libraries(${target_name} PRIVATE ${extra_libs})
+	target_compile_options(${target_name} PRIVATE ${compilation_flags})
+	target_compile_definitions(${target_name} PRIVATE ${preprocessor_defs} ${ARBITRARY_PRECISION_NUMBERS_DEF})
 
-	set_property(TARGET ${LIBRARY_TARGET_NAME} PROPERTY VERSION ${project_build_version_string})
-	set_property(TARGET ${LIBRARY_TARGET_NAME} PROPERTY SOVERSION ${project_API_version_string})
-	set_property(TARGET ${LIBRARY_TARGET_NAME} PROPERTY OUTPUT_NAME ${OUTPUT_FILENAME})
+	set_property(TARGET ${target_name} PROPERTY VERSION ${project_build_version_string})
+	set_property(TARGET ${target_name} PROPERTY SOVERSION ${project_API_version_string})
 
-	get_target_property(target_type ${LIBRARY_TARGET_NAME} TYPE)
+	get_target_property(target_type ${target_name} TYPE)
 
 	if (target_type STREQUAL "SHARED")
-		set_property(TARGET ${LIBRARY_TARGET_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
+		set_property(TARGET ${target_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 		if(MSVC)
-			set_property(TARGET ${LIBRARY_TARGET_NAME} PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS ON)
+			set_property(TARGET ${target_name} PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS ON)
 		endif()
 	endif()
 endfunction()
@@ -175,12 +172,12 @@ if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 	# arbitrary-precision numbers builds
 	#
 	if(MCUT_BUILD_AS_SHARED_LIB)
-		create_library_target(${apn_shared_lib_name} SHARED ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 mcut-exact)
-		set (MCUT_APN_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_shared_lib_name}>)
+		create_library_target(SHARED MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 )
+		set (MCUT_APN_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
 		message(STATUS "[MCUT] MCUT_APN_SHARED_LIB_PATH=${MCUT_APN_SHARED_LIB_PATH}")
 	else()
-		create_library_target(${apn_static_lib_name} STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 libmcut-exact)
-		set (MCUT_APN_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${apn_static_lib_name}>)
+		create_library_target(STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1)
+		set (MCUT_APN_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
 		message(STATUS "[MCUT] MCUT_APN_STATIC_LIB_PATH=${MCUT_APN_STATIC_LIB_PATH}")
 	endif()
 
@@ -193,12 +190,12 @@ else()
 	# machine-precision numbers builds
 	#
 	if(MCUT_BUILD_AS_SHARED_LIB)
-		create_library_target(${mpn_shared_lib_name} SHARED "" mcut) 
-		set (MCUT_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_shared_lib_name}>)
+		create_library_target(SHARED "") 
+		set (MCUT_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
 		message(STATUS "[MCUT] MCUT_SHARED_LIB_PATH=${MCUT_SHARED_LIB_PATH}")
 	else()
-		create_library_target(${mpn_static_lib_name} STATIC "" libmcut)
-		set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${mpn_static_lib_name}>)
+		create_library_target(STATIC "")
+		set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
 		message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
 	endif()
 endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -213,30 +210,16 @@ endif()
 #
 # documentation
 #
-
 if(MCUT_BUILD_THE_DOCS)
-	find_package(Doxygen)
-
-	if (DOXYGEN_FOUND)
-		# set input and output files
-		set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
-		set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-
-		# request to configure the file
-		configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-		message("[MCUT] Doxygen build started")
-
-		# note the option ALL which allows to build the docs together with the application
-		add_custom_target( doc_doxygen ALL
-			COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-			COMMENT "[MCUT] Generating API documentation with Doxygen"
-			VERBATIM )
-	else (DOXYGEN_FOUND)
-		message("[MCUT] Doxygen needs to be installed to generate the doxygen documentation")
-	endif (DOXYGEN_FOUND)
+	add_subdirectory(docs)
 endif()
 
+#
+# Tutorials
+#
+if(MCUT_BUILD_TUTORIALS)
+	add_subdirectory(tutorials)
+endif()
 ########################################################
 ###                   PACKAGING                      ###
 ### This is a quite INCOMPLETE set of variables that ###
