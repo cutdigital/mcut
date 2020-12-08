@@ -68,7 +68,7 @@ macro(package_add_test TESTNAME test_source_files use_exact_lib)
     
     # link the Google test infrastructure, mocking library, and a default main function to
     # the test executable.  Remove g_test_main if writing your own main function.
-    list(APPEND linked_libs gtest gmock gtest_main offLoad)
+    list(APPEND linked_libs gtest gmock gtest_main offLoad mcut)
 
     if(use_exact_lib)
         list(APPEND linked_libs ${apn_static_lib_name})
