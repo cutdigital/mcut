@@ -890,6 +890,7 @@ vd_t resolve_intersection_point_descriptor(
     return resolved_inst;
 };
 
+#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 std::vector<vd_t> insert_bounding_box_mesh(mesh_t& bvh_mesh, const geom::bounding_box_t<math::fast_vec3>& bbox)
 {
     math::fast_vec3 dim2 = ((bbox.maximum() - bbox.minimum()) / 2.0);
@@ -951,6 +952,7 @@ std::vector<vd_t> insert_bounding_box_mesh(mesh_t& bvh_mesh, const geom::boundin
     MCUT_ASSERT(f5 != mesh_t::null_face());
     return v;
 }
+#endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
 bool check_input_mesh(const mesh_t& m)
 {
