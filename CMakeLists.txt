@@ -72,7 +72,7 @@ option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by 
 option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" OFF)
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
-option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
+option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" OFF)
 
 #
 # machine-precision-numbers library targets
