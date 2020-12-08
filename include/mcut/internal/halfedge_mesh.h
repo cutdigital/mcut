@@ -311,9 +311,14 @@ public:
 
     vertex_descriptor_t add_vertex(const math::vec3& point);
 
-    vertex_descriptor_t add_vertex(const math::real_t& x, const math::real_t& y, const math::real_t& z);
+    vertex_descriptor_t add_vertex(const math::fast_vec3& point);
 
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+    vertex_descriptor_t add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z);
+
+    
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+    
+#else
     vertex_descriptor_t add_vertex(const char* x, const char* y, const char* z);
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);

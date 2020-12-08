@@ -36,9 +36,14 @@
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
 
+// This macro enables dumping to the log information about meshes that are
+// dumped to file via "dump_mesh(...)"
 #ifndef MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
+
+// This macro for BVH-debugging purposes but can be excruciatingly slow when using exact numbers.
+// #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
 
 namespace mcut {
 
@@ -677,7 +682,7 @@ bool have_same_coordinate(
     bool is_duplicate = false;
     for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator i = bin_vertices_sorted.begin(); i != bin_vertices_sorted.end(); ++i) {
         const math::vec3& vertex_i_coordinates = i->second;
-        const math::real_t vertex_i_coordinate = vertex_i_coordinates[coordinate_index];
+        const math::real_number_t vertex_i_coordinate = vertex_i_coordinates[coordinate_index];
         bool vertex_i_coordinate_is_duplicate = false;
 
         for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator j = bin_vertices_sorted.begin(); j != bin_vertices_sorted.end(); ++j) {
@@ -686,7 +691,7 @@ bool have_same_coordinate(
             }
 
             const math::vec3& vertex_j_coordinates = j->second;
-            const math::real_t vertex_j_coordinate = vertex_j_coordinates[coordinate_index];
+            const math::real_number_t vertex_j_coordinate = vertex_j_coordinates[coordinate_index];
             vertex_i_coordinate_is_duplicate = (vertex_i_coordinate == vertex_j_coordinate);
 
             if (vertex_i_coordinate_is_duplicate) {
@@ -885,36 +890,36 @@ vd_t resolve_intersection_point_descriptor(
     return resolved_inst;
 };
 
-std::vector<vd_t> insert_bounding_box_mesh(mesh_t& bvh_mesh, const geom::bounding_box_t<math::vec3>& bbox)
+std::vector<vd_t> insert_bounding_box_mesh(mesh_t& bvh_mesh, const geom::bounding_box_t<math::fast_vec3>& bbox)
 {
-    math::vec3 dim2((bbox.maximum() - bbox.minimum()) / 2.0);
-    math::vec3 back_bottom_left(-dim2.x(), -dim2.y(), -dim2.z());
-    math::vec3 shift = (bbox.minimum() - back_bottom_left);
-    math::vec3 front_bl = (math::vec3(-dim2.x(), -dim2.y(), dim2.z()) + shift);
-    math::vec3 front_br = (math::vec3(dim2.x(), -dim2.y(), dim2.z()) + shift);
-    math::vec3 front_tr = (math::vec3(dim2.x(), dim2.y(), dim2.z()) + shift);
-    math::vec3 front_tl = (math::vec3(-dim2.x(), dim2.y(), dim2.z()) + shift);
-    math::vec3 back_bl = (back_bottom_left + shift);
-    math::vec3 back_br = (math::vec3(dim2.x(), -dim2.y(), -dim2.z()) + shift);
-    math::vec3 back_tr = (math::vec3(dim2.x(), dim2.y(), -dim2.z()) + shift);
-    math::vec3 back_tl = (math::vec3(-dim2.x(), dim2.y(), -dim2.z()) + shift);
+    math::fast_vec3 dim2 = ((bbox.maximum() - bbox.minimum()) / 2.0);
+    math::fast_vec3 back_bottom_left(-dim2.x(), -dim2.y(), -dim2.z());
+    math::fast_vec3 shift = (bbox.minimum() - back_bottom_left);
+    math::fast_vec3 front_bl = (math::fast_vec3(-dim2.x(), -dim2.y(), dim2.z()) + shift);
+    math::fast_vec3 front_br = (math::fast_vec3(dim2.x(), -dim2.y(), dim2.z()) + shift);
+    math::fast_vec3 front_tr = (math::fast_vec3(dim2.x(), dim2.y(), dim2.z()) + shift);
+    math::fast_vec3 front_tl = (math::fast_vec3(-dim2.x(), dim2.y(), dim2.z()) + shift);
+    math::fast_vec3 back_bl = (back_bottom_left + shift);
+    math::fast_vec3 back_br = (math::fast_vec3(dim2.x(), -dim2.y(), -dim2.z()) + shift);
+    math::fast_vec3 back_tr = (math::fast_vec3(dim2.x(), dim2.y(), -dim2.z()) + shift);
+    math::fast_vec3 back_tl = (math::fast_vec3(-dim2.x(), dim2.y(), -dim2.z()) + shift);
 
     std::vector<vd_t> v;
     v.resize(8);
 
     // front
-    v[0] = bvh_mesh.add_vertex(front_bl); // bottcs left
+    v[0] = bvh_mesh.add_vertex(front_bl); // bottom left
     MCUT_ASSERT(v[0] != mesh_t::null_vertex());
-    v[1] = bvh_mesh.add_vertex(front_br); // bottcs right
+    v[1] = bvh_mesh.add_vertex(front_br); // bottom right
     MCUT_ASSERT(v[1] != mesh_t::null_vertex());
     v[2] = bvh_mesh.add_vertex(front_tr); // top right
     MCUT_ASSERT(v[2] != mesh_t::null_vertex());
     v[3] = bvh_mesh.add_vertex(front_tl); // top left
     MCUT_ASSERT(v[3] != mesh_t::null_vertex());
     // back
-    v[4] = bvh_mesh.add_vertex(back_bl); // bottcs left
+    v[4] = bvh_mesh.add_vertex(back_bl); // bottom left
     MCUT_ASSERT(v[4] != mesh_t::null_vertex());
-    v[5] = bvh_mesh.add_vertex(back_br); // bottcs right
+    v[5] = bvh_mesh.add_vertex(back_br); // bottom right
     MCUT_ASSERT(v[5] != mesh_t::null_vertex());
     v[6] = bvh_mesh.add_vertex(back_tr); // top right
     MCUT_ASSERT(v[6] != mesh_t::null_vertex());
@@ -1329,8 +1334,8 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "calculate bounding volume hierarchies (BVH)" << std::endl;
 
-    std::map<fd_t, geom::bounding_box_t<math::vec3>> ps_face_bboxes;
-    std::map<fd_t, math::vec3> ps_face_bbox_centres;
+    std::map<fd_t, geom::bounding_box_t<math::fast_vec3>> ps_face_bboxes;
+    std::map<fd_t, math::fast_vec3> ps_face_bbox_centres;
 
     for (mesh_t::face_iterator_t i = ps.faces_begin(); i != ps.faces_end(); ++i) {
 
@@ -1338,19 +1343,19 @@ void dispatch(output_t& output, const input_t& input)
         const std::vector<vd_t> vertices_on_face = ps.get_vertices_around_face(*i);
 
         for (std::vector<vd_t>::const_iterator face_vertex_iter = vertices_on_face.cbegin(); face_vertex_iter != vertices_on_face.cend(); ++face_vertex_iter) {
-            const math::vec3 face_vertex_coords = ps.vertex(*face_vertex_iter);
+            const math::fast_vec3 face_vertex_coords = ps.vertex(*face_vertex_iter);
             ps_face_bboxes[*i].expand(face_vertex_coords);
         }
 
         //const double eps = 1e-6; // enlarge Bbox by small epsilon
         // ps_face_bboxes[*i] = CGAL::Bbox_3(minx, miny, minz, maxx, maxy, maxz);
 
-        const geom::bounding_box_t<math::vec3>& bbox = ps_face_bboxes[*i];
+        const geom::bounding_box_t<math::fast_vec3>& bbox = ps_face_bboxes[*i];
         // calculate bbox centre for morton code evaluation
         ps_face_bbox_centres[*i] = (bbox.minimum() + bbox.maximum()) / 2;
     }
 
-    std::map<std::string, std::vector<geom::bounding_box_t<math::vec3>>> bvh_internal_nodes_array = {
+    std::map<std::string, std::vector<geom::bounding_box_t<math::fast_vec3>>> bvh_internal_nodes_array = {
         { "sm", {} },
         { "cs", {} },
     };
@@ -1360,7 +1365,7 @@ void dispatch(output_t& output, const input_t& input)
         { "cs", {} },
     };
 
-    for (std::map<std::string, std::vector<geom::bounding_box_t<math::vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
+    for (std::map<std::string, std::vector<geom::bounding_box_t<math::fast_vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
          mesh_bvh_iter != bvh_internal_nodes_array.end();
          ++mesh_bvh_iter) {
         lg.indent();
@@ -1368,11 +1373,11 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "mesh = " << mesh_name << std::endl;
         lg.indent();
-        std::vector<geom::bounding_box_t<math::vec3>>& bvh = mesh_bvh_iter->second; // my ostensibly implicit BVH
+        std::vector<geom::bounding_box_t<math::fast_vec3>>& bvh = mesh_bvh_iter->second; // my ostensibly implicit BVH
 
         std::vector<std::pair<fd_t, unsigned int>> unsorted_morton_codes;
-        std::map<fd_t, math::vec3>::const_iterator ps_face_bbox_centres_iter_cbegin; // sm face come first
-        std::map<fd_t, math::vec3>::const_iterator ps_face_bbox_centres_iter_cend;
+        std::map<fd_t, math::fast_vec3>::const_iterator ps_face_bbox_centres_iter_cbegin; // sm face come first
+        std::map<fd_t, math::fast_vec3>::const_iterator ps_face_bbox_centres_iter_cend;
 
         if (mesh_name == "sm") {
             ps_face_bbox_centres_iter_cbegin = ps_face_bbox_centres.cbegin();
@@ -1386,9 +1391,9 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "calculate mesh bounding box" << std::endl;
 
-        geom::bounding_box_t<math::vec3>& meshBbox = ps_face_bboxes.at(ps_face_bbox_centres_iter_cbegin->first); // root bounding box
+        geom::bounding_box_t<math::fast_vec3>& meshBbox = ps_face_bboxes.at(ps_face_bbox_centres_iter_cbegin->first); // root bounding box
 
-        for (std::map<fd_t, math::vec3>::const_iterator ps_face_bbox_centres_iter = ps_face_bbox_centres_iter_cbegin;
+        for (std::map<fd_t, math::fast_vec3>::const_iterator ps_face_bbox_centres_iter = ps_face_bbox_centres_iter_cbegin;
              ps_face_bbox_centres_iter != ps_face_bbox_centres_iter_cend;
              ++ps_face_bbox_centres_iter) {
 
@@ -1402,14 +1407,14 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "calculate morton codes" << std::endl;
 
-        for (std::map<fd_t, math::vec3>::const_iterator ps_face_bbox_centres_iter = ps_face_bbox_centres_iter_cbegin;
+        for (std::map<fd_t, math::fast_vec3>::const_iterator ps_face_bbox_centres_iter = ps_face_bbox_centres_iter_cbegin;
              ps_face_bbox_centres_iter != ps_face_bbox_centres_iter_cend;
              ++ps_face_bbox_centres_iter) {
 
             const fd_t& face_id = ps_face_bbox_centres_iter->first;
-            const math::vec3& face_aabb_centre = ps_face_bbox_centres_iter->second;
-            math::vec3 offset = face_aabb_centre - meshBbox.minimum();
-            math::vec3 dims = meshBbox.maximum() - meshBbox.minimum();
+            const math::fast_vec3& face_aabb_centre = ps_face_bbox_centres_iter->second;
+            math::fast_vec3 offset = face_aabb_centre - meshBbox.minimum();
+            math::fast_vec3 dims = meshBbox.maximum() - meshBbox.minimum();
 
             const unsigned int mortion_code = bvh::morton3D(
                 static_cast<float>(offset.x() / dims.x()),
@@ -1460,20 +1465,20 @@ void dispatch(output_t& output, const input_t& input)
                 const int leftmost_real_node_on_child_level = bvh::get_level_leftmost_node(level_index + 1);
                 const bool right_child_exists = (right_child_implicit_idx <= rightmost_real_node_on_child_level);
 
-                geom::bounding_box_t<math::vec3> node_bbox;
+                geom::bounding_box_t<math::fast_vec3> node_bbox;
 
                 if (is_penultimate_level) {
 
                     const int left_child_index_on_level = left_child_implicit_idx - leftmost_real_node_on_child_level;
                     const fd_t& left_child_face = bvh_leaf_nodes_array.at(mesh_name).at(left_child_index_on_level).first;
-                    const geom::bounding_box_t<math::vec3>& left_child_bbox = ps_face_bboxes.at(left_child_face);
+                    const geom::bounding_box_t<math::fast_vec3>& left_child_bbox = ps_face_bboxes.at(left_child_face);
                     //node_bbox = left_child_bbox;
                     node_bbox.expand(left_child_bbox);
 
                     if (right_child_exists) {
                         const int right_child_index_on_level = right_child_implicit_idx - leftmost_real_node_on_child_level;
                         const fd_t& right_child_face = bvh_leaf_nodes_array.at(mesh_name).at(right_child_index_on_level).first;
-                        const geom::bounding_box_t<math::vec3>& right_child_bbox = ps_face_bboxes.at(right_child_face);
+                        const geom::bounding_box_t<math::fast_vec3>& right_child_bbox = ps_face_bboxes.at(right_child_face);
                         node_bbox.expand(right_child_bbox);
                     }
                 } else { // remaining internal node levels
@@ -1483,7 +1488,7 @@ void dispatch(output_t& output, const input_t& input)
                         leftmost_real_node_on_child_level,
                         0,
                         rightmost_real_node_on_child_level);
-                    const geom::bounding_box_t<math::vec3>& left_child_bbox = bvh.at(left_child_memory_idx);
+                    const geom::bounding_box_t<math::fast_vec3>& left_child_bbox = bvh.at(left_child_memory_idx);
                     node_bbox.expand(left_child_bbox);
 
                     if (right_child_exists) {
@@ -1492,7 +1497,7 @@ void dispatch(output_t& output, const input_t& input)
                             leftmost_real_node_on_child_level,
                             0,
                             rightmost_real_node_on_child_level);
-                        const geom::bounding_box_t<math::vec3>& right_child_bbox = bvh.at(right_child_memory_idx);
+                        const geom::bounding_box_t<math::fast_vec3>& right_child_bbox = bvh.at(right_child_memory_idx);
                         node_bbox.expand(right_child_bbox);
                     }
                 }
@@ -1512,6 +1517,7 @@ void dispatch(output_t& output, const input_t& input)
 
     ps_face_bbox_centres.clear();
 
+#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
     ///////////////////////////////////////////////////////////////////////////
     // generate BVH meshes
     ///////////////////////////////////////////////////////////////////////////
@@ -1519,12 +1525,12 @@ void dispatch(output_t& output, const input_t& input)
     if (input.verbose) {
         lg << "create BVH meshes\n";
 
-        for (std::map<std::string, std::vector<geom::bounding_box_t<math::vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
+        for (std::map<std::string, std::vector<geom::bounding_box_t<math::fast_vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
              mesh_bvh_iter != bvh_internal_nodes_array.end();
              ++mesh_bvh_iter) {
 
             const std::string mesh_name = mesh_bvh_iter->first;
-            const std::vector<geom::bounding_box_t<math::vec3>>& internal_nodes_array = mesh_bvh_iter->second;
+            const std::vector<geom::bounding_box_t<math::fast_vec3>>& internal_nodes_array = mesh_bvh_iter->second;
             const std::vector<std::pair<fd_t, unsigned int>>& leaf_nodes_array = bvh_leaf_nodes_array.at(mesh_name);
             const int real_leaf_node_count = (int)leaf_nodes_array.size();
             //const int bvh_real_node_count = bvh::get_ostensibly_implicit_bvh_size(real_leaf_node_count);
@@ -1542,7 +1548,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 for (int level_node_idx_iter = 0; level_node_idx_iter < number_of_real_nodes_on_level; ++level_node_idx_iter) {
 
-                    geom::bounding_box_t<math::vec3> node_bbox;
+                    geom::bounding_box_t<math::fast_vec3> node_bbox;
                     const bool is_leaf_level = (level_idx == leaf_level_index);
 
                     if (is_leaf_level) {
@@ -1567,6 +1573,7 @@ void dispatch(output_t& output, const input_t& input)
         }
 
     } // if (input.verbose)
+#endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
     ///////////////////////////////////////////////////////////////////////////
     // Evaluate BVHs
@@ -1589,8 +1596,8 @@ void dispatch(output_t& output, const input_t& input)
     do {
         bvh::node_pair_t ct_front_node = oibvh_traversal_queue.front();
 
-        geom::bounding_box_t<math::vec3> sm_bvh_node_bbox;
-        geom::bounding_box_t<math::vec3> cs_bvh_node_bbox;
+        geom::bounding_box_t<math::fast_vec3> sm_bvh_node_bbox;
+        geom::bounding_box_t<math::fast_vec3> cs_bvh_node_bbox;
 
         // sm
         const int sm_bvh_node_implicit_idx = ct_front_node.m_left;
@@ -1741,11 +1748,11 @@ void dispatch(output_t& output, const input_t& input)
 
     // only need to be computed if input mesh is watertight
     // key=ivertex; value=[intersected-smface-normal;cs-halfedge-to-normal scalar product]
-    std::map<vd_t, std::pair<math::vec3, math::real_t>> cs_reg_reentrant_ivtx_list;
+    std::map<vd_t, std::pair<math::vec3, math::real_number_t>> cs_reg_reentrant_ivtx_list;
 
     // Always needs to be computed (i.e. whether input mesh is watertight or not)
     // key=ivertex; value=[intersected-csface-normal;sm-halfedge-to-normal scalar product]
-    std::map<vd_t, std::pair<math::vec3, math::real_t>> sm_reg_reentrant_ivtx_list;
+    std::map<vd_t, std::pair<math::vec3, math::real_number_t>> sm_reg_reentrant_ivtx_list;
 
     // edges of the polygon soup mesh which intersect a polygon
     std::vector<ed_t> ps_intersecting_edges;
@@ -1818,7 +1825,7 @@ void dispatch(output_t& output, const input_t& input)
 
             lg << "plane normal: " << face_B_plane_normal << std::endl;
 
-            math::real_t face_B_plane_param_d;
+            math::real_number_t face_B_plane_param_d;
             geom::polygon_plane_d_param(face_B_plane_param_d, face_B_plane_normal, face_B_vertices.data(), (int)face_B_vertices.size());
 
             lg << "plane d: " << face_B_plane_param_d << std::endl;
@@ -1848,7 +1855,7 @@ void dispatch(output_t& output, const input_t& input)
                 const math::vec3& face_A_halfedge_target_vertex = ps.vertex(face_A_halfedge_target_descr);
                 //auto result = CGAL::intersection(segment, plane);
                 math::vec3 intersection_point;
-                math::real_t tparam = 0.0; // how far along the halfedge the intersection point is.
+                math::real_number_t tparam = 0.0; // how far along the halfedge the intersection point is.
 
                 bool have_plane_intersection = geom::intersect_plane_with_segment(
                     intersection_point,
@@ -1872,7 +1879,7 @@ void dispatch(output_t& output, const input_t& input)
                     lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;
 
                     if (have_point_in_polygon) {
-                        if (tparam == math::real_t(0.0) || tparam == math::real_t(1.0)) {
+                        if (tparam == math::real_number_t(0.0) || tparam == math::real_number_t(1.0)) {
                             // NOTE: if t == 0 or t == 1, then we need to terminate with an error.
                             // This is because 1) our intersection registry formulation requires that
                             // edges completely penetrate/intersect through polygon's area. Also, 2) If any
@@ -2042,9 +2049,9 @@ void dispatch(output_t& output, const input_t& input)
 
                         if (vertex_is_new || is_intersecting_halfedge_of_sm) {
 
-                            const math::real_t scalar_prod = math::dot_product(face_B_plane_normal, face_A_halfedge_target_vertex - face_A_halfedge_source_vertex /*m_ihalfedge_segment.to_vector()*/);
+                            const math::real_number_t scalar_prod = math::dot_product(face_B_plane_normal, face_A_halfedge_target_vertex - face_A_halfedge_source_vertex /*m_ihalfedge_segment.to_vector()*/);
 
-                            const bool is_reentrant = (scalar_prod < math::real_t(0.0));
+                            const bool is_reentrant = (scalar_prod < math::real_number_t(0.0));
 
                             if (is_reentrant) {
                                 const bool intersection_registry_exists = pre_existing_copy != mesh_t::null_vertex(); // vertex already registered in intersection registries
@@ -2062,7 +2069,7 @@ void dispatch(output_t& output, const input_t& input)
                                         cs_tip_reentrant_ivtx_list.push_back(new_copy);
                                     } else // is regular
                                     {
-                                        std::pair<std::map<vd_t, std::pair<math::vec3, math::real_t>>::const_iterator, bool> m_cs_regular_reentrant_ivertices_insertion = cs_reg_reentrant_ivtx_list.insert(
+                                        std::pair<std::map<vd_t, std::pair<math::vec3, math::real_number_t>>::const_iterator, bool> m_cs_regular_reentrant_ivertices_insertion = cs_reg_reentrant_ivtx_list.insert(
                                             std::make_pair(new_copy, std::make_pair(face_B_plane_normal, scalar_prod)));
                                         MCUT_ASSERT(m_cs_regular_reentrant_ivertices_insertion.second == true);
                                     }
@@ -2075,7 +2082,7 @@ void dispatch(output_t& output, const input_t& input)
                                         sm_regular_reentrant_vertex = pre_existing_copy;
                                     }
 
-                                    std::pair<std::map<vd_t, std::pair<math::vec3, math::real_t>>::const_iterator, bool> m_sm_regular_reentrant_ivertices_insertion = sm_reg_reentrant_ivtx_list.insert(
+                                    std::pair<std::map<vd_t, std::pair<math::vec3, math::real_number_t>>::const_iterator, bool> m_sm_regular_reentrant_ivertices_insertion = sm_reg_reentrant_ivtx_list.insert(
                                         std::make_pair(sm_regular_reentrant_vertex, std::make_pair(face_B_plane_normal, scalar_prod)));
                                     MCUT_ASSERT(m_sm_regular_reentrant_ivertices_insertion.second == true); // TODO: may fail (can't remember why!)
                                 }
@@ -2234,7 +2241,7 @@ void dispatch(output_t& output, const input_t& input)
     intersecting_sm_cs_face_pairs.clear(); // free
 
     if (m0_ivtx_to_ps_faces.empty()) {
-        lg.set_reason_for_failure("polygons do not not intersect");
+        lg.set_reason_for_failure("polygons do not intersect");
         output.status = status_t::INVALID_MESH_INTERSECTION;
         return;
     }
@@ -4868,7 +4875,7 @@ if(input.verbose){
                 }
 
                 // get the intersection info which was calculated earlier (src-mesh normal vector, and dot product)
-                const std::map<vd_t, std::pair<math::vec3, math::real_t>>::const_iterator cs_regular_reentrant_ivertices_find_iter = cs_reg_reentrant_ivtx_list.find(cs_poly_he_tgt);
+                const std::map<vd_t, std::pair<math::vec3, math::real_number_t>>::const_iterator cs_regular_reentrant_ivertices_find_iter = cs_reg_reentrant_ivtx_list.find(cs_poly_he_tgt);
                 const bool tgt_is_regular_reentrant_vertex = cs_regular_reentrant_ivertices_find_iter != cs_reg_reentrant_ivtx_list.cend();
                 std::vector<vd_t>::const_iterator tip_reentrant_vertex_find_iter = std::find(cs_tip_reentrant_ivtx_list.cbegin(), cs_tip_reentrant_ivtx_list.cend(), cs_poly_he_tgt);
                 const bool tgt_is_tip_reentrant_vertex = tip_reentrant_vertex_find_iter != cs_tip_reentrant_ivtx_list.cend();
@@ -4908,9 +4915,9 @@ if(input.verbose){
                     // tgt-ivertex (i.e. with scalar product) using the halfedge's src and tgt
                     // coordinates and the normal of the face which was intersected to produce
                     // the tgt vertex.
-                    const std::pair<math::vec3, math::real_t>& geometric_data = cs_regular_reentrant_ivertices_find_iter->second;
+                    const std::pair<math::vec3, math::real_number_t>& geometric_data = cs_regular_reentrant_ivertices_find_iter->second;
                     const math::vec3& polygon_normal = geometric_data.first; // src-mesh face normal
-                    const math::real_t& orig_scalar_prod = geometric_data.second; // the dot product result we computed earlier
+                    const math::real_number_t& orig_scalar_prod = geometric_data.second; // the dot product result we computed earlier
 
                     // the original ps-halfedge was "incoming" (pointing inwards) and gave a
                     // negative scalar-product with the src-mesh face normal.
@@ -4919,7 +4926,7 @@ if(input.verbose){
                     // calculate the vector represented by the current halfedge
                     const math::vec3 cs_poly_he_vector = m0.vertex(cs_poly_he_tgt) - m0.vertex(cs_poly_he_src);
                     // calculate dot product with the src-mesh normal
-                    const math::real_t scalar_prod = math::dot_product(polygon_normal, cs_poly_he_vector);
+                    const math::real_number_t scalar_prod = math::dot_product(polygon_normal, cs_poly_he_vector);
                     // check that it is the same
                     // Note: we want the same sign (i.e. cs_poly_he_vector has negative scalar-product)
                     // because we want the class-1 ihalfedge which is exterior but points inside the src-mesh
@@ -4973,7 +4980,7 @@ if(input.verbose){
                 continue; // either class-0 (o-->o) or class-2 (x-->o)
             }
 
-            const std::map<vd_t, std::pair<math::vec3, math::real_t>>::const_iterator sm_regular_reentrant_ivertices_find_iter = sm_reg_reentrant_ivtx_list.find(sm_poly_he_tgt);
+            const std::map<vd_t, std::pair<math::vec3, math::real_number_t>>::const_iterator sm_regular_reentrant_ivertices_find_iter = sm_reg_reentrant_ivtx_list.find(sm_poly_he_tgt);
             const bool tgt_is_sm_regular_reentrant_vertex = sm_regular_reentrant_ivertices_find_iter != sm_reg_reentrant_ivtx_list.cend();
 
             // NOTE: we do not need src-mesh tip re-entrant vertices because they are not useful for the
@@ -5014,9 +5021,9 @@ if(input.verbose){
             // the tgt-ivertex (scalar product using the halfedge's src and tgt coordinates
             // and and the normal of the cut-mesh face that was intersected to produce
             // the tgt vertex).
-            const std::pair<math::vec3, math::real_t>& geometric_data = sm_regular_reentrant_ivertices_find_iter->second;
+            const std::pair<math::vec3, math::real_number_t>& geometric_data = sm_regular_reentrant_ivertices_find_iter->second;
             const math::vec3& polygon_normal = geometric_data.first;
-            const math::real_t& orig_scalar_prod = geometric_data.second;
+            const math::real_number_t& orig_scalar_prod = geometric_data.second;
 
             // Again, the notion of exterior is denoted by a negative dot-product.
             // Original ps-halfedge was "incoming" and gave a negative scalar-product
@@ -5024,7 +5031,7 @@ if(input.verbose){
             MCUT_ASSERT(math::sign(orig_scalar_prod) == math::NEGATIVE);
 
             const math::vec3 sm_poly_he_vector = m0.vertex(sm_poly_he_tgt) - m0.vertex(sm_poly_he_src);
-            const math::real_t scalar_prod = math::dot_product(polygon_normal, sm_poly_he_vector);
+            const math::real_number_t scalar_prod = math::dot_product(polygon_normal, sm_poly_he_vector);
 
             // We want the same sign (i.e. cs_poly_he_vector has negative scalar-product) because we want
             // the class-1 ihalfedge which is exterior but points "inside" the cut-mesh (i.e. torward

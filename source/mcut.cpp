@@ -144,7 +144,7 @@ struct IndexArrayMesh {
         pEdges.release();
     }
 
-    std::unique_ptr<mcut::math::real_t[]> pVertices;
+    std::unique_ptr<mcut::math::real_number_t[]> pVertices;
     std::unique_ptr<uint32_t[]> pSeamVertexIndices;
     std::unique_ptr<uint32_t[]> pFaceIndices;
     std::unique_ptr<uint32_t[]> pFaceSizes;
@@ -241,16 +241,16 @@ struct McDispatchContextInternal {
 
         if (precision != defaultPrecision) {
             log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "redundant precision change");
-            // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
+            // no-op ("mcut::math::real_number_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
         // MPFR uses global state which could be potentially polluted other libraries/apps using MCUT
         //if (roundingMode != defaultRoundingMode) {
-        mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(roundingMode));
+        mcut::math::arbitrary_precision_number_t::set_default_rounding_mode(convertRoundingMode(roundingMode));
         //}
 
         //if (precision != defaultPrecision) {
-        mcut::math::high_precision_float_t::set_default_precision(precision);
+        mcut::math::arbitrary_precision_number_t::set_default_precision(precision);
         //}
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
@@ -264,15 +264,15 @@ struct McDispatchContextInternal {
 
         if (precision != defaultPrecision) {
             log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "redundant precision change");
-            // no-op ("mcut::math::real_t" is just "long double" so we cannot change precision - its fixed)
+            // no-op ("mcut::math::real_number_t" is just "long double" so we cannot change precision - its fixed)
         }
 #else
         // if (roundingMode != defaultRoundingMode) {
-        mcut::math::high_precision_float_t::set_default_rounding_mode(convertRoundingMode(defaultRoundingMode));
+        mcut::math::arbitrary_precision_number_t::set_default_rounding_mode(convertRoundingMode(defaultRoundingMode));
         //}
 
         // if (precision != defaultPrecision) {
-        mcut::math::high_precision_float_t::set_default_precision(defaultPrecision);
+        mcut::math::arbitrary_precision_number_t::set_default_precision(defaultPrecision);
         // }
 #endif
     }
@@ -280,12 +280,12 @@ struct McDispatchContextInternal {
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(std::fegetround());
-uint64_t McDispatchContextInternal::defaultPrecision = sizeof(mcut::math::real_t) * 8;
+uint64_t McDispatchContextInternal::defaultPrecision = sizeof(mcut::math::real_number_t) * 8;
 const uint64_t McDispatchContextInternal::minPrecision = McDispatchContextInternal::defaultPrecision;
 const uint64_t McDispatchContextInternal::maxPrecision = McDispatchContextInternal::defaultPrecision;
 #else
-McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(mcut::math::high_precision_float_t::get_default_rounding_mode());
-mpfr_prec_t McDispatchContextInternal::defaultPrecision = mcut::math::high_precision_float_t::get_default_precision();
+McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(mcut::math::arbitrary_precision_number_t::get_default_rounding_mode());
+mpfr_prec_t McDispatchContextInternal::defaultPrecision = mcut::math::arbitrary_precision_number_t::get_default_precision();
 const mpfr_prec_t McDispatchContextInternal::minPrecision = MPFR_PREC_MIN;
 const mpfr_prec_t McDispatchContextInternal::maxPrecision = MPFR_PREC_MAX;
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -510,7 +510,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     MCUT_ASSERT(indexArrayMesh.numVertices >= 3);
 
-    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_t[]>(new mcut::math::real_t[indexArrayMesh.numVertices * 3u]);
+    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[indexArrayMesh.numVertices * 3u]);
 
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i) {
 
@@ -1498,7 +1498,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             }
 
             for (uint32_t i = 0; i < nelems; ++i) {
-                const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
+                const mcut::math::real_number_t& val = ccData->indexArrayMesh.pVertices[i];
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
                 const float val_ = static_cast<float>(val);
 #else
@@ -1537,7 +1537,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             //uint32_t verticesToCopy = (uint32_t)(nelems / 3);
 
             for (uint32_t i = 0; i < nelems; ++i) {
-                const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
+                const mcut::math::real_number_t& val = ccData->indexArrayMesh.pVertices[i];
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
                 const double val_ = static_cast<double>(val);
 #else
@@ -1554,7 +1554,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
         uint64_t allocatedBytes = 0;
         for (uint32_t i = 0; i < ccData->indexArrayMesh.numVertices * 3; ++i) {
-            const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
+            const mcut::math::real_number_t& val = ccData->indexArrayMesh.pVertices[i];
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
             allocatedBytes += (std::to_string(val) + " ").length(); // NOTE: we could cache results of tmp strings
@@ -1579,7 +1579,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             int8_t* outPtr = reinterpret_cast<int8_t*>(pMem);
 
             for (uint32_t i = 0; i < ccData->indexArrayMesh.numVertices * 3; ++i) {
-                const mcut::math::real_t& val = ccData->indexArrayMesh.pVertices[i];
+                const mcut::math::real_number_t& val = ccData->indexArrayMesh.pVertices[i];
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
                 const std::string val_ = std::to_string(val) + " ";

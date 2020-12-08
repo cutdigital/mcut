@@ -51,34 +51,35 @@ namespace math {
         POSITIVE = ON_POSITIVE_SIDE,
     };
 
-    class vec2 {
+    template<typename T = real_number_t>
+    class vec2_ {
     public:
-        vec2() { }
+        vec2_() { }
 
-        vec2(const real_t& value)
+        vec2_(const T& value)
             : m_x(value)
             , m_y(value)
         {
         }
 
-        vec2(const real_t& x, const real_t& y)
+        vec2_(const T& x, const T& y)
             : m_x(x)
             , m_y(y)
         {
         }
 
-        virtual ~vec2() { }
+        virtual ~vec2_() { }
 
         static int cardinality()
         {
             return 2;
         }
 
-        const real_t& operator[](int index) const
+        const T& operator[](int index) const
         {
             MCUT_ASSERT(index >= 0 && index <= 1);
 
-            const real_t* val = nullptr;
+            const T* val = nullptr;
             if (index == 0) {
                 val = &m_x;
             } else {
@@ -88,11 +89,11 @@ namespace math {
             return *val;
         }
 
-        real_t& operator[](int index)
+        T& operator[](int index)
         {
             MCUT_ASSERT(index >= 0 && index <= 1);
 
-            real_t* val = nullptr;
+            T* val = nullptr;
             if (index == 0) {
                 val = &m_x;
             } else {
@@ -102,49 +103,53 @@ namespace math {
             return *val;
         }
 
-        const vec2 operator-(const vec2& other) const
+        const vec2_ operator-(const vec2_& other) const
         {
-            return vec2(m_x - other.m_x, m_y - other.m_y);
+            return vec2_(m_x - other.m_x, m_y - other.m_y);
         }
 
-        const vec2 operator/(const real_t& number) const
+        const vec2_ operator/(const T& number) const
         {
-            return vec2(m_x / number, m_y / number);
+            return vec2_(m_x / number, m_y / number);
         }
 
-        const real_t& x() const
+        const T& x() const
         {
             return m_x;
         }
 
-        const real_t& y() const
+        const T& y() const
         {
             return m_y;
         }
 
     protected:
-        real_t m_x, m_y;
-    };
+        T m_x, m_y;
+    }; // vec2_
 
-    class vec3 : public vec2 {
+    typedef vec2_<> vec2;
+    typedef vec2_<fixed_precision_number_t> fast_vec2;
+
+    template<typename T = real_number_t>
+    class vec3_ : public vec2_<T> {
 
     public:
-        vec3()
+        vec3_()
         {
         }
 
-        vec3(const real_t& value)
-            : vec2(value, value)
+        vec3_(const T& value)
+            : vec2_<T>(value, value)
             , m_z(value)
         {
         }
 
-        vec3(const real_t& x, const real_t& y, const real_t& z)
-            : vec2(x, y)
+        vec3_(const T& x, const T& y, const T& z)
+            : vec2_<T>(x, y)
             , m_z(z)
         {
         }
-        ~vec3()
+        ~vec3_()
         {
         }
 
@@ -153,58 +158,70 @@ namespace math {
             return 3;
         }
 
-        const real_t& operator[](int index) const
+        const T& operator[](int index) const
         {
             MCUT_ASSERT(index >= 0 && index <= 2);
-            const real_t* val = nullptr;
+            const T* val = nullptr;
             if (index <= 1) {
-                val = &vec2::operator[](index);
+                val = &vec2_<T>::operator[](index);
             } else {
                 val = &m_z;
             }
             return *val;
         }
 
-        real_t& operator[](int index)
+        T& operator[](int index)
         {
             MCUT_ASSERT(index >= 0 && index <= 2);
-            real_t* val = nullptr;
+            T* val = nullptr;
             if (index <= 1) {
-                val = &vec2::operator[](index);
+                val = &vec2_<T>::operator[](index);
             } else {
                 val = &m_z;
             }
             return *val;
         }
 
-        vec3 operator-(const vec3& other) const
-        {
-            return vec3(this->m_x - other.m_x, this->m_y - other.m_y, this->m_z - other.m_z);
+        // intended for converting from arb-prec to fast vec
+
+        operator vec3_<mcut::math::fixed_precision_number_t>() const { 
+            return vec3_<mcut::math::fixed_precision_number_t>(
+                static_cast<mcut::math::fixed_precision_number_t>(this->m_x), 
+                static_cast<mcut::math::fixed_precision_number_t>(this->m_y), 
+                static_cast<mcut::math::fixed_precision_number_t>(this->m_z)); 
         }
 
-        vec3 operator+(const vec3& other) const
+        vec3_ operator-(const vec3_& other) const
         {
-            return vec3(this->m_x + other.m_x, this->m_y + other.m_y, this->m_z + other.m_z);
+            return vec3_(this->m_x - other.m_x, this->m_y - other.m_y, this->m_z - other.m_z);
         }
 
-        const vec3 operator/(const real_t& number) const
+        vec3_ operator+(const vec3_& other) const
         {
-            return vec3(this->m_x / number, this->m_y / number, this->m_z / number);
+            return vec3_(this->m_x + other.m_x, this->m_y + other.m_y, this->m_z + other.m_z);
         }
 
-        const vec3 operator*(const real_t& number) const
+        const vec3_ operator/(const T& number) const
         {
-            return vec3(this->m_x * number, this->m_y * number, this->m_z * number);
+            return vec3_(this->m_x / number, this->m_y / number, this->m_z / number);
         }
 
-        const real_t& z() const
+        const vec3_ operator*(const T& number) const
+        {
+            return vec3_(this->m_x * number, this->m_y * number, this->m_z * number);
+        }
+
+        const T& z() const
         {
             return m_z;
         }
 
     protected:
-        real_t m_z;
-    };
+        T m_z;
+    }; // vec3_
+
+    typedef vec3_<> vec3;
+    typedef vec3_<fixed_precision_number_t> fast_vec3;
 
     class matrix_t {
     public:
@@ -256,29 +273,60 @@ namespace math {
         std::vector<int> m_entries;
     };
 
-    extern real_t square_root(const real_t& number);
-    extern real_t absolute_value(const real_t& number);
-    extern sign_t sign(const real_t& number);
+    extern real_number_t square_root(const real_number_t& number);
+    extern real_number_t absolute_value(const real_number_t& number);
+    extern sign_t sign(const real_number_t& number);
     extern std::ostream& operator<<(std::ostream& os, const vec3& v);
     extern std::ostream& operator<<(std::ostream& os, const matrix_t& m);
-    const real_t& min(const real_t& a, const real_t& b);
-    const real_t& max(const real_t& a, const real_t& b);
+    
+    template<typename T>
+    const T& min(const T& a, const T& b)
+    {
+        return ((b < a) ? b : a);
+    }
+    template<typename T>
+    const T& max(const T& a, const T& b)
+    {
+        return ((a < b) ? b : a);
+    }
+
     extern bool operator==(const vec3& a, const vec3& b);
-    extern vec2 compwise_min(const vec2& a, const vec2& b);
-    extern vec3 compwise_min(const vec3& a, const vec3& b);
-    extern vec2 compwise_max(const vec2& a, const vec2& b);
-    extern vec3 compwise_max(const vec3& a, const vec3& b);
+    
+    template<typename T>
+    vec2_<T> compwise_min(const vec2_<T>& a, const vec2_<T>& b)
+    {
+        return vec2_<T>(min(a.x(), b.x()), min(a.y(), b.y()));
+    }
+    
+    template<typename T>
+    vec2_<T> compwise_max(const vec2_<T>& a, const vec2_<T>& b)
+    {
+        return vec2_<T>(max(a.x(), b.x()), max(a.y(), b.y()));
+    }
+
+    template<typename T>
+    vec3_<T> compwise_min(const vec3_<T>& a, const vec3_<T>& b)
+    {
+        return vec3_<T>(min(a.x(), b.x()), min(a.y(), b.y()), min(a.z(), b.z()));
+    }
+
+    template<typename T>
+    vec3_<T> compwise_max(const vec3_<T>& a, const vec3_<T>& b)
+    {
+        return vec3_<T>(max(a.x(), b.x()), max(a.y(), b.y()), max(a.z(), b.z()));
+    }
+
     extern vec3 cross_product(const vec3& a, const vec3& b);
-    extern real_t dot_product(const vec3& a, const vec3& b);
+    extern real_number_t dot_product(const vec3& a, const vec3& b);
 
     template <typename vector_type>
-    typename math::real_t squared_length(const vector_type& v)
+    typename math::real_number_t squared_length(const vector_type& v)
     {
         return dot_product(v, v);
     }
 
     template <typename vector_type>
-    typename math::real_t length(const vector_type& v)
+    typename math::real_number_t length(const vector_type& v)
     {
         return square_root(squared_length(v));
     }

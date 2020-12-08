@@ -25,11 +25,6 @@
 namespace mcut {
 namespace geom {
 
-    bool intersect_bounding_boxes(const bounding_box_t<math::vec3>& a, const bounding_box_t<math::vec3>& b)
-    {
-        return (a.minimum().x() <= b.maximum().x() && a.maximum().x() >= b.minimum().x()) && (a.minimum().y() <= b.maximum().y() && a.maximum().y() >= b.minimum().y()) && (a.minimum().z() <= b.maximum().z() && a.maximum().z() >= b.minimum().z());
-    }
-
     bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox)
     {
         if ((point.x() < bbox.m_minimum.x() || point.x() > bbox.m_maximum.x()) || //
@@ -61,9 +56,9 @@ namespace geom {
         normal = normalize(normal);
     }
 
-    void polygon_plane_d_param(math::real_t& d, const math::vec3& plane_normal, const math::vec3* polygon_vertices, const int num_polygon_vertices)
+    void polygon_plane_d_param(math::real_number_t& d, const math::vec3& plane_normal, const math::vec3* polygon_vertices, const int num_polygon_vertices)
     {
-        math::real_t frac = 1.0 / num_polygon_vertices;
+        math::real_number_t frac = 1.0 / num_polygon_vertices;
         math::vec3 p = polygon_vertices[0];
         for (int i = 1; i < num_polygon_vertices; ++i) {
             p = p + polygon_vertices[i];
@@ -76,23 +71,23 @@ namespace geom {
 
     void project_point(math::vec2& projected_point, const math::vec3& point, const math::vec3& u, const math::vec3& v)
     {
-        MCUT_ASSERT(length(u) > math::real_t(0.0));
-        MCUT_ASSERT(length(v) > math::real_t(0.0));
+        MCUT_ASSERT(length(u) > math::real_number_t(0.0));
+        MCUT_ASSERT(length(v) > math::real_number_t(0.0));
 
         projected_point = math::vec2(dot_product(point, u), dot_product(point, v));
     }
 
-    void polygon_span(math::vec3& span, math::real_t& span_length, const math::vec3* vertices, const int num_vertices)
+    void polygon_span(math::vec3& span, math::real_number_t& span_length, const math::vec3* vertices, const int num_vertices)
     {
         MCUT_ASSERT(num_vertices >= 3);
 
         span = math::vec3(0.0);
-        span_length = math::real_t(0.0);
+        span_length = math::real_number_t(0.0);
 
         for (int i = 0; i < num_vertices; ++i) {
             for (int j = 0; j < i; ++j) {
                 const math::vec3 diff = vertices[i] - vertices[j];
-                const math::real_t len = length(diff);
+                const math::real_number_t len = length(diff);
                 if (len > span_length) {
                     span_length = len;
                     span = diff;
@@ -103,12 +98,12 @@ namespace geom {
 
     inline long direction(const math::vec2& a, const math::vec2& b, const math::vec2& c)
     {
-        math::real_t acx = a.x() - c.x();
-        math::real_t bcx = b.x() - c.x();
-        math::real_t acy = a.y() - c.y();
-        math::real_t bcy = b.y() - c.y();
-        math::real_t result = acx * bcy - acy * bcx;
-        return (result == math::real_t(0.0) ? 0 : (result > math::real_t(0.0) ? 1 : -1));
+        math::real_number_t acx = a.x() - c.x();
+        math::real_number_t bcx = b.x() - c.x();
+        math::real_number_t acy = a.y() - c.y();
+        math::real_number_t bcy = b.y() - c.y();
+        math::real_number_t result = acx * bcy - acy * bcx;
+        return (result == math::real_number_t(0.0) ? 0 : (result > math::real_number_t(0.0) ? 1 : -1));
     }
 
     inline orientation_t orientation(const math::vec2& a, const math::vec2& b, const math::vec2& c)
@@ -175,7 +170,7 @@ namespace geom {
         // polygon_normal(normal, vertices, num_vertices);
 
         math::vec3 span;
-        math::real_t span_length;
+        math::real_number_t span_length;
         polygon_span(span, span_length, vertices, num_vertices);
 
         const math::vec3 u = normalize(span); // first unit vector on the plane
@@ -197,7 +192,7 @@ namespace geom {
 
         //create a ray (segment) starting from the given point,
         // and to the point outside of polygon.
-        math::vec2 outside(bbox2.m_minimum.x() - math::real_t(1.0), bbox2.m_minimum.y());
+        math::vec2 outside(bbox2.m_minimum.x() - math::real_number_t(1.0), bbox2.m_minimum.y());
 
         int intersections = 0;
 
@@ -218,31 +213,31 @@ namespace geom {
 
     bool intersect_plane_with_segment(
         math::vec3& point,
-        math::real_t& t,
+        math::real_number_t& t,
         // plane
         const math::vec3& normal,
-        math::real_t& distance,
+        math::real_number_t& distance,
         // segment
         const math::vec3& source,
         const math::vec3& target)
     {
         MCUT_ASSERT(!(target == source));
-        MCUT_ASSERT(length(normal) != math::real_t(0.0));
+        MCUT_ASSERT(length(normal) != math::real_number_t(0.0));
 
         // Compute the t value for the directed line ab intersecting the plane
         const math::vec3 dir = target - source;
-        const math::real_t nom = (distance - dot_product(normal, source));
-        const math::real_t denom = dot_product(normal, dir);
+        const math::real_number_t nom = (distance - dot_product(normal, source));
+        const math::real_number_t denom = dot_product(normal, dir);
         bool result = false;
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         if (!(0 == denom)) {
 #else
-        if (!math::real_t::is_zero(denom)) {
+        if (!math::real_number_t::is_zero(denom)) {
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
             t = nom / denom;
             // If t in [0..1] compute and return intersection point
-            if (t >= math::real_t(0.0) && t <= math::real_t(1.0)) {
+            if (t >= math::real_number_t(0.0) && t <= math::real_number_t(1.0)) {
                 point = source + dir * t;
                 result = true;
             }

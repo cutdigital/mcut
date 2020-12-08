@@ -77,7 +77,13 @@ namespace geom {
         }
     };
 
-    bool intersect_bounding_boxes(const bounding_box_t<math::vec3>& a, const bounding_box_t<math::vec3>& b);
+    template<typename T>
+    bool intersect_bounding_boxes(const bounding_box_t<math::vec3_<T>>& a, const bounding_box_t<math::vec3_<T>>& b)
+    {
+        return  (a.minimum().x() <= b.maximum().x() && a.maximum().x() >= b.minimum().x()) && //
+                (a.minimum().y() <= b.maximum().y() && a.maximum().y() >= b.minimum().y()) && //
+                (a.minimum().z() <= b.maximum().z() && a.maximum().z() >= b.minimum().z());
+    }
 
     bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox);
 
@@ -86,11 +92,11 @@ namespace geom {
     // http://cs.haifa.ac.il/~gordon/plane.pdf
     void polygon_normal(math::vec3& normal, const math::vec3* vertices, const int num_vertices);
 
-    void polygon_plane_d_param(math::real_t& d, const math::vec3& plane_normal, const math::vec3* polygon_vertices, const int num_polygon_vertices);
+    void polygon_plane_d_param(math::real_number_t& d, const math::vec3& plane_normal, const math::vec3* polygon_vertices, const int num_polygon_vertices);
 
     void project_point(math::vec2& projected_point, const math::vec3& point, const math::vec3& u, const math::vec3& v);
 
-    void polygon_span(math::vec3& span, math::real_t& span_length, const math::vec3* vertices, const int num_vertices);
+    void polygon_span(math::vec3& span, math::real_number_t& span_length, const math::vec3* vertices, const int num_vertices);
 
     inline long direction(const math::vec2& a, const math::vec2& b, const math::vec2& c);
 
@@ -123,10 +129,10 @@ namespace geom {
 
     bool intersect_plane_with_segment(
         math::vec3& point,
-        math::real_t& t,
+        math::real_number_t& t,
         // plane
         const math::vec3& normal,
-        math::real_t& distance,
+        math::real_number_t& distance,
         // segment
         const math::vec3& source,
         const math::vec3& target);

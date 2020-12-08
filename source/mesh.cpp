@@ -241,7 +241,7 @@ vertex_descriptor_t mesh_t::add_vertex(const math::vec3& point)
     return add_vertex(point.x(), point.y(), point.z());
 }
 
-vertex_descriptor_t mesh_t::add_vertex(const math::real_t& x, const math::real_t& y, const math::real_t& z)
+vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z)
 {
     vertex_data_t vdata;
     vdata.p = math::vec3(x, y, z);
@@ -257,9 +257,9 @@ vertex_descriptor_t mesh_t::add_vertex(const math::real_t& x, const math::real_t
 vertex_descriptor_t mesh_t::add_vertex(const char* x, const char* y, const char* z)
 {
     // ... convert convert the numerical value embedded in each character-string to a double
-    math::real_t x_ = static_cast<math::real_t>(std::atof(x));
-    math::real_t y_ = static_cast<math::real_t>(std::atof(y));
-    math::real_t z_ = static_cast<math::real_t>(std::atof(z));
+    math::real_number_t x_ = static_cast<math::real_number_t>(std::atof(x));
+    math::real_number_t y_ = static_cast<math::real_number_t>(std::atof(y));
+    math::real_number_t z_ = static_cast<math::real_number_t>(std::atof(z));
 
     return add_vertex(x_, y_, z_); // register the vertex
 }
