@@ -311,7 +311,9 @@ public:
 
     vertex_descriptor_t add_vertex(const math::vec3& point);
 
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     vertex_descriptor_t add_vertex(const math::fast_vec3& point);
+#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
     vertex_descriptor_t add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z);
 

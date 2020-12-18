@@ -27,7 +27,7 @@
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
 #include <algorithm>
-#include <fstream>
+//#include <fstream>
 #include <queue>
 #include <set>
 #include <string>
@@ -36,13 +36,12 @@
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
 
-// This macro enables dumping to the log information about meshes that are
-// dumped to file via "dump_mesh(...)"
+// This macro enables dumping data about meshes to the log when "dump_mesh(...)" is called
 #ifndef MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
 
-// This macro for BVH-debugging purposes but can be excruciatingly slow when using exact numbers.
+// This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
 // #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
 
 namespace mcut {
@@ -1341,16 +1340,12 @@ void dispatch(output_t& output, const input_t& input)
 
     for (mesh_t::face_iterator_t i = ps.faces_begin(); i != ps.faces_end(); ++i) {
 
-        //const std::vector<vd_t> vertices_on_face = get_vertices_on_face(ps, *i);
         const std::vector<vd_t> vertices_on_face = ps.get_vertices_around_face(*i);
 
         for (std::vector<vd_t>::const_iterator face_vertex_iter = vertices_on_face.cbegin(); face_vertex_iter != vertices_on_face.cend(); ++face_vertex_iter) {
             const math::fast_vec3 face_vertex_coords = ps.vertex(*face_vertex_iter);
             ps_face_bboxes[*i].expand(face_vertex_coords);
         }
-
-        //const double eps = 1e-6; // enlarge Bbox by small epsilon
-        // ps_face_bboxes[*i] = CGAL::Bbox_3(minx, miny, minz, maxx, maxy, maxz);
 
         const geom::bounding_box_t<math::fast_vec3>& bbox = ps_face_bboxes[*i];
         // calculate bbox centre for morton code evaluation
@@ -1444,13 +1439,15 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "build BVH (" << bvh_real_node_count << " nodes)" << std::endl;
 
-        bvh.resize(bvh_real_node_count - real_leaf_node_count); // internal nodes stored separately from leafs
+        MCUT_ASSERT(bvh_real_node_count > real_leaf_node_count);
+
+        bvh.resize((size_t)(bvh_real_node_count - real_leaf_node_count)); // internal nodes stored separately from leafs
 
         const int leaf_level_index = bvh::get_leaf_level_from_real_leaf_count(real_leaf_node_count);
 
         // process internal nodes
 
-        for (int level_index = leaf_level_index - 1; level_index >= 0; --level_index) {
+        for (int level_index = leaf_level_index - 1; level_index >= 0; --level_index) { // for eah tree level
 
             const int rightmost_real_leaf = bvh::get_rightmost_real_leaf(leaf_level_index, real_leaf_node_count);
             const int rightmost_real_node_on_level = bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_index);
@@ -1474,7 +1471,7 @@ void dispatch(output_t& output, const input_t& input)
                     const int left_child_index_on_level = left_child_implicit_idx - leftmost_real_node_on_child_level;
                     const fd_t& left_child_face = bvh_leaf_nodes_array.at(mesh_name).at(left_child_index_on_level).first;
                     const geom::bounding_box_t<math::fast_vec3>& left_child_bbox = ps_face_bboxes.at(left_child_face);
-                    //node_bbox = left_child_bbox;
+                    
                     node_bbox.expand(left_child_bbox);
 
                     if (right_child_exists) {
@@ -1587,7 +1584,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // simultaneuosly traverse both BVHs to find intersecting pairs
     std::queue<bvh::node_pair_t> oibvh_traversal_queue;
-    oibvh_traversal_queue.push({ 0, 0 }); // left = sm; right = cs
+    oibvh_traversal_queue.push({ 0, 0 }); // left = sm BVH; right = cm BVH
 
     const int sm_bvh_leaf_level_idx = bvh::get_leaf_level_from_real_leaf_count(sm_face_count);
     const int cs_bvh_leaf_level_idx = bvh::get_leaf_level_from_real_leaf_count(cs_face_count);
@@ -1742,10 +1739,10 @@ void dispatch(output_t& output, const input_t& input)
     lg << "calculate intersection-points" << std::endl;
 
     // intersection registry
-    std::map<vd_t, std::vector<fd_t>> m0_ivtx_to_ps_faces;
-    std::map<vd_t, hd_t> m0_ivtx_to_ps_he;
+    std::map<vd_t, std::vector<fd_t>> m0_ivtx_to_ps_faces; // intersection point to faces
+    std::map<vd_t, hd_t> m0_ivtx_to_ps_he; // intersection point to intersecting halfedge
 
-    // cut surface tip re-entrant vertices
+    // cut mesh tip re-entrant vertices
     std::vector<vd_t> cs_tip_reentrant_ivtx_list;
 
     // only need to be computed if input mesh is watertight

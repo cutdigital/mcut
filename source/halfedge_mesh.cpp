@@ -241,10 +241,12 @@ vertex_descriptor_t mesh_t::add_vertex(const math::vec3& point)
     return add_vertex(point.x(), point.y(), point.z());
 }
 
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 vertex_descriptor_t mesh_t::add_vertex(const math::fast_vec3& point)
 {
-    return add_vertex(point.x(), point.y(), point.z());
+    return add_vertex(point.x(), point.y(), point.z());  
 }
+#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z)
 {
@@ -620,12 +622,12 @@ void read_off(mcut::mesh_t& mesh, const char* fpath)
             printf("error: .off vertex not found\n");
             std::exit(1);
         }
-        std::istringstream info_stream(info);
+        std::istringstream vtx_line_stream(info);
 
         long double x;
         long double y;
         long double z;
-        info_stream >> x >> y >> z;
+        vtx_line_stream >> x >> y >> z;
         vmap[i] = mesh.add_vertex(x, y, z);
     }
 
@@ -644,10 +646,10 @@ void read_off(mcut::mesh_t& mesh, const char* fpath)
             printf("error: .off file face not found\n");
             std::exit(1);
         }
-        std::istringstream info_stream(info);
+        std::istringstream face_line_stream(info);
         int n; // number of vertices in face
         int index;
-        info_stream >> n;
+        face_line_stream >> n;
 
         if (n < 3) {
             printf("error: invalid polygon vertex count in file (%d)\n", n);
