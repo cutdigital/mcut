@@ -108,11 +108,11 @@ message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
 list(APPEND compilation_flags "")
 
-if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	list(APPEND compilation_flags -Wall -Wextra)
-elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	list(APPEND compilation_flags w3 -diag-disable:remark)
-elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	list(APPEND compilation_flags /W4)
 	list(APPEND preprocessor_defs _CRT_SECURE_NO_WARNINGS)
 endif()
@@ -121,15 +121,18 @@ message(STATUS "[MCUT] compilation_flags=${compilation_flags}")
 message(STATUS "[MCUT] preprocessor_defs=${preprocessor_defs}")
 
 # disable redandant warnings for kernel.cpp
-if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	set(kernel_source_file_flags "-Wno-unused-but-set-variable -Wno-unused-variable")
-elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	# pass
-elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	set(kernel_source_file_flags "/wd4100 /wd4189")
 endif()
 
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp PROPERTIES COMPILE_FLAGS ${kernel_source_file_flags})
+set_source_files_properties(
+	SOURCE 
+	${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp 
+	PROPERTY COMPILE_FLAGS ${kernel_source_file_flags})
 
 set (	project_source_files  
 		${CMAKE_CURRENT_SOURCE_DIR}/source/mcut.cpp 
@@ -220,6 +223,7 @@ endif()
 if(MCUT_BUILD_TUTORIALS)
 	add_subdirectory(tutorials)
 endif()
+
 ########################################################
 ###                   PACKAGING                      ###
 ### This is a quite INCOMPLETE set of variables that ###
