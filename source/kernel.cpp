@@ -157,10 +157,10 @@ std::string to_string(const cut_surface_patch_winding_order_t& v)
     std::string s;
     switch (v) {
     case cut_surface_patch_winding_order_t::DEFAULT:
-        s = "ccw";
+        s = "def";
         break;
     case cut_surface_patch_winding_order_t::REVERSE:
-        s = "cw";
+        s = "rev";
         break;
     }
     return s;
