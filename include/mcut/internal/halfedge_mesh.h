@@ -272,11 +272,11 @@ public:
     // regular member functions
     // ------------------------
 
-     int number_of_vertices() const;
+    int number_of_vertices() const;
 
-     int number_of_edges() const;
+    int number_of_edges() const;
 
-     int number_of_halfedges() const;
+    int number_of_halfedges() const;
 
     int number_of_faces() const;
 
@@ -307,7 +307,7 @@ public:
     halfedge_descriptor_t halfedge(const edge_descriptor_t e, const int i) const;
 
     // finds a halfedge between two vertices. Returns a default constructed halfedge descriptor, if source and target are not connected.
-    halfedge_descriptor_t halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t) const;
+    halfedge_descriptor_t halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check = false) const;
 
     vertex_descriptor_t add_vertex(const math::vec3& point);
 
@@ -317,9 +317,8 @@ public:
 
     vertex_descriptor_t add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z);
 
-    
 #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    
+
 #else
     vertex_descriptor_t add_vertex(const char* x, const char* y, const char* z);
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)

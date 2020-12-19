@@ -122,7 +122,11 @@ namespace geom {
 
     bool point_on_segment(const math::vec2& pi, const math::vec2& pj, const math::vec2& pk)
     {
-        return (math::min(pi.x(), pj.x()) <= pk.x() && pk.x() <= math::max(pi.x(), pj.x()) && math::min(pi.y(), pj.y()) <= pk.y() && pk.y() <= math::max(pi.y(), pj.y()));
+        return (  math::min(pi.x(), pj.x()) <= pk.x() && //
+                  pk.x() <= math::max(pi.x(), pj.x()) && //
+                  math::min(pi.y(), pj.y()) <= pk.y() && //
+                  pk.y() <= math::max(pi.y(), pj.y())
+          );
     }
 
     // segment 0: ab

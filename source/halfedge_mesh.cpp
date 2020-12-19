@@ -199,8 +199,7 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
     return h;
 }
 
-// finds a halfedge between two vertices. Returns a default constructed halfedge descriptor, if source and target are not connected.
-halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t) const
+halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
 {
     const vertex_data_t& svd = m_vertices.at(s);
     const std::vector<halfedge_descriptor_t>& s_halfedges = svd.m_halfedges;
@@ -222,11 +221,15 @@ halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex
         if (std::find(t_edges.cbegin(), t_edges.cend(), s_edge) != t_edges.cend()) // belong to same edge?
         {
             result = *i; // assume source(*i) and target(*i) match "s" and "t"
+
+            // check if we need to return the opposite halfedge
             if ((source(*i) == s && target(*i) == t) == false) {
                 MCUT_ASSERT(source(*i) == t);
                 MCUT_ASSERT(target(*i) == s);
+
                 halfedge_descriptor_t h = opposite(*i);
-                if (face(h) != null_face()) {
+
+                if (face(h) != null_face() || strict_check) { // "strict_check" ensures that we return the halfedge matching the input vertices
                     result = h;
                     break;
                 }
@@ -244,7 +247,7 @@ vertex_descriptor_t mesh_t::add_vertex(const math::vec3& point)
 #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 vertex_descriptor_t mesh_t::add_vertex(const math::fast_vec3& point)
 {
-    return add_vertex(point.x(), point.y(), point.z());  
+    return add_vertex(point.x(), point.y(), point.z());
 }
 #endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 

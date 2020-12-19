@@ -31,10 +31,7 @@
 # This script will define the following cache variables:
 #
 #	MCUT_INCLUDE_DIR - the MCUT include directory
-# 	MCUT_SHARED_LIB_PATH - path to the MCUT shared library (machine precision)
-#   MCUT_STATIC_LIB_PATH - path to the MCUT static library (machine precision)
-# 	MCUT_EXACT_SHARED_LIB_PATH - path to the MCUT shared library (exact precision)
-#   MCUT_EXACT_STATIC_LIB_PATH - path to the MCUT static library (exact precision)
+# 	MCUT_SHARED_LIB_PATH - path to the MCUT shared library 
 
 cmake_minimum_required(VERSION 3.12...3.13 FATAL_ERROR)
 
@@ -71,7 +68,7 @@ set (project_namespace_name MCUT)
 option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by default
 option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" OFF)
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
-option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
+option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
 option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" OFF)
 
 #
@@ -162,7 +159,7 @@ function(create_library_target LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF)
 
 	get_target_property(target_type ${target_name} TYPE)
 
-	if (target_type STREQUAL "SHARED")
+	if ("${target_type}" STREQUAL "SHARED")
 		set_property(TARGET ${target_name} PROPERTY POSITION_INDEPENDENT_CODE ON)
 		if(MSVC)
 			set_property(TARGET ${target_name} PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -176,12 +173,8 @@ if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 	#
 	if(MCUT_BUILD_AS_SHARED_LIB)
 		create_library_target(SHARED MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 )
-		set (MCUT_APN_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
-		message(STATUS "[MCUT] MCUT_APN_SHARED_LIB_PATH=${MCUT_APN_SHARED_LIB_PATH}")
 	else()
-		create_library_target(STATIC ${apn_object_library} MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1)
-		set (MCUT_APN_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
-		message(STATUS "[MCUT] MCUT_APN_STATIC_LIB_PATH=${MCUT_APN_STATIC_LIB_PATH}")
+		create_library_target(STATIC MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1)
 	endif()
 
 	message(STATUS "[MCUT] MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
@@ -194,15 +187,13 @@ else()
 	#
 	if(MCUT_BUILD_AS_SHARED_LIB)
 		create_library_target(SHARED "") 
-		set (MCUT_SHARED_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
-		message(STATUS "[MCUT] MCUT_SHARED_LIB_PATH=${MCUT_SHARED_LIB_PATH}")
 	else()
 		create_library_target(STATIC "")
-		set (MCUT_STATIC_LIB_PATH $<TARGET_FILE:${project_namespace_name}::${target_name}>)
-		message(STATUS "[MCUT] MCUT_STATIC_LIB_PATH=${MCUT_STATIC_LIB_PATH}")
 	endif()
 endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 
+set (MCUT_LIB_PATH $<TARGET_FILE:mcut>)
+message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
 #
 # tests
 #

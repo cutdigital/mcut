@@ -1,6 +1,6 @@
 
-#include "off.h"
 #include "mcut/mcut.h"
+#include "off.h"
 #include "gtest/gtest.h"
 #include <cstring>
 
@@ -11,7 +11,7 @@ protected:
     void SetUp() override
     {
         // create with no flags (default)
-        EXPECT_EQ(mcCreateContext(&context_, 0), MC_NO_ERROR);
+        EXPECT_EQ(mcCreateContext(&context_, MC_DEBUG), MC_NO_ERROR);
         EXPECT_TRUE(context_ != nullptr);
     }
 
