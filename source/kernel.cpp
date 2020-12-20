@@ -337,6 +337,8 @@ struct connected_component_info_t {
     std::vector<vd_t> seam_vertices;
 };
 
+// a seam vertex is simply an intersection point, including a duplicated instance if it exists as determined by the 
+// parameters "ps_num_vertices" and "m1_num_vertices_after_srcmesh_partitioning"
 void mark_seam_vertices(
     std::map<vd_t, bool>& mesh_seam_vertices,
     mesh_t& mesh,
@@ -663,7 +665,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
     return incident_vertices;
 }
 
-bool is_virtual_polygon(const fd_t& face)
+bool is_virtual_face(const fd_t& face)
 {
     return (face == mesh_t::null_face());
 }
@@ -1121,7 +1123,7 @@ bool cutpath_vertices_are_connectable(
              face_iter != entry_faces_first.cend();
              ++face_iter) {
 
-            if (is_virtual_polygon(*face_iter)) {
+            if (is_virtual_face(*face_iter)) {
                 continue; // we strictly compare based on the number of real faces
             }
 
@@ -2699,8 +2701,8 @@ void dispatch(output_t& output, const input_t& input)
                 const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
                 if (ps_edge_h != mesh_t::null_halfedge()) { // note: ps_edge could be on the border!
                     const fd_t f = ps.face(ps_edge_h);
-                    bool is_iface = f != mesh_t::null_face() && ps_iface_to_m0_edge_list.find(f) != ps_iface_to_m0_edge_list.cend();
-                    if (is_iface) {
+                    bool is_intersecting_ps_face = f != mesh_t::null_face() && ps_iface_to_m0_edge_list.find(f) != ps_iface_to_m0_edge_list.cend();
+                    if (is_intersecting_ps_face) {
                         ps_iface_to_m0_edge_list[f].emplace_back(edge);
                     }
                 }
@@ -3135,7 +3137,7 @@ void dispatch(output_t& output, const input_t& input)
                          face_iter != entry0_faces.cend();
                          ++face_iter) {
 
-                        if (is_virtual_polygon(*face_iter)) {
+                        if (is_virtual_face(*face_iter)) {
                             // we compare based on the number of real faces since ambiguities may arise
                             // in the specific case of border cancave faces, whose cut-path problem
                             // we are trying to solve right now.
@@ -3533,57 +3535,67 @@ void dispatch(output_t& output, const input_t& input)
         }
     }
 
-    // The following steps are about clipping intersecting polygons
-    // ------------------------------------------------------------
+    // The following sections of code are about clipping intersecting polygons,
+    // and the information we need in order to do that.
+    // -----------------------------------------------------------------------
 
     ///////////////////////////////////////////////////////////////////////////
-    // Gather intersection points on each intersecting faces
+    // Gather/map intersection points on each intersecting faces
     ///////////////////////////////////////////////////////////////////////////
 
     lg << "associate intersecting faces to intersection-points" << std::endl;
 
-    std::map<fd_t, std::vector<vd_t>> ps_iface_to_ivtx_list; // faces which intersect with another
+    std::map<
+      fd_t, // intersectiong face 
+      std::vector<vd_t> // intersection point which involve the intersecting face
+    > ps_iface_to_ivtx_list; // faces which intersect with another
 
     for (std::map<vd_t, std::vector<fd_t>>::const_iterator ireg_entry_iter = m0_ivtx_to_ps_faces.cbegin();
          ireg_entry_iter != m0_ivtx_to_ps_faces.cend();
-         ++ireg_entry_iter) { // for each intersection registry entry
+         ++ireg_entry_iter) { // for each intersection point ...
 
-        const vd_t& entry_vertex = ireg_entry_iter->first;
-        const std::vector<fd_t>& entry_faces = ireg_entry_iter->second;
+        const vd_t& intersection_point = ireg_entry_iter->first;
+        const std::vector<fd_t>& entry_faces = ireg_entry_iter->second; // faces in registry entry
 
         // update face vertex-registry
 
         for (std::vector<fd_t>::const_iterator entry_face_iter = entry_faces.cbegin();
              entry_face_iter != entry_faces.cend();
-             ++entry_face_iter) {
+             ++entry_face_iter) { // for each face in the intersection point's registry entry
 
-            if (is_virtual_polygon(*entry_face_iter)) {
-                continue; // virtal faces are simply placeholders
+            if (is_virtual_face(*entry_face_iter)) {
+                continue; // virtual faces are simply placeholders - not useful
             }
 
+            // get entry of current face
             std::map<fd_t, std::vector<vd_t>>::iterator find_iter = ps_iface_to_ivtx_list.find(*entry_face_iter);
             const bool face_vertex_registery_exists = find_iter != ps_iface_to_ivtx_list.cend();
 
-            if (face_vertex_registery_exists) {
-                std::vector<vd_t>& face_vertex_registry = find_iter->second;
-                const bool vertex_registered = std::find(face_vertex_registry.cbegin(), face_vertex_registry.cend(), entry_vertex) != face_vertex_registry.cend();
+            if (face_vertex_registery_exists) { // do we have a map entry already...?
+                // get the intersection points incident to the face
+                std::vector<vd_t>& face_vertex_registry = find_iter->second; 
+                // has the current intersection point been associated with the current intersecting face
+                const bool vertex_registered = std::find(face_vertex_registry.cbegin(), face_vertex_registry.cend(), intersection_point) != face_vertex_registry.cend();
 
                 if (!vertex_registered) {
-                    face_vertex_registry.push_back(entry_vertex);
+                    face_vertex_registry.push_back(intersection_point); // associate intersection point with intersecting face
                 }
             } else {
                 // add face-registry and register vertex
                 std::pair<std::map<fd_t, std::vector<vd_t>>::iterator, bool> pair = ps_iface_to_ivtx_list.insert(std::make_pair(*entry_face_iter, std::vector<vd_t>()));
                 MCUT_ASSERT(pair.second == true);
 
-                find_iter = pair.first;
+                find_iter = pair.first; 
                 std::vector<vd_t>& face_vertex_registry = find_iter->second;
-                face_vertex_registry.push_back(entry_vertex);
+                face_vertex_registry.push_back(intersection_point); // associate intersection point with intersecting face
             }
         }
     }
 
-    // dump
+
+    // dump mapping to the log
+    // -----------------------
+
     for (std::map<fd_t, std::vector<vd_t>>::const_iterator i = ps_iface_to_ivtx_list.cbegin(); i != ps_iface_to_ivtx_list.cend(); ++i) {
         lg.indent();
         lg << "face " << i->first << std::endl;
@@ -3601,20 +3613,33 @@ void dispatch(output_t& output, const input_t& input)
     // Polygon tracing (clipping of intersecting polygon-soup faces)
     ///////////////////////////////////////////////////////////////////////////
 
-    lg << "clip intersecting polygons" << std::endl;
+    // Now we start to clip every intersecting face
+    // -----------------------------------------------
 
-    std::vector<traced_polygon_t> m0_polygons;
+    lg << "clip intersecting faces" << std::endl;
+
+    // Stores the all polygons, including new polygons that are produced after clipping
+    // and the faces that remained unchanged because they were not intersecting. Note 
+    // that faces in the polygon soup that were found to be intersecting are replaced
+    // with "child" faces that result from their clipping.
+    //
+    // I use the word "polygon" here because they are not yet used to define a mesh -
+    // at which point they become faces!
+    std::vector<traced_polygon_t> m0_polygons; 
 
     int traced_sm_polygon_count = 0;
 
+    // for each face in the polygon-soup mesh
     for (mesh_t::face_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter) {
         lg.indent();
 
         const fd_t& ps_face = *ps_face_iter;
 
-        // reference to all the edges which lie on the face
+        // get all the edges that lie on "ps_face", including the new one after partiting acording to intersection 
+        // points, and the old one which did not intersect any face
         std::map<fd_t, std::vector<ed_t>>::iterator ps_iface_to_m0_edge_list_fiter = ps_iface_to_m0_edge_list.find(ps_face);
-        bool is_iface = ps_iface_to_m0_edge_list_fiter != ps_iface_to_m0_edge_list.end();
+     
+        bool is_intersecting_ps_face = ps_iface_to_m0_edge_list_fiter != ps_iface_to_m0_edge_list.end();
         bool is_from_cut_mesh = ps_is_cutmesh_face(ps_face, sm_face_count);
 
         lg << "face " << ps_face << std::endl;
@@ -3623,40 +3648,60 @@ void dispatch(output_t& output, const input_t& input)
 
         lg.indent();
 
-        lg << "mesh = " << (is_from_cut_mesh ? "cut-mesh" : "source-mesh") << std::endl;
-        lg << "is intersecting face = " << std::boolalpha << is_iface << std::endl;
+        lg << "origin-mesh = " << (is_from_cut_mesh ? "cut-mesh" : "source-mesh") << std::endl;
+        lg << "is intersecting face = " << std::boolalpha << is_intersecting_ps_face << std::endl;
 
-        if (is_iface == false) { // non-intersecting face
+        if (is_intersecting_ps_face == false) { // non-intersecting face
 
-            // NOTE: here we just copy the polygon as-is
-            traced_polygon_t retraced_poly;
-            //CGAL::Halfedge_around_face_iterator<mesh_t> hbegin, hend;
-            //int num_halfedges = 0;
-            lg << "polygon" << std::endl;
-            //for (boost::tie(hbegin, hend) = halfedges_around_face(ps.halfedge(ps_face), ps); hbegin != hend; ++hbegin) {
+            // NOTE: here we just copy the polygon as-is because it does not change.
+            // --------------------------------------------------------------------
+
+            traced_polygon_t retraced_poly; // ordered sequence of halfedges defining the unchanged polygon
+            
+            // query the halfedge sequence in the polygon soup that defines our polygon
             std::vector<hd_t> halfedges_around_face = ps.get_halfedges_around_face(ps_face);
+
+            retraced_poly.reserve(halfedges_around_face.size()); // minimum 3 (triangle)
+
+            // what we are going to do now is: 
+            //  for each halfedge in "halfedges_around_face" (ps), find its equivalent halfedge in "m0"
+            //  The found m0-halfedges will then define "retraced_poly"
+            // ----------------------------------------------------------------------------------------
+
+            // for each halfedge in the current polygon
             for (std::vector<hd_t>::const_iterator hbegin = halfedges_around_face.cbegin(); hbegin != halfedges_around_face.cend(); ++hbegin) {
                 lg.indent();
 
+                // get the source and target vertex descriptors in the polygon soup
                 const vd_t ps_h_src = ps.source(*hbegin);
                 const vd_t ps_h_tgt = ps.target(*hbegin);
+
+                // get the "m0" version of "ps_h_src"
                 std::map<vd_t, vd_t>::const_iterator ps_h_src_fiter = std::find_if(m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
                     [&](const std::pair<vd_t, vd_t>& e) -> bool { return e.second == ps_h_src; });
 
-                MCUT_ASSERT(ps_h_src_fiter != m0_to_ps_vtx.cend());
+                MCUT_ASSERT(ps_h_src_fiter != m0_to_ps_vtx.cend()); // must exist because all "ps" vertices exist in "m0"
 
+                // get the "m0" version of "ps_h_tgt"
                 std::map<vd_t, vd_t>::const_iterator ps_h_tgt_fiter = std::find_if(m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
                     [&](const std::pair<vd_t, vd_t>& e) -> bool { return e.second == ps_h_tgt; });
 
                 MCUT_ASSERT(ps_h_tgt_fiter != m0_to_ps_vtx.cend());
 
+                // the "m0" versions of "ps_h_src" and  "ps_h_tgt"
                 const vd_t m0_h_src = ps_h_src_fiter->first;
                 const vd_t m0_h_tgt = ps_h_tgt_fiter->first;
-                const ed_t ps_edge = ps.edge(*hbegin);
-                const ed_t m0_edge = ps_to_m0_non_intersecting_edge.at(ps_edge);
+
+                // Now we find the actual "m0" halfedge equivalent to "*hbegin" using 
+                // our "m0" source and target descriptors
+                // --------------------------------------------------------------------
+
+                const ed_t ps_edge = ps.edge(*hbegin); // polygon soup version of the edge of the current halfedge
+                const ed_t m0_edge = ps_to_m0_non_intersecting_edge.at(ps_edge); // "m0" version of edge
                 const hd_t m0_edge_h0 = m0.halfedge(m0_edge, 0);
                 const hd_t m0_edge_h1 = m0.halfedge(m0_edge, 1);
 
+                // resolve the correct halfedge by match the source and target vertex descriptors
                 if (m0.source(m0_edge_h0) == m0_h_src && m0.target(m0_edge_h0) == m0_h_tgt) {
                     lg << hstr(m0, m0_edge_h0) << std::endl;
                     retraced_poly.emplace_back(m0_edge_h0);
@@ -3665,24 +3710,30 @@ void dispatch(output_t& output, const input_t& input)
                     retraced_poly.emplace_back(m0_edge_h1);
                 }
 
-                //num_halfedges++;
                 lg.unindent();
             }
 
-            child_polygons.emplace_back(retraced_poly);
+            MCUT_ASSERT(retraced_poly.size() == halfedges_around_face.size());
+
+            // save the retraced polygon, using the information in "m0" from "ps"
+            child_polygons.emplace_back(retraced_poly); 
 
         } else {
 
-            // list of edges which lie on the face
+            // Here we enter the complex case of having to actually clip the current face
+            // because it is intersecting
+            // --------------------------------------------------------------------------
+
+            // retrieve the list of edges which lie on the face (new and some original)
             const std::vector<ed_t>& ps_iface_m0_edge_list = ps_iface_to_m0_edge_list_fiter->second;
 
-            //
-            // gather vertices on face (including intersection points)
-            //
+            // Now we gather vertices on face (including intersection points)
+            // ------------------------------------------------------
 
-            //std::vector<vd_t> ps_coincident_vertices = get_vertices_on_face(ps, ps_face);
+            // Get the original vertices first, which we do by first querying them from "ps"
+            // and then using our maps to get their "m0" versions.
             std::vector<vd_t> ps_coincident_vertices = ps.get_vertices_around_face(ps_face);
-            std::vector<vd_t> coincident_vertices; // those stored in "m0"
+            std::vector<vd_t> coincident_vertices; // "m0" versions of those stored in "ps_coincident_vertices"
 
             // gather the original (m0) vertices on the face
             for (int i = 0; i < (int)ps_coincident_vertices.size(); ++i) {
@@ -3698,20 +3749,22 @@ void dispatch(output_t& output, const input_t& input)
                 coincident_vertices.emplace_back(m0_to_ps_vtx_fiter->first);
             }
 
-            // now gather the intersection-points on the face
+            MCUT_ASSERT(coincident_vertices.size() == ps_coincident_vertices.size());
+
+            // now we gather the intersection-points on the face
             const std::map<fd_t, std::vector<vd_t>>::const_iterator ireg_entry_iter = ps_iface_to_ivtx_list.find(ps_face);
 
             MCUT_ASSERT(ireg_entry_iter != ps_iface_to_ivtx_list.cend());
 
-            const int coincident_ps_vertex_count = (int)coincident_vertices.size();
+            // const int coincident_ps_vertex_count = (int)coincident_vertices.size();
             const std::vector<vd_t>& intersection_points_on_face = ireg_entry_iter->second;
             coincident_vertices.insert(coincident_vertices.end(), intersection_points_on_face.cbegin(), intersection_points_on_face.cend());
 
-            lg << "intersection points = " << intersection_points_on_face.size() << std::endl;
+            lg << "intersection points on face = " << intersection_points_on_face.size() << std::endl;
 
-            MCUT_ASSERT(intersection_points_on_face.size() >= 2);
+            MCUT_ASSERT(intersection_points_on_face.size() >= 2); // minimum
 
-            // dump
+            // dump to log
             if (input.verbose) {
                 lg << "coincident vertices = " << coincident_vertices.size() << std::endl;
                 lg.indent();
@@ -3722,106 +3775,44 @@ void dispatch(output_t& output, const input_t& input)
                 lg.unindent();
             }
 
-            //
-            // gather edges on face
-            //
+            // After gathering the vertices above, we will not collect edges on the face
+            // -------------------------------------------------------------------------
 
-            // first, we gather the edges on the exterior (boundary) of the face
-            std::vector<ed_t> incident_edges;
-#if 1
-            incident_edges = ps_iface_m0_edge_list;
-#else
-            // for each edge on the current face
-            for (std::vector<ed_t>::const_iterator aux_edge_iter = ps_iface_m0_edge_list.cbegin(); aux_edge_iter != ps_iface_m0_edge_list.cend(); ++aux_edge_iter) {
+            // edges on face
+            std::vector<ed_t> incident_edges = ps_iface_m0_edge_list; // COPY because "incident_edges" will be modified later
 
-                const ed_t& edge = (*aux_edge_iter);
-                const vd_t v0 = m0.vertex(edge, 0);
-                const vd_t v1 = m0.vertex(edge, 1);
-                const bool v0_is_ivtx = m0_is_intersection_point(v0, ps_vtx_cnt);
-                const bool v1_is_ivtx = m0_is_intersection_point(v1, ps_vtx_cnt);
-                const bool is_ambiguious_exterior_edge_case = v0_is_ivtx && v1_is_ivtx;
-                bool is_valid_ambiguious_exterior_edge = false;
+            // number of boundary edges on the face
+            int incident_boundary_edge_count = 0;
 
-                if (is_ambiguious_exterior_edge_case) { // denotes an exterior edge defined by two intersection vertices which is an ambigious case arising from concave cutting problem
-
-                    // get the halfedges which where traversed to calculate v0 and v1 as intersection points
-                    const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v0);
-                    const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v1);
-
-                    // get their edges
-                    const ed_t v0_ps_edge = ps.edge(v0_coincident_ps_halfedge);
-                    const ed_t v1_ps_edge = ps.edge(v1_coincident_ps_halfedge);
-
-                    // when the two halfedges belongs to the same edge, v0 and v1 where produced by multiple intersections of one edge "edge" with two faces which is a scenario which will arise from a concave cutting problem
-                    is_valid_ambiguious_exterior_edge = (v0_ps_edge == v1_ps_edge); //
-                }
-
-                if ((!is_ambiguious_exterior_edge_case || is_valid_ambiguious_exterior_edge)) {
-                    incident_edges.push_back(edge);
-                }
-            }
-
-            const int incident_exterior_edge_count = incident_edges.size(); // used to calculate an offset into "incident_edges" for determining that starting position of interior edges
-
-            // dump
-            lg << "exterior edges = " << incident_exterior_edge_count << " :";
-            for (std::vector<ed_t>::const_iterator exterior_edge_iter = incident_edges.cbegin(); exterior_edge_iter != incident_edges.cend(); ++exterior_edge_iter) {
-                lg << estr(m0, *exterior_edge_iter) << std::endl; // " ext-edge=" << *exterior_edge_iter << " : " << m0.vertex(*exterior_edge_iter, 0) << " " << m0.vertex(*exterior_edge_iter, 1) << std::endl;
-            }
-            lg << std::endl;
-
-            MCUT_ASSERT(incident_exterior_edge_count >= 3); // minimum is 3 edge which is for a triangle
-
-            // now that we have gathered the exterior edges, the next step is to gather
-            // interior edges on the face
-            //
-            //  an incident interior edge must satisfy 3 conditions
-            //  1) edge defined by incident vertices
-            //  2) these vertices are intersection vertices
-            //  3) the coincident ps-halfedges of these vertices are different (i.e. the inverse rule which is used to resolve the ambiguity of exterior edges defined by two edges).
-
-            // for each edge on face
-            for (std::vector<ed_t>::const_iterator aux_edge_iter = ps_iface_m0_edge_list.cbegin(); aux_edge_iter != ps_iface_m0_edge_list.cend(); ++aux_edge_iter) {
-
-                const ed_t& edge = *aux_edge_iter;
-                const vd_t v0 = m0.vertex(edge, 0);
-                const vd_t v1 = m0.vertex(edge, 1);
-                const bool v0_is_ivtx = m0_is_intersection_point(v0, ps_vtx_cnt);
-                const bool v1_is_ivtx = m0_is_intersection_point(v1, ps_vtx_cnt);
-                const bool is_ambiguious_interior_edge_case = v0_is_ivtx && v1_is_ivtx;
-                bool is_valid_ambiguious_interior_edge = false;
-
-                if (is_ambiguious_interior_edge_case) {
-                    const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v0);
-                    const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v1);
-                    const ed_t v0_ps_edge = ps.edge(v0_coincident_ps_halfedge);
-                    const ed_t v1_ps_edge = ps.edge(v1_coincident_ps_halfedge);
-
-                    is_valid_ambiguious_interior_edge = (v0_ps_edge != v1_ps_edge); // must be different!
-
-                    if (is_valid_ambiguious_interior_edge) {
-                        incident_edges.push_back(edge);
-                        lg << estr(m0, edge) << std::endl; //"interior edge = "  << edge << " " << m0.vertex(edge, 0) << " " << m0.vertex(edge, 1) << std::endl;
-                    }
-                }
-            }
-#endif
-            int incident_exterior_edge_count = 0;
-            // at this point we want to partition the list of edges into exterior and interior
-            // i.e. exterior edges come first. We do this because it makes it easier for us
-            // to filter interior edges when they are consecutive in the list
+            // We will now partition the list of incident edges into boundary/exterior and interior
+            // Boundary edges come first, then interior ones. We do this because it makes it easier for us
+            // to filter our interior edges if they are consecutive in the list (i.e. in "incident_edges")
             std::partition(incident_edges.begin(), incident_edges.end(),
-                [&](const ed_t& e) { // calculate if edge is exterior
+                [&](const ed_t& e) { 
+                    // calculate if edge is exterior
+                    // -----------------------------
+
+                    // get vertices defining edge
                     const vd_t v0 = m0.vertex(e, 0);
                     const vd_t v1 = m0.vertex(e, 1);
+
+                    // are both vertices intersection points (the main property of interior edges)
                     const bool v0_is_ivtx = m0_is_intersection_point(v0, ps_vtx_cnt);
                     const bool v1_is_ivtx = m0_is_intersection_point(v1, ps_vtx_cnt);
-                    const bool is_ambiguious_exterior_edge_case = v0_is_ivtx && v1_is_ivtx;
-                    bool is_valid_ambiguious_exterior_edge = false;
 
-                    if (is_ambiguious_exterior_edge_case) { // denotes an exterior edge defined by two intersection vertices which is an ambigious case arising from concave cutting problem
+                    // if both vertices are intersection points, we must be careful to make an extra 
+                    // check that the edge is really on the boundary. Moreover, it is possible that 
+                    // their exist an edge on the boundary whose vertices are both intersection 
+                    // points - hence the possible ambiguity.
+                    // A boundary edge defined by two intersection points can arise from "carve-out" 
+                    // cuts..
+                    const bool is_ambiguious_boundary_edge_case = (v0_is_ivtx && v1_is_ivtx);
+                    bool is_valid_ambiguious_boundary_edge = false;
 
-                        // get the halfedges which where traversed to calculate v0 and v1 as intersection points
+                    if (is_ambiguious_boundary_edge_case) { 
+
+                        // get the respectve "ps" halfedges whose intersection test lead to "v0" and "v1"
+                        // which are intersection points.
                         const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v0);
                         const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v1);
 
@@ -3829,79 +3820,89 @@ void dispatch(output_t& output, const input_t& input)
                         const ed_t v0_ps_edge = ps.edge(v0_coincident_ps_halfedge);
                         const ed_t v1_ps_edge = ps.edge(v1_coincident_ps_halfedge);
 
-                        // when the two halfedges belongs to the same edge, v0 and v1 where produced by multiple intersections of one edge "edge" with two faces which is a scenario which will arise from a concave cutting problem
-                        is_valid_ambiguious_exterior_edge = (v0_ps_edge == v1_ps_edge); //
+                        // This is true if v0 and v1 where produced by multiple intersections of one edge 
+                        // with two different faces 
+                        is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge); 
                     }
 
-                    bool is_exterior_edge = (!is_ambiguious_exterior_edge_case || is_valid_ambiguious_exterior_edge);
-                    if (is_exterior_edge) {
-                        incident_exterior_edge_count++; // count
+                    bool is_boundary_edge = (!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge);
+                    if (is_boundary_edge) {
+                        incident_boundary_edge_count++; // count
                     }
-                    return is_exterior_edge;
+                    return is_boundary_edge;
                 });
 
-            // dump
-            lg << "exterior edges = " << incident_exterior_edge_count << std::endl;
+            // dump info to log
+
+            lg << "boundary edges = " << incident_boundary_edge_count << std::endl;
+
             for (std::vector<ed_t>::const_iterator exterior_edge_iter = incident_edges.cbegin();
-                 exterior_edge_iter != incident_edges.cbegin() + incident_exterior_edge_count;
+                 exterior_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count;
                  ++exterior_edge_iter) {
                 lg.indent();
                 lg << estr(m0, *exterior_edge_iter) << std::endl; // " ext-edge=" << *exterior_edge_iter << " : " << m0.vertex(*exterior_edge_iter, 0) << " " << m0.vertex(*exterior_edge_iter, 1) << std::endl;
                 lg.unindent();
             }
 
-            MCUT_ASSERT(incident_exterior_edge_count >= 3); // minimum is 3 edge which is for a triangle
+            MCUT_ASSERT(incident_boundary_edge_count >= 3); // minimum is 3 edge which is for a triangle
 
-            const int interior_edges_on_face = (int)incident_edges.size() - incident_exterior_edge_count;
-            lg << "interior edges (unfiltered) = " << interior_edges_on_face << std::endl;
-            for (std::vector<ed_t>::const_iterator interior_edge_iter = incident_edges.cbegin() + incident_exterior_edge_count;
+            const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
+
+            lg << "unfiltered interior edges = " << interior_edges_on_face << std::endl;
+            
+            // dump info to log
+
+            for (std::vector<ed_t>::const_iterator interior_edge_iter = incident_edges.cbegin() + incident_boundary_edge_count;
                  interior_edge_iter != incident_edges.cend();
                  ++interior_edge_iter) {
                 lg.indent();
-                lg << estr(m0, *interior_edge_iter) << std::endl; // " ext-edge=" << *exterior_edge_iter << " : " << m0.vertex(*exterior_edge_iter, 0) << " " << m0.vertex(*exterior_edge_iter, 1) << std::endl;
+                lg << estr(m0, *interior_edge_iter) << std::endl;
                 lg.unindent();
             }
 
-            MCUT_ASSERT(interior_edges_on_face >= 1); // minimum possible number (cae of two intersection points)
+            MCUT_ASSERT(interior_edges_on_face >= 1); // minimum possible number (i.e. situation of two intersection points)
 
             // Having partitioned the list of edges on the current face, we will now filter out the
             // redundant [exterior interior-edges]. An exterior interior-edge is one whose vertices
-            // lie on the clipped polygon but the line connecting them passes outside that polygon.
-            // such edges arise due to concave polygon intersections i.e. the currently clipped
-            // polygon (ps_face) intersected a concave polygon.
+            // lie on the clipped face but the line connecting them passes outside the area of that face.
+            // Such edges arise due to concave face intersections i.e. the currently clipped
+            // face (ps_face) intersected (or is a) a concave polygon.
             //
-            // For why we need filtering, we need it because our goal is to be able to trace
-            // child-polygons without of numerical (geometry) operations. Specifically, filtering
-            // is necessary to avoid certain ambiguities which arise when tracing child-polygons,
-            // and these ambiguity come from the fact that we will be using only halfedges to trace.
-            // (See tracing steps below!)
+            // For [why] we need filtering: we need it because our goal is to be able to trace
+            // child-polygons using a well-defined algorithm that is free from numerical/floating point calculations. 
+            // Moreover, filtering is necessary to avoid certain ambiguities which arise when tracing child-polygons,
+            // and these ambiguities come from the fact that we will be using only halfedges to do the tracing.
+            // (See tracing steps below for more context!)
+
             lg << "filter exterior interior-edges" << std::endl;
 
             /*
+                Algorithm to remove redundant "exterior interior-edges" from the list of incident edges.
+
                 Here we identify [sets] of edges that are 1) defined using intersection points, and 2) each 
                 set has edges with the (grouping) property that: intersection registry entries match by at 
                 least two real faces
 
                 1. gather all intersection points (on current face) 
-                2. gather all iedges which are connected to vertices in step (1)
-                3. classify the edges from step (2) into sets using our set property `S` # (registry entry matching by 2 faces)
+                2. gather all edges which are connected to vertices in step (1)
+                3. classify the edges from step (2) into sets `S` using our set property --> (registry entry matching by 2 faces)
                     a. while there is a non-classified edge, `i`
                         b. for each set `s`
-                            c. pick any edge in `s`, `e` # (since all in the set edges will share the set property)
+                            c. pick any edge in `s`, `e` # (since all in the set edges will share the set property `S`)
                             d. IF the property of `e` matches `i`
                                 e. insert `i` into `s`
                         d. IF `i` not added to any set
                             e. create new set and insert `i`
-                4. for each set in `S`, `s`
+                4. for each set `s` in `S` 
                     a. IF `s` has 3 or more edges
-                        b. apply filtering
-
-                see code below for filtering algorithm
+                        b. apply filtering (See code below for filtering algorithm)
             */
+
+            // 1. (we already have the intersection points)
 
             // 2. gather all interior edges (those connected to intesection points)
             std::deque<ed_t> incident_iedges_set_classification_queue(
-                incident_edges.cbegin() + incident_exterior_edge_count, // offset to start of interior edges
+                incident_edges.cbegin() + incident_boundary_edge_count, // offset to start of interior edges (thanks to partitioning step)
                 incident_edges.cend()); // dirty copy
 
             std::map<int, std::set<ed_t>> iedge_sets;
@@ -3922,12 +3923,13 @@ void dispatch(output_t& output, const input_t& input)
                 const ed_t v0_ps_edge = ps.edge(v0_coincident_ps_halfedge);
                 const ed_t v1_ps_edge = ps.edge(v1_coincident_ps_halfedge);
 
-                const bool is_valid_ambiguious_exterior_edge = (v0_ps_edge == v1_ps_edge); // must be different!
+                const bool is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge); // must be different!
 
-                if (is_valid_ambiguious_exterior_edge) {
+                if (is_valid_ambiguious_boundary_edge) {
                     continue; // is exterior!
                 }
 
+                // get registry entries of edge vertices
                 const std::vector<fd_t>& unclassified_iedge_v0_registry = m0_ivtx_to_ps_faces.at(unclassified_iedge_v0);
                 const std::vector<fd_t>& unclassified_iedge_v1_registry = m0_ivtx_to_ps_faces.at(unclassified_iedge_v1);
 
@@ -3935,7 +3937,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 // b. for each set
                 for (std::map<int, std::set<ed_t>>::iterator iedge_sets_iter = iedge_sets.begin(); iedge_sets_iter != iedge_sets.end(); ++iedge_sets_iter) {
-
+                    // TODO: just use std::vector
                     std::set<ed_t>& iedge_set = iedge_sets_iter->second;
                     // c. pick any edge in <b> # (since all edges will share the set property)
                     const ed_t set_edge0 = *iedge_set.cbegin();
@@ -3944,14 +3946,17 @@ void dispatch(output_t& output, const input_t& input)
                     const vd_t set_edge0_v0 = m0.vertex(set_edge0, 0);
                     const vd_t set_edge0_v1 = m0.vertex(set_edge0, 1);
 
-                    // NOTE: we need to compare against both vertices' registries (set_edge0_v0 and set_edge0_v1) since second vertex may not share the two same faces we are trying to match with
+                    // NOTE: we need to compare against both vertices' registries (set_edge0_v0 and set_edge0_v1) since 
+                    // second vertex may not share the two same faces we are trying to match with
                     const std::vector<fd_t>& set_edge0_v0_registry = m0_ivtx_to_ps_faces.at(set_edge0_v0);
 
                     int unclassified_iedge_v0_match_count = 0;
                     int unclassified_iedge_v1_match_count = 0;
 
-                    for (std::vector<fd_t>::const_iterator set_edge0_v0_registry_iter = set_edge0_v0_registry.cbegin(); set_edge0_v0_registry_iter != set_edge0_v0_registry.cend(); ++set_edge0_v0_registry_iter) {
-                        if (is_virtual_polygon(*set_edge0_v0_registry_iter)) {
+                    for ( std::vector<fd_t>::const_iterator set_edge0_v0_registry_iter = set_edge0_v0_registry.cbegin(); 
+                          set_edge0_v0_registry_iter != set_edge0_v0_registry.cend(); 
+                          ++set_edge0_v0_registry_iter) {
+                        if (is_virtual_face(*set_edge0_v0_registry_iter)) {
                             continue; // we want to count the number of real faces
                         }
 
@@ -3970,8 +3975,10 @@ void dispatch(output_t& output, const input_t& input)
                         unclassified_iedge_v0_match_count = 0;
                         unclassified_iedge_v1_match_count = 0;
 
-                        for (std::vector<fd_t>::const_iterator set_edge0_v1_registry_iter = set_edge0_v1_registry.cbegin(); set_edge0_v1_registry_iter != set_edge0_v1_registry.cend(); ++set_edge0_v1_registry_iter) {
-                            if (is_virtual_polygon(*set_edge0_v1_registry_iter)) {
+                        for (std::vector<fd_t>::const_iterator set_edge0_v1_registry_iter = set_edge0_v1_registry.cbegin(); 
+                            set_edge0_v1_registry_iter != set_edge0_v1_registry.cend(); 
+                            ++set_edge0_v1_registry_iter) {
+                            if (is_virtual_face(*set_edge0_v1_registry_iter)) {
                                 continue; // we want to count the number of real faces
                             }
 
@@ -3997,13 +4004,16 @@ void dispatch(output_t& output, const input_t& input)
                     iedge_sets_insertion.first->second.insert(unclassified_iedge);
                 }
 
-                incident_iedges_set_classification_queue.pop_front(); // rm unclassified_iedge
+                incident_iedges_set_classification_queue.pop_front(); // rm unclassified_iedge from queue
             }
 
-            if (!iedge_sets.empty()) {
+            
+           // if (!iedge_sets.empty()) {
                 // normally we just get one set
-                lg << "interior edge sets = " << iedge_sets.at(0).size() << std::endl;
-            }
+                lg << "interior edge sets = " << iedge_sets.size() << std::endl;
+            //}
+
+            MCUT_ASSERT(!iedge_sets.empty()); // can never be empty (one set with one edge at least!)
 
             // 4. for each set in <3>
             for (std::map<int, std::set<ed_t>>::const_iterator iedge_sets_iter = iedge_sets.cbegin(); iedge_sets_iter != iedge_sets.cend(); ++iedge_sets_iter) {
@@ -4011,7 +4021,7 @@ void dispatch(output_t& output, const input_t& input)
                 const std::set<ed_t>& iedge_set = iedge_sets_iter->second;
 
                 // a. IF set has 3 or more edges
-                // Note: The minimum possible number of interior halfedges necessary to
+                // Note: The minimum possible number of interior edges necessary to
                 // apply filtering is 3. ** think 2-teeth concave polygon where both teeth
                 // are partially cut , as shown below:
                 //
@@ -4031,10 +4041,11 @@ void dispatch(output_t& output, const input_t& input)
                     // b. apply filtering
 
                     // first, we gather all vertices used by iedges in the current set
+                    // These are all intersection points.
+                    // ---------------------------------------------------------------
 
                     std::vector<vd_t> iedge_set_vertices;
-
-                    // TODO: we can use the already-known interrior edges from above!!
+                    // for each edge in the current set
                     for (std::set<ed_t>::const_iterator iedge_set_iter = iedge_set.cbegin();
                          iedge_set_iter != iedge_set.cend();
                          ++iedge_set_iter) {
@@ -4053,17 +4064,26 @@ void dispatch(output_t& output, const input_t& input)
                         }
                     }
 
-                    // Here, we check that there is at-least one of the intersection
-                    // points (connected to by the edges in the set) that lies on a halfedge
-                    // of the currently clipped face (ps_face). If this is false, then we
-                    // can't do filtering. Alternative, we also check is exactly two such vertices
-                    // lie on an edge of the clipped polygon
+                    // Here, we check for one condition before we proceed with filtering:
+                    // 1) that there is at-least one vertex (i.e. in "iedge_set_vertices") which lies on a halfedge 
+                    //    (i.e. the boundary) of the currently clipped face (ps_face).  
+                    //
+                    // If this is false, then we skip filtering.
                     //
                     // This is necessary if the clipped face (ps_face) was intersected by
-                    // another jagged/concave face
+                    // another jagged/concave face, in a stab-like fashion.
+                    // Note that the edges that are part of the skipped set do not actually get 
+                    // used to clipped the current face because they do not touch its boundary, and hence
+                    // cannot partition it - even for a partial. The tracing algorithm below will detect 
+                    // such edge sets automatically and get rid of them because tracing with them produces
+                    // an invalid polygon!
 
                     bool atleast_one_set_ivertex_on_ps_face_he = false;
+
+                    // We also check if exactly two such vertices (as defined in conditions <1> above) exist.
                     int num_set_ivertices_on_a_ps_face_he = 0;
+
+                    // for each vertex in the edge set
                     for (std::vector<vd_t>::const_iterator iedge_set_vertices_iter = iedge_set_vertices.cbegin();
                          iedge_set_vertices_iter != iedge_set_vertices.cend();
                          ++iedge_set_vertices_iter) {
@@ -4072,8 +4092,8 @@ void dispatch(output_t& output, const input_t& input)
                         // get halfedge which intersected at ivertex
                         const hd_t coincident_ps_halfedge = m0_ivtx_to_ps_he.at(ivertex);
                         const ed_t coincident_ps_edge = ps.edge(coincident_ps_halfedge);
+
                         // halfedges of the clipped face
-                        //std::vector<hd_t> ps_face_halfedges = get_halfedges_on_face(ps, ps_face);
                         std::vector<hd_t> ps_face_halfedges = ps.get_halfedges_around_face(ps_face);
 
                         // check if any halfedge of coincident_ps_edge belongs to ps_face
@@ -4086,46 +4106,57 @@ void dispatch(output_t& output, const input_t& input)
                                 if (!atleast_one_set_ivertex_on_ps_face_he) {
                                     atleast_one_set_ivertex_on_ps_face_he = true;
                                 }
-                                // break;
                             }
                         }
-                        //if (atleast_one_set_ivertex_on_ps_face_he) {
-                        //    break;
-                        //}
                     }
 
                     if (!atleast_one_set_ivertex_on_ps_face_he || num_set_ivertices_on_a_ps_face_he == 2) {
                         // we cannot do filtering because
-                        // 1) the edges in the set lie on/inside ps_face and without touching its bounding halfedges (e.g. tet vs tri complete cut)
-                        // 2) the edges partition the current polygon into two parts (e.g. test 7)
+                        // 1) the edges in the set lie inside the area of "ps_face" and without connecting to its bounding halfedges (e.g. tet vs tri complete cut)
+                        // 2) the edges partition the current polygon into two parts (e.g. TEST 7, look at the cut surface triangle and imagine how it is clipped)
                         continue;
                     }
 
-                    // Now we are going to create a bin for each intersection point which connected
-                    // to by an edge in the set. a bin contains the edges that are connected to the
+                    // Now we are going to create a bin for each intersection point which is connected
+                    // to by an edge in the set. A bin contains the edges that are connected to the
                     // corresponding vertex.
+                    // -------------------------------------------------------------------------------
+
+                    // The bins store vertices and edges connected to them in a way that allows us to 
+                    // easily deduce the connectivity of the sequence implied by the edge in the set.
 
                     std::map<vd_t, std::vector<ed_t>> iedge_set_vertex_to_iedge_set_edges; // bins
 
+                    // for each vertex in the edge set
                     for (std::vector<vd_t>::const_iterator iedge_set_vertices_iter = iedge_set_vertices.cbegin();
                          iedge_set_vertices_iter != iedge_set_vertices.cend();
                          ++iedge_set_vertices_iter) {
 
                         const vd_t& bin_vertex = *iedge_set_vertices_iter;
-                        std::pair<std::map<vd_t, std::vector<ed_t>>::const_iterator, bool> pair = iedge_set_vertex_to_iedge_set_edges.insert(std::make_pair(bin_vertex, std::vector<ed_t>()));
-
-                        MCUT_ASSERT(pair.second == true);
+                        // create bin entry
+                        MCUT_ASSERT(iedge_set_vertex_to_iedge_set_edges.count(bin_vertex) == 0);
+                        iedge_set_vertex_to_iedge_set_edges[bin_vertex] = std::vector<ed_t>();
+                        //std::pair<std::map<vd_t, std::vector<ed_t>>::const_iterator, bool> pair = iedge_set_vertex_to_iedge_set_edges.insert(std::make_pair(bin_vertex, std::vector<ed_t>()));
+                        //MCUT_ASSERT(pair.second == true);
+                        MCUT_ASSERT(iedge_set_vertex_to_iedge_set_edges.count(bin_vertex) == 1);
                     }
 
-                    // populate bins (if the vertex of bin is used by edge, then add edge to bin)
+                    // populate bins (Idea: if the vertex of bin is used by edge, then add edge to bin)
+                    // --------------------------------------------------------------------------------
 
+                    // for each edge in the set
                     for (std::set<ed_t>::const_iterator iedge_set_iter = iedge_set.cbegin();
                          iedge_set_iter != iedge_set.cend();
                          ++iedge_set_iter) {
 
                         const ed_t& edge = (*iedge_set_iter);
+
+                        // get vertices defining edge
                         const vd_t v0 = m0.vertex(edge, 0);
                         const vd_t v1 = m0.vertex(edge, 1);
+
+                        // get bin of "v0", and add edge into it
+                        // -------------------------------------
                         const std::map<vd_t, std::vector<ed_t>>::iterator find_v0 = iedge_set_vertex_to_iedge_set_edges.find(v0);
 
                         MCUT_ASSERT(find_v0 != iedge_set_vertex_to_iedge_set_edges.cend());
@@ -4136,6 +4167,8 @@ void dispatch(output_t& output, const input_t& input)
 
                         find_v0->second.push_back(edge);
 
+                        // get bin of "v1", and add edge into it
+                        // -------------------------------------
                         const std::map<vd_t, std::vector<ed_t>>::iterator find_v1 = iedge_set_vertex_to_iedge_set_edges.find(v1);
 
                         MCUT_ASSERT(find_v1 != iedge_set_vertex_to_iedge_set_edges.cend());
@@ -4149,17 +4182,26 @@ void dispatch(output_t& output, const input_t& input)
 
                     // Now we are going to `sort` edges of the set into a sequence using the bins.
                     // Note that the sorting is not numerical but is akin to re-ordering the edges
-                    // according to the vertices they connect
+                    // according to the vertices they connect. We are basically deducing the 
+                    // connectivity of the sequence implied by the edges.
+                    // ---------------------------------------------------------------------------
 
                     // First, we must find a bin (any) with 1 edge. This is a case where the vertex
-                    // (of the bin) is the first or last vertex of the final sequence - a `terminal`
-                    // vertex.
+                    // (of the bin) is the first or last vertex of the sequence we are deducing - a 
+                    // `terminal` vertex.
+
+                    vd_t terminal_vertex_descr = mesh_t::null_vertex();
 
                     const int terminal_vertex_count = (int)std::count_if(
                         iedge_set_vertex_to_iedge_set_edges.cbegin(),
                         iedge_set_vertex_to_iedge_set_edges.cend(),
                         [&](const std::pair<vd_t, std::vector<ed_t>>& e) {
-                            return e.second.size() == 1;
+                              bool found = (e.second.size() == 1);
+                              if (found && terminal_vertex_descr == mesh_t::null_vertex())
+                              {
+                                terminal_vertex_descr = e.first; // set to first-encountered terminal vertex
+                              }
+                            return found;
                         });
 
                     if (terminal_vertex_count == 0) {
@@ -4176,17 +4218,22 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(terminal_vertex_count == 2); // verify that there are exactly two vertices associated with only one edge each
 
                     // get any terminal vertex
+#if 1
+                    std::map<vd_t, std::vector<ed_t>>::const_iterator first_vertex_of_sequence_iter = iedge_set_vertex_to_iedge_set_edges.find(terminal_vertex_descr);
+                    MCUT_ASSERT(first_vertex_of_sequence_iter->second.size() == 1);
+#else
+
                     std::map<vd_t, std::vector<ed_t>>::const_iterator first_vertex_of_sequence_iter = std::find_if(
                         iedge_set_vertex_to_iedge_set_edges.cbegin(),
                         iedge_set_vertex_to_iedge_set_edges.cend(),
                         [&](const std::pair<vd_t, std::vector<ed_t>>& e) {
                             return e.second.size() == 1;
                         });
-
+#endif
                     MCUT_ASSERT(first_vertex_of_sequence_iter != iedge_set_vertex_to_iedge_set_edges.cend());
 
                     const ed_t first_edge_of_sequence = first_vertex_of_sequence_iter->second.front();
-                    iedge_set_vertex_to_iedge_set_edges.erase(first_vertex_of_sequence_iter); // remove
+                    iedge_set_vertex_to_iedge_set_edges.erase(first_vertex_of_sequence_iter); // remove bin of first terminal vertex
 
                     // Now we are going to re-order/sort the sequence using the bins.
                     // O(n) since the do-while loop can iterate at most "n-1" times where n is the number of bins
@@ -4221,17 +4268,19 @@ void dispatch(output_t& output, const input_t& input)
 
                     } while (!iedge_set_vertex_to_iedge_set_edges.empty());
 
-                    // dump
+                    // dump the sequence to log
                     lg << "re-ordered edge sequence : ";
+
                     for (std::vector<ed_t>::const_iterator i = iedge_set_sequence.begin(); i != iedge_set_sequence.end(); ++i) {
                         lg << " <" << *i << ">";
                     }
                     lg << std::endl;
 
                     // Now that we have sorted the sequence, we can then systemically filter out
-                    // the exterior interior-edges.
+                    // the exterior interior-edges (which has been our objective so far before clipping).
                     // It so happens that every second edge in the sorted sequence will be a exterior
                     // interior-edge :)
+                    // ---------------------------------------------------------------------------------
 
                     lg << "filtered exterior interior-iedges : ";
 
@@ -4252,7 +4301,7 @@ void dispatch(output_t& output, const input_t& input)
                 } // end of edge filtering
             }
 
-            // dump
+            // dump the final set of edges to be used for clipping
 
             lg << "final edges on face = " << incident_edges.size() << std::endl;
 
@@ -4265,31 +4314,34 @@ void dispatch(output_t& output, const input_t& input)
             // is to gather the halfedges on the clipped face from these edges.
             //
             // Note that the gathered set of halfedges will contain some halfedges which are redundant.
-            // These redundant halfedges are those which lie on the exterior of the clipped polygon and
-            // have a winding order which is opposite to input meshes (cut-mesh or source-mesh) i.e. cw
-            // (clockwise) order. Thus, we need one more filtering step which will remove these redundant
-            // halfedges from the gather set.
+            // These redundant halfedges are those which lie on the boundary of the clipped polygon and
+            // have a winding order which is opposite to the winding order of the input mesh which contained 
+            // "ps_face" (i.e. either the cut-mesh or source-mesh). 
+            // 
+            // Thus, we need one more filtering step which will remove these redundant halfedges from 
+            // the gather set.
 
             lg << "gather exterior halfedges on face" << std::endl;
 
             std::vector<hd_t> incident_halfedges;
 
             // 1. find an exterior halfedge (any)
-            hd_t first_exterior_halfedge = mesh_t::null_halfedge();
+            hd_t first_boundary_halfedge = mesh_t::null_halfedge();
 
             // for each edge on clipped polygon, (i.e. from the filtered set)
             for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin();
-                 incident_edge_iter != incident_edges.cend();
+                 incident_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count; // we only want exterior edges
                  ++incident_edge_iter) {
 
-                const int incident_edge_idx = (int)std::distance(incident_edges.cbegin(), incident_edge_iter);
-
-                if (incident_edge_idx >= incident_exterior_edge_count) {
-                    continue; // we only want exterior edge
-                }
+                //const int incident_edge_idx = (int)std::distance(incident_edges.cbegin(), incident_edge_iter);
+                 
+                //if (incident_edge_idx >= incident_boundary_edge_count) {
+                //    continue; // we only want exterior edge
+                //}
 
                 const ed_t& edge = (*incident_edge_iter);
 
+                // for each halfedge on the current edge
                 for (int edge_he_iter = 0; edge_he_iter < 2; ++edge_he_iter) {
 
                     const hd_t m0_edge_he = m0.halfedge(edge, edge_he_iter);
@@ -4298,21 +4350,21 @@ void dispatch(output_t& output, const input_t& input)
                     const bool m0_edge_he_src_is_ivertex = m0_is_intersection_point(m0_edge_he_src, ps_vtx_cnt);
                     const bool m0_edge_he_tgt_is_ivertex = m0_is_intersection_point(m0_edge_he_tgt, ps_vtx_cnt);
 
-                    if (!m0_edge_he_src_is_ivertex && !m0_edge_he_tgt_is_ivertex) { // o-->o
+                    if (!m0_edge_he_src_is_ivertex && !m0_edge_he_tgt_is_ivertex) { // o-->o (unmodified original edge)
 
                         const vd_t ps_he_src = m0_to_ps_vtx.at(m0_edge_he_src);
                         const vd_t ps_he_tgt = m0_to_ps_vtx.at(m0_edge_he_tgt);
                         const hd_t ps_he = ps.halfedge(ps_he_src, ps_he_tgt);
 
                         if (ps_he == mesh_t::null_halfedge()) {
-                            continue; // opposite of border halfedge
+                            continue; 
                         }
 
                         if (ps.face(ps_he) == ps_face) {
-                            first_exterior_halfedge = m0_edge_he;
+                            first_boundary_halfedge = m0_edge_he;
                             break;
                         }
-                    } else { // x-->x o-->x x-->o
+                    } else { // x-->x OR o-->x OR x-->o
 
                         // o-->x : We want the ihalfedges which point into the sm whose tgt lays on the
                         // sm-face of tgt (they have an opposite direction wrt the face normal)
@@ -4322,22 +4374,22 @@ void dispatch(output_t& output, const input_t& input)
 
                             // get the incident ps-halfedge of tgt
                             hd_t tgt_ps_h = m0_ivtx_to_ps_he.at(m0_edge_he_tgt);
-                            //hd_t ps_halfedge_of_face = tgt_ps_h;
+                            
                             if (ps.face(tgt_ps_h) != ps_face) {
                                 tgt_ps_h = ps.opposite(tgt_ps_h);
-                                MCUT_ASSERT(tgt_ps_h != mesh_t::null_halfedge()); // must be true if the current face is exists.
+                                MCUT_ASSERT(tgt_ps_h != mesh_t::null_halfedge()); // must be true if ps_face exists!
                             }
 
                             const vd_t& m0_edge_he_src_as_ps_vertex = m0_to_ps_vtx.at(m0_edge_he_src);
 
                             if (m0_edge_he_src_as_ps_vertex == ps.source(tgt_ps_h)) { // is counter clock-wise halfedge
-                                first_exterior_halfedge = m0_edge_he;
+                                first_boundary_halfedge = m0_edge_he;
                                 break;
                             }
-                        } else {
+                        } else { // x-->x OR x-->o
 
                             const bool is_xx = m0_edge_he_src_is_ivertex && m0_edge_he_tgt_is_ivertex;
-
+                            
                             if (is_xx) { // exterior interior-iedge
 
                                 const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(m0_edge_he_src);
@@ -4353,44 +4405,53 @@ void dispatch(output_t& output, const input_t& input)
                                 /*
                                     At this point, vertex information alone is insufficient to select the correct
                                     ihalfedge from the edge. This is because the two vertices are topologically equivalent 
-                                    if just try to distinguish them following similar rules as other iedge types.
-                                    To solve this problem, we must instead used on the connectivity information of 
-                                    the polygon soup by using the incident ps-halfedge common to both vertices 
-                                    (in their registry entries). The steps:
+                                    if we just try to distinguish them following similar rules as other iedge types.
+                                    To solve this problem, we must instead use the connectivity information of 
+                                    the polygon soup by relying on the incident ps-halfedge common to both vertices 
+                                    (in their registry entries). The rough idea/steps:
 
                                     1. get incident ps-halfedge incident to both src and tgt
                                     2. get m0 edges incident to the edge on <1>
                                     3. sort <2> with the first edge containing the source of <1>
                                     4. get the halfedge sequence in <3> where src of the first he is the src of <1> and the tgt of the last he is the tgt of <1>
-                                    5. get the halfedge in <4> which is incident to the same ivertices as the current potential first-exterior halfedge  
+                                    5. get the halfedge in <4> which is incident to the same ivertices as the current potential first-boundary halfedge  
                                     6. if the ps-face of <1> is the same as the current face
-                                        7. set first polygon-exterior halfedge as <5> 
+                                        7. set first polygon-boundary halfedge as <5> 
                                     8. else
-                                        9. set first polygon-exterior halfedge as opposite of <5> 
+                                        9. set first polygon-boundary halfedge as opposite of <5> 
                                 */
 
+                                // 1. get incident ps-halfedge incident to both src and tgt
                                 hd_t ps_halfedge_of_face = tgt_ps_h;
 
+                                // equivalent to the check done at step 6. so that we know the correct halfedge to use in the steps ahead
                                 if (ps.face(ps_halfedge_of_face) != ps_face) {
                                     ps_halfedge_of_face = ps.opposite(ps_halfedge_of_face);
-                                    MCUT_ASSERT(ps_halfedge_of_face != mesh_t::null_halfedge()); // guarranteed to exist since we have a poly=exterior interior ihalfedge
+                                    MCUT_ASSERT(ps_halfedge_of_face != mesh_t::null_halfedge()); // guarranteed to exist since we have a poly-boundary interior ihalfedge
                                 }
 
+                                // 2. get m0 edges incident to the edge on <1>
                                 const ed_t& incident_ps_edge = ps.edge(ps_halfedge_of_face);
                                 std::map<ed_t, std::vector<ed_t>>::const_iterator ps_to_m0_edges_find_iter = ps_to_m0_edges.find(incident_ps_edge);
                                 MCUT_ASSERT(ps_to_m0_edges_find_iter != ps_to_m0_edges.cend()); // because incident_ps_edge contains a polygon exterior interior ihalfedge
 
+                                //3. sort <2> with the first edge containing the source of <1>
+                                // NOTE: The edges are already sorted based on how we created "edges between the sorted vertices that are coincident on the same 
+                                // ps-edge that has more-than 3 incident vertices." (Refer to that step for details)
                                 const std::vector<ed_t>& sorted_m0_edges = ps_to_m0_edges_find_iter->second;
 
                                 // 4. get the halfedge sequence in <3> where src of the first he is the src of <1> and the tgt of the last he is the tgt of <1>
                                 std::vector<hd_t> halfedge_sequence;
 
-                                // add the first halfedge (its sourc emust be an original vertex)
+                                // add the first halfedge (its source must be an original vertex)
+                                // NOTE: its does not matter whether "first_he" point in the wrong direction or not right now (read on...)
                                 const ed_t& first_e = sorted_m0_edges.front();
                                 hd_t first_he = m0.halfedge(first_e, 0);
                                 vd_t first_he_src = m0.source(first_he);
 
                                 if (m0_is_intersection_point(first_he_src, ps_vtx_cnt)) {
+                                    // TODO: I think this scope is never entered based on how we created "sorted_m0_edges". 
+                                    // Thus, the source vertex of the first halfedge in the sequence cannot be an intersection point
                                     first_he = m0.halfedge(first_e, 1);
                                     first_he_src = m0.source(first_he);
                                     MCUT_ASSERT(!m0_is_intersection_point(first_he_src, ps_vtx_cnt)); // expect original vertex since halfedge edge is the first in sequence
@@ -4399,11 +4460,12 @@ void dispatch(output_t& output, const input_t& input)
                                 halfedge_sequence.push_back(first_he);
 
                                 // get the remaining halfedge of sequence
-                                for (std::vector<ed_t>::const_iterator seq_edge_iter = sorted_m0_edges.cbegin(); seq_edge_iter != sorted_m0_edges.cend(); ++seq_edge_iter) {
+                                for (std::vector<ed_t>::const_iterator seq_edge_iter = sorted_m0_edges.cbegin()+1; // we have already added the first halfedge
+                                  seq_edge_iter != sorted_m0_edges.cend(); ++seq_edge_iter) {
 
-                                    if (seq_edge_iter == sorted_m0_edges.cbegin()) {
-                                        continue; // we have already added the first halfedge
-                                    }
+                                    //if (seq_edge_iter == sorted_m0_edges.cbegin()) {
+                                    //    continue; // we have already added the first halfedge
+                                    //}
 
                                     const ed_t& e = *seq_edge_iter;
                                     const hd_t h0 = m0.halfedge(e, 0);
@@ -4416,12 +4478,14 @@ void dispatch(output_t& output, const input_t& input)
                                     }
                                 }
 
+                                // we have our sequence but it is not gurranteed to point in the correct direction
                                 MCUT_ASSERT(halfedge_sequence.size() == sorted_m0_edges.size());
 
                                 const vd_t& first_he_src_as_ps_vertex = m0_to_ps_vtx.at(first_he_src); // first he of sequence
 
                                 if (first_he_src_as_ps_vertex != ps.source(ps_halfedge_of_face)) {
-
+                                    
+                                  // flip the sequence to make it point in the right direction
                                     std::for_each(
                                         halfedge_sequence.begin(),
                                         halfedge_sequence.end(),
@@ -4442,34 +4506,42 @@ void dispatch(output_t& output, const input_t& input)
                                         return (he_src == m0_edge_he_src && he_tgt == m0_edge_he_tgt /*|| (he_src == m0_edge_he_tgt && he_tgt == m0_edge_he_src*/);
                                     });
 
-                                if (matching_he_find_iter != halfedge_sequence.cend()) // does the potential halfedge actually point in the correct direction or not
+                                MCUT_ASSERT(matching_he_find_iter != halfedge_sequence.cend()); // does the potential halfedge actually point in the correct direction or not
                                 {
                                     // 6. if the ps-face of <1> is the same as the current face
                                     //      7. set first polygon-exterior halfedge as <5>
                                     // 8. else
                                     //      9. set first polygon-exterior halfedge as opposite of <5>
                                     // if (ps.face(incident_ps_halfedge) == ps_face) {
-                                    first_exterior_halfedge = *matching_he_find_iter;
+                                    first_boundary_halfedge = *matching_he_find_iter;
                                     break;
                                 }
-                            }
-                        }
-                    }
-                }
+                            } // if (is_xx) {
+                            else
+                            {
+                              // TODO: implement logic for is_xo
 
-                if (first_exterior_halfedge != mesh_t::null_halfedge()) {
+                              // NOTE: The code is able to work without implementing this scope due to the order-dependent nature in which
+                              // edges are traversed (its guarranteed that oo ox and xx edges are encountered first) to find the first 
+                              // boundary halfedge
+                            }
+                        } // } else { // x-->x OR x-->o
+                    } // } else { // x-->x OR o-->x OR x-->o
+                } // for (int edge_he_iter = 0; edge_he_iter < 2; ++edge_he_iter) {
+
+                if (first_boundary_halfedge != mesh_t::null_halfedge()) {
                     break; // done
                 }
             }
 
-            MCUT_ASSERT(first_exterior_halfedge != mesh_t::null_halfedge());
+            MCUT_ASSERT(first_boundary_halfedge != mesh_t::null_halfedge());
 
-            // Now that we halfedge a halfedge which lies on the exterior of the clipped polygon,
-            // we will traverse/walk the clipped polygon's [exterior] to collect all other exterior halfedges
-            // that share the same winding order as the input meshes (src-mesh and cut-mesh).
+            // Now that we have a halfedge which lies on the boundary of the clipped polygon,
+            // we will traverse/walk the clipped polygon's exterior to collect all other boundary halfedges
+            // that have the same winding order as the input meshes (i.e. the source-mesh and cut-mesh).
 
             hd_t current_exterior_halfedge = mesh_t::null_halfedge();
-            hd_t next_exterior_halfedge = first_exterior_halfedge;
+            hd_t next_exterior_halfedge = first_boundary_halfedge;
 
             do {
                 lg.indent();
@@ -4482,12 +4554,14 @@ void dispatch(output_t& output, const input_t& input)
                 const vd_t current_tgt = m0.target(current_exterior_halfedge);
                 next_exterior_halfedge = mesh_t::null_halfedge(); // reset
 
-                // find next halfedge from incident edges
-                for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin(); incident_edge_iter != incident_edges.cend(); ++incident_edge_iter) {
-                    const int incident_edge_idx = (int)std::distance(incident_edges.cbegin(), incident_edge_iter);
-                    if (incident_edge_idx >= incident_exterior_edge_count) {
-                        continue; // we only want exterior halfedge
-                    }
+                // find next boundary halfedge from incident edges
+                for ( std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin(); 
+                      incident_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count; // we only want exterior edges; 
+                      ++incident_edge_iter) {
+                    //const int incident_edge_idx = (int)std::distance(incident_edges.cbegin(), incident_edge_iter);
+                    //if (incident_edge_idx >= incident_boundary_edge_count) {
+                    //    continue; // we only want exterior halfedge
+                    //}
 
                     const ed_t& edge = *incident_edge_iter;
                     bool edge_walked = std::find_if(
@@ -4511,19 +4585,19 @@ void dispatch(output_t& output, const input_t& input)
                     {
                         const bool v0_is_ivtx = m0_is_intersection_point(v0, ps_vtx_cnt);
                         const bool v1_is_ivtx = m0_is_intersection_point(v1, ps_vtx_cnt);
-                        bool is_ambiguious_exterior_edge_case = v0_is_ivtx && v1_is_ivtx;
-                        bool is_valid_ambiguious_exterior_edge = false;
+                        bool is_ambiguious_boundary_edge_case = v0_is_ivtx && v1_is_ivtx;
+                        bool is_valid_ambiguious_boundary_edge = false;
 
-                        if (is_ambiguious_exterior_edge_case) { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
+                        if (is_ambiguious_boundary_edge_case) { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
 
                             const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v0);
                             const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v1);
                             const ed_t v0_ps_edge = ps.edge(v0_coincident_ps_halfedge);
                             const ed_t v1_ps_edge = ps.edge(v1_coincident_ps_halfedge);
-                            is_valid_ambiguious_exterior_edge = (v0_ps_edge == v1_ps_edge); // see also above when gathering exterior incident edges
+                            is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge); // see also above when gathering exterior incident edges
                         }
 
-                        if (!is_ambiguious_exterior_edge_case || is_valid_ambiguious_exterior_edge) {
+                        if (!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge) {
                             const hd_t h0 = m0.halfedge(edge, 0);
                             const hd_t h1 = m0.halfedge(edge, 1);
 
@@ -4541,9 +4615,9 @@ void dispatch(output_t& output, const input_t& input)
                     }
                 }
                 lg.unindent();
-            } while (next_exterior_halfedge != mesh_t::null_halfedge() /*first_exterior_halfedge*/);
+            } while (next_exterior_halfedge != mesh_t::null_halfedge() /*first_boundary_halfedge*/);
 
-            MCUT_ASSERT(incident_halfedges.size() >= 3); // minumum i.e. for a triangles!
+            MCUT_ASSERT(incident_halfedges.size() >= 3); // minimum i.e. for a triangles!
 
             // Note: at this stage we have gathered all of the [exterior] halfedges needed to traced child polygons
 
@@ -4551,9 +4625,9 @@ void dispatch(output_t& output, const input_t& input)
 
             lg << "exterior halfedges on face = " << exterior_halfedge_count << std::endl;
 
-            MCUT_ASSERT(exterior_halfedge_count == incident_exterior_edge_count);
+            MCUT_ASSERT(exterior_halfedge_count == incident_boundary_edge_count);
 
-            // Now we going to also gather interior halfedges (those defined only by intersection points
+            // Now we are going to also gather interior halfedges (those passing inside the area of "ps_face", and defined only by intersection points
             // where the src and tgt vertex do not share the same incident ihalfedge in their registry entry.
 
             for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin(); incident_edge_iter != incident_edges.cend(); ++incident_edge_iter) {
@@ -4579,6 +4653,7 @@ void dispatch(output_t& output, const input_t& input)
                     if (is_valid_interior_edge) {
                         //MCUT_ASSERT(v0_ps_edge != edge);
 
+                      // NOTE: both halfedge are used in tracing!
                         incident_halfedges.push_back(h0);
                         incident_halfedges.push_back(h1);
                     }
@@ -4595,19 +4670,21 @@ void dispatch(output_t& output, const input_t& input)
             }
 
             // Note: at this stage, we have all the halfedges that we need to trace child polygons.
-            // Thus, the next step is tracing
+            // Thus, the next step is the actual tracing to clip ps_face
 
-            //
-            // Trace child polygons on face to clip it
-            //
+            // Trace child polygons on ps_face to clip it
+            //-------------------------------------------
 
-            std::vector<hd_t> incident_halfedges_to_be_walked(incident_halfedges.cbegin(), incident_halfedges.cend()); // dirty copy
+            std::vector<hd_t> incident_halfedges_to_be_walked(incident_halfedges.cbegin(), incident_halfedges.cend()); // copy
 
             do { // each iteration traces a child polygon
 
                 traced_polygon_t child_polygon;
                 hd_t current_halfedge = mesh_t::null_halfedge();
-                hd_t next_halfedge = incident_halfedges_to_be_walked.front(); // can be any halfedge in vector
+                // can be any boundary halfedge in vector (NOTE: boundary halfedges come first in the std::vector)
+                // Its important that we start from boundary halfedge as it simplies the conditions for when a 
+                // valid polygon has been constructed
+                hd_t next_halfedge = incident_halfedges_to_be_walked.front(); 
 
                 MCUT_ASSERT(incident_halfedges_to_be_walked.size() >= 2);
 
@@ -4625,14 +4702,15 @@ void dispatch(output_t& output, const input_t& input)
                     child_polygon.push_back(current_halfedge);
                     const vd_t current_halfedge_target = m0.target(current_halfedge);
                     next_halfedge = mesh_t::null_halfedge(); // reset
+
                     // remove next halfedge so that we dont walk it again
-                    std::vector<hd_t>::const_iterator find_iter = std::find(incident_halfedges_to_be_walked.cbegin(), incident_halfedges_to_be_walked.cend(), current_halfedge);
+                    {
+                      std::vector<hd_t>::const_iterator find_iter = std::find(incident_halfedges_to_be_walked.cbegin(), incident_halfedges_to_be_walked.cend(), current_halfedge);
+                      MCUT_ASSERT(find_iter != incident_halfedges_to_be_walked.cend());
+                      incident_halfedges_to_be_walked.erase(find_iter); // remove
+                    }
 
-                    MCUT_ASSERT(find_iter != incident_halfedges_to_be_walked.cend());
-
-                    incident_halfedges_to_be_walked.erase(find_iter); // remove
-
-                    if (child_polygon.size() >= 3) { // minimum halfedge count (triangle)
+                    if (child_polygon.size() >= 3) { // minimum halfedge count to constitute a valid polygon (triangle)
 
                         // source of first halfedge is target of last
                         if (m0.source(child_polygon.front()) == m0.target(child_polygon.back())) {
@@ -4640,6 +4718,7 @@ void dispatch(output_t& output, const input_t& input)
                             // the current halfedge is [not] the opposite of the first halfedge in list
                             // This is an important edge case for when you walk a halfedge connecting two vertices not in alpha (intersection).
                             // Example: case of tracing a polygon analogous to a cheek slash.
+                            // See also the comment above the declaration of "next_halfedge"
                             if (current_halfedge != m0.opposite(child_polygon.front())) {
                                 is_valid_polygon = true;
                                 lg.unindent();
@@ -4749,15 +4828,13 @@ void dispatch(output_t& output, const input_t& input)
                     lg.unindent();
                 } while (next_halfedge != mesh_t::null_halfedge());
 
-                //MCUT_ASSERT(is_valid_polygon);
-
                 if (is_valid_polygon) {
                     lg << "valid" << std::endl;
                     child_polygons.emplace_back(child_polygon);
                 }
 
             } while (!incident_halfedges_to_be_walked.empty());
-        } // if (!is_iface) {
+        } // if (!is_intersecting_ps_face) {
 
         lg << "traced polygons on face = " << child_polygons.size() << std::endl;
 
@@ -4772,22 +4849,22 @@ void dispatch(output_t& output, const input_t& input)
     } // for each ps-face to trace
 
     m0_ivtx_to_ps_faces.clear(); // free
-    ps_iface_to_m0_edge_list.clear();
-    ps_to_m0_edges.clear();
-    ps_to_m0_non_intersecting_edge.clear();
-    ps_iface_to_ivtx_list.clear();
+    ps_iface_to_m0_edge_list.clear(); // free
+    ps_to_m0_edges.clear(); // free
+    ps_to_m0_non_intersecting_edge.clear(); // free
+    ps_iface_to_ivtx_list.clear(); // free
 
     // Note: at this stage, we have traced all polygons. This means that any intersecting face in the polygon
     // soup will also now have been clipped.
     //
     // The connectivity of all traced polygons are represented a lists of halfedges for each
     // traced polygon. The halfedge data structure (i.e. "m0") still holds the underlying mesh data
-    // over-which we are abstracting the connectivity i.e. it stores vertices (like intersection
+    // over-which we are abstracting the connectivity i.e. the data structure stores vertices (like intersection
     // points), edges, and halfeges.
     //
-    // The lists of halfedges that we are using to represent the traced polygons avoid "2-manifold restrictions".
-    // Storing the traced polygons inside a halfedge data structure is not possible because we would violate the
-    // prinicipal rule that an edge must be incident to at most 2 faces (2-manifold surface mesh rule).
+    // The lists of halfedges that we are using to represent the traced polygons avoid "2-manifold restrictions":
+    // Storing the traced polygons inside a halfedge data structure is not always possible because we could violate the
+    // prinicipal rule that an edge must be incident to at-most 2 faces (2-manifold surface mesh rule).
     //
     // There is a other benefit to using lists: it makes for a more logical implementation for the remainder of the
     // cutting algorithm i.e when duplicating intersection points, creating cut-mesh patches, stitching (hole
@@ -4809,18 +4886,18 @@ void dispatch(output_t& output, const input_t& input)
     MCUT_ASSERT(!m0_vertex_to_seam_flag.empty());
 
     ///////////////////////////////////////////////////////////////////////////
-    // Dump meshes for src-mesh and cut-mesh using the traced polygons
+    // Dump meshes for the source-mesh and cut-mesh using the traced polygons
     ///////////////////////////////////////////////////////////////////////////
 
     //
     // NOTE: we cannot always create meshes using the traced polygons because of
-    // a violation of the surface mesh contruction rules. Basically, we cannot
+    // a possible violation of the surface mesh contruction rules. Basically, we cannot
     // reference a halfedge and its opposite in the same face because it violates
     // halfedge construction rules (2-manifold surface mesh). This issue occurs
     // whenever ps polygon is partially cut.
     //
     // Thus, we will only dump meshes if can gaurranteed not to violate halfedge
-    // mesh rules (which can crash the program).
+    // mesh rules (to avoid potentially crashing the program due to logic error).
     //
 
     lg << "dump traced-polygons if possible" << std::endl;
@@ -4828,7 +4905,7 @@ void dispatch(output_t& output, const input_t& input)
     // dump traced src-mesh polygons.
 
     // dump traced polygons only if the cut paths are circular or complete linear cuts (prevents us
-    // from violating halfedge construction rules, which would happen otherwise)
+    // from violating halfedge construction rules)
     bool all_cutpaths_are_circular = (num_explicit_circular_cutpaths == num_explicit_cutpath_sequences);
     bool all_cutpaths_linear_and_without_making_holes = (num_explicit_circular_cutpaths == 0) && ((int)explicit_cutpaths_severing_srcmesh.size() == num_explicit_linear_cutpaths);
 
@@ -4836,7 +4913,7 @@ void dispatch(output_t& output, const input_t& input)
 
         std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_src_mesh_fragments;
 
-        // NOTE: The result is a mesh identical to the original except at the edges introduced by the cut..
+        // NOTE: The result is a mesh identical to the original source mesh except at the edges introduced by the cut..
         extract_connected_components(
             separated_src_mesh_fragments,
             m0,
@@ -4874,16 +4951,21 @@ void dispatch(output_t& output, const input_t& input)
             MCUT_ASSERT(separated_cut_mesh_fragments.cbegin()->second.size() == 1); // one instance
             output.seamed_cut_mesh.mesh = std::move(separated_cut_mesh_fragments.begin()->second.front().first);
             output.seamed_cut_mesh.seam_vertices = std::move(separated_cut_mesh_fragments.begin()->second.front().second.seam_vertices);
-        } else // cutmesh is a single (large) polygon [and] we have multiple patches
+        } else // cutmesh is a single (large) polygon [and] we have multiple patches which are not connected at the edges
         {
             // here we create a new mesh containing only the polygons of the cut-mesh [and] where every vertex is referenced
             // by a face (i.e. we remove those vertices used only by the source mesh in "m0")
             mesh_t m; // output (seamed connected component)
             std::vector<vd_t> remapped_seam_vertices;
             std::map<vd_t, vd_t> vmap_mesh_vertices;
+
+            // for each face in the merged mesh
             for (mesh_t::face_iterator_t f = merged.faces_begin(); f != merged.faces_end(); ++f) {
+                // get vertices on face
                 const std::vector<vd_t> vertices_around_face = merged.get_vertices_around_face(*f);
                 std::vector<vd_t> remapped_face;
+                
+                // for each vertex on face
                 for (std::vector<vd_t>::const_iterator v = vertices_around_face.cbegin(); v != vertices_around_face.cend(); ++v) {
                     if (vmap_mesh_vertices.count(*v) == 0) { // not registered
                         vmap_mesh_vertices[*v] = m.add_vertex(merged.vertex(*v)); // add vertex and save it new descriptor
@@ -4909,7 +4991,7 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    // Map each halfedge to the traced polygons that use it
+    // Map each halfedge to the traced polygons that uses it
     ///////////////////////////////////////////////////////////////////////////
 
     lg << "map halfedges to polygons" << std::endl;
@@ -4920,7 +5002,7 @@ void dispatch(output_t& output, const input_t& input)
     // no longer possible for reasons mentioned above (see long comment after tracing loop).
     //
     // So the first incidence information that we need to keep around is the mapping from every
-    // halfedge (in "m0") which is used to trace a polygon, to the traced polygon(s) that use
+    // halfedge (in "m0") which is used to trace a polygon, to the traced polygon(s) that uses
     // that halfedge. Thus, halfedges which are not used for tracing [at all] do not have an entry
     // in this map. We will use this information later, like to stitch cut-mesh patches to src-mesh
     // fragments.
@@ -5342,16 +5424,16 @@ void dispatch(output_t& output, const input_t& input)
         // ** I'm not convinced that this is a problem
 
 #if 0
-        bool is_ambiguious_exterior_edge_case = v0_is_ivtx && v1_is_ivtx;
+        bool is_ambiguious_boundary_edge_case = v0_is_ivtx && v1_is_ivtx;
 
-        if (is_ambiguious_exterior_edge_case) { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
+        if (is_ambiguious_boundary_edge_case) { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
 
             const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v0);
             const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v1);
             const ed_t v0_ps_edge = ps.edge(v0_coincident_ps_halfedge);
             const ed_t v1_ps_edge = ps.edge(v1_coincident_ps_halfedge);
-            bool is_valid_ambiguious_exterior_edge = (v0_ps_edge == v1_ps_edge); // see also above when gathering exterior incident edges
-            if (is_valid_ambiguious_exterior_edge && !cs_is_watertight) // x-->x where o-->x-->x-->o
+            bool is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge); // see also above when gathering exterior incident edges
+            if (is_valid_ambiguious_boundary_edge && !cs_is_watertight) // x-->x where o-->x-->x-->o
             {
                 // Exterior ihalfedges (and hence their respective halfedges) are not transformed.
                 // Only interior ihalfedges need to be transformed to create incisions that allow openings of the sm via transformations.
@@ -6574,20 +6656,20 @@ void dispatch(output_t& output, const input_t& input)
 
                     const vd_t src_vertex = m0.source(*poly_he_iter);
                     const vd_t tgt_vertex = m0.target(*poly_he_iter);
-                    bool is_ambiguious_exterior_edge_case = m0_is_intersection_point(src_vertex, ps_vtx_cnt) && m0_is_intersection_point(tgt_vertex, ps_vtx_cnt);
-                    bool is_valid_ambiguious_exterior_edge = false;
+                    bool is_ambiguious_boundary_edge_case = m0_is_intersection_point(src_vertex, ps_vtx_cnt) && m0_is_intersection_point(tgt_vertex, ps_vtx_cnt);
+                    bool is_valid_ambiguious_boundary_edge = false;
 
-                    if (is_ambiguious_exterior_edge_case) { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
+                    if (is_ambiguious_boundary_edge_case) { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
 
                         const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(src_vertex);
                         const hd_t tgt_ps_h = m0_ivtx_to_ps_he.at(tgt_vertex);
                         const ed_t src_ps_edge = ps.edge(src_coincident_ps_halfedge);
                         const ed_t tgt_ps_edge = ps.edge(tgt_ps_h);
-                        is_valid_ambiguious_exterior_edge = (src_ps_edge == tgt_ps_edge);
+                        is_valid_ambiguious_boundary_edge = (src_ps_edge == tgt_ps_edge);
                     }
 
                     // "is the halfdge not along the cut-path"
-                    if (!is_ambiguious_exterior_edge_case || is_valid_ambiguious_exterior_edge) {
+                    if (!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge) {
 
                         // get the opposite halfedge which is used to trace the adjacent polygon
                         const hd_t poly_he_opp = m0.opposite(*poly_he_iter);
