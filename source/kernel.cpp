@@ -7515,18 +7515,21 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "create reversed patches" << std::endl;
 
-    const int traced_polygon_count = (int)m0_polygons.size(); // does not include the reversed cs-polygons
+    const int traced_polygon_count = (int)m0_polygons.size(); // does not include the reversed cut-mesh polygons
 
-    // note: reversed patches are called "cw" patches
+    // note: reversed patches are called "cw" patches (for assumed clockwise based on input meshes)
 
-    // MapKey=color
-    // MapValue=reversed patch index
-    std::map<char, std::vector<int>> color_to_cw_patch;
-    // MapKey=patch index
-    // MapValue=opposite patch index
-    std::map<int, int> patch_to_opposite;
+    std::map<
+      char, // color tag 
+      std::vector<int> // reversed patch index
+    > color_to_cw_patch;
 
-    lg << "colors = " << color_to_patch.size() << std::endl;
+    std::map<
+      int, // patch index 
+      int // opposite patch index
+    > patch_to_opposite;
+
+    lg << "color tags = " << color_to_patch.size() << std::endl;
 
     // for each color
     for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin();
@@ -7539,17 +7542,21 @@ void dispatch(output_t& output, const input_t& input)
         lg << "color = " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
 
         // add entry
-        std::pair<std::map<char, std::vector<int>>::iterator, bool> color_to_cw_patch_insertion = color_to_cw_patch.insert(std::make_pair(color_to_ccw_patches_iter->first, std::vector<int>()));
-
-        MCUT_ASSERT(color_to_cw_patch_insertion.second == true);
+        MCUT_ASSERT(color_to_cw_patch.count(color_to_ccw_patches_iter->first) == 0);
+        color_to_cw_patch[color_to_ccw_patches_iter->first] = std::vector<int>();
+        //std::pair<std::map<char, std::vector<int>>::iterator, bool> color_to_cw_patch_insertion = color_to_cw_patch.insert(std::make_pair(color_to_ccw_patches_iter->first, std::vector<int>()));
+        //MCUT_ASSERT(color_to_cw_patch_insertion.second == true);
+        MCUT_ASSERT(color_to_cw_patch.count(color_to_ccw_patches_iter->first) == 1);
 
         // list of reversed patches with current color
-        std::vector<int>& cw_patch_color = color_to_cw_patch_insertion.first->second;
+        std::vector<int>& cw_patch_color = color_to_cw_patch.at(color_to_ccw_patches_iter->first);
 
         lg << "patch count = " << color_to_ccw_patches_iter->second.size() << std::endl;
 
         // for each patch with current color
-        for (std::vector<int>::const_iterator patch_iter = color_to_ccw_patches_iter->second.cbegin(); patch_iter != color_to_ccw_patches_iter->second.cend(); ++patch_iter) {
+        for (std::vector<int>::const_iterator patch_iter = color_to_ccw_patches_iter->second.cbegin(); 
+              patch_iter != color_to_ccw_patches_iter->second.cend(); 
+              ++patch_iter) {
             lg.indent();
 
             const int patch_idx = *patch_iter;
@@ -7562,7 +7569,7 @@ void dispatch(output_t& output, const input_t& input)
             // create reversed patch
             //
 
-            const int cw_patch_idx = (int)patches.size();
+            const int cw_patch_idx = (int)patches.size(); // index of reversed version
 
             // relate patch to opposite
             patch_to_opposite[patch_idx] = cw_patch_idx;
@@ -7570,10 +7577,13 @@ void dispatch(output_t& output, const input_t& input)
 
             lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;
 
-            std::pair<std::map<int, std::vector<int>>::iterator, bool> patch_insertion = patches.insert(std::make_pair(cw_patch_idx, std::vector<int>()));
-            MCUT_ASSERT(patch_insertion.second == true);
+            MCUT_ASSERT(patches.count(cw_patch_idx) == 0);
+            patches[cw_patch_idx] = std::vector<int>();
+            //std::pair<std::map<int, std::vector<int>>::iterator, bool> patch_insertion = patches.insert(std::make_pair(cw_patch_idx, std::vector<int>()));
+            //MCUT_ASSERT(patch_insertion.second == true);
+            MCUT_ASSERT(patches.count(cw_patch_idx) == 1);
 
-            std::vector<int>& cw_patch = patch_insertion.first->second;
+            std::vector<int>& cw_patch = patches.at(cw_patch_idx);
 
             // add to list of patches with current color
             cw_patch_color.push_back(cw_patch_idx);
@@ -7581,16 +7591,16 @@ void dispatch(output_t& output, const input_t& input)
             /* 
                 for each polygon in patch
                     if is floating-patch polygon
-                        find the opposite polygon which already exists
-                        add into opposite polygon into patch
+                        find the opposite polygon (which already exists)
+                        add opposite polygon into patch
                     else
                         create reversed version and update data structures
             */
 
-            // number of polygon in the normal patch
+            // number of polygons in the ccw patch
             const int initial_patch_size = (int)patch.size();
 
-            // for each polygon in the normal patch
+            // for each polygon in the ccw patch
             for (int ccw_patch_iter = 0; ccw_patch_iter < initial_patch_size; ++ccw_patch_iter) {
 
                 lg.indent();
@@ -7628,19 +7638,19 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(coincident_polys_find_iter != coincident_polys.cend());
 
                     const int patch_poly_opp = *coincident_polys_find_iter;
-                    cw_poly_idx = patch_poly_opp;
+                    cw_poly_idx = patch_poly_opp; // found opposite polygon
                 } else {
 
                     //
-                    // the current normal polygon does not form a floating patch,
-                    // so we calculate the reversed polygon by to retracing the
-                    // current normal polygon in reverse order
+                    // the current ccw polygon does not form a floating patch,
+                    // so we calculate the reversed version by retracing the
+                    // connectivity in reverse order
                     //
 
                     traced_polygon_t cw_poly;
                     traced_polygon_t tmp;
 
-                    // for each halfedge of the normal polygon
+                    // for each halfedge of the ccw polygon
                     for (traced_polygon_t::const_iterator patch_poly_he_iter = patch_poly.cbegin();
                          patch_poly_he_iter != patch_poly.cend();
                          ++patch_poly_he_iter) {
@@ -7673,7 +7683,7 @@ void dispatch(output_t& output, const input_t& input)
 
                     MCUT_ASSERT(tmp.size() == patch_poly.size());
 
-                    // reverse the order to ensure correct winding, last for goes to beginning, and so on...
+                    // reverse the order to ensure correct winding, last halfedge for goes to beginning, and so on...
                     for (int h = 0; h < (int)tmp.size(); ++h) {
                         const int index = (int)tmp.size() - 1 - h;
                         cw_poly.push_back(tmp.at(index));
@@ -7691,11 +7701,11 @@ void dispatch(output_t& output, const input_t& input)
 
                     MCUT_ASSERT(m0.source(cw_poly.front()) == m0.target(cw_poly.back())); // must form loop
 
-                    // save the new polygon
-                    m0_polygons.push_back(cw_poly);
+                    
+                    m0_polygons.push_back(cw_poly);// save the new polygon!
                 }
 
-                // the the new polygon's index as being part of the patch
+                // the new polygon's index as being part of the patch
                 cw_patch.push_back(cw_poly_idx);
 
                 lg.unindent();
@@ -7710,7 +7720,7 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "reversed cut-mesh polygons = " << cw_cs_poly_count << std::endl;
 
-    // NOTE: at this stage, all patch polygons (normal) also have an opposite (reversed)
+    // NOTE: at this stage, all patch polygons (ccw/normal) also have an opposite (cw/reversed)
 
     lg << "merge normal and reversed patches" << std::endl;
 
@@ -7775,6 +7785,7 @@ void dispatch(output_t& output, const input_t& input)
          color_to_patches_iter != color_to_patch.cend();
          ++color_to_patches_iter) {
         lg.indent();
+
         const char color_id = color_to_patches_iter->first;
         lg << "color=" << (char)color_id << std::endl;
 
@@ -7789,13 +7800,15 @@ void dispatch(output_t& output, const input_t& input)
             // create mesh for patch
             //
             mesh_t patch_mesh;
-            // MapKey=vertex descriptor in "m0"
-            // MapValue=vertex descriptor in "patch_mesh"
-            std::map<vd_t, vd_t> m0_to_patch_mesh_vertex;
+
+            std::map<
+              vd_t, // vertex descriptor in "m0"
+              vd_t // vertex descriptor in "patch_mesh"
+            > m0_to_patch_mesh_vertex;
 
             lg << "patch -  " << cur_patch_idx << std::endl;
 
-            // NOTE: normal patches are created before their reversed counterparts (hence the modulo Operator trick)
+            // NOTE: ccw/normal patches are created before their reversed counterparts (hence the modulo Operator trick)
 
             // is the a normal patch
             const bool is_ccw_patch = ((cur_patch_idx % total_ccw_patch_count) == cur_patch_idx);
@@ -7811,7 +7824,7 @@ void dispatch(output_t& output, const input_t& input)
             // add vertices into patch mesh
             //
 
-            std::vector<vd_t> seam_vertices;
+            std::vector<vd_t> seam_vertices; // vertices along cutpath
 
             // for each polygon in the patch
             for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter) {
@@ -7857,7 +7870,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 std::vector<vd_t> remapped_poly_vertices; // redefined face using "patch_mesh" descriptors
 
-                // for each halfedhe
+                // for each halfedge
                 for (traced_polygon_t::const_iterator patch_poly_he_iter = patch_poly.cbegin();
                      patch_poly_he_iter != patch_poly.cend();
                      ++patch_poly_he_iter) {
@@ -7896,7 +7909,7 @@ void dispatch(output_t& output, const input_t& input)
     ///////////////////////////////////////////////////////////////////////////
 
     //
-    // Here, we will infer the seed interior intersection-halfedges and polygons
+    // Here, we will infer the seed [interior intersection-halfedges] and polygons
     // for the newly create reversed polygons. We will also save information telling
     // whether each reversed patch is a floating patch or not. We will use this
     // information during stitching
@@ -7934,7 +7947,7 @@ void dispatch(output_t& output, const input_t& input)
             const int ccw_patch_idx = patch_to_opposite.at(cw_patch_idx); //opposite patch
 
             //
-            // copy information from opposite (normal) patch
+            // copy information from opposite (ccw/normal) patch
             //
             std::pair<std::map<int, bool>::const_iterator, bool> patch_to_floating_flag_insertion = patch_to_floating_flag.insert(
                 std::make_pair(cw_patch_idx, patch_to_floating_flag.at(ccw_patch_idx)));
@@ -7943,15 +7956,15 @@ void dispatch(output_t& output, const input_t& input)
 
             // was the opposite patch determined to be a floating patch
             const bool is_floating_patch = patch_to_floating_flag_insertion.first->second;
-            // get the index of seed interior intersection halfedge of the opposite normal patch
+            // get the index of seed interior intersection halfedge of the opposite ccw/normal patch
             const int ccw_patch_seed_interior_ihalfedge_idx = patch_to_seed_interior_ihalfedge_idx.at(ccw_patch_idx);
-            // get the index of seed polygon of the opposite normal patch
+            // get the index of seed polygon of the opposite ccw/normal patch
             const int ccw_patch_seed_poly_idx = patch_to_seed_poly_idx.at(ccw_patch_idx);
-            // get the seed polygon of the opposite normal patch
+            // get the seed polygon of the opposite ccw/normal patch
             const traced_polygon_t& ccw_patch_seed_poly = m0_polygons.at(ccw_patch_seed_poly_idx);
-            // get the seed interior intersection halfedge of the opposite normal patch
+            // get the seed interior intersection halfedge of the opposite ccw/normal patch
             const hd_t& ccw_patch_seed_interior_ihalfedge = ccw_patch_seed_poly.at(ccw_patch_seed_interior_ihalfedge_idx);
-            // opposite halfedge of the seed interior intersection halfedge of the opposite normal patch
+            // opposite halfedge of the seed interior intersection halfedge of the opposite ccw/normal patch
             const hd_t ccw_patch_seed_interior_ihalfedge_opp = m0.opposite(ccw_patch_seed_interior_ihalfedge);
 
             lg << "seed interior intersection-halfedge = " << ccw_patch_seed_interior_ihalfedge_opp << std::endl;
@@ -7986,13 +7999,18 @@ void dispatch(output_t& output, const input_t& input)
 
             // the index of the interior intersection halfedge of the current reversed patch
             const int opposite_patch_seed_interior_ihalfedge_idx = (int)std::distance(cw_patch_seed_poly.cbegin(), he_find_iter);
-            std::pair<std::map<int, int>::const_iterator, bool> seed_interior_ihalfedge_idx_insertion = patch_to_seed_interior_ihalfedge_idx.insert(std::make_pair(cw_patch_idx, opposite_patch_seed_interior_ihalfedge_idx));
 
-            MCUT_ASSERT(seed_interior_ihalfedge_idx_insertion.second == true);
+            MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(cw_patch_idx) == 0);
+            patch_to_seed_interior_ihalfedge_idx[cw_patch_idx] = opposite_patch_seed_interior_ihalfedge_idx;
+            //std::pair<std::map<int, int>::const_iterator, bool> seed_interior_ihalfedge_idx_insertion = patch_to_seed_interior_ihalfedge_idx.insert(std::make_pair(cw_patch_idx, opposite_patch_seed_interior_ihalfedge_idx));
+           // MCUT_ASSERT(seed_interior_ihalfedge_idx_insertion.second == true);
+            MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(cw_patch_idx) == 1);
 
-            std::pair<std::map<int, int>::const_iterator, bool> seed_poly_idx_insertion = patch_to_seed_poly_idx.insert(std::make_pair(cw_patch_idx, cw_patch_seed_poly_idx));
-
-            MCUT_ASSERT(seed_poly_idx_insertion.second == true);
+            MCUT_ASSERT(patch_to_seed_poly_idx.count(cw_patch_idx) == 0);
+            patch_to_seed_poly_idx[cw_patch_idx] = cw_patch_seed_poly_idx;
+            //std::pair<std::map<int, int>::const_iterator, bool> seed_poly_idx_insertion = patch_to_seed_poly_idx.insert(std::make_pair(cw_patch_idx, cw_patch_seed_poly_idx));
+            //MCUT_ASSERT(seed_poly_idx_insertion.second == true);
+            MCUT_ASSERT(patch_to_seed_poly_idx.count(cw_patch_idx) == 1);
 
             lg.unindent();
         }
@@ -8000,20 +8018,20 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     patch_to_floating_flag.clear(); // free
-    color_to_cw_patch.clear();
-    patch_to_opposite.clear();
+    color_to_cw_patch.clear(); // free
+    patch_to_opposite.clear(); // free
 
     ///////////////////////////////////////////////////////////////////////////
-    // Stitch cut-mesh patches into connected components of the src-mesh
+    // Stitch cut-mesh patches into connected components (fragments) of the source-mesh
     ///////////////////////////////////////////////////////////////////////////
 
     //
-    // We are now going to effectively "fill the holes"
+    // We are now going to "fill the holes"
     //
     // For each color, we have a halfdge data structure which is a copy of "m1".
-    // We do this to make sure that the exterior patches will be stitched to
-    // separate copies the connected components in "m1" from interior patches.
-    // This helps us to distinguish between stitching the interior of the src-mesh
+    // We do this to make sure that the exterior/outside patches will be stitched to
+    // separate copies of the connected components in "m1", compared to interior patches.
+    // This helps us to distinguish between stitching the interior of the source-mesh
     // (hole-filling), and stitching the exterior (i.e. boolean merge operation
     // if the cut-mesh is water-tight)
     //
@@ -8039,8 +8057,8 @@ void dispatch(output_t& output, const input_t& input)
     std::map<char, std::vector<traced_polygon_t>> color_to_m1_polygons;
 
     // a halfedge in "m0" that is used to trace a cut-mesh polygon will have
-    // two "m1" versions - one for the normal patch and the other for the
-    // reversed patch.
+    // two "m1" versions - one for the ccw/normal patch and the other for the
+    // cw/reversed patch.
     //
     // MapKey=color
     // MapValue=[
