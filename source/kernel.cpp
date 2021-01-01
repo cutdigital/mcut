@@ -6375,7 +6375,7 @@ void dispatch(output_t& output, const input_t& input)
         int, // traced cut-mesh polygon index
         int // patch index
         >
-        cm_poly_to_patch_idx;
+        m0_cm_poly_to_patch_idx;
 
     // This map stores an interior intersection-halfedge for each patch. This
     // halfedge also represents the traced cut-mesh polygon from which we will
@@ -6480,7 +6480,7 @@ void dispatch(output_t& output, const input_t& input)
             // halfedge index in polygon
             const int& potential_seed_poly_he_idx = primary_interior_ihalfedge_pool_citer->second;
             // check if the polygon has already been associated with a patch
-            const bool poly_patch_is_known = cm_poly_to_patch_idx.find(potential_seed_poly_idx) != cm_poly_to_patch_idx.cend();
+            const bool poly_patch_is_known = m0_cm_poly_to_patch_idx.find(potential_seed_poly_idx) != m0_cm_poly_to_patch_idx.cend();
 
             if (!poly_patch_is_known) {
 
@@ -6564,7 +6564,7 @@ void dispatch(output_t& output, const input_t& input)
                 // polygon will have already been identified as forming a patch)
                 const int potential_seed_poly_idx = *find_iter; // potential seed (starting) polygon for the new patch we want to build
                 // has it already been associated with a patch..?
-                const bool coincident_cs_poly_patch_is_known = cm_poly_to_patch_idx.find(potential_seed_poly_idx) != cm_poly_to_patch_idx.cend();
+                const bool coincident_cs_poly_patch_is_known = m0_cm_poly_to_patch_idx.find(potential_seed_poly_idx) != m0_cm_poly_to_patch_idx.cend();
 
                 if (!coincident_cs_poly_patch_is_known) {
 
@@ -6660,11 +6660,11 @@ void dispatch(output_t& output, const input_t& input)
                 patch.push_back(cur_scs_patch_poly_idx);
 
                 // relate polygon to patch
-                MCUT_ASSERT(cm_poly_to_patch_idx.count(cur_scs_patch_poly_idx) == 0);
-                cm_poly_to_patch_idx[cur_scs_patch_poly_idx] = cur_scs_cur_patch_idx;
-                //std::pair<std::map<int, int>::const_iterator, bool> pair = cm_poly_to_patch_idx.insert(std::make_pair(cur_scs_patch_poly_idx, cur_scs_cur_patch_idx)); // signifies that polygon has been associated with a patch
+                MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(cur_scs_patch_poly_idx) == 0);
+                m0_cm_poly_to_patch_idx[cur_scs_patch_poly_idx] = cur_scs_cur_patch_idx;
+                //std::pair<std::map<int, int>::const_iterator, bool> pair = m0_cm_poly_to_patch_idx.insert(std::make_pair(cur_scs_patch_poly_idx, cur_scs_cur_patch_idx)); // signifies that polygon has been associated with a patch
                 //MCUT_ASSERT(pair.second == true);
-                MCUT_ASSERT(cm_poly_to_patch_idx.count(cur_scs_patch_poly_idx) == 1);
+                MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(cur_scs_patch_poly_idx) == 1);
 
                 //
                 // find adjacent polygons which share class 0,1,2 (o-->o, o-->x, x-->o) halfedges, and
@@ -6715,8 +6715,8 @@ void dispatch(output_t& output, const input_t& input)
                             MCUT_ASSERT(incident_poly >= traced_sm_polygon_count);
 
                             // does the patch already contain the polygon ...?
-                            // TODO: search "cm_poly_to_patch_idx" which has O(log N) compared to O(N) here
-                            const bool poly_already_in_patch = cm_poly_to_patch_idx.find(incident_poly) != cm_poly_to_patch_idx.cend(); // std::find(patch.cbegin(), patch.cend(), incident_poly) != patch.cend();
+                            // TODO: search "m0_cm_poly_to_patch_idx" which has O(log N) compared to O(N) here
+                            const bool poly_already_in_patch = m0_cm_poly_to_patch_idx.find(incident_poly) != m0_cm_poly_to_patch_idx.cend(); // std::find(patch.cbegin(), patch.cend(), incident_poly) != patch.cend();
 
                             if (!poly_already_in_patch) {
                                 const bool poly_already_in_queue = std::find(flood_fill_queue.cbegin(), flood_fill_queue.cend(), incident_poly) != flood_fill_queue.cend();
@@ -7430,7 +7430,7 @@ void dispatch(output_t& output, const input_t& input)
             != known_exterior_cm_polygons.cend()); // must be a known exterior patch polygon
 
         // get the patch containing the polygon
-        const int patch_idx = cm_poly_to_patch_idx.at(known_exterior_cm_polygon.first);
+        const int patch_idx = m0_cm_poly_to_patch_idx.at(known_exterior_cm_polygon.first);
 
         // get the color of the patch
         std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_find_iter = std::find_if(
@@ -7451,8 +7451,8 @@ void dispatch(output_t& output, const input_t& input)
         patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cut_surface_patch_location_t::INSIDE));
 #else
         // for each cut-mesh polygon
-        for (std::map<int, int>::const_iterator cs_poly_to_patch_idx_iter = cm_poly_to_patch_idx.cbegin();
-             cs_poly_to_patch_idx_iter != cm_poly_to_patch_idx.cend();
+        for (std::map<int, int>::const_iterator cs_poly_to_patch_idx_iter = m0_cm_poly_to_patch_idx.cbegin();
+             cs_poly_to_patch_idx_iter != m0_cm_poly_to_patch_idx.cend();
              ++cs_poly_to_patch_idx_iter) {
 
             // get index of polygon
@@ -7496,7 +7496,7 @@ void dispatch(output_t& output, const input_t& input)
     MCUT_ASSERT(!patch_color_label_to_location.empty());
 
     known_exterior_cm_polygons.clear();
-    cm_poly_to_patch_idx.clear();
+    //m0_cm_poly_to_patch_idx.clear();
 
     // dump
     lg << "color label values (dye)" << std::endl;
@@ -7612,9 +7612,10 @@ void dispatch(output_t& output, const input_t& input)
 
                 lg << "polygon = " << ccw_patch_poly_idx << " (normal)" << std::endl;
 
-                // all polygon are stored in the same array so we can use that to infer
+                // all polygon are stored in the same array so we can use that to deduce
                 // index of new reversed polygon
                 int cw_poly_idx = (int)m0_polygons.size();
+
                 // get the normal polygon
                 const traced_polygon_t& patch_poly = m0_polygons.at(ccw_patch_poly_idx);
                 const bool is_floating_patch = patch_to_floating_flag.at(patch_idx);
@@ -7708,6 +7709,9 @@ void dispatch(output_t& output, const input_t& input)
 
                 // the new polygon's index as being part of the patch
                 cw_patch.push_back(cw_poly_idx);
+
+                MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(cw_poly_idx) == 0);
+                m0_cm_poly_to_patch_idx[cw_poly_idx] = patch_idx;
 
                 lg.unindent();
             }
@@ -8883,7 +8887,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 //
                 // We are basically adding all unstitched neighbours of the current polygon
-                // (we just sticthed) to the queue so they can be stitched as well. These
+                // (that we just sticthed) to the queue so they can be stitched as well. These
                 // are polygons on the same patch as the current polygon and are adjacent to
                 // it i.e. they share an edge.
                 //
@@ -8892,6 +8896,11 @@ void dispatch(output_t& output, const input_t& input)
 
                 // polygons of current patch
                 const std::vector<int>& patch_polys = patches.at(cur_patch_idx);
+
+                // stores the queued adjacent polygon to be stitched that have just been discovered
+                // i.e. discovered while finding the next untransformed adjacent polygons of the
+                // current one that we just transformed
+                std::deque<std::tuple<hd_t /*m1*/, int /*m0 poly*/, int /*m0 he*/>> patch_poly_stitching_queue_tmp;
 
                 // for each halfedge of the polygon we just stitched
                 for (traced_polygon_t::const_iterator m0_poly_he_iter = m0_cur_patch_cur_poly.cbegin();
@@ -8995,10 +9004,13 @@ void dispatch(output_t& output, const input_t& input)
 
                     // get the polygons traced with the opposite halfedge
                     const std::vector<int> m0_poly_he_opp_coincident_polys = m0_h_to_ply.at(m0_cur_patch_cur_poly_cur_he_opp);
-                    const std::vector<int>::const_iterator find_iter = std::find_if( // find the cs polygon of current patch
+                    const std::vector<int>::const_iterator find_iter = std::find_if( // find the current polygon of current patch
                         m0_poly_he_opp_coincident_polys.cbegin(),
                         m0_poly_he_opp_coincident_polys.cend(),
                         [&](const int poly_idx) {
+                            MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(poly_idx) == 1);
+                            //return m0_cm_poly_to_patch_idx.at(poly_idx) == cur_patch_idx;
+
                             bool has_patch_winding_orientation = false;
 
                             // check if polygon has the same winding order as the current patch
@@ -9011,12 +9023,12 @@ void dispatch(output_t& output, const input_t& input)
 
                             // polygon has same winding-order as current patch, and polygon is part of the current patch
                             // TODO: use the cs_poly_to_patch map for O(Log N) improvement
-                            return has_patch_winding_orientation && std::find(patch_polys.cbegin(), patch_polys.cend(), poly_idx) != patch_polys.cend(); // NOTE: only one polygon in the current patch will match
+                            return has_patch_winding_orientation && m0_cm_poly_to_patch_idx.at(poly_idx) == cur_patch_idx; // std::find(patch_polys.cbegin(), patch_polys.cend(), poly_idx) != patch_polys.cend(); // NOTE: only one polygon in the current patch will match
                         });
 
                     // note: if the current halfedge is on the border of the cut-mesh, then its opposite
-                    // halfedge can only be traced one polygon, which is the opposite polygon to the
-                    // current. Hence, if find_iter is null then it means "m0_cur_patch_cur_poly_cur_he"
+                    // halfedge can only trace one polygon, which is the opposite polygon to the
+                    // current (i.e. on the opposing patch). Hence, if find_iter is null then it means "m0_cur_patch_cur_poly_cur_he"
                     // is on the border of the cut-mesh.
                     const bool opp_is_border_halfedge = (find_iter == m0_poly_he_opp_coincident_polys.cend()); // current patch is reversed-patch and
 
@@ -9036,13 +9048,14 @@ void dispatch(output_t& output, const input_t& input)
                     // We could do the right here now that "m0_next_poly_idx" is known.
                     //
 
-                    // infer the index of the next polygon's seed m0 halfedge
+                    // deduce the index of the next polygon's seed m0 halfedge
+                    // -------------------------------------------------------
+
                     MCUT_ASSERT(m0_next_poly_idx < (int)m0_polygons.size());
 
                     // adjacent polygon
                     const traced_polygon_t& next_poly = m0_polygons.at(m0_next_poly_idx);
-                    // pointer to the first halfedge in the polygon from which its
-                    // stitching will begin
+                    // pointer to the first halfedge in the polygon from which its stitching will begin
                     const traced_polygon_t::const_iterator he_find_iter = std::find(next_poly.cbegin(), next_poly.cend(), m0_cur_patch_cur_poly_cur_he_opp);
 
                     // "m0_cur_patch_cur_poly_cur_he_opp" must exist in next_poly since we have
@@ -9055,10 +9068,10 @@ void dispatch(output_t& output, const input_t& input)
                     const int m0_next_poly_he_idx = (int)std::distance(next_poly.cbegin(), he_find_iter);
 
                     // NOTE: there is no need to check if the next polygon is transformed here
-                    // because our 4 conditions above implicitely take care of this.
+                    // because our 4 conditions above take care of this.
                     // However, we do have to take care not to add the polygon to the queue more
                     // than once (due to BFS nature of stitching), hence the following.
-
+#if 0
                     //
                     // NOTE: the following is redundant!
                     // we don't need to calculate "poly_is_already_stitched_wrt_cur_patch" because
@@ -9082,21 +9095,39 @@ void dispatch(output_t& output, const input_t& input)
                                                                           return is_transformed_in_current_patch;
                                                                       })
                         != m0_to_m1_he_instances.cend();
-
-                    if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
-                        const bool poly_is_already_in_queue = std::find_if(
-                                                                  patch_poly_stitching_queue.cbegin(),
-                                                                  patch_poly_stitching_queue.cend(),
+#endif
+                    const bool poly_is_already_in_tmp_queue = std::find_if(
+                                                                  patch_poly_stitching_queue_tmp.cbegin(),
+                                                                  patch_poly_stitching_queue_tmp.cend(),
                                                                   [&](const std::tuple<hd_t, int, int>& elem) {
-                                                                      return std::get<1>(elem) == m0_next_poly_idx; // there is an element in the queue with the polygon's ID
+                                                                      return std::get<1>(elem) == m0_next_poly_idx;
                                                                   })
+                        != patch_poly_stitching_queue_tmp.cend();
+
+                    if (!poly_is_already_in_tmp_queue) {
+                        //                   if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
+                        // check the main global queue to make sure poly has not already been added
+                        const bool poly_is_already_in_main_queue = std::find_if(
+                                                                       patch_poly_stitching_queue.cbegin(),
+                                                                       patch_poly_stitching_queue.cend(),
+                                                                       [&](const std::tuple<hd_t, int, int>& elem) {
+                                                                           return std::get<1>(elem) == m0_next_poly_idx; // there is an element in the queue with the polygon's ID
+                                                                       })
                             != patch_poly_stitching_queue.cend();
 
-                        if (!poly_is_already_in_queue) {
-                            patch_poly_stitching_queue.push_back(std::make_tuple(m1_next_poly_seed_he, m0_next_poly_idx, m0_next_poly_he_idx));
+                        if (!poly_is_already_in_main_queue) {
+                            patch_poly_stitching_queue_tmp.push_back(std::make_tuple(m1_next_poly_seed_he, m0_next_poly_idx, m0_next_poly_he_idx));
                         }
                     }
-                } // for each m0 halfedge of current patch-polygon
+                }
+                //              } // for each m0 halfedge of current patch-polygon
+
+                // add elements of tmp/local queue to global queue
+                while (!patch_poly_stitching_queue_tmp.empty()) {
+                    const std::tuple<hd_t, int, int>& elem = patch_poly_stitching_queue_tmp.front();
+                    patch_poly_stitching_queue.push_back(elem); // add
+                    patch_poly_stitching_queue_tmp.pop_front(); // rm
+                }
 
                 //
                 // NOTE: At this stage, we have finished transforming all the halfedges of the current polygon
@@ -9110,9 +9141,9 @@ void dispatch(output_t& output, const input_t& input)
                 ///////////////////////////////////////////////////////////////////////////
 
                 // TODO: replace with to_string call
-                const std::string color_dye_string_id = (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "e" : "i");
+                const std::string color_tag_stri = to_string(patch_color_label_to_location.at(color_id)); // == cut_surface_patch_location_t::OUTSIDE ? "e" : "i");
 
-//dump_mesh_summary(m1_colored, color_dye_string_id);
+//dump_mesh_summary(m1_colored, color_tag_stri);
 #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
                 unseparated_stitching_CCs.clear();
 //unseparated_stitching_CCs.erase(unseparated_stitching_CCs.begin(), unseparated_stitching_CCs.begin() + unseparated_stitching_CCs.size() - 1);
@@ -9156,7 +9187,7 @@ void dispatch(output_t& output, const input_t& input)
                 //for (int index = ccsp_count_pre; index < ccsp_count_post; ++index) { // TODO: this loop may be redundant because unseparated_stitching_CCs.size() always increases by one.
 
                 //const mesh_t& new_unseparated_connected_ccsponent = unseparated_stitching_CCs.back();
-                //dump_mesh(new_unseparated_connected_ccsponent, ("c." + color_dye_string_id + "." + "p" + std::to_string(stitched_poly_counter)).c_str());
+                //dump_mesh(new_unseparated_connected_ccsponent, ("c." + color_tag_stri + "." + "p" + std::to_string(stitched_poly_counter)).c_str());
 
                 for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = separated_stitching_CCs.begin();
                      cc_iter != separated_stitching_CCs.end();
@@ -9168,7 +9199,7 @@ void dispatch(output_t& output, const input_t& input)
                     //const mesh_t& mesh_inst = incremental_instances.back().first;
                     //const connected_component_location_t location = incremental_instances.back().second;
 
-                    //dump_mesh(mesh_inst, ("cc" + std::to_string(cc_id) + "." + color_dye_string_id + "." + "p" + std::to_string(stitched_poly_counter) + "." + to_string(location)).c_str());
+                    //dump_mesh(mesh_inst, ("cc" + std::to_string(cc_id) + "." + color_tag_stri + "." + "p" + std::to_string(stitched_poly_counter) + "." + to_string(location)).c_str());
 
                     // keep only the last (most up-to-date) copy
                     incremental_instances.erase(incremental_instances.cbegin(), incremental_instances.cbegin() + incremental_instances.size() - 1);
@@ -9191,6 +9222,7 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
     } // for each color
 
+    m0_cm_poly_to_patch_idx.clear();
     m0_ivtx_to_ps_he.clear(); // free
     m0_polygons.clear();
     m0_h_to_ply.clear();
