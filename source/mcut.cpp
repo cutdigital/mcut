@@ -1187,6 +1187,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         backendInput.require_looped_cutpaths = true;
     }
 
+    if (ctxtPtr->dispatchFlags & MC_DISPATCH_KEEP_PARTIALLY_SEALED_FRAGMENTS) {
+        backendInput.keep_partially_sealed_connected_components = true;
+    }
+
     mcut::output_t backendOutput;
 
     // cut!
@@ -1231,6 +1235,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     //
     // sealed connected components (fragments)
     //
+
     for (std::map<mcut::connected_component_location_t, std::map<mcut::cut_surface_patch_location_t, std::vector<mcut::output_mesh_info_t>>>::const_iterator i = backendOutput.connected_components.cbegin();
          i != backendOutput.connected_components.cend();
          ++i) {
@@ -1242,7 +1247,17 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             //const mcut::cut_surface_patch_location_t& cut_surface_patch_location = j->first;
             const std::string cs_patch_loc_str = mcut::to_string(j->first);
 
-            for (std::vector<mcut::output_mesh_info_t>::const_iterator k = j->second.cbegin(); k != j->second.cend(); ++k) {
+            // The first connected compoenent may or may not have been sealed with atleast one polygon.
+            // One example case is when [completely] cutting a source-mesh like the tetrahedron into two pieces using just one cut-mesh polygon.
+            // In this case, some fragment(s) will have exactly two output instances i.e. "unsealed" and "completely sealed".
+            // This is because there will only be one interior patch polygon, which when stitched leads to a complete seal, thus there are not partial stages of sealing.
+            //
+            bool first_cc_is_completely_sealed = j->second.size() == 1;
+            std::vector<mcut::output_mesh_info_t>::const_iterator start_off = first_cc_is_completely_sealed ? j->second.cbegin() : j->second.cbegin() + 1;
+            for (std::vector<mcut::output_mesh_info_t>::const_iterator k = start_off; k != j->second.cend(); ++k) {
+
+                // Note: the last CC is always guarranteed to be fully sealed (see: "keep_partially_sealed_connected_components" in kernel)!
+                bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
 
                 std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> frag = std::unique_ptr<McFragmentConnComp, void (*)(McConnCompBase*)>(new McFragmentConnComp, ccDeletorFunc<McFragmentConnComp>);
                 McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(frag.get());
@@ -1255,7 +1270,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 if (asFragPtr->patchLocation == MC_PATCH_LOCATION_UNDEFINED) {
                     asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
                 } else {
-                    asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
+
+                    if (is_last_cc) {
+                        asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
+                    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_KEEP_PARTIALLY_SEALED_FRAGMENTS) { // did the user tell us to keep partially sealed fragments
+                        asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL;
+                    }
+
+                    // Personal note: Do not be tempted to just deal with unsealed fragments here.
+                    // Its not guarranteed that the first element of "j->second" is always completely unsealed! Only sometimes.
+                    // Thus, for simplicity we deal with unsealed fragment specifically below (next for-loop)
                 }
 
                 halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *k);

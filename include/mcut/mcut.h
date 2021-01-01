@@ -1,4 +1,4 @@
- 
+
 /**
  * Copyright (c) 2020-2021 CutDigital Ltd.
  * All rights reserved.
@@ -67,7 +67,7 @@ extern "C" {
 // Constant value assigned to null variables and parameters
 #define MC_NULL_HANDLE 0
 
-// Helper-macro to define opaque handles 
+// Helper-macro to define opaque handles
 #define MC_DEFINE_HANDLE(object) typedef struct object##_T* object;
 
 /**
@@ -133,7 +133,7 @@ typedef enum McResult {
     MC_INVALID_CUT_MESH = -(1 << 1), /**< The input cut-mesh does not the meet requirements of a valid mesh. */
     MC_INVALID_OPERATION = -(1 << 2), /**< An internal operation could not be executed successively. */
     MC_INVALID_VALUE = -(1 << 3), /**< An invalid value has been passed to the API. */
-    MC_OUT_OF_MEMORY = -(1<<4), /** Memory allocation operation cannot allocate memory. */
+    MC_OUT_OF_MEMORY = -(1 << 4), /** Memory allocation operation cannot allocate memory. */
     MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McResult;
 
@@ -184,8 +184,8 @@ typedef enum McFragmentSealType {
  */
 typedef enum McPatchLocation {
     MC_PATCH_LOCATION_INSIDE = 1 << 0, /**< Patch is located on the interior of the source-mesh (used to seal holes). */
-    MC_PATCH_LOCATION_OUTSIDE = 1<<1, /**< Patch is located on the exterior of the source-mesh. Rather than hole-filling these patches seal from the outside so-as to extrude the cut.*/
-    MC_PATCH_LOCATION_UNDEFINED = 1<<2, /**< Patch is located neither on the interior nor exterior of the source-mesh. */
+    MC_PATCH_LOCATION_OUTSIDE = 1 << 1, /**< Patch is located on the exterior of the source-mesh. Rather than hole-filling these patches seal from the outside so-as to extrude the cut.*/
+    MC_PATCH_LOCATION_UNDEFINED = 1 << 2, /**< Patch is located neither on the interior nor exterior of the source-mesh. */
     MC_PATCH_LOCATION_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McPatchLocation;
 
@@ -297,7 +297,8 @@ typedef enum McDispatchFlags {
     MC_DISPATCH_VERTEX_ARRAY_FLOAT = (1 << 0), /**< Interpret the input mesh vertices as arrays of 32-bit floating-point numbers.*/
     MC_DISPATCH_VERTEX_ARRAY_DOUBLE = (1 << 1), /**< Interpret the input mesh vertices as arrays of 64-bit floating-point numbers.*/
     MC_DISPATCH_VERTEX_ARRAY_EXACT = (1 << 2), /**< Interpret the input mesh vertices as character strings representing arbitrary-precision numbers. Values are parsed exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to std::to_string.*/
-    MC_DISPATCH_REQUIRE_SEVERING_SEAMS = (1 << 3), /**< Require that all intersection paths partition/divide the source mesh into two subsets of polygons. Otherwise, ::mcDispatch is a no-op.*/
+    MC_DISPATCH_REQUIRE_SEVERING_SEAMS = (1 << 3), /**< Require that all intersection paths partition/divide the source mesh into two subsets of polygons. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts.*/
+    MC_DISPATCH_KEEP_PARTIALLY_SEALED_FRAGMENTS = (1 << 3) /** Include partially sealed fragments in the returned output. */
 } McDispatchFlags;
 
 /**
@@ -323,12 +324,12 @@ typedef enum McQueryFlags {
  * The callback function should have this prototype (in C), or be otherwise compatible with such a prototype.
  */
 typedef void (*pfn_mcDebugOutput_CALLBACK)(
-    McDebugSource source, 
-    McDebugType type, 
-    unsigned int id, 
-    McDebugSeverity severity, 
-    size_t length, 
-    const char* message, 
+    McDebugSource source,
+    McDebugType type,
+    unsigned int id,
+    McDebugSeverity severity,
+    size_t length,
+    const char* message,
     const void* userParam);
 
 /** @brief Create an MCUT context.
