@@ -87,6 +87,16 @@ struct input_t {
 struct output_mesh_info_t {
     mesh_t mesh;
     std::vector<vd_t> seam_vertices;
+    std::map<
+        vd_t, // vertex descriptor in connected component
+        vd_t // vertex descriptor in input-mesh e.g. source mesh or cut mesh. ("null_vertex()" if vertex is an intersection point)
+        >
+        vertex_map;
+    std::map<
+        fd_t, // face descriptor in connected component
+        fd_t // face descriptor in input-mesh e.g. source mesh or cut mesh. (new polygons resulting from clipping are mapped to the same input mesh face)
+        >
+        face_map;
 };
 
 //
@@ -95,12 +105,14 @@ struct output_mesh_info_t {
 struct output_t {
     status_t status = status_t::SUCCESS;
     logger_t logger;
+    // fragments
     std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>> connected_components;
     std::map<connected_component_location_t, std::vector<output_mesh_info_t>> unsealed_cc; // connected components before hole-filling
+    // patches
     std::map<cut_surface_patch_winding_order_t, std::vector<output_mesh_info_t>> inside_patches; // .. between neigbouring connected ccsponents (cs-sealing patches)
     std::map<cut_surface_patch_winding_order_t, std::vector<output_mesh_info_t>> outside_patches;
     // the input meshes which also include the edges that define the cut path
-    // NOTE: not always define (depending on the arising cutpath configurations)
+    // NOTE: not always defined (depending on the arising cutpath configurations)
     output_mesh_info_t seamed_src_mesh;
     output_mesh_info_t seamed_cut_mesh;
 };
