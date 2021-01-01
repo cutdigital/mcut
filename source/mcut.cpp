@@ -35,12 +35,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// This pragma is placed here until we implement the event synch stuff.
-#if __linux__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags convertRoundingMode(int rm)
 {
@@ -1053,18 +1047,6 @@ bool checkFrontendMesh(
     return result;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(const McContext context, uint32_t numEvents, const McEvent* eventList)
-{
-    McResult result = McResult::MC_NO_ERROR;
-    return result;
-}
-
-MCAPI_ATTR McResult MCAPI_CALL mcFinish(const McContext context)
-{
-    McResult result = McResult::MC_NO_ERROR;
-    return result;
-}
-
 MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const McContext context,
     McFlags dispatchFlags,
@@ -1077,10 +1059,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces,
-    uint32_t numEventInWaitList,
-    const McEvent* waitlist,
-    McEvent* event)
+    uint32_t numCutMeshFaces)
 {
 #define DEMO_BUILD 0 // comment out for full build
 
@@ -1381,14 +1360,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
 MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     const McContext context,
-    const McBool blocking,
     const McConnectedComponentType connectedComponentType,
     const uint32_t numEntries,
     McConnectedComponent* pConnComps,
-    uint32_t* numConnComps,
-    uint32_t numEventInWaitList,
-    const McEvent* waitlist,
-    McEvent* event)
+    uint32_t* numConnComps)
 {
     McResult result = McResult::MC_NO_ERROR;
     auto ctxtIter = gDispatchContexts.find(context);
@@ -1448,15 +1423,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 
 McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
-    const McBool blocking,
     const McConnectedComponent connCompId,
     McFlags queryFlags,
     uint64_t bytes,
     void* pMem,
-    uint64_t* pNumBytes,
-    uint32_t numEventInWaitList,
-    const McEvent* waitlist,
-    McEvent* event)
+    uint64_t* pNumBytes)
 {
     McResult result = McResult::MC_NO_ERROR;
 

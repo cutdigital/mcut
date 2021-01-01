@@ -87,14 +87,6 @@ typedef struct McConnectedComponent_T* McConnectedComponent;
 typedef struct McContext_T* McContext;
 
 /**
- * \struct McEvent
- * @brief Event handle.
- *
- * Opaque type referencing an instance of a task. Event objects are unique and can be used to identify a particular task execution instance later on.
- */
-typedef struct McEvent_T* McEvent;
-
-/**
  * @brief Bitfield type.
  *
  * Integral type representing a 32-bit bitfield for storing parameter values.
@@ -598,60 +590,6 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
     McDebugSeverity severity,
     bool enabled);
 
-/** @brief Waits on the client thread for commands identified by event objects to complete.
-*
-* This function waits on the client thread for commands identified by event objects in eventList to complete. A command is considered complete if its execution status is MC_COMPLETE or a negative value. The events specified in eventList act as synchronization points.
-*
-* @param [in] context The context handle
-* @param [in] numEvents The number of events in eventList.
-* @param [in] eventList A pointer to a list of event object handles.
-*
- * An example of usage:
- * @code
- * // coming soon!
- * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# if \p numEvents is zero or \p pEventList is NULL .
-*   -# event objects specified in \p pEventList are not valid event objects.
-*
-* @note This function is not yet implemented.
-*/
-extern MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
-    const McContext context,
-    uint32_t numEvents,
-    const McEvent* pEventList);
-
-/** @brief Blocks until all previously queued MCUT commands associated with the context have completed.
-*
-* All previously submitted MCUT commands in context are executed, and the function blocks until all previously sumbitted commands have completed. The function will not return until all previously submitted tasks in the context have been processed and completed. The function is also a synchronization point.
-*
-* @param [in] context The context handle.
-*
- * An example of usage:
- * @code
- * // coming soon!
- * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*
-* @note This function is not yet implemented.
-*/
-extern MCAPI_ATTR McResult MCAPI_CALL mcFinish(
-    const McContext context);
-
 /**
 * @brief Execute a cutting operation with two meshes - the source mesh, and the cut mesh.
 *
@@ -667,9 +605,6 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcFinish(
 * @param[in] pCutMeshFaceSizes The sizes (in terms of vertex indices) of the faces in the cut mesh.
 * @param[in] numCutMeshVertices The number of vertices in the cut mesh.
 * @param[in] numCutMeshFaces The number of faces in the cut mesh.
-* @param[in] numEventInWaitList Specify the number of events that need to complete before this particular command can be executed
-* @param[in] waitlist Specify events that need to complete before this particular command can be executed
-* @param[out] event Returns an event object that identifies this particular task execution instance.
 *
 * This function specifies the two mesh objects to operate on. The 'source mesh' is the mesh to be cut 
 * (i.e. partitioned) along intersection paths prescribed by the 'cut mesh'. Instead of performing 
@@ -698,9 +633,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcFinish(
 *        pCutMeshFaceIndices,
 *        pCutMeshFaceSizes,
 *        numCutMeshVertices,
-*        numCutMeshFaces,
-*        // synchronisation
-*        0, NULL, NULL);
+*        numCutMeshFaces);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -719,8 +652,6 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcFinish(
 *   -# Invalid face/polygon definition (vertex list) implying non-manifold mesh \p pSrcMeshFaceIndices or \p pCutMeshFaceIndices is out of bounds.
 *   -# invalid character-string format in \p pSrcMeshVertices or \p pCutMeshVertices.
 *   -# The MC_DISPATCH_VERTEX_ARRAY_... value has not been specified in \p flags
-*   -# \p numEvents is zero or \p pEventList is NULL .
-*   -# event objects specified in \p pEventList are not valid event objects.
 * - ::MC_INVALID_SRC_MESH
 *   -# mesh is not a single connected component
 *   -# \p pSrcMeshVertices is NULL.
@@ -748,10 +679,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces,
-    uint32_t numEventInWaitList,
-    const McEvent* waitlist,
-    McEvent* event);
+    uint32_t numCutMeshFaces);
 
 /**
 * @brief Return the value of a selected parameter.
@@ -801,13 +729,8 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
 * @brief Query the connected components available in a context.
 * 
 * This function will return an array of connected components matching the given description of flags.
-* 
-* If \p blocking is set to #MC_TRUE i.e. the command is blocking, ::mcGetConnectedComponents does not return until the data has been read and copied into memory pointed to.
-* 
-* If \p blocking is #MC_FALSE i.e. the command is non-blocking, ::mcGetConnectedComponents submits a non-blocking read command and returns. The contents of the destination ptr cannot be used until the read command has completed. The event argument returns an event object which can be used to query the execution status of the read command. When the read command has completed, the contents of the memory that the destination pointer points to can be used by the application.
-*
+*  
 * @param[in] context The context handle
-* @param[in] blocking Indicate if the read and write operations are blocking or non-blocking.
 * @param[in] connectedComponentType The type(s) of connected component sought. See also ::McConnectedComponentType.
 * @param[in] numEntries The number of ::McConnectedComponent entries that can be added to \p pConnComps. If \p pConnComps is not NULL, \p numEntries must be the number of elements in \p pConnComps.
 * @param[out] pConnComps Returns a list of connected components found. The ::McConnectedComponentType values returned in \p pConnComps can be used 
@@ -815,15 +738,12 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
 * is the minimum of the value specified by \p numEntries or the number of connected components whose type matches \p connectedComponentType.
 * @param[out] numConnComps Returns the number of connected components available that match \p connectedComponentType. If \p numConnComps is NULL, 
 * this argument is ignored.
-* @param[in] numEventInWaitList Specify the number of events that need to complete before this particular command can be executed
-* @param[in] waitlist Specify events that need to complete before this particular command can be executed
-* @param[out] event Returns an event object that identifies this particular task execution instance.
 *
  * An example of usage:
  * @code
  * uint32_t numConnComps = 0;
  * McConnectedComponent* pConnComps;
- * McResult err =  err = mcGetConnectedComponents(myContext, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps, 0, NULL, NULL);
+ * McResult err =  err = mcGetConnectedComponents(myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -835,7 +755,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  *
  * pConnComps = (McConnectedComponent*)malloc(sizeof(McConnectedComponent) * numConnComps);
  *
- * err = mcGetConnectedComponents(myContext, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, numConnComps, pConnComps, NULL, 0, NULL, NULL);
+ * err = mcGetConnectedComponents(myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, numConnComps, pConnComps, NULL);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -852,40 +772,30 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
 *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
 *   -# \p numConnComps and \p pConnComps are both NULL.
 *   -# \p numConnComps is zero and \p pConnComps is not NULL.
-*
-* @note Event synchronisation is not implemented.
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     const McContext context,
-    const McBool blocking,
     const McConnectedComponentType connectedComponentType,
     const uint32_t numEntries,
     McConnectedComponent* pConnComps,
-    uint32_t* numConnComps,
-    uint32_t numEventInWaitList,
-    const McEvent* waitlist,
-    McEvent* event);
+    uint32_t* numConnComps);
 
 /**
 * @brief Query specific information about a connected component.
 *
 * @param[in] context The context handle that was created by a previous call to ::mcCreateContext. 
-* @param[in] blocking Indicate if the read and write operations are blocking or non-blocking
 * @param[in] connCompId A connected component returned by ::mcGetConnectedComponents whose data is to be read.
 * @param[in] flags An enumeration constant that identifies the connected component information being queried.
 * @param[in] bytes Specifies the size in bytes of memory pointed to by \p flags.
 * @param[out] pMem A pointer to memory location where appropriate values for a given \p flags will be returned. If \p pMem is NULL, it is ignored.
 * @param[out] pNumBytes Returns the actual size in bytes of data being queried by \p flags. If \p pNumBytes is NULL, it is ignored.
-* @param[in] numEventInWaitList Specify the number of events that need to complete before this particular command can be executed
-* @param[in] waitlist Specify events that need to complete before this particular command can be executed.
-* @param[out] event Returns an event object that identifies this particular task execution instance.
 *
 * The connected component queries described in the ::McConnectedComponentInfo should return the same information for a connected component returned by ::mcGetConnectedComponents.
 *
  * An example of usage:
  * @code
  * uint64_t numBytes = 0;
- * McResult err = mcGetConnectedComponentData(myContext, MC_TRUE, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes, 0, NULL, NULL);
+ * McResult err = mcGetConnectedComponentData(myContext,  connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -893,7 +803,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  * 
  * double* pVertices = (double*)malloc(numBytes);
  *
- * err = mcGetConnectedComponentData(context, MC_TRUE, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL, 0, NULL, NULL);
+ * err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -910,20 +820,14 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
 *   -# \p pMem and \p pNumBytes are both NULL (or not NULL).
 *   -# \p bytes is zero and \p pMem is not NULL.
-*
-* @note Event synchronisation is not yet implemented.
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
-    const McBool blocking,
     const McConnectedComponent connCompId,
     McFlags flags,
     uint64_t bytes,
     void* pMem,
-    uint64_t* pNumBytes,
-    uint32_t numEventInWaitList,
-    const McEvent* waitlist,
-    McEvent* event);
+    uint64_t* pNumBytes);
 
 /**
 * @brief To release the memory of a connected component, call this function.

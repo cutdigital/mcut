@@ -86,8 +86,7 @@ int main()
         cutMeshFaces,
         cutMeshFaceSizes,
         numCutMeshVertices,
-        numCutMeshFaces,
-        0, NULL, NULL);
+        numCutMeshFaces);
 
     if (err != MC_NO_ERROR) {
         fprintf(stderr, "dispatch call failed (err=%d)\n", (int)err);
@@ -99,7 +98,7 @@ int main()
     uint32_t numConnComps;
     std::vector<McConnectedComponent> connComps;
 
-    err = mcGetConnectedComponents(context, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps, 0, NULL, NULL);
+    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
 
     if (err != MC_NO_ERROR) {
         fprintf(stderr, "1:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
@@ -113,7 +112,7 @@ int main()
 
     connComps.resize(numConnComps);
 
-    err = mcGetConnectedComponents(context, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps.size(), connComps.data(), NULL, 0, NULL, NULL);
+    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps.size(), connComps.data(), NULL);
 
     if (err != MC_NO_ERROR) {
         fprintf(stderr, "2:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
@@ -130,7 +129,7 @@ int main()
 
         // 5.1 query the number of vertices
         // ----------------------------....
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
@@ -138,7 +137,7 @@ int main()
         }
 
         uint32_t numberOfVertices = 0;
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &numberOfVertices, NULL, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &numberOfVertices, NULL);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
@@ -149,7 +148,7 @@ int main()
         // ----------------------
 
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
@@ -159,7 +158,7 @@ int main()
         std::vector<float> vertices;
         vertices.resize(numberOfVertices * 3u);
 
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (void*)vertices.data(), NULL, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (void*)vertices.data(), NULL);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
@@ -170,7 +169,7 @@ int main()
         // -------------------
 
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
@@ -180,7 +179,7 @@ int main()
         std::vector<uint32_t> faceIndices;
         faceIndices.resize(numBytes / sizeof(uint32_t));
 
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, faceIndices.data(), NULL, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, faceIndices.data(), NULL);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
@@ -190,7 +189,7 @@ int main()
         // 5.4 query the face sizes
         // ------------------------
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
             exit(1);
@@ -199,7 +198,7 @@ int main()
         std::vector<uint32_t> faceSizes;
         faceSizes.resize(numBytes / sizeof(uint32_t));
 
-        err = mcGetConnectedComponentData(context, MC_TRUE, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL, 0, NULL, NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
 
         if (err != MC_NO_ERROR) {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);

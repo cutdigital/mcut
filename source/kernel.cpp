@@ -5403,8 +5403,6 @@ void dispatch(output_t& output, const input_t& input)
         >
         m0_sm_ihe_to_flag;
 
-    // TODO: this can be improved so that we do not iterate over all edges.
-    // I.e. we could iterate over the cutpath edge and the edges we create ealier that connect to atleast one intersection point
     //for (mesh_t::edge_iterator_t edge_iter = m0.edges_begin(); edge_iter != m0.edges_end(); ++edge_iter) {
     for (std::map<vd_t, std::vector<hd_t>>::const_iterator ivtx_iter = ivtx_to_incoming_hlist.cbegin(); ivtx_iter != ivtx_to_incoming_hlist.cend(); ++ivtx_iter) {
         for (std::vector<hd_t>::const_iterator halfedge_iter = ivtx_iter->second.cbegin(); halfedge_iter != ivtx_iter->second.cend(); ++halfedge_iter) {
@@ -6310,7 +6308,7 @@ void dispatch(output_t& output, const input_t& input)
 
             MCUT_ASSERT(h_polygon_find_iter != h_polygon.cend());
 
-            const int h_idx = std::distance(h_polygon.cbegin(), h_polygon_find_iter);
+            const int h_idx = (int)std::distance(h_polygon.cbegin(), h_polygon_find_iter);
 
             primary_interior_ihalfedge_pool.emplace_back(h_polygon_idx, h_idx); // save
         }

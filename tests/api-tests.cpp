@@ -1,7 +1,7 @@
-#include "off.h"
 #include "mcut/mcut.h"
+#include "off.h"
 #include "gtest/gtest.h"
-
+#include <algorithm>
 //
 // TODO: test cut path query code & partial cut disable test.
 //
@@ -217,7 +217,7 @@ TEST(PrecisionAndRoundingModes, test_mcSetPrecision_and_mcGetPrecision_functions
 
     // mcGetInfo MC_PRECISION_MIN
     uint64_t minPrec = 0;
-    uint64_t bytes =0;
+    uint64_t bytes = 0;
     EXPECT_EQ(mcGetInfo(context, MC_PRECISION_MIN, 0, nullptr, &bytes), MC_NO_ERROR);
     EXPECT_EQ(bytes, sizeof(uint64_t));
     EXPECT_EQ(mcGetInfo(context, MC_PRECISION_MIN, bytes, &minPrec, nullptr), MC_NO_ERROR);
@@ -225,21 +225,21 @@ TEST(PrecisionAndRoundingModes, test_mcSetPrecision_and_mcGetPrecision_functions
 
     // mcGetInfo MC_PRECISION_MAX
     uint64_t maxPrec = 0;
-    bytes =0;
+    bytes = 0;
     EXPECT_EQ(mcGetInfo(context, MC_PRECISION_MAX, 0, nullptr, &bytes), MC_NO_ERROR);
     EXPECT_EQ(bytes, sizeof(uint64_t));
     EXPECT_EQ(mcGetInfo(context, MC_PRECISION_MAX, bytes, &maxPrec, nullptr), MC_NO_ERROR);
     ASSERT_GT(minPrec, 0u);
 
     // mcSetPrecision
-    uint64_t precValSet = std::max(64ul, minPrec); // bits
+    uint64_t precValSet = std::max((uint64_t)64ul, minPrec); // bits
     EXPECT_EQ(mcSetPrecision(context, precValSet), MC_NO_ERROR);
 
     // mcGetPrecision
     uint64_t prec = 0;
     EXPECT_EQ(mcGetPrecision(context, &prec), MC_NO_ERROR);
 
-    ASSERT_EQ(prec,precValSet);
+    ASSERT_EQ(prec, precValSet);
 
     // rounding modes
 
@@ -330,13 +330,12 @@ TEST_F(SeamedConnComp, querySeamedMeshVertices)
                   pCutMeshFaceIndices,
                   pCutMeshFaceSizes,
                   numCutMeshVertices,
-                  numCutMeshFaces,
-                  0, NULL, NULL),
+                  numCutMeshFaces),
         MC_NO_ERROR);
 
     uint32_t numConnComps = 0;
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps), MC_NO_ERROR);
     // NOTE: there can only be a seamed mesh whose origin/parent is the cut-mesh in this test
     // a seamed conn-comp whose origin is the cut-mesh is guarranteed to exist if the src-mesh is water-tight.
     // More generally, a seamed mesh is guarranteed to exist if and only if discovered seams/cut-paths are either 1) "circular" (loop) or 2) "linear"
@@ -345,22 +344,22 @@ TEST_F(SeamedConnComp, querySeamedMeshVertices)
 
     connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, (uint32_t)connComps_.size(), connComps_.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, (uint32_t)connComps_.size(), connComps_.data(), NULL), MC_NO_ERROR);
 
     for (int i = 0; i < (int)connComps_.size(); ++i) {
         McConnectedComponent cc = connComps_[i]; // connected compoenent id
 
         uint32_t numberOfVertices = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
         ASSERT_GT((int)numberOfVertices, 0);
 
         // indices of the vertices which define the seam
         uint64_t connCompSeamVertexIndicesBytes = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, 0, NULL, &connCompSeamVertexIndicesBytes, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, 0, NULL, &connCompSeamVertexIndicesBytes), MC_NO_ERROR);
 
         std::vector<uint32_t> seamVertexIndices;
         seamVertexIndices.resize(connCompSeamVertexIndicesBytes / sizeof(uint32_t));
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, connCompSeamVertexIndicesBytes, seamVertexIndices.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, connCompSeamVertexIndicesBytes, seamVertexIndices.data(), NULL), MC_NO_ERROR);
 
         for (int i = 0; i < (int)seamVertexIndices.size(); ++i) {
             ASSERT_GE((uint32_t)seamVertexIndices[i], (uint32_t)0);
@@ -387,27 +386,26 @@ TEST_F(SeamedConnComp, querySeamedMeshOriginPartialCut)
                   pCutMeshFaceIndices,
                   pCutMeshFaceSizes,
                   numCutMeshVertices,
-                  numCutMeshFaces,
-                  0, NULL, NULL),
+                  numCutMeshFaces),
         MC_NO_ERROR);
 
     uint32_t numConnComps = 0;
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 1);
 
     connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, (uint32_t)connComps_.size(), connComps_.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, (uint32_t)connComps_.size(), connComps_.data(), NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = connComps_[0]; // connected compoenent id
 
     uint32_t numberOfVertices = 0;
-    ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
     ASSERT_GT((int)numberOfVertices, 0);
 
     McSeamedConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
-    ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
 
     ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
 
@@ -431,18 +429,17 @@ TEST_F(SeamedConnComp, querySeamedMeshTypeCompleteCut)
                   pCutMeshFaceIndices,
                   pCutMeshFaceSizes,
                   numCutMeshVertices,
-                  numCutMeshFaces,
-                  0, NULL, NULL),
+                  numCutMeshFaces),
         MC_NO_ERROR);
 
     uint32_t numConnComps = 0;
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 2u);
 
     connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, (uint32_t)connComps_.size(), connComps_.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, (uint32_t)connComps_.size(), connComps_.data(), NULL), MC_NO_ERROR);
 
     bool foundSeamedMeshFromSrcMesh = false;
     bool foundSeamedMeshFromCutMesh = false;
@@ -450,11 +447,11 @@ TEST_F(SeamedConnComp, querySeamedMeshTypeCompleteCut)
         McConnectedComponent cc = connComps_[i]; // connected compoenent id
 
         uint32_t numberOfVertices = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
         ASSERT_GT((int)numberOfVertices, 0);
 
         McSeamedConnectedComponentOrigin orig = McSeamedConnectedComponentOrigin::MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
 
         ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH || orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
 
@@ -488,13 +485,12 @@ TEST_F(SeamedConnComp, dispatchRequireSeveringSeamsCompleteCut)
                   pCutMeshFaceIndices,
                   pCutMeshFaceSizes,
                   numCutMeshVertices,
-                  numCutMeshFaces,
-                  0, NULL, NULL),
+                  numCutMeshFaces),
         MC_NO_ERROR);
 
     uint32_t numConnComps = 0;
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_SEAMED, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 2u);
 }
 
@@ -514,13 +510,12 @@ TEST_F(SeamedConnComp, dispatchRequireSeveringSeamsPartialCut)
                   pCutMeshFaceIndices,
                   pCutMeshFaceSizes,
                   numCutMeshVertices,
-                  numCutMeshFaces,
-                  0, NULL, NULL),
+                  numCutMeshFaces),
         MC_NO_ERROR);
 
     uint32_t numConnComps = 0;
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 0u) << "there should be no connected components";
 }
 } //  namespace {

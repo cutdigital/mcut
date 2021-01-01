@@ -61,13 +61,12 @@ protected:
                       pCutMeshFaceIndices,
                       pCutMeshFaceSizes,
                       numCutMeshVertices,
-                      numCutMeshFaces,
-                      0, NULL, NULL),
+                      numCutMeshFaces),
             MC_NO_ERROR);
 
         uint32_t numConnComps = 0;
 
-        ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
         if (numConnComps == 0) {
             printf("no connected component found\n");
@@ -75,7 +74,7 @@ protected:
 
         pConnComps_.resize(numConnComps);
 
-        ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)pConnComps_.size(), pConnComps_.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)pConnComps_.size(), pConnComps_.data(), NULL), MC_NO_ERROR);
 
         //
         // query connected component data
@@ -84,35 +83,35 @@ protected:
             McConnectedComponent cc = pConnComps_[i]; // connected compoenent id
 
             uint64_t vertexCountBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes), MC_NO_ERROR);
             ASSERT_EQ(vertexCountBytes, sizeof(uint32_t));
 
             // we can also directly query the number of vertices since we know the number of bytes, which is a constant 4 bytes.
             uint32_t numberOfVertices = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, vertexCountBytes, &numberOfVertices, NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, vertexCountBytes, &numberOfVertices, NULL), MC_NO_ERROR);
             ASSERT_GT((int)numberOfVertices, 0);
 
             // vertex array
             uint64_t connCompVerticesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
             ASSERT_GT(connCompVerticesBytes, 0);
             ASSERT_GE(connCompVerticesBytes, sizeof(float) * 9); // triangle
             std::vector<float> vertices;
             uint32_t nfloats = (uint32_t)(connCompVerticesBytes / sizeof(float));
             vertices.resize(nfloats);
 
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
             ASSERT_EQ((uint64_t)numberOfVertices, (uint64_t)(connCompVerticesBytes / (sizeof(float) * 3)));
 
             // face indices
             uint64_t connCompFaceIndicesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &connCompFaceIndicesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &connCompFaceIndicesBytes), MC_NO_ERROR);
             ASSERT_GT(connCompFaceIndicesBytes, 0);
             ASSERT_GE(connCompFaceIndicesBytes, sizeof(uint32_t) * 3); // triangle
             std::vector<uint32_t> faceIndices;
             faceIndices.resize(connCompFaceIndicesBytes / sizeof(uint32_t));
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_FACE, connCompFaceIndicesBytes, faceIndices.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE, connCompFaceIndicesBytes, faceIndices.data(), NULL), MC_NO_ERROR);
 
             for (int i = 0; i < (int)faceIndices.size(); ++i) {
                 ASSERT_GE((uint32_t)faceIndices[i], (uint32_t)0);
@@ -121,12 +120,12 @@ protected:
 
             // face sizes
             uint64_t connCompFaceSizesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &connCompFaceSizesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &connCompFaceSizesBytes), MC_NO_ERROR);
             ASSERT_GE(connCompFaceIndicesBytes, sizeof(uint32_t));
             std::vector<uint32_t> faceSizes;
             faceSizes.resize(connCompFaceSizesBytes / sizeof(uint32_t));
 
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, connCompFaceSizesBytes, faceSizes.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, connCompFaceSizesBytes, faceSizes.data(), NULL), MC_NO_ERROR);
             ASSERT_GT(faceSizes.size(), 0) << "there has to be at least one face in a connected component";
 
             for (int i = 0; i < (int)faceSizes.size(); ++i) {
@@ -135,12 +134,12 @@ protected:
 
             // edge indices
             uint64_t connCompEdgesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_EDGE, 0, NULL, &connCompEdgesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_EDGE, 0, NULL, &connCompEdgesBytes), MC_NO_ERROR);
             ASSERT_GE(connCompEdgesBytes, sizeof(uint32_t) * 6); // triangle
 
             std::vector<uint32_t> edgeIndices;
             edgeIndices.resize(connCompEdgesBytes / sizeof(uint32_t));
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_EDGE, connCompEdgesBytes, edgeIndices.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_EDGE, connCompEdgesBytes, edgeIndices.data(), NULL), MC_NO_ERROR);
             ASSERT_GE((uint32_t)edgeIndices.size(), (uint32_t)6) << "6 is the minimum number of indices in a triangle, which is the simplest polygon";
         }
     }
@@ -256,13 +255,12 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
                   pCutMeshFaceIndices,
                   pCutMeshFaceSizes,
                   numCutMeshVertices,
-                  numCutMeshFaces,
-                  0, NULL, NULL),
+                  numCutMeshFaces),
         MC_NO_ERROR);
 
     uint32_t numConnComps = 0;
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
     if (numConnComps == 0) {
         printf("no connected component found\n");
@@ -270,7 +268,7 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
 
     pConnComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(context_, MC_TRUE, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)pConnComps_.size(), pConnComps_.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)pConnComps_.size(), pConnComps_.data(), NULL), MC_NO_ERROR);
 
     //
     // query connected component data
@@ -279,12 +277,12 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
         McConnectedComponent cc = pConnComps_[i]; // connected compoenent id
 
         uint64_t vertexCountBytes = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes), MC_NO_ERROR);
         ASSERT_EQ(vertexCountBytes, sizeof(uint32_t));
 
         // we can also directly query the number of vertices since we know the number of bytes, which is a constant 4 bytes.
         uint32_t numberOfVertices = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, vertexCountBytes, &numberOfVertices, NULL, 0, NULL, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, vertexCountBytes, &numberOfVertices, NULL), MC_NO_ERROR);
         ASSERT_GT((int)numberOfVertices, 0);
 
         // float
@@ -292,13 +290,13 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
         {
             // vertex array
             uint64_t connCompVerticesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
 
             std::vector<float> vertices;
             uint32_t nfloats = (uint32_t)(connCompVerticesBytes / sizeof(float));
             vertices.resize(nfloats);
 
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
             ASSERT_EQ((uint64_t)numberOfVertices, (uint64_t)(connCompVerticesBytes / (sizeof(float) * 3)));
         }
@@ -308,13 +306,13 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
         {
             // vertex array
             uint64_t connCompVerticesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &connCompVerticesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
 
             std::vector<double> vertices;
             uint32_t ndoubles = (uint32_t)(connCompVerticesBytes / sizeof(double));
             vertices.resize(ndoubles);
 
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, connCompVerticesBytes, (void*)vertices.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
             ASSERT_EQ((uint64_t)numberOfVertices, (uint64_t)(connCompVerticesBytes / (sizeof(double) * 3)));
         }
@@ -324,12 +322,12 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
         {
             // vertex array
             uint64_t connCompVerticesBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT, 0, NULL, &connCompVerticesBytes, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
 
             std::vector<char> rawVerticesString;
             rawVerticesString.resize(connCompVerticesBytes);
 
-            ASSERT_EQ(mcGetConnectedComponentData(context_, MC_TRUE, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT, connCompVerticesBytes, (void*)rawVerticesString.data(), NULL, 0, NULL, NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT, connCompVerticesBytes, (void*)rawVerticesString.data(), NULL), MC_NO_ERROR);
 
             auto my_isdigit = [&](unsigned char ch) {
                 return ch == '.' || ch == '-' || std::isdigit(ch);
