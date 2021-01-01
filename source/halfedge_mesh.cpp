@@ -470,6 +470,15 @@ const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_de
     return faces_around_face;
 }
 
+const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(const vertex_descriptor_t v) const
+{
+  MCUT_ASSERT(v != mesh_t::null_vertex());
+
+  const vertex_data_t& vd = m_vertices.at(v);
+  const std::vector<halfedge_descriptor_t>& incoming_halfedges = vd.m_halfedges;
+  return incoming_halfedges;
+}
+
 mesh_t::vertex_iterator_t mesh_t::vertices_begin() const
 {
     return vertex_iterator_t(m_vertices.cbegin());

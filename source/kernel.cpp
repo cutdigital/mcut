@@ -8650,7 +8650,9 @@ void dispatch(output_t& output, const input_t& input)
                                         //
 
                                         bool found_transformed_neigh_he = false; // any updated halfedge whose m0 instance references m0_cur_patch_cur_poly_cur_he_tgt
-
+#if 1
+                                        
+#endif
                                         //
                                         // TODO: replace the following loop over "patch", with a loop over the
                                         // halfedges around vertex, where vertex is "m0_cur_patch_cur_poly_cur_he_tgt"
@@ -8708,6 +8710,7 @@ void dispatch(output_t& output, const input_t& input)
                                                 break;
                                             }
                                         }
+#endif
 
                                         if (!found_transformed_neigh_he) {
                                             //
