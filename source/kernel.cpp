@@ -569,36 +569,52 @@ mesh_t extract_connected_components(
          ++cc_iter) {
 
         const std::size_t& cc_id = cc_iter->first;
-
-        (*logger_ptr) << "connected component id = " << cc_id << std::endl;
-
         const mesh_t& cc = cc_iter->second;
 
-        (*logger_ptr).indent();
-        connected_component_location_t location = connected_component_location_t::UNDEFINED;
+        // The boolean is needed to prevent saving duplicate connected components into the vector "connected_components[cc_id]".
+        // This can happen because the current function is called for each new cut-mesh polygon that is stitched, during the
+        // polygon stitching phases. In the other times when the current function is called, we are guarranteed that
+        // "connected_components[cc_id]" is empty.
+        //
+        // The above has the implication that the newly stitched polygon (during the stitching phase) is added to just [one] of the
+        // discovered connected components (which are of a particular color tag), thus leaving the other connected components to be
+        // discovered as having exactly the same number of polygons as before since no new polygon has been added to them.
+        // So to prevent this connected component dupliction issue, a connected component is only added into "connected_components[cc_id]"
+        // if the following hold:
+        // 1) "connected_components[cc_id]" is empty (making the added connected new and unique)
+        // 2) the most-recent connected component instance at "connected_components[cc_id].back()" has less faces (in which case, always differing by one)
+        //    that the new connected component we wish to add i.e. "cc"
+        bool proceed_to_save_mesh = connected_components[cc_id].empty() || connected_components[cc_id].back().first.number_of_faces() != cc.number_of_faces();
 
-        if (!sm_polygons_below_cs.empty() && !sm_polygons_above_cs.empty()) {
-            MCUT_ASSERT(cc_to_cs_descriptor.find(cc_id) != cc_to_cs_descriptor.cend());
-            location = cc_to_cs_descriptor.at(cc_id);
+        if (proceed_to_save_mesh) {
+            (*logger_ptr) << "connected component id = " << cc_id << std::endl;
+
+            (*logger_ptr).indent();
+            connected_component_location_t location = connected_component_location_t::UNDEFINED;
+
+            if (!sm_polygons_below_cs.empty() && !sm_polygons_above_cs.empty()) {
+                MCUT_ASSERT(cc_to_cs_descriptor.find(cc_id) != cc_to_cs_descriptor.cend());
+                location = cc_to_cs_descriptor.at(cc_id);
+            }
+
+            // infer the seam vertices of the current cc
+            // const std::map<vd_t, vd_t>& m1_to_cc_vertex = cc_to_m1_to_cc_vertex.at(cc_id);
+            // mesh_vertex_to_seam_flag;
+
+            connected_component_info_t ccinfo;
+            ccinfo.location = location;
+            ccinfo.seam_vertices = std::move(cc_to_seam_vertices[cc_id]);
+
+            connected_components[cc_id].emplace_back(cc, std::move(ccinfo));
+
+            (*logger_ptr) << "location = " << to_string(location) << std::endl;
+            (*logger_ptr) << "vertices = " << cc.number_of_vertices() << std::endl;
+            (*logger_ptr) << "edges = " << cc.number_of_edges() << std::endl;
+            (*logger_ptr) << "halfedges = " << cc.number_of_halfedges() << std::endl;
+            (*logger_ptr) << "faces = " << cc.number_of_faces() << std::endl;
+
+            (*logger_ptr).unindent();
         }
-
-        // infer the seam vertices of the current cc
-        // const std::map<vd_t, vd_t>& m1_to_cc_vertex = cc_to_m1_to_cc_vertex.at(cc_id);
-        // mesh_vertex_to_seam_flag;
-
-        connected_component_info_t ccinfo;
-        ccinfo.location = location;
-        ccinfo.seam_vertices = std::move(cc_to_seam_vertices[cc_id]);
-
-        connected_components[cc_id].emplace_back(cc, std::move(ccinfo));
-
-        (*logger_ptr) << "location = " << to_string(location) << std::endl;
-        (*logger_ptr) << "vertices = " << cc.number_of_vertices() << std::endl;
-        (*logger_ptr) << "edges = " << cc.number_of_edges() << std::endl;
-        (*logger_ptr) << "halfedges = " << cc.number_of_halfedges() << std::endl;
-        (*logger_ptr) << "faces = " << cc.number_of_faces() << std::endl;
-
-        (*logger_ptr).unindent();
     }
     (*logger_ptr).unindent();
 
