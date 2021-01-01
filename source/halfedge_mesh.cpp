@@ -88,6 +88,7 @@ vertex_descriptor_t mesh_t::source(const halfedge_descriptor_t& h) const
 vertex_descriptor_t mesh_t::target(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.t;
 }
@@ -95,6 +96,7 @@ vertex_descriptor_t mesh_t::target(const halfedge_descriptor_t& h) const
 halfedge_descriptor_t mesh_t::opposite(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.o;
 }
@@ -102,6 +104,7 @@ halfedge_descriptor_t mesh_t::opposite(const halfedge_descriptor_t& h) const
 halfedge_descriptor_t mesh_t::prev(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.p;
 }
@@ -109,6 +112,7 @@ halfedge_descriptor_t mesh_t::prev(const halfedge_descriptor_t& h) const
 halfedge_descriptor_t mesh_t::next(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.n;
 }
@@ -117,6 +121,7 @@ void mesh_t::set_next(const halfedge_descriptor_t& h, const halfedge_descriptor_
 {
     MCUT_ASSERT(h != null_halfedge());
     MCUT_ASSERT(nxt != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     halfedge_data_t& hd = m_halfedges.at(h);
     hd.n = nxt;
     set_previous(nxt, h);
@@ -126,6 +131,7 @@ void mesh_t::set_previous(const halfedge_descriptor_t& h, const halfedge_descrip
 {
     MCUT_ASSERT(h != null_halfedge());
     MCUT_ASSERT(prev != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     halfedge_data_t& hd = m_halfedges.at(h);
     hd.p = prev;
 }
@@ -133,6 +139,7 @@ void mesh_t::set_previous(const halfedge_descriptor_t& h, const halfedge_descrip
 edge_descriptor_t mesh_t::edge(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.e;
 }
@@ -140,6 +147,7 @@ edge_descriptor_t mesh_t::edge(const halfedge_descriptor_t& h) const
 face_descriptor_t mesh_t::face(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.f;
 }
@@ -148,14 +156,16 @@ vertex_descriptor_t mesh_t::vertex(const edge_descriptor_t e, const int v) const
 {
     MCUT_ASSERT(e != null_edge());
     MCUT_ASSERT(v == 0 || v == 1);
-
+    MCUT_ASSERT(m_edges.count(e) == 1);
     const edge_data_t& ed = m_edges.at(e);
     const halfedge_descriptor_t h = ed.h;
+    MCUT_ASSERT(m_halfedges.count(h) == 1);
     const halfedge_data_t& hd = m_halfedges.at(h);
     vertex_descriptor_t v_out = hd.t; // assuming v ==0
 
     if (v == 1) {
         const halfedge_descriptor_t opp = hd.o;
+        MCUT_ASSERT(m_halfedges.count(opp) == 1);
         const halfedge_data_t& ohd = m_halfedges.at(opp);
         v_out = ohd.t;
     }
@@ -184,12 +194,15 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
 {
     MCUT_ASSERT(i == 0 || i == 1);
     MCUT_ASSERT(e != null_edge());
+    MCUT_ASSERT(m_edges.count(e) == 1);
     const edge_data_t& ed = m_edges.at(e);
     halfedge_descriptor_t h = ed.h; // assuming i ==0
 
     MCUT_ASSERT(h != null_halfedge());
 
     if (i == 1) {
+        MCUT_ASSERT(m_halfedges.count(h) == 1);
+
         const halfedge_data_t& hd = m_halfedges.at(h);
         h = hd.o;
 
@@ -201,9 +214,10 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
 
 halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
 {
+    MCUT_ASSERT(m_vertices.count(s) == 1);
     const vertex_data_t& svd = m_vertices.at(s);
     const std::vector<halfedge_descriptor_t>& s_halfedges = svd.m_halfedges;
-
+    MCUT_ASSERT(m_vertices.count(t) == 1);
     const vertex_data_t& tvd = m_vertices.at(t);
     const std::vector<halfedge_descriptor_t>& t_halfedges = tvd.m_halfedges;
     std::vector<edge_descriptor_t> t_edges;
@@ -241,8 +255,8 @@ halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex
 
 edge_descriptor_t mesh_t::edge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
 {
-  halfedge_descriptor_t h = halfedge(s, t, strict_check);
-  return (h == mesh_t::null_halfedge() ? mesh_t::null_edge() : edge(h));
+    halfedge_descriptor_t h = halfedge(s, t, strict_check);
+    return (h == mesh_t::null_halfedge() ? mesh_t::null_edge() : edge(h));
 }
 
 vertex_descriptor_t mesh_t::add_vertex(const math::vec3& point)
@@ -322,11 +336,13 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
     // update vertex incidence
 
     // v0
+    MCUT_ASSERT(m_vertices.count(v0) == 1);
     vertex_data_t& v0_data = m_vertices.at(v0);
     if (std::find(v0_data.m_halfedges.cbegin(), v0_data.m_halfedges.cend(), h1_ret.first->first) == v0_data.m_halfedges.cend()) {
         v0_data.m_halfedges.push_back(h1_ret.first->first); // halfedge whose target is v0
     }
     // v1
+    MCUT_ASSERT(m_vertices.count(v1) == 1);
     vertex_data_t& v1_data = m_vertices.at(v1);
     if (std::find(v1_data.m_halfedges.cbegin(), v1_data.m_halfedges.cend(), h0_ret.first->first) == v1_data.m_halfedges.cend()) {
         v1_data.m_halfedges.push_back(h0_ret.first->first); // halfedge whose target is v1
@@ -363,7 +379,6 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         halfedge_descriptor_t v1_h = null_halfedge();
 
         for (int v0_h_iter = 0; v0_h_iter < static_cast<int>(v0_data.m_halfedges.size()); ++v0_h_iter) {
-
             v0_h = v0_data.m_halfedges.at(v0_h_iter);
             const edge_descriptor_t v0_e = edge(v0_h);
 
@@ -390,10 +405,12 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 
         if (connecting_edge_exists) // edge connecting v0 and v1
         {
+            MCUT_ASSERT(m_halfedges.count(v1_h) == 1);
             v1_hd_ptr = &m_halfedges.at(v1_h);
             new_face.m_halfedges.push_back(v1_h);
         } else { // there exists no edge between v0 and v1, so we create it
             const halfedge_descriptor_t h = add_edge(v0, v1);
+            MCUT_ASSERT(m_halfedges.count(h) == 1);
             v1_hd_ptr = &m_halfedges.at(h);
             new_face.m_halfedges.push_back(h);
         }
@@ -421,6 +438,8 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 
 const math::vec3& mesh_t::vertex(const vertex_descriptor_t& vd) const
 {
+    MCUT_ASSERT(vd != null_vertex());
+    MCUT_ASSERT(m_vertices.count(vd) == 1);
     const vertex_data_t& vdata = m_vertices.at(vd);
     return vdata.p;
 }
@@ -434,6 +453,7 @@ std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_des
 
     for (int i = 0; i < (int)halfedges_on_face.size(); ++i) {
         const halfedge_descriptor_t h = halfedges_on_face.at(i);
+        MCUT_ASSERT(m_halfedges.count(h) == 1);
         const halfedge_data_t& hd = m_halfedges.at(h);
         vertex_descriptors.push_back(hd.t);
     }
@@ -443,6 +463,7 @@ std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_des
 const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_face(const face_descriptor_t f) const
 {
     MCUT_ASSERT(f != null_face());
+    MCUT_ASSERT(m_faces.count(f) == 1);
     return m_faces.at(f).m_halfedges;
 }
 
@@ -456,10 +477,11 @@ const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_de
     for (int i = 0; i < (int)halfedges_on_face.size(); ++i) {
 
         const halfedge_descriptor_t h = halfedges_on_face.at(i);
+        MCUT_ASSERT(m_halfedges.count(h) == 1);
         const halfedge_data_t& hd = m_halfedges.at(h);
 
         if (hd.o != null_halfedge()) {
-
+            MCUT_ASSERT(m_halfedges.count(hd.o) == 1);
             const halfedge_data_t& ohd = m_halfedges.at(hd.o);
 
             if (ohd.f != null_face()) {
@@ -472,11 +494,11 @@ const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_de
 
 const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(const vertex_descriptor_t v) const
 {
-  MCUT_ASSERT(v != mesh_t::null_vertex());
-
-  const vertex_data_t& vd = m_vertices.at(v);
-  const std::vector<halfedge_descriptor_t>& incoming_halfedges = vd.m_halfedges;
-  return incoming_halfedges;
+    MCUT_ASSERT(v != mesh_t::null_vertex());
+    MCUT_ASSERT(m_vertices.count(v) == 1);
+    const vertex_data_t& vd = m_vertices.at(v);
+    const std::vector<halfedge_descriptor_t>& incoming_halfedges = vd.m_halfedges;
+    return incoming_halfedges;
 }
 
 mesh_t::vertex_iterator_t mesh_t::vertices_begin() const

@@ -7520,14 +7520,16 @@ void dispatch(output_t& output, const input_t& input)
     // note: reversed patches are called "cw" patches (for assumed clockwise based on input meshes)
 
     std::map<
-      char, // color tag 
-      std::vector<int> // reversed patch index
-    > color_to_cw_patch;
+        char, // color tag
+        std::vector<int> // reversed patch index
+        >
+        color_to_cw_patch;
 
     std::map<
-      int, // patch index 
-      int // opposite patch index
-    > patch_to_opposite;
+        int, // patch index
+        int // opposite patch index
+        >
+        patch_to_opposite;
 
     lg << "color tags = " << color_to_patch.size() << std::endl;
 
@@ -7554,9 +7556,9 @@ void dispatch(output_t& output, const input_t& input)
         lg << "patch count = " << color_to_ccw_patches_iter->second.size() << std::endl;
 
         // for each patch with current color
-        for (std::vector<int>::const_iterator patch_iter = color_to_ccw_patches_iter->second.cbegin(); 
-              patch_iter != color_to_ccw_patches_iter->second.cend(); 
-              ++patch_iter) {
+        for (std::vector<int>::const_iterator patch_iter = color_to_ccw_patches_iter->second.cbegin();
+             patch_iter != color_to_ccw_patches_iter->second.cend();
+             ++patch_iter) {
             lg.indent();
 
             const int patch_idx = *patch_iter;
@@ -7701,8 +7703,7 @@ void dispatch(output_t& output, const input_t& input)
 
                     MCUT_ASSERT(m0.source(cw_poly.front()) == m0.target(cw_poly.back())); // must form loop
 
-                    
-                    m0_polygons.push_back(cw_poly);// save the new polygon!
+                    m0_polygons.push_back(cw_poly); // save the new polygon!
                 }
 
                 // the new polygon's index as being part of the patch
@@ -7802,9 +7803,10 @@ void dispatch(output_t& output, const input_t& input)
             mesh_t patch_mesh;
 
             std::map<
-              vd_t, // vertex descriptor in "m0"
-              vd_t // vertex descriptor in "patch_mesh"
-            > m0_to_patch_mesh_vertex;
+                vd_t, // vertex descriptor in "m0"
+                vd_t // vertex descriptor in "patch_mesh"
+                >
+                m0_to_patch_mesh_vertex;
 
             lg << "patch -  " << cur_patch_idx << std::endl;
 
@@ -8003,7 +8005,7 @@ void dispatch(output_t& output, const input_t& input)
             MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(cw_patch_idx) == 0);
             patch_to_seed_interior_ihalfedge_idx[cw_patch_idx] = opposite_patch_seed_interior_ihalfedge_idx;
             //std::pair<std::map<int, int>::const_iterator, bool> seed_interior_ihalfedge_idx_insertion = patch_to_seed_interior_ihalfedge_idx.insert(std::make_pair(cw_patch_idx, opposite_patch_seed_interior_ihalfedge_idx));
-           // MCUT_ASSERT(seed_interior_ihalfedge_idx_insertion.second == true);
+            // MCUT_ASSERT(seed_interior_ihalfedge_idx_insertion.second == true);
             MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(cw_patch_idx) == 1);
 
             MCUT_ASSERT(patch_to_seed_poly_idx.count(cw_patch_idx) == 0);
@@ -8039,37 +8041,35 @@ void dispatch(output_t& output, const input_t& input)
     lg << "stitch patches" << std::endl;
 
     std::map<
-      char, // color tag
-      std::map<
-        std::size_t, // cc-id
-        std::vector< // list of partially sealed connected components (first elem has 1 stitched polygon and the last has all cut-mesh polygons stitched to fill holes)
-          std::pair< // mesh instance
-              mesh_t, // actual mesh data structure
-              connected_component_info_t // information about mesh
-            >
-          >
-        >
-    > color_to_separated_connected_ccsponents;
+        char, // color tag
+        std::map<
+            std::size_t, // cc-id
+            std::vector< // list of partially sealed connected components (first elem has 1 stitched polygon and the last has all cut-mesh polygons stitched to fill holes)
+                std::pair< // mesh instance
+                    mesh_t, // actual mesh data structure
+                    connected_component_info_t // information about mesh
+                    >>>>
+        color_to_separated_connected_ccsponents;
 
     std::map<
-      char, // color tag 
-      std::vector<traced_polygon_t> // traced polygons in colored "m1" mesh
-    > color_to_m1_polygons;
+        char, // color tag
+        std::vector<traced_polygon_t> // traced polygons in colored "m1" mesh
+        >
+        color_to_m1_polygons;
 
     // A halfedge in "m0" that is used to trace a cut-mesh polygon will have
     // two "m1" versions - one for the ccw/normal patch and the other for the
     // cw/reversed patch.
     //
     std::map<
-      char, // color tag 
-      std::map<
-        hd_t, // "m0" cut-mesh halfedge instance
+        char, // color tag
         std::map<
-          int, // patch idx
-          hd_t // "m1" cut-mesh halfedge instance
-        >
-       >
-    > color_to_m0_to_m1_he_instances;
+            hd_t, // "m0" cut-mesh halfedge instance
+            std::map<
+                int, // patch idx
+                hd_t // "m1" cut-mesh halfedge instance
+                >>>
+        color_to_m0_to_m1_he_instances;
 
     // for each color  ("interior" / "exterior")
     for (std::map<char, std::vector<int>>::const_iterator color_to_patches_iter = color_to_patch.cbegin();
@@ -8120,7 +8120,7 @@ void dispatch(output_t& output, const input_t& input)
         // ref to entry
         std::map<hd_t, std::map<int, hd_t>>& m0_to_m1_he_instances = color_to_m0_to_m1_he_instances.at(color_id);
         // copy all of the "m1_polygons" that were created before we got to the stitching stage
-        // Note: Before stitching has began, "m1_polygons" contains only source-mesh polygons, 
+        // Note: Before stitching has began, "m1_polygons" contains only source-mesh polygons,
         // which have been partition to allow separation of unsealed connected components
         std::pair<std::map<char, std::vector<traced_polygon_t>>::iterator, bool> color_to_m1_polygons_insertion = color_to_m1_polygons.insert(std::make_pair(color_id, m1_polygons)); // copy!
 
@@ -8128,7 +8128,7 @@ void dispatch(output_t& output, const input_t& input)
 
         // ref to "m1_polygons" i.e. the source-mesh polygons with partitioning
         std::vector<traced_polygon_t>& m1_polygons_colored = color_to_m1_polygons_insertion.first->second;
-        
+
         // reference to the list connected components (see declaration for details)
         std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
 
@@ -8274,7 +8274,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 // the number of halfedges in the current polygon that have been processed
                 // Note: we start from "1" because the initial halfedge (m0_cur_patch_cur_poly_1st_he) has already been processed.
-                // That is, we already have an "m1" version of it thanks to the halfedge transformation step (intersection point 
+                // That is, we already have an "m1" version of it thanks to the halfedge transformation step (intersection point
                 // dupication step) which occurs along the cutpath.
                 int transformed_he_counter = 1; //
 
@@ -8605,7 +8605,7 @@ void dispatch(output_t& output, const input_t& input)
                             {
                                 // check if opposite halfedge of current is transformed. (NOTE: searching
                                 // only through the polygons of the current patch)
-                                
+
                                 hd_t m1_cs_cur_patch_polygon_he_opp = mesh_t::null_halfedge(); // transformed instance of opposite
                                 std::map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp);
 
@@ -8651,8 +8651,63 @@ void dispatch(output_t& output, const input_t& input)
 
                                         bool found_transformed_neigh_he = false; // any updated halfedge whose m0 instance references m0_cur_patch_cur_poly_cur_he_tgt
 #if 1
-                                        
-#endif
+                                        /*
+                                          1. get "m0" halfedges around vertex
+                                          2. for each halfedge around vertex, check if it has a transformed instance that belonging to the current patch
+                                        */
+                                        const std::vector<halfedge_descriptor_t>& m0_incoming_halfedges = m0.get_halfedges_around_vertex(m0_cur_patch_cur_poly_cur_he_tgt);
+
+                                        for (std::vector<halfedge_descriptor_t>::const_iterator m0_incoming_halfedges_iter = m0_incoming_halfedges.cbegin();
+                                             m0_incoming_halfedges_iter != m0_incoming_halfedges.cend();
+                                             ++m0_incoming_halfedges_iter) {
+
+                                            const halfedge_descriptor_t m0_incoming_halfedge = *m0_incoming_halfedges_iter;
+                                            MCUT_ASSERT(m0_incoming_halfedge != mesh_t::null_halfedge());
+
+                                            // is it transformed?
+                                            m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_incoming_halfedge);
+                                            hd_t m1_incoming_halfedge = mesh_t::null_halfedge();
+
+                                            if (m0_to_m1_he_instances_find_iter != m0_to_m1_he_instances.cend()) {
+
+                                                // get the transformed instance belonging to the current patch
+                                                std::map<int, hd_t>::const_iterator m1_he_instances_find_iter = m0_to_m1_he_instances_find_iter->second.find(cur_patch_idx);
+
+                                                if (m1_he_instances_find_iter != m0_to_m1_he_instances_find_iter->second.cend()) {
+                                                    m1_incoming_halfedge = m1_he_instances_find_iter->second;
+
+                                                    m1_cs_cur_patch_polygon_he_tgt = m1_colored.target(m1_incoming_halfedge);
+                                                    found_transformed_neigh_he = true;
+                                                }
+                                            }
+
+                                            if (!found_transformed_neigh_he) {
+                                                // We enter this scope if: "m1_incoming_halfedge" does not exist
+
+                                                // What we are going to try to do now is check if the opposite of "m0_incoming_halfedge" has been transformed (w.r.t the current patch),
+                                                // and if so, we get it transformed instanced from which we deduce the correct value of "m1_cs_cur_patch_polygon_he_tgt"
+
+                                                const halfedge_descriptor_t m0_incoming_halfedge_opp = m0.opposite(m0_incoming_halfedge);
+                                                m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_incoming_halfedge);
+                                                hd_t m1_incoming_halfedge_opp = mesh_t::null_halfedge();
+
+                                                if (m0_to_m1_he_instances_find_iter != m0_to_m1_he_instances.cend()) {
+
+                                                    std::map<int, hd_t>::const_iterator m1_he_instances_find_iter = m0_to_m1_he_instances_find_iter->second.find(cur_patch_idx);
+
+                                                    if (m1_he_instances_find_iter != m0_to_m1_he_instances_find_iter->second.cend()) {
+                                                        m1_incoming_halfedge_opp = m1_he_instances_find_iter->second;
+                                                        m1_cs_cur_patch_polygon_he_tgt = m1_colored.source(m1_incoming_halfedge_opp); // Note: using "m1.source" not "m1.target"
+                                                        found_transformed_neigh_he = true;
+                                                    }
+                                                }
+                                            }
+
+                                            if (found_transformed_neigh_he) {
+                                                break; // done
+                                            }
+                                        }
+#else
                                         //
                                         // TODO: replace the following loop over "patch", with a loop over the
                                         // halfedges around vertex, where vertex is "m0_cur_patch_cur_poly_cur_he_tgt"
@@ -8766,7 +8821,7 @@ void dispatch(output_t& output, const input_t& input)
                             //m1_computed_edges.push_back(m1_colored.edge(m1_cur_patch_cur_poly_cur_he));
                             //std::map<vd_t, std::vector<std::pair<vd_t, ed_t>>>
 
-                            ed_t new_edge = m1_colored.edge(m1_cur_patch_cur_poly_cur_he);
+                            //ed_t new_edge = m1_colored.edge(m1_cur_patch_cur_poly_cur_he);
                             //m1_computed_edges[m1_cs_cur_patch_polygon_he_src].push_back(std::make_pair(m1_cs_cur_patch_polygon_he_tgt, new_edge));
                             //m1_computed_edges[m1_cs_cur_patch_polygon_he_tgt].push_back(std::make_pair(m1_cs_cur_patch_polygon_he_src, new_edge));
                         }
@@ -8813,7 +8868,6 @@ void dispatch(output_t& output, const input_t& input)
                     transformed_he_counter += 1; // next halfedge in m0_cur_patch_cur_poly
 
                     lg.unindent();
-
                 } while (transformed_he_counter != (int)m0_cur_patch_cur_poly.size()); // while not all halfedges of the current polygon have been transformed.
 
                 //

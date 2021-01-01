@@ -330,6 +330,7 @@ public:
 
     const math::vec3& vertex(const vertex_descriptor_t& vd) const;
 
+    // returns vector of halfedges which point to vertex (i.e. "v" is their target)
     const std::vector<halfedge_descriptor_t>& get_halfedges_around_vertex(const vertex_descriptor_t v) const;
 
     std::vector<vertex_descriptor_t> get_vertices_around_face(const face_descriptor_t f) const;
