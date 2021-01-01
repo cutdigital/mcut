@@ -239,6 +239,12 @@ halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex
     return result;
 }
 
+edge_descriptor_t mesh_t::edge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
+{
+  halfedge_descriptor_t h = halfedge(s, t, strict_check);
+  return (h == mesh_t::null_halfedge() ? mesh_t::null_edge() : edge(h));
+}
+
 vertex_descriptor_t mesh_t::add_vertex(const math::vec3& point)
 {
     return add_vertex(point.x(), point.y(), point.z());

@@ -8028,7 +8028,7 @@ void dispatch(output_t& output, const input_t& input)
     //
     // We are now going to "fill the holes"
     //
-    // For each color, we have a halfdge data structure which is a copy of "m1".
+    // For each color tag, we have a halfdge data structure (which is a copy of "m1").
     // We do this to make sure that the exterior/outside patches will be stitched to
     // separate copies of the connected components in "m1", compared to interior patches.
     // This helps us to distinguish between stitching the interior of the source-mesh
@@ -8038,37 +8038,38 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "stitch patches" << std::endl;
 
-    // list of mesh copies containing the unseparated connected ccsponents each differing by one newly stitched polygon
-    //std::map<char, std::vector<mesh_t> > color_to_unseparated_connected_ccsponents; // TODO: probably not useful, remove
+    std::map<
+      char, // color tag
+      std::map<
+        std::size_t, // cc-id
+        std::vector< // list of partially sealed connected components (first elem has 1 stitched polygon and the last has all cut-mesh polygons stitched to fill holes)
+          std::pair< // mesh instance
+              mesh_t, // actual mesh data structure
+              connected_component_info_t // information about mesh
+            >
+          >
+        >
+    > color_to_separated_connected_ccsponents;
 
-    // NOTE: <value> has the same number of elements as "unseparated_stitching_CCs"
+    std::map<
+      char, // color tag 
+      std::vector<traced_polygon_t> // traced polygons in colored "m1" mesh
+    > color_to_m1_polygons;
 
-    // MapKey=color
-    // MapValue=[
-    //  MapKey=cc-id;
-    //  MapValue=list of partially sealed connected components (first elem has 1
-    //           stitched polygon and the last has all cut-mesh polygons stitched
-    //           to fill holes).
-    // ].
-    std::map<char, std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>> color_to_separated_connected_ccsponents;
-
-    // MapKey=color
-    // MapValue=traced polygons in "m1"
-    std::map<char, std::vector<traced_polygon_t>> color_to_m1_polygons;
-
-    // a halfedge in "m0" that is used to trace a cut-mesh polygon will have
+    // A halfedge in "m0" that is used to trace a cut-mesh polygon will have
     // two "m1" versions - one for the ccw/normal patch and the other for the
     // cw/reversed patch.
     //
-    // MapKey=color
-    // MapValue=[
-    //  MapKey="m0" halfedge;
-    //  MapValue=[
-    //      MapKey=patch index;
-    //      MapValue="m1" version of "m1" halfedge
-    //  ]
-    // ]
-    std::map<char, std::map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>> color_to_m0_to_m1_he_instances;
+    std::map<
+      char, // color tag 
+      std::map<
+        hd_t, // "m0" cut-mesh halfedge instance
+        std::map<
+          int, // patch idx
+          hd_t // "m1" cut-mesh halfedge instance
+        >
+       >
+    > color_to_m0_to_m1_he_instances;
 
     // for each color  ("interior" / "exterior")
     for (std::map<char, std::vector<int>>::const_iterator color_to_patches_iter = color_to_patch.cbegin();
@@ -8080,10 +8081,11 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "color : " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
 
-        // get the copy of "m1" which is used to specifically stitch
-        // patches of the current color
+        MCUT_ASSERT(color_to_m1.count(color_id) == 1);
+        // get the reference to the copy of "m1" to which patches of the current color will be stitched
         mesh_t& m1_colored = color_to_m1.at(color_id);
 
+#if 0
         // used to keep track of already-calculated edges in "color_to_m1"
         // TODO: maybe its better to use a map for this look-up
         std::map<vd_t, std::vector<std::pair<vd_t, ed_t>>> m1_computed_edges; // note: local var and in same scope as m1_colored
@@ -8111,29 +8113,28 @@ void dispatch(output_t& output, const input_t& input)
 
             return edge;
         };
+#endif
 
         // create entry
         color_to_m0_to_m1_he_instances.insert(std::make_pair(color_id, std::map<hd_t, std::map<int, hd_t>>()));
-        // ref
+        // ref to entry
         std::map<hd_t, std::map<int, hd_t>>& m0_to_m1_he_instances = color_to_m0_to_m1_he_instances.at(color_id);
         // copy all of the "m1_polygons" that were created before we got to the stitching stage
-        // Note: "m1_polygons" contains only src-mesh polygons, which have been partition to allow
-        // separation of unsealed connected components
-        std::pair<std::map<char, std::vector<traced_polygon_t>>::iterator, bool> color_to_m1_polygons_insertion = color_to_m1_polygons.insert(std::make_pair(color_id, m1_polygons)); // copy
+        // Note: Before stitching has began, "m1_polygons" contains only source-mesh polygons, 
+        // which have been partition to allow separation of unsealed connected components
+        std::pair<std::map<char, std::vector<traced_polygon_t>>::iterator, bool> color_to_m1_polygons_insertion = color_to_m1_polygons.insert(std::make_pair(color_id, m1_polygons)); // copy!
 
         MCUT_ASSERT(color_to_m1_polygons_insertion.second == true);
 
-        // ref to "m1_polygons" i.e. the src-mesh polygons with partitioning
+        // ref to "m1_polygons" i.e. the source-mesh polygons with partitioning
         std::vector<traced_polygon_t>& m1_polygons_colored = color_to_m1_polygons_insertion.first->second;
-        // TODO: this is not needed
-        // std::vector<mesh_t>& unseparated_stitching_CCs = color_to_unseparated_connected_ccsponents[color_id];
+        
         // reference to the list connected components (see declaration for details)
         std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
 
         lg << "patches : " << color_to_patches_iter->second.size() << std::endl;
 
-        // keeps track of the total number of cut-mesh polygons for the current
-        // color
+        // keeps track of the total number of cut-mesh polygons for the current color tag (ccw & cw)
         int stitched_poly_counter = 0;
 
         // for each patch with current color
@@ -8147,11 +8148,10 @@ void dispatch(output_t& output, const input_t& input)
 
             lg << "patch = " << cur_patch_idx << std::endl;
 
-            // is it a normal patch i.e. not the reversed version
-            // NOTE: normal patches are created before reversed counterparts (hence the modulo trick)
+            // is it a ccw/normal patch i.e. not the cw/reversed version
+            // NOTE: ccw/normal patches are created/traced before reversed counterparts (hence the modulo trick)
             const bool is_ccw_patch = ((cur_patch_idx % total_ccw_patch_count) == cur_patch_idx);
 
-            // TODO: use the information about winding order to print patch info
             lg << "is " << (is_ccw_patch ? "ccw" : "cw") << " patch" << std::endl;
 
             MCUT_ASSERT(patches.find(cur_patch_idx) != patches.cend());
@@ -8164,7 +8164,7 @@ void dispatch(output_t& output, const input_t& input)
             ///////////////////////////////////////////////////////////////////////////
 
             //
-            // We are basically going to search for the connected component to which
+            // We are basically going to search for the connected component (in "m1_colored") to which
             // the current patch will be stitched/glued.
             //
             // PERSONAL NOTE REGARDING `NORMAL` PATCHES:
@@ -8187,7 +8187,7 @@ void dispatch(output_t& output, const input_t& input)
             // the seed polygon must be from the ones that were traced in "m0" (see graph discovery stage above)
             MCUT_ASSERT(m0_patch_seed_poly_idx < (int)m0_polygons.size());
 
-            // the seed polygon of the patch
+            // get the seed polygon of the patch
             const traced_polygon_t& m0_patch_seed_poly = m0_polygons.at(m0_patch_seed_poly_idx);
 
             // patch must have a seed halfedge (the one used to traced the seed polygon)
@@ -8205,9 +8205,9 @@ void dispatch(output_t& output, const input_t& input)
             const hd_t& m0_patch_seed_poly_he = m0_patch_seed_poly.at(m0_patch_seed_poly_he_idx);
 
             //
-            // Here, we now infer connected component to which the current patch will be stitched.
-            // to do this we can use he opposite halfedge of the seed halfedge. This opposite halfedge
-            // is used to trace a src-mesh polygon next to the cut-path.
+            // Here, we now deduce the connected component to which the current patch will be stitched.
+            // To do this we can use the opposite halfedge of the seed halfedge. This opposite halfedge
+            // is used to trace a source-mesh polygon next to the cut-path.
             //
 
             // get opposite halfedge of the seed halfedge of the current patch
@@ -8215,16 +8215,16 @@ void dispatch(output_t& output, const input_t& input)
 
             // an "m1" version of this opposite halfedge must exist from the halfedge
             // partitioning problem we solved when duplicating intersection points to
-            // partition the src-mesh
+            // partition the source-mesh
             MCUT_ASSERT(m0_to_m1_ihe.find(m0_patch_seed_poly_he_opp) != m0_to_m1_ihe.cend());
 
             // get the "m1" version of the opposite-halfedge of the seed-halfedge.
-            // Note that this halfedge has already been used to trace a src-mesh polygon
+            // Note that this halfedge has already been used to trace a source-mesh polygon
             // in "m1"....
             const hd_t m1_seed_interior_ihe_opp = m0_to_m1_ihe.at(m0_patch_seed_poly_he_opp);
             // .... thus, we have to use its opposite, which will be the "m1" version of the
             // seed halfedge of the current patch.
-            // NOTE: this probably requires a visual example to properly understand
+            // PERSONAL NOTE: this probably requires a visual example to properly understand
             const hd_t m1_seed_interior_ihe_opp_opp = m1_colored.opposite(m1_seed_interior_ihe_opp); // i.e. m1 instance of m0_patch_seed_poly_he_opp
 
             lg << "stitch polygon-halfedges of patch" << std::endl;
@@ -8255,7 +8255,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 lg << "polygon = " << m0_cur_patch_cur_poly_idx << std::endl;
 
-                // must be within the range of the trace polygons (include the reversed ones)
+                // must be within the range of the traced polygons (include the reversed ones)
                 MCUT_ASSERT(m0_cur_patch_cur_poly_idx < (int)m0_polygons.size());
 
                 // get the current polygon of the patch
@@ -8269,19 +8269,21 @@ void dispatch(output_t& output, const input_t& input)
 
                 // the processed/stitched version of the current polygon
                 m1_polygons_colored.emplace_back(traced_polygon_t());
-                traced_polygon_t& m1_poly = m1_polygons_colored.back(); // stitched version of polygon
+                traced_polygon_t& m1_poly = m1_polygons_colored.back(); // stitched/"m1" version of polygon
                 m1_poly.push_back(m1_cur_patch_cur_poly_1st_he);
 
                 // the number of halfedges in the current polygon that have been processed
                 // Note: we start from "1" because the initial halfedge (m0_cur_patch_cur_poly_1st_he) has already been processed.
+                // That is, we already have an "m1" version of it thanks to the halfedge transformation step (intersection point 
+                // dupication step) which occurs along the cutpath.
                 int transformed_he_counter = 1; //
 
                 //
                 // In the following loop, we will process polygon-halfedges iteratively as we
-                // advance onto the next ones starting from the initial. In each interation,
-                // we create an "m1" version of the of the current halfedge so that it references the
+                // advance onto the "next" ones in the sequence starting from the initial. In each interation,
+                // we create an "m1" version of the of the current "m0" halfedge so that it references the
                 // correct vertex descriptors (src and tgt). The next iteration moves onto the
-                // next halfedge
+                // next halfedge, and so on...
                 //
 
                 do { // for each remaining halfedge of current polygon being stitched
@@ -8315,10 +8317,10 @@ void dispatch(output_t& output, const input_t& input)
                     const int m1_cur_patch_cur_poly_prev_he_idx = transformed_he_counter - 1; // note: transformed_he_counter is init to 1
 
                     // must be in current polygon's range
-                    MCUT_ASSERT(m1_cur_patch_cur_poly_prev_he_idx < (int)m1_poly.size());
+                    MCUT_ASSERT(m1_cur_patch_cur_poly_prev_he_idx >= 0 && m1_cur_patch_cur_poly_prev_he_idx < (int)m1_poly.size());
 
                     // get descriptor of the processed copy of the preceeding halfedge in the current polygon
-                    const hd_t m1_cur_patch_cur_poly_prev_he = m1_poly.at(m1_cur_patch_cur_poly_prev_he_idx); // previous transformed
+                    const hd_t m1_cur_patch_cur_poly_prev_he = m1_poly.at(m1_cur_patch_cur_poly_prev_he_idx); // previously transformed
                     // get target of transformed previous
                     const vd_t m1_cur_patch_cur_poly_prev_he_tgt = m1_colored.target(m1_cur_patch_cur_poly_prev_he); // transformed target of previous
 
@@ -8326,13 +8328,12 @@ void dispatch(output_t& output, const input_t& input)
                     // create "m1" version of current halfedge
                     ///////////////////////////////////////////////////////////////////////////
 
-                    // that source of the processed version of the current halfedge is the same as
-                    // the target of the processed previous halfedge in the current polygon
+                    // Note that the source of the processed/"m1" version of the current halfedge is the same as
+                    // the target of the processed/"m1" version of the previous halfedge in the current polygon
                     vd_t m1_cs_cur_patch_polygon_he_src = m1_cur_patch_cur_poly_prev_he_tgt; // known from previous halfedge
-                    // assume the target of the processed version of the current halfedge
-                    // is the same descriptor as unprocessed version (this is generally true
-                    // when processing non-boundary/border halfedges, and if the current patch
-                    // is a normal patch).
+                    // This initialization assumes the target of the processed/"m1" version of the current halfedge
+                    // is the same descriptor as the unprocessed/"m0" version (this is generally true
+                    // when processing non-boundary/border halfedges and the current patch is a normal patch).
                     vd_t m1_cs_cur_patch_polygon_he_tgt = m0_cur_patch_cur_poly_cur_he_tgt;
 
                     // flag whether to insert new edge into "m1_colored"
@@ -8378,14 +8379,14 @@ void dispatch(output_t& output, const input_t& input)
                                 const hd_t m1_cur_patch_cur_poly_cur_he_opp = m0_to_m1_ihe.at(m0_cur_patch_cur_poly_cur_he_opp);
                                 const hd_t m1_cur_patch_cur_poly_cur_he_opp_opp = m1_colored.opposite(m1_cur_patch_cur_poly_cur_he_opp);
 
-                                // halfedge already exists. it was created during src-mesh partitioning
+                                // halfedge already exists. it was created during source-mesh partitioning stage earlier
                                 m1_cur_patch_cur_poly_cur_he = m1_cur_patch_cur_poly_cur_he_opp_opp;
 
-                                // TODO: fix problem case2 (i.e. where cs-patch has one orig vertex at the middle and the rest are intersection points, to create a "scoop cut")
                                 MCUT_ASSERT(m1_colored.target(m1_cur_patch_cur_poly_cur_he) == m1_cs_cur_patch_polygon_he_tgt);
                             }
                         }
-                    } else if (!src_is_ivertex && tgt_is_ivertex) { // class 1 : o-->x : this type of halfedge can only be "coming in" i.e. pointing torward sm
+                    } // if (cur_is_last_to_be_transformed) {
+                    else if (!src_is_ivertex && tgt_is_ivertex) { // class 1 : o-->x : this type of halfedge can only be "coming in" i.e. pointing torward source mesh
                         // o-->x
 
                         /*
@@ -8399,7 +8400,7 @@ void dispatch(output_t& output, const input_t& input)
                                 transformed_tgt = source of transformed "opp" 
                             ELSE 
                                 transformed_tgt = source of transformed "next" // note: "next" will always be an interior intersection-halfedge since o-->x ihalfedges are always "incoming" i.e. torward the src-mesh 
-                                create_new_edge = TRUE // because opposite does not exist
+                                create_new_edge = TRUE // because opposite does not exist (in "m1")
                             
                             IF create_new_edge
                                 create new edge and use halfedge defined by transformed_src and transformed_tgt
@@ -8428,6 +8429,7 @@ void dispatch(output_t& output, const input_t& input)
                             }
                         }
 
+                        // check if opposite halfedge is transformed
                         const bool opp_is_transformed = m1_cs_cur_patch_polygon_he_opp != mesh_t::null_halfedge();
 
                         if (opp_is_transformed) {
@@ -8437,11 +8439,11 @@ void dispatch(output_t& output, const input_t& input)
 
                             //
                             // the opposite halfedge has not been transformed.
-                            // We will infer the target from the updated "next" halfedge, and
+                            // We will deduce the target from the updated "next" halfedge, and
                             // we have to create a new edge
                             //
 
-                            // look up the updated "next" by looking forward and finding the coincident src-mesh polygon
+                            // look up the updated "next" by looking forward and finding the coincident source-mesh polygon
                             // and then getting the updated instance of "next".
                             const int m0_next_cs_polygon_he_index = wrap_integer(m0_cur_patch_cur_poly_cur_he_idx + 1, 0, (int)m0_cur_patch_cur_poly.size() - 1);
 
@@ -8463,7 +8465,7 @@ void dispatch(output_t& output, const input_t& input)
                             //        return (e < traced_sm_polygon_count); // match with src-mesn polygon
                             //    });
 
-                            // "next" is always incident to a src-mesh polygon
+                            // "next" is always incident to a source-mesh polygon
                             MCUT_ASSERT(std::find_if(
                                             m0_poly_he_coincident_polys.cbegin(),
                                             m0_poly_he_coincident_polys.cend(),
@@ -8478,9 +8480,9 @@ void dispatch(output_t& output, const input_t& input)
                             // determine the connected component by looking up the updated instance
                             // of m0_cs_next_patch_polygon_he_opp since m0_cs_next_patch_polygon_he_opp
                             // is guarranteed to have been updated because it is an interior intersection
-                            // halfedge.
+                            // halfedge (i.e. its on the cut path).
                             //
-                            // REMEMBER: exterior patches are stitched to the "upper" src-mesh fragment
+                            // REMEMBER: exterior patches are stitched to the "upper" source-mesh fragment
                             const hd_t m0_cs_next_patch_polygon_he_opp = m0.opposite(m0_cs_next_patch_polygon_he);
                             const hd_t m1_cs_next_patch_polygon_he_opp = m0_to_m1_ihe.at(m0_cs_next_patch_polygon_he_opp);
                             const hd_t m1_cs_next_patch_polygon_he_opp_opp = m1_colored.opposite(m1_cs_next_patch_polygon_he_opp);
@@ -8524,7 +8526,7 @@ void dispatch(output_t& output, const input_t& input)
                             lg << "exterior" << std::endl;
 
                             // look up the transformed "next" by looking finding the
-                            // coincident src-mesh polygon and then getting the transformed instance of "next".
+                            // coincident source-mesh polygon and then getting the transformed instance of "next".
                             const int m0_next_cs_polygon_he_index = wrap_integer(m0_cur_patch_cur_poly_cur_he_idx + 1, 0, (int)m0_cur_patch_cur_poly.size() - 1);
 
                             MCUT_ASSERT(m0_next_cs_polygon_he_index < (int)m0_cur_patch_cur_poly.size());
@@ -8541,16 +8543,16 @@ void dispatch(output_t& output, const input_t& input)
                                 m0_poly_he_coincident_polys.cbegin(),
                                 m0_poly_he_coincident_polys.cend(),
                                 [&](const int& e) {
-                                    return (e < traced_sm_polygon_count); // match with src-mesh polygon
+                                    return (e < traced_sm_polygon_count); // match with source-mesh polygon
                                 });
 
-                            // "next" is always incident to an src-mesh polygon
+                            // "next" is always incident to an source-mesh polygon
                             MCUT_ASSERT(find_iter != m0_poly_he_coincident_polys.cend());
 
                             const hd_t m0_cs_next_patch_polygon_he_opp = m0.opposite(m0_cs_next_patch_polygon_he);
 
                             // Note: this is always true, even in the case of scoop cuts. This is because
-                            // halfedge along the cut-path are updated before stitching (srm-mesh parttioning)
+                            // halfedges along the cut-path are updated before stitching (during source-mesh partitioning)
                             // so we can infer the tgt easily
                             MCUT_ASSERT(m0_h_to_ply.find(m0_cs_next_patch_polygon_he_opp) != m0_h_to_ply.cend());
 
@@ -8562,7 +8564,7 @@ void dispatch(output_t& output, const input_t& input)
                     } else { // class 0 or 2 i.e. o-->o or x-->o
                         lg << "o-->o or x-->o" << std::endl;
                         /*
-                            In the following steps, our ability to infer the correct vertex instance 
+                            In the following steps, our ability to deduce the correct target vertex instance 
                             by simply checking whether "opp" or "next" is updated before 
                             duplication is guarranteed to work. This is because we update polygons 
                             of a patch using BFS (following adjacency) which guarrantees that when 
@@ -8580,7 +8582,7 @@ void dispatch(output_t& output, const input_t& input)
                                 3. ELSE IF next halfedge is transformed
                                 4.      infer from next
                                 2. ELSE 
-                                    IF updated halfedge point to tgt exists
+                                    IF an updated halfedge pointing to tgt already exists (i.e. using "halfedges around vertex")
                                         infer from that halfedge
                                     ELSE
                                         create duplicate of untransformed_tgt
@@ -8588,8 +8590,8 @@ void dispatch(output_t& output, const input_t& input)
                                         create_new_edge = TRUE // because "opposite" AND "next" halfedge are not updated, so we have create a new connection between vertices
                             ELSE
                                     // Do nothing (keep transformed_tgt as it is) because there 
-                                    // is no adjacent halfedge which updated, and the current 
-                                    // patch gets precedence to use the first vertex instances
+                                    // is no adjacent halfedge which is updated, and the current 
+                                    // patch gets precedence to use the first/original vertex instances
                         */
                         if (cur_is_last_to_be_transformed) {
                             // initial polygon halfedge which was transformed
@@ -8603,7 +8605,7 @@ void dispatch(output_t& output, const input_t& input)
                             {
                                 // check if opposite halfedge of current is transformed. (NOTE: searching
                                 // only through the polygons of the current patch)
-
+                                
                                 hd_t m1_cs_cur_patch_polygon_he_opp = mesh_t::null_halfedge(); // transformed instance of opposite
                                 std::map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp);
 
@@ -8644,8 +8646,7 @@ void dispatch(output_t& output, const input_t& input)
                                     } else {
 
                                         //
-                                        // find all updated tracing halfedges (in "m1") which connected to
-                                        // m0_cur_patch_cur_poly_cur_he_tgt in the current patch
+                                        // find all transformed halfedges which connect to m0_cur_patch_cur_poly_cur_he_tgt in the current patch
                                         //
 
                                         bool found_transformed_neigh_he = false; // any updated halfedge whose m0 instance references m0_cur_patch_cur_poly_cur_he_tgt
@@ -8738,11 +8739,12 @@ void dispatch(output_t& output, const input_t& input)
                     if (m1_cur_patch_cur_poly_cur_he == mesh_t::null_halfedge()) {
                         // check if edge exists
                         // TODO: use mesh built "halfedge(...)" (may require minor update to function)
-                        ed_t e = get_computed_edge(/*m1_colored, */ m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
-
+                        //ed_t e = get_computed_edge(/*m1_colored, */ m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
+                        //hd_t h = m1_colored.halfedge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
+                        ed_t e = m1_colored.edge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt, true);
                         lg << "edge = " << e << std::endl;
 
-                        if (e != mesh_t::null_edge()) { // edge already exists
+                        if (e != mesh_t::null_edge()) { // if edge already exists
 
                             hd_t h0 = m1_colored.halfedge(e, 0);
 
@@ -8762,8 +8764,8 @@ void dispatch(output_t& output, const input_t& input)
                             //std::map<vd_t, std::vector<std::pair<vd_t, ed_t>>>
 
                             ed_t new_edge = m1_colored.edge(m1_cur_patch_cur_poly_cur_he);
-                            m1_computed_edges[m1_cs_cur_patch_polygon_he_src].push_back(std::make_pair(m1_cs_cur_patch_polygon_he_tgt, new_edge));
-                            m1_computed_edges[m1_cs_cur_patch_polygon_he_tgt].push_back(std::make_pair(m1_cs_cur_patch_polygon_he_src, new_edge));
+                            //m1_computed_edges[m1_cs_cur_patch_polygon_he_src].push_back(std::make_pair(m1_cs_cur_patch_polygon_he_tgt, new_edge));
+                            //m1_computed_edges[m1_cs_cur_patch_polygon_he_tgt].push_back(std::make_pair(m1_cs_cur_patch_polygon_he_src, new_edge));
                         }
                     } // if (m1_cur_patch_cur_poly_cur_he == mesh_t::null_halfedge()) {
 
@@ -8812,7 +8814,7 @@ void dispatch(output_t& output, const input_t& input)
                 } while (transformed_he_counter != (int)m0_cur_patch_cur_poly.size()); // while not all halfedges of the current polygon have been transformed.
 
                 //
-                // at this stage, all polygon halfedges have been transformed
+                // at this stage, all halfedges of the current polygon have been transformed
                 //
 
                 // ... remove the stitching-initialiation data of current polygon.

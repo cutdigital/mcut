@@ -308,6 +308,8 @@ public:
 
     // finds a halfedge between two vertices. Returns a default constructed halfedge descriptor, if source and target are not connected.
     halfedge_descriptor_t halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check = false) const;
+    // finds an edge between two vertices. Returns a default constructed halfedge descriptor, if source and target are not connected.
+    edge_descriptor_t edge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check = false) const;
 
     vertex_descriptor_t add_vertex(const math::vec3& point);
 
