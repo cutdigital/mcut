@@ -1190,7 +1190,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             ctxtPtr->applyPrecisionAndRoundingModeSettings();
             mcut::dispatch(backendOutput, backendInput);
         } catch (...) {
-            throw;
+            fprintf(stderr, "fatal: exception caught\n");
         }
         ctxtPtr->revertPrecisionAndRoundingModeSettings();
     }

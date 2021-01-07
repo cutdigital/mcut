@@ -33,15 +33,13 @@
 #include <memory>
 #include <vector>
 
-
-
-#include "mcut/internal/utils.h"
 #include "mcut/internal/number.h"
+#include "mcut/internal/utils.h"
 
 namespace mcut {
 namespace math {
 
- enum sign_t {
+    enum sign_t {
         ON_NEGATIVE_SIDE = -1, // left
         ON_ORIENTED_BOUNDARY = 0, // on boundary
         ON_POSITIVE_SIDE = 1, // right
@@ -51,10 +49,14 @@ namespace math {
         POSITIVE = ON_POSITIVE_SIDE,
     };
 
-    template<typename T = real_number_t>
+    template <typename T = real_number_t>
     class vec2_ {
     public:
-        vec2_() { }
+        vec2_()
+            : m_x(0.0)
+            , m_y(0.0)
+        {
+        }
 
         vec2_(const T& value)
             : m_x(value)
@@ -130,11 +132,13 @@ namespace math {
     typedef vec2_<> vec2;
     typedef vec2_<fixed_precision_number_t> fast_vec2;
 
-    template<typename T = real_number_t>
+    template <typename T = real_number_t>
     class vec3_ : public vec2_<T> {
 
     public:
         vec3_()
+            : vec2_<T>(0.0, 0.0)
+            , m_z(0.0)
         {
         }
 
@@ -184,11 +188,12 @@ namespace math {
 
         // intended for converting from arb-prec to fast vec
 
-        operator vec3_<mcut::math::fixed_precision_number_t>() const { 
+        operator vec3_<mcut::math::fixed_precision_number_t>() const
+        {
             return vec3_<mcut::math::fixed_precision_number_t>(
-                static_cast<mcut::math::fixed_precision_number_t>(this->m_x), 
-                static_cast<mcut::math::fixed_precision_number_t>(this->m_y), 
-                static_cast<mcut::math::fixed_precision_number_t>(this->m_z)); 
+                static_cast<mcut::math::fixed_precision_number_t>(this->m_x),
+                static_cast<mcut::math::fixed_precision_number_t>(this->m_y),
+                static_cast<mcut::math::fixed_precision_number_t>(this->m_z));
         }
 
         vec3_ operator-(const vec3_& other) const
@@ -278,39 +283,39 @@ namespace math {
     extern sign_t sign(const real_number_t& number);
     extern std::ostream& operator<<(std::ostream& os, const vec3& v);
     extern std::ostream& operator<<(std::ostream& os, const matrix_t& m);
-    
-    template<typename T>
+
+    template <typename T>
     const T& min(const T& a, const T& b)
     {
         return ((b < a) ? b : a);
     }
-    template<typename T>
+    template <typename T>
     const T& max(const T& a, const T& b)
     {
         return ((a < b) ? b : a);
     }
 
     extern bool operator==(const vec3& a, const vec3& b);
-    
-    template<typename T>
+
+    template <typename T>
     vec2_<T> compwise_min(const vec2_<T>& a, const vec2_<T>& b)
     {
         return vec2_<T>(min(a.x(), b.x()), min(a.y(), b.y()));
     }
-    
-    template<typename T>
+
+    template <typename T>
     vec2_<T> compwise_max(const vec2_<T>& a, const vec2_<T>& b)
     {
         return vec2_<T>(max(a.x(), b.x()), max(a.y(), b.y()));
     }
 
-    template<typename T>
+    template <typename T>
     vec3_<T> compwise_min(const vec3_<T>& a, const vec3_<T>& b)
     {
         return vec3_<T>(min(a.x(), b.x()), min(a.y(), b.y()), min(a.z(), b.z()));
     }
 
-    template<typename T>
+    template <typename T>
     vec3_<T> compwise_max(const vec3_<T>& a, const vec3_<T>& b)
     {
         return vec3_<T>(max(a.x(), b.x()), max(a.y(), b.y()), max(a.z(), b.z()));

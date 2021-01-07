@@ -77,16 +77,14 @@ enum class cut_surface_patch_winding_order_t : unsigned char {
 // settings for how to execute the function "mcut::dispatch(...)"
 //
 struct input_t {
-    const mesh_t* src_mesh;
-    const mesh_t* cut_mesh;
+    const mesh_t* src_mesh = nullptr;
+    const mesh_t* cut_mesh = nullptr;
     bool verbose = true;
     bool keep_partially_sealed_connected_components = false;
     bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
 };
 
-struct output_mesh_info_t {
-    mesh_t mesh;
-    std::vector<vd_t> seam_vertices;
+struct output_mesh_data_maps_t {
     std::map<
         vd_t, // vertex descriptor in connected component
         vd_t // vertex descriptor in input-mesh e.g. source mesh or cut mesh. ("null_vertex()" if vertex is an intersection point)
@@ -97,6 +95,12 @@ struct output_mesh_info_t {
         fd_t // face descriptor in input-mesh e.g. source mesh or cut mesh. (new polygons resulting from clipping are mapped to the same input mesh face)
         >
         face_map;
+};
+
+struct output_mesh_info_t {
+    mesh_t mesh;
+    std::vector<vd_t> seam_vertices;
+    output_mesh_data_maps_t data_maps;
 };
 
 //
