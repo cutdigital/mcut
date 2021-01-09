@@ -27,6 +27,12 @@
 #define stringize(s) #s
 #define XSTR(s) stringize(s)
 
+#if WIN32
+#define MCUT_DEBUG_BREAKPOINT() __debugbreak()
+#else
+
+#endif
+
 #ifndef NDEBUG
 #define MCUT_ASSERT(a)                   \
     do {                                 \
@@ -37,7 +43,7 @@
                 __FILE__,                \
                 __LINE__,                \
                 XSTR(a));                \
-            std::abort();                \
+            MCUT_DEBUG_BREAKPOINT();                \
         }                                \
     } while (0)
 #else
