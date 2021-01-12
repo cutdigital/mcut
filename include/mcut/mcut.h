@@ -70,6 +70,8 @@ extern "C" {
 // Helper-macro to define opaque handles
 #define MC_DEFINE_HANDLE(object) typedef struct object##_T* object;
 
+#define MC_UNDEFINED_VALUE UINT32_MAX
+
 /**
  * \struct McConnectedComponent
  * @brief Connected component handle.
@@ -212,7 +214,9 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION = (1 << 9), /**< The location of a patch with respect to the source mesh (See also: ::McPatchLocation).*/
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE = (1 << 10), /**< The Hole-filling configuration of a fragment connected component (See also: ::McFragmentSealType). */
     MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX = (1 << 11), /**< List of seam-vertices as an array of indices. */
-    MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 12) /**< The input mesh (source- or cut-mesh) from which a seamed connected component is derived (See also: ::McSeamedConnectedComponentOrigin). */
+    MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 12), /**< The input mesh (source- or cut-mesh) from which a seamed connected component is derived (See also: ::McSeamedConnectedComponentOrigin). */
+    MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP = (1 << 13), /**< List of a subset of vertex indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh vertex or MC_UNDEFINED_VALUE. This index-value corresponds to the connected component vertex at the accessed index. Example: the value at index 0 of the queried array is the index of the vertex in the original input mesh. Note that intersection points are mapped to MC_UNDEFINED_VALUE. The input mesh will be deduced by the user from the type of connected component with which the information is queried.*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 14) /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that are mapped to a defined value. The input mesh will be deduced by the user from the type of connected component with which the information is queried.*/
 } McConnectedComponentData;
 
 /**
@@ -290,7 +294,9 @@ typedef enum McDispatchFlags {
     MC_DISPATCH_VERTEX_ARRAY_DOUBLE = (1 << 1), /**< Interpret the input mesh vertices as arrays of 64-bit floating-point numbers.*/
     MC_DISPATCH_VERTEX_ARRAY_EXACT = (1 << 2), /**< Interpret the input mesh vertices as character strings representing arbitrary-precision numbers. Values are parsed exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to std::to_string.*/
     MC_DISPATCH_REQUIRE_SEVERING_SEAMS = (1 << 3), /**< Require that all intersection paths partition/divide the source mesh into two subsets of polygons. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts.*/
-    MC_DISPATCH_KEEP_PARTIALLY_SEALED_FRAGMENTS = (1 << 3) /** Include partially sealed fragments in the returned output. */
+    MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS = (1 << 4), /** Flag to include partially sealed fragments as queryable connected components. */
+    MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 5), /** Flag to enable connected component-to-input mesh vertex maps as queryable connected component data. */
+    MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 6) /** Flag to enable connected component-to-input mesh face maps as queryable  connected component data. */
 } McDispatchFlags;
 
 /**
@@ -820,6 +826,8 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
 *   -# \p pMem and \p pNumBytes are both NULL (or not NULL).
 *   -# \p bytes is zero and \p pMem is not NULL.
+*   -# \p flag is MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP when \p context dispatch flags did not include flag MC_DISPATCH_INCLUDE_VERTEX_MAP
+*   -# \p flag is MC_CONNECTED_COMPONENT_DATA_FACE_MAP when \p context dispatch flags did not include flag MC_DISPATCH_INCLUDE_FACE_MAP
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,

@@ -140,7 +140,9 @@ struct IndexArrayMesh {
 
     std::unique_ptr<mcut::math::real_number_t[]> pVertices;
     std::unique_ptr<uint32_t[]> pSeamVertexIndices;
+    std::unique_ptr<uint32_t[]> pVertexMapIndices; // descriptor/index in original mesh (source/cut-mesh), each vertex has an entry
     std::unique_ptr<uint32_t[]> pFaceIndices;
+    std::unique_ptr<uint32_t[]> pFaceMapIndices; // descriptor/index in original mesh (source/cut-mesh), each face has an entry
     std::unique_ptr<uint32_t[]> pFaceSizes;
     std::unique_ptr<uint32_t[]> pEdges;
 
@@ -1061,20 +1063,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces)
 {
-#define DEMO_BUILD 0 // comment out for full build
 
-#if defined(DEMO_BUILD)
-    if (numSrcMeshFaces > 16 || numCutMeshVertices > 16) {
-        std::fprintf(stdout,
-            "===============================================================\n"
-            "Thanks for using MCUT. This demo has been restricted to meshes \n"
-            "with 16 vertices.\n"
-            "Please email contact@cut-digital.com for more information about\n"
-            "obtaining a commercial licence for this product.\n"
-            "================================================================\n");
-        return McResult::MC_NO_ERROR;
-    }
-#endif
     McResult result = McResult::MC_NO_ERROR;
     std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator ctxtIter = gDispatchContexts.find(context);
 
@@ -1166,7 +1155,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         backendInput.require_looped_cutpaths = true;
     }
 
-    if (ctxtPtr->dispatchFlags & MC_DISPATCH_KEEP_PARTIALLY_SEALED_FRAGMENTS) {
+    if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS) {
         backendInput.keep_partially_sealed_connected_components = true;
     }
 
@@ -1252,7 +1241,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     if (is_last_cc) {
                         asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
-                    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_KEEP_PARTIALLY_SEALED_FRAGMENTS) { // did the user tell us to keep partially sealed fragments
+                    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS) { // did the user tell us to keep partially sealed fragments
                         asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL;
                     }
 
@@ -1795,6 +1784,53 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                 return result;
             }
             memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pSeamVertexIndices.get()), bytes);
+        }
+    } break;
+    case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {
+        if ((ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP) == 0) {
+            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "dispatch flags not set");
+            result = McResult::MC_INVALID_VALUE;
+            return result;
+        }
+        if (pMem == nullptr) {
+            *pNumBytes = ccData->indexArrayMesh.numVertices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+        } else {
+            if (bytes > ccData->indexArrayMesh.numVertices * sizeof(uint32_t)) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            if (bytes % (sizeof(uint32_t)) != 0) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+            memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pVertexMapIndices.get()), bytes);
+        }
+    } break;
+    case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
+        if ((ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP) == 0) {
+            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "dispatch flags not set");
+            result = McResult::MC_INVALID_VALUE;
+            return result;
+        }
+
+        if (pMem == nullptr) {
+            *pNumBytes = ccData->indexArrayMesh.numFaces * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+        } else {
+            if (bytes > ccData->indexArrayMesh.numFaces * sizeof(uint32_t)) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            if (bytes % (sizeof(uint32_t)) != 0) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+            memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pFaceMapIndices.get()), bytes);
         }
     } break;
     default:
