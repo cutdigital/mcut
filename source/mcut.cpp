@@ -507,6 +507,9 @@ McResult halfedgeMeshToIndexArrayMesh(
     MCUT_ASSERT(indexArrayMesh.numVertices >= 3);
 
     indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[indexArrayMesh.numVertices * 3u]);
+    if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
+        indexArrayMesh.pVertexMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numVertices]);
+    }
 
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i) {
 
@@ -521,6 +524,11 @@ McResult halfedgeMeshToIndexArrayMesh(
         //std::cout << indexArrayMesh.pVertices[(i * 3u) + 0u] << " " << indexArrayMesh.pVertices[(i * 3u) + 1u] << " " << indexArrayMesh.pVertices[(i * 3u) + 2u] << std::endl;
 
         vmap[*vIter] = i;
+
+        if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
+            MCUT_ASSERT(halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1);
+            indexArrayMesh.pVertexMapIndices[i] = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter);
+        }
     }
 
     MCUT_ASSERT(!vmap.empty());
@@ -546,16 +554,16 @@ McResult halfedgeMeshToIndexArrayMesh(
     MCUT_ASSERT(indexArrayMesh.numFaces > 0);
 
     indexArrayMesh.pFaceSizes = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
+    if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
+        indexArrayMesh.pFaceMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
+    }
     indexArrayMesh.numFaceIndices = 0;
 
     std::vector<std::vector<mcut::vd_t>> gatheredFaces;
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i) {
 
         std::vector<mcut::vd_t> face;
-        // CGAL::Vertex_around_face_iterator<mcut::mesh_t> vbegin, vend;
         std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
-
-        //for (boost::tie(vbegin, vend) = vertices_around_face(halfedgeMesh.halfedge(*i), halfedgeMesh); vbegin != vend; ++vbegin) {
 
         for (std::vector<mcut::vd_t>::const_iterator iter = vertices_around_face.cbegin();
              iter != vertices_around_face.cend();
@@ -568,6 +576,12 @@ McResult halfedgeMeshToIndexArrayMesh(
         gatheredFaces.emplace_back(face);
 
         indexArrayMesh.numFaceIndices += (int)face.size();
+
+        if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
+            MCUT_ASSERT(halfedgeMeshInfo.data_maps.face_map.count(*i) == 1);
+            const size_t idx = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+            indexArrayMesh.pFaceMapIndices[idx] = static_cast<uint32_t>(halfedgeMeshInfo.data_maps.face_map.at(*i));
+        }
     }
 
     // sanity check
