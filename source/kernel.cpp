@@ -407,7 +407,9 @@ mesh_t extract_connected_components(
     const int m1_num_vertices_after_srcmesh_partitioning,
     const int sm_vtx_cnt,
     const int ps_vtx_count,
-    const int sm_face_count)
+    const int sm_face_count,
+    bool popuplate_vertex_maps,
+    bool popuplate_face_maps)
 {
     (*logger_ptr) << "extract connected components" << std::endl;
     (*logger_ptr).indent();
@@ -562,8 +564,9 @@ mesh_t extract_connected_components(
 
                 // map vertex
                 ccID_to_mX_to_cc_vertex.at(face_cc_id).insert(std::make_pair(*face_vertex_iter, cc_descriptor));
-                ccID_to_cc_to_mX_vertex.at(face_cc_id).insert(std::make_pair(cc_descriptor, *face_vertex_iter));
-
+                if (popuplate_vertex_maps) {
+                    ccID_to_cc_to_mX_vertex.at(face_cc_id).insert(std::make_pair(cc_descriptor, *face_vertex_iter));
+                }
                 // check if we need to save vertex as being a seam vertex
                 std::map<vd_t, bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
                 bool is_seam_vertex = fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
@@ -619,8 +622,10 @@ mesh_t extract_connected_components(
 
         MCUT_ASSERT(f != mesh_t::null_face());
 
-        MCUT_ASSERT(cc_to_mX_face.count(f) == 0);
-        cc_to_mX_face[f] = fd;
+        if (popuplate_face_maps) {
+            MCUT_ASSERT(cc_to_mX_face.count(f) == 0);
+            cc_to_mX_face[f] = fd;
+        }
     }
 
     // Note: at this stage we have our connected components (meshes) with their
@@ -678,104 +683,108 @@ mesh_t extract_connected_components(
 
             const std::map<vd_t, vd_t>& cc_to_mX_vertex = ccID_to_cc_to_mX_vertex.at(cc_id);
 
-            // map cc vertices to original input mesh
-            // -----------------------------------
+            if (popuplate_vertex_maps) {
+                // map cc vertices to original input mesh
+                // -----------------------------------
 
-            for (mesh_t::vertex_iterator_t i = cc.vertices_begin(); i != cc.vertices_end(); ++i) {
-                const vd_t cc_descr = *i;
-                MCUT_ASSERT(cc_to_mX_vertex.count(cc_descr) == 1);
-                const vd_t mX_descr = cc_to_mX_vertex.at(cc_descr);
+                for (mesh_t::vertex_iterator_t i = cc.vertices_begin(); i != cc.vertices_end(); ++i) {
+                    const vd_t cc_descr = *i;
+                    MCUT_ASSERT(cc_to_mX_vertex.count(cc_descr) == 1);
+                    const vd_t mX_descr = cc_to_mX_vertex.at(cc_descr);
 
-                // NOTE: "m1_to_m0_sm_ovtx_colored" contains only non-intersection points from the source mesh
-                std::map<vd_t, vd_t>::const_iterator m1_to_m0_sm_ovtx_colored_fiter = m1_to_m0_sm_ovtx_colored.find(mX_descr);
+                    // NOTE: "m1_to_m0_sm_ovtx_colored" contains only non-intersection points from the source mesh
+                    std::map<vd_t, vd_t>::const_iterator m1_to_m0_sm_ovtx_colored_fiter = m1_to_m0_sm_ovtx_colored.find(mX_descr);
 
-                bool is_m1_sm_overtex = m1_to_m0_sm_ovtx_colored_fiter != m1_to_m0_sm_ovtx_colored.cend();
-                vd_t m0_descr = mesh_t::null_vertex(); // NOTE: two cut-mesh "m1" original vertices may map to one "m0" vertex (due to winding order duplication)
+                    bool is_m1_sm_overtex = m1_to_m0_sm_ovtx_colored_fiter != m1_to_m0_sm_ovtx_colored.cend();
+                    vd_t m0_descr = mesh_t::null_vertex(); // NOTE: two cut-mesh "m1" original vertices may map to one "m0" vertex (due to winding order duplication)
 
-                if (is_m1_sm_overtex) {
-                    m0_descr = m1_to_m0_sm_ovtx_colored_fiter->second;
-                } else if (!m1_to_m0_cm_ovtx_colored.empty()) { // are we in the stitching stage..? (calling with "m1")
-                    // Lets search through the map "m1_to_m0_cm_ovtx_colored"
+                    if (is_m1_sm_overtex) {
+                        m0_descr = m1_to_m0_sm_ovtx_colored_fiter->second;
+                    } else if (!m1_to_m0_cm_ovtx_colored.empty()) { // are we in the stitching stage..? (calling with "m1")
+                        // Lets search through the map "m1_to_m0_cm_ovtx_colored"
 
-                    // NOTE: "m1_to_m0_cm_ovtx_colored" contains only non-intersection points from the cut mesh
-                    std::map<vd_t, vd_t>::const_iterator m1_to_m0_cm_ovtx_colored_fiter = m1_to_m0_cm_ovtx_colored.find(mX_descr);
+                        // NOTE: "m1_to_m0_cm_ovtx_colored" contains only non-intersection points from the cut mesh
+                        std::map<vd_t, vd_t>::const_iterator m1_to_m0_cm_ovtx_colored_fiter = m1_to_m0_cm_ovtx_colored.find(mX_descr);
 
-                    bool is_m1_cm_overtex = m1_to_m0_cm_ovtx_colored_fiter != m1_to_m0_cm_ovtx_colored.cend();
+                        bool is_m1_cm_overtex = m1_to_m0_cm_ovtx_colored_fiter != m1_to_m0_cm_ovtx_colored.cend();
 
-                    if (is_m1_cm_overtex) {
-                        m0_descr = m1_to_m0_cm_ovtx_colored_fiter->second;
-                    }
-                }
-
-                if (m0_descr == mesh_t::null_vertex()) { // if still not found, then we are strictly "mX" polygons is "m0" polygons
-                    m0_descr = mX_descr;
-                }
-
-                const bool vertex_is_in_input_mesh_or_is_intersection_point = (m0_descr != mesh_t::null_vertex()); // i.e. is it an original vertex (its not an intersection point/along cut-path)
-
-                if (vertex_is_in_input_mesh_or_is_intersection_point) {
-                    std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
-                    bool vertex_is_in_input_mesh = m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
-                    vd_t input_mesh_descr = mesh_t::null_vertex(); // i.e. source-mesh or cut-mesh
-
-                    if (vertex_is_in_input_mesh) {
-                        //MCUT_ASSERT(m0_to_ps_vtx.count(m0_descr) == 1);
-                        const vd_t ps_descr = m0_to_ps_vtx_fiter->second; // m0_to_ps_vtx.at(m0_descr);
-                        // we don't know whether it belongs to cut-mesh patch or source-mesh, so check
-                        const bool is_cutmesh_vtx = ps_is_cutmesh_vertex(ps_descr, sm_vtx_cnt);
-                        if (is_cutmesh_vtx) {
-                            input_mesh_descr = ps_to_cm_vtx.at(ps_descr);
-                        } else { // source-mesh vertex
-                            input_mesh_descr = ps_to_sm_vtx.at(ps_descr);
+                        if (is_m1_cm_overtex) {
+                            m0_descr = m1_to_m0_cm_ovtx_colored_fiter->second;
                         }
                     }
 
-                    MCUT_ASSERT(ccinfo.data_maps.vertex_map.count(cc_descr) == 0);
-                    ccinfo.data_maps.vertex_map[cc_descr] = input_mesh_descr;
+                    if (m0_descr == mesh_t::null_vertex()) { // if still not found, then we are strictly "mX" polygons is "m0" polygons
+                        m0_descr = mX_descr;
+                    }
+
+                    const bool vertex_is_in_input_mesh_or_is_intersection_point = (m0_descr != mesh_t::null_vertex()); // i.e. is it an original vertex (its not an intersection point/along cut-path)
+
+                    if (vertex_is_in_input_mesh_or_is_intersection_point) {
+                        std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
+                        bool vertex_is_in_input_mesh = m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
+                        vd_t input_mesh_descr = mesh_t::null_vertex(); // i.e. source-mesh or cut-mesh
+
+                        if (vertex_is_in_input_mesh) {
+                            //MCUT_ASSERT(m0_to_ps_vtx.count(m0_descr) == 1);
+                            const vd_t ps_descr = m0_to_ps_vtx_fiter->second; // m0_to_ps_vtx.at(m0_descr);
+                            // we don't know whether it belongs to cut-mesh patch or source-mesh, so check
+                            const bool is_cutmesh_vtx = ps_is_cutmesh_vertex(ps_descr, sm_vtx_cnt);
+                            if (is_cutmesh_vtx) {
+                                input_mesh_descr = ps_to_cm_vtx.at(ps_descr);
+                            } else { // source-mesh vertex
+                                input_mesh_descr = ps_to_sm_vtx.at(ps_descr);
+                            }
+                        }
+
+                        MCUT_ASSERT(ccinfo.data_maps.vertex_map.count(cc_descr) == 0);
+                        ccinfo.data_maps.vertex_map[cc_descr] = input_mesh_descr;
+                    }
                 }
-            }
+            } // if (popuplate_vertex_maps) {
 
-            // map face to original input mesh
-            // -----------------------------------
-            MCUT_ASSERT(ccID_to_cc_to_mX_face.count(cc_id) == 1);
+            if (popuplate_face_maps) {
+                // map face to original input mesh
+                // -----------------------------------
+                MCUT_ASSERT(ccID_to_cc_to_mX_face.count(cc_id) == 1);
 
-            std::map<fd_t, fd_t>& cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
+                std::map<fd_t, fd_t>& cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
 
-            for (mesh_t::face_iterator_t f = cc.faces_begin(); f != cc.faces_end(); ++f) {
-                const fd_t cc_descr = *f;
-                // account for the fact that the parameter "mX_traced_polygons" may contain only a subset of traced polygons
-                // need this to compute correct polygon index to access std::maps
-                //const fd_t cc_descr_offsetted(traced_polygons_base_offset + static_cast<int>(cc_descr));
-                MCUT_ASSERT(cc_to_mX_face.count(cc_descr) == 1);
-                const fd_t mX_descr = cc_to_mX_face.at(cc_descr);
-                const fd_t offsetted_mX_descr(traced_polygons_base_offset + static_cast<int>(mX_descr)); // global traced polygon index
-                int m0_descr = -1;
+                for (mesh_t::face_iterator_t f = cc.faces_begin(); f != cc.faces_end(); ++f) {
+                    const fd_t cc_descr = *f;
+                    // account for the fact that the parameter "mX_traced_polygons" may contain only a subset of traced polygons
+                    // need this to compute correct polygon index to access std::maps
+                    //const fd_t cc_descr_offsetted(traced_polygons_base_offset + static_cast<int>(cc_descr));
+                    MCUT_ASSERT(cc_to_mX_face.count(cc_descr) == 1);
+                    const fd_t mX_descr = cc_to_mX_face.at(cc_descr);
+                    const fd_t offsetted_mX_descr(traced_polygons_base_offset + static_cast<int>(mX_descr)); // global traced polygon index
+                    int m0_descr = -1;
 
-                if (m1_to_m0_face_colored.size() > 0) { // are we calling from during the patch stitching phase..?
-                    const fd_t m1_descr = offsetted_mX_descr;
-                    MCUT_ASSERT(m1_to_m0_face_colored.count(mX_descr) == 1);
-                    m0_descr = m1_to_m0_face_colored.at(m1_descr);
-                } else {
-                    m0_descr = static_cast<int>(offsetted_mX_descr);
+                    if (m1_to_m0_face_colored.size() > 0) { // are we calling from during the patch stitching phase..?
+                        const fd_t m1_descr = offsetted_mX_descr;
+                        MCUT_ASSERT(m1_to_m0_face_colored.count(mX_descr) == 1);
+                        m0_descr = m1_to_m0_face_colored.at(m1_descr);
+                    } else {
+                        m0_descr = static_cast<int>(offsetted_mX_descr);
+                    }
+
+                    MCUT_ASSERT(m0_to_ps_face.count(m0_descr) == 1);
+                    const fd_t ps_descr = m0_to_ps_face.at(m0_descr); // every traced polygon can be mapped back to an input mesh polygon
+                    fd_t input_mesh_descr = mesh_t::null_face();
+
+                    const bool from_cutmesh_face = ps_is_cutmesh_face(ps_descr, sm_face_count);
+                    if (from_cutmesh_face) {
+                        MCUT_ASSERT(ps_to_cm_face.count(ps_descr) == 1);
+                        input_mesh_descr = ps_to_cm_face.at(ps_descr);
+                    } else {
+                        MCUT_ASSERT(ps_to_sm_face.count(ps_descr) == 1);
+                        input_mesh_descr = ps_to_sm_face.at(ps_descr);
+                    }
+
+                    // map to input mesh face
+                    MCUT_ASSERT(ccinfo.data_maps.face_map.count(cc_descr) == 0);
+                    ccinfo.data_maps.face_map[cc_descr] = input_mesh_descr;
                 }
-
-                MCUT_ASSERT(m0_to_ps_face.count(m0_descr) == 1);
-                const fd_t ps_descr = m0_to_ps_face.at(m0_descr); // every traced polygon can be mapped back to an input mesh polygon
-                fd_t input_mesh_descr = mesh_t::null_face();
-
-                const bool from_cutmesh_face = ps_is_cutmesh_face(ps_descr, sm_face_count);
-                if (from_cutmesh_face) {
-                    MCUT_ASSERT(ps_to_cm_face.count(ps_descr) == 1);
-                    input_mesh_descr = ps_to_cm_face.at(ps_descr);
-                } else {
-                    MCUT_ASSERT(ps_to_sm_face.count(ps_descr) == 1);
-                    input_mesh_descr = ps_to_sm_face.at(ps_descr);
-                }
-
-                // map to input mesh face
-                MCUT_ASSERT(ccinfo.data_maps.face_map.count(cc_descr) == 0);
-                ccinfo.data_maps.face_map[cc_descr] = input_mesh_descr;
-            }
+            } // if (popuplate_face_maps) {
 
             connected_components[cc_id].emplace_back(cc, std::move(ccinfo));
 
@@ -5126,7 +5135,9 @@ void dispatch(output_t& output, const input_t& input)
             -1, // Unused ... because we are extracting from "m0"
             sm_vtx_cnt,
             ps_vtx_cnt,
-            sm_face_count);
+            sm_face_count,
+            input.populate_vertex_maps,
+            input.populate_face_maps);
 
         MCUT_ASSERT(separated_src_mesh_fragments.size() == 1); // one cc
         MCUT_ASSERT(separated_src_mesh_fragments.cbegin()->second.size() == 1); // one instance
@@ -5167,7 +5178,9 @@ void dispatch(output_t& output, const input_t& input)
             -1, // Unused ... because we are extracting from "m0"
             sm_vtx_cnt,
             ps_vtx_cnt,
-            sm_face_count);
+            sm_face_count,
+            input.populate_vertex_maps,
+            input.populate_face_maps);
 
         if (separated_cut_mesh_fragments.size() == 1) { // usual case
             MCUT_ASSERT(separated_cut_mesh_fragments.cbegin()->second.size() == 1); // one instance
@@ -6430,7 +6443,9 @@ void dispatch(output_t& output, const input_t& input)
         m1_num_vertices_after_srcmesh_partitioning, // unused parameter until "m1" stitching stage (later)
         sm_vtx_cnt,
         ps_vtx_cnt,
-        sm_face_count);
+        sm_face_count,
+        input.populate_vertex_maps,
+        input.populate_face_maps);
 
     // for each connected component (i.e. mesh)
     for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = unsealed_connected_components.begin();
@@ -8109,6 +8124,8 @@ void dispatch(output_t& output, const input_t& input)
 
             std::vector<vd_t> seam_vertices; // vertices along cutpath
 
+            std::map<vd_t, vd_t> patch_to_m0_vertex;
+
             // for each polygon in the patch
             for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter) {
 
@@ -8130,6 +8147,7 @@ void dispatch(output_t& output, const input_t& input)
                         MCUT_ASSERT(patch_mesh_vertex != mesh_t::null_halfedge());
 
                         m0_to_patch_mesh_vertex.insert(std::make_pair(m0_vertex, patch_mesh_vertex));
+                        patch_to_m0_vertex.insert(std::make_pair(patch_mesh_vertex, m0_vertex));
 
                         // mark if is seam vertex
                         if (m0_is_intersection_point(m0_vertex, ps_vtx_cnt)) {
@@ -8144,6 +8162,8 @@ void dispatch(output_t& output, const input_t& input)
             //
             // add faces into patch mesh
             //
+
+            std::map<fd_t, int> patch_to_m0_face;
 
             // for each polygon
             for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter) {
@@ -8165,6 +8185,8 @@ void dispatch(output_t& output, const input_t& input)
                 const fd_t f = patch_mesh.add_face(remapped_poly_vertices);
 
                 MCUT_ASSERT(f != mesh_t::null_face());
+
+                patch_to_m0_face.insert(std::make_pair(f, patch_poly_idx));
             }
 
             const cut_surface_patch_location_t& patch_location = patch_color_label_to_location.at(color_id);
@@ -8176,6 +8198,46 @@ void dispatch(output_t& output, const input_t& input)
             output_mesh_info_t omi;
             omi.mesh = std::move(patch_mesh);
             omi.seam_vertices = std::move(seam_vertices);
+
+            if (input.populate_vertex_maps) {
+                // compute vertex mapping
+                // ----------------------
+
+                for (mesh_t::vertex_iterator_t v = patch_mesh.vertices_begin(); v != patch_mesh.vertices_end(); ++v) {
+                    MCUT_ASSERT(patch_to_m0_vertex.count(*v) == 1);
+                    const vd_t as_m0_descr = patch_to_m0_vertex.at(*v);
+
+                    vd_t as_cm_descr = mesh_t::null_vertex();
+                    if (m0_to_ps_vtx.count(as_m0_descr) == 1) {
+                        vd_t as_ps_descr = patch_to_m0_vertex.at(*v);
+
+                        MCUT_ASSERT(ps_to_cm_vtx.count(as_ps_descr) == 1);
+                        as_cm_descr = ps_to_cm_vtx.at(as_ps_descr);
+                    }
+
+                    MCUT_ASSERT(omi.data_maps.vertex_map.count(*v) == 0);
+                    omi.data_maps.vertex_map[*v] = as_cm_descr;
+                }
+            }
+
+            if (input.populate_face_maps) {
+                // compute face mapping
+                // ----------------------
+
+                for (mesh_t::face_iterator_t f = patch_mesh.faces_begin(); f != patch_mesh.faces_end(); ++f) {
+                    MCUT_ASSERT(patch_to_m0_face.count(*f) == 1);
+                    const int as_m0_descr = patch_to_m0_face.at(*f);
+
+                    MCUT_ASSERT(m0_to_ps_face.count(as_m0_descr) == 1);
+                    const fd_t as_ps_descr = m0_to_ps_face.at(as_m0_descr);
+
+                    MCUT_ASSERT(ps_to_cm_face.count(as_ps_descr) == 1);
+                    const fd_t as_cm_descr = ps_to_cm_face.at(as_ps_descr);
+
+                    MCUT_ASSERT(omi.data_maps.face_map.count(*f) == 0);
+                    omi.data_maps.face_map[*f] = as_cm_descr;
+                }
+            }
 
             if (patch_location == cut_surface_patch_location_t::INSIDE) {
                 output.inside_patches[patch_descriptor].emplace_back(std::move(omi));
@@ -9534,7 +9596,9 @@ void dispatch(output_t& output, const input_t& input)
                         m1_num_vertices_after_srcmesh_partitioning,
                         sm_vtx_cnt,
                         ps_vtx_cnt,
-                        sm_face_count);
+                        sm_face_count,
+                        input.populate_vertex_maps,
+                        input.populate_face_maps);
                 }
                 //int numInstancesCur = 0;
                 // for (auto it = separated_stitching_CCs.cbegin(); it != separated_stitching_CCs.cend(); ++it) {
@@ -9661,7 +9725,9 @@ void dispatch(output_t& output, const input_t& input)
                 m1_num_vertices_after_srcmesh_partitioning,
                 sm_vtx_cnt,
                 ps_vtx_cnt,
-                sm_face_count);
+                sm_face_count,
+                input.populate_vertex_maps,
+                input.populate_face_maps);
         }
     }
 

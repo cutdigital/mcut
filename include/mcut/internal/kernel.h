@@ -82,6 +82,8 @@ struct input_t {
     bool verbose = true;
     bool keep_partially_sealed_connected_components = false;
     bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
+    bool populate_vertex_maps = false; // compute data relating vertices in cc to original input mesh
+    bool populate_face_maps = false; // compute data relating face in cc to original input mesh
 };
 
 struct output_mesh_data_maps_t {
