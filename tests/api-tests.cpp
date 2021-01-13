@@ -80,14 +80,6 @@ TEST(ContextCreationTest, creationWithDebugFlag)
     EXPECT_EQ(err, MC_NO_ERROR);
 }
 
-TEST(ContextCreationTest, creationWithProfilingFlag)
-{
-    McContext context;
-    McResult err = mcCreateContext(&context, MC_PROFILING_ENABLE);
-    EXPECT_TRUE(context != nullptr);
-    EXPECT_EQ(err, MC_NO_ERROR);
-}
-
 // context query
 
 class DebugContextTest : public testing::Test {
@@ -518,4 +510,283 @@ TEST_F(SeamedConnComp, dispatchRequireSeveringSeamsPartialCut)
     ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 0u) << "there should be no connected components";
 }
+
+/////
+
+class FaceAndVertexDataMapsQueryTest : public testing::Test {
+protected: // You should make the members protected s.t. they can be
+           // accessed from sub-classes.
+    // virtual void SetUp() will be called before each test is run.  You
+    // should define it if you need to initialize the variables.
+    // Otherwise, this can be skipped.
+    void SetUp() override
+    {
+
+        McResult err = mcCreateContext(&context_, MC_NULL_HANDLE);
+        EXPECT_TRUE(context_ != nullptr);
+        EXPECT_EQ(err, MC_NO_ERROR);
+
+        // NOTE: using same example mesh as hello world tutorial
+
+        pSrcMeshVertices = {
+            // cube vertices
+            -5, -5, 5, // 0
+            5, -5, 5, // 1
+            5, 5, 5, //2
+            -5, 5, 5, //3
+            -5, -5, -5, //4
+            5, -5, -5, //5
+            5, 5, -5, //6
+            -5, 5, -5 //7
+        };
+        pSrcMeshFaceIndices = {
+            // cube faces
+            0, 1, 2, 3, //0
+            7, 6, 5, 4, //1
+            1, 5, 6, 2, //2
+            0, 3, 7, 4, //3
+            3, 2, 6, 7, //4
+            4, 5, 1, 0 //5
+        };
+        pSrcMeshFaceSizes = { // cube face sizes
+            4, 4, 4, 4, 4, 4
+        };
+
+        // the cut mesh
+        // ---------
+        pCutMeshVertices = {
+            // cut mesh vertices
+            -20, -4, 0, //0
+            0, 20, 20, //1
+            20, -4, 0, //2
+            0, 20, -20 //3
+        };
+
+        pCutMeshFaceIndices = {
+            0, 1, 2, //0
+            0, 2, 3 //1
+        };
+        pCutMeshFaceSizes = {
+            3, 3
+        };
+    }
+
+    void mySetup(McFlags dispatchFlags)
+    {
+        ASSERT_EQ(mcDispatch(
+                      context_,
+                      MC_DISPATCH_VERTEX_ARRAY_FLOAT | dispatchFlags,
+                      pSrcMeshVertices.data(),
+                      pSrcMeshFaceIndices.data(),
+                      pSrcMeshFaceSizes.data(),
+                      pSrcMeshVertices.size() / 3,
+                      pSrcMeshFaceIndices.size() / 4,
+                      pCutMeshVertices.data(),
+                      pCutMeshFaceIndices.data(),
+                      pCutMeshFaceSizes.data(),
+                      pCutMeshVertices.size() / 3,
+                      pCutMeshFaceIndices.size() / 3),
+            MC_NO_ERROR);
+
+        uint32_t numConnComps = 0;
+
+        ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
+
+        connComps_.resize(numConnComps);
+
+        ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps_.size(), connComps_.data(), NULL), MC_NO_ERROR);
+    }
+
+    // virtual void TearDown() will be called after each test is run.
+    // You should define it if there is cleanup work to do.  Otherwise,
+    // you don't have to provide it.
+    //
+    virtual void TearDown()
+    {
+        pSrcMeshVertices.clear();
+        pSrcMeshFaceIndices.clear();
+        pSrcMeshFaceSizes.clear();
+        pCutMeshVertices.clear();
+        pCutMeshFaceIndices.clear();
+        pCutMeshFaceSizes.clear();
+        EXPECT_EQ(mcReleaseConnectedComponents(context_, connComps_.size(), connComps_.data()), MC_NO_ERROR);
+        connComps_.clear();
+        EXPECT_EQ(mcReleaseContext(context_), MC_NO_ERROR);
+    }
+
+    McContext context_;
+    std::vector<McConnectedComponent> connComps_;
+    std::vector<float> pSrcMeshVertices;
+    std::vector<uint32_t> pSrcMeshFaceIndices;
+    std::vector<uint32_t> pSrcMeshFaceSizes;
+    uint32_t numSrcMeshVertices = 0;
+    uint32_t numSrcMeshFaces = 0;
+    std::vector<float> pCutMeshVertices;
+    std::vector<uint32_t> pCutMeshFaceIndices;
+    std::vector<uint32_t> pCutMeshFaceSizes;
+    uint32_t numCutMeshVertices = 0;
+    uint32_t numCutMeshFaces = 0;
+};
+
+TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
+{
+    mySetup(MC_DISPATCH_INCLUDE_VERTEX_MAP);
+
+    for (int i = 0; i < (int)connComps_.size(); ++i) {
+        McConnectedComponent cc = connComps_[i]; // connected compoenent id
+
+        uint32_t numberOfVertices = 0;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
+        ASSERT_GT((int)numberOfVertices, 0);
+
+        McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McSeamedConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
+
+        uint64_t numBytes = 0;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
+        ASSERT_EQ(numBytes / sizeof(uint32_t), numberOfVertices);
+
+        std::vector<uint32_t> vertexMap;
+        vertexMap.resize(numberOfVertices);
+
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, vertexMap.size() * sizeof(uint32_t), vertexMap.data(), NULL), MC_NO_ERROR);
+
+        auto testSrcMeshCC = [&]() {
+            const int numberOfSrcMeshVertices = pSrcMeshVertices.size() / 3;
+            for (int i = 0; i < numberOfVertices; i++) {
+                const uint32_t correspondingSrcMeshVertex = vertexMap[i];
+                const bool isIntersectionPoint = (correspondingSrcMeshVertex == MC_UNDEFINED_VALUE);
+                if (!isIntersectionPoint) {
+                    ASSERT_GE(correspondingSrcMeshVertex, 0);
+                    ASSERT_LT(correspondingSrcMeshVertex, numberOfSrcMeshVertices);
+                }
+            }
+        };
+
+        auto testPatchCC = [&]() {
+            const int numberOfCutMeshVertices = pCutMeshVertices.size() / 3;
+            for (int i = 0; i < numberOfVertices; i++) {
+                const uint32_t correspondingCutMeshVertex = vertexMap[i];
+                const bool isIntersectionPoint = (correspondingCutMeshVertex == MC_UNDEFINED_VALUE);
+                if (!isIntersectionPoint) {
+                    ASSERT_GE(correspondingCutMeshVertex, 0);
+                    ASSERT_LT(correspondingCutMeshVertex, numberOfCutMeshVertices);
+                }
+            }
+        };
+
+        switch (type) {
+        case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT: { // comes from source-mesh
+            testSrcMeshCC();
+        } break;
+        case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH: { // comes from cut-mesh
+            testPatchCC();
+        } break;
+        case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAMED: {
+            // find out where it comes from (source-mesh or cut-mesh)
+            McSeamedConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
+
+            if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
+                testSrcMeshCC();
+            } else {
+                ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+                testPatchCC();
+            }
+        } break;
+        }
+    }
+}
+
+TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMap)
+{
+    mySetup(MC_DISPATCH_INCLUDE_FACE_MAP);
+
+    for (int i = 0; i < (int)connComps_.size(); ++i) {
+        McConnectedComponent cc = connComps_[i]; // connected compoenent id
+
+        uint64_t numBytes = 0;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes), MC_NO_ERROR);
+        uint32_t numberOfFaces = numBytes / sizeof(uint32_t);
+        ASSERT_GT((int)numberOfFaces, 0);
+
+        McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McSeamedConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
+
+        numBytes = 0;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
+        ASSERT_EQ(numBytes / sizeof(uint32_t), numberOfFaces);
+
+        std::vector<uint32_t> faceMap;
+        faceMap.resize(numberOfFaces);
+
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, faceMap.size() * sizeof(uint32_t), faceMap.data(), NULL), MC_NO_ERROR);
+
+        auto testSrcMeshCC = [&]() {
+            const int numberOfSrcMeshFaces = pSrcMeshFaceSizes.size();
+            for (int i = 0; i < numberOfFaces; i++) {
+                const uint32_t correspondingSrcMeshFace = faceMap[i];
+                ASSERT_TRUE(correspondingSrcMeshFace != MC_UNDEFINED_VALUE); // all face indices are mapped!
+                ASSERT_GE(correspondingSrcMeshFace, 0);
+                ASSERT_LT(correspondingSrcMeshFace, numberOfSrcMeshFaces);
+            }
+        };
+
+        auto testPatchCC = [&]() {
+            const int numberOfCutMeshVertices = pCutMeshFaceSizes.size();
+            for (int i = 0; i < numberOfFaces; i++) {
+                const uint32_t correspondingCutMeshVertex = faceMap[i];
+                ASSERT_TRUE(correspondingCutMeshVertex != MC_UNDEFINED_VALUE);
+                ASSERT_GE(correspondingCutMeshVertex, 0);
+                ASSERT_LT(correspondingCutMeshVertex, numberOfCutMeshVertices);
+            }
+        };
+
+        switch (type) {
+        case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT: { // comes from source-mesh
+            testSrcMeshCC();
+        } break;
+        case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH: { // comes from cut-mesh
+            testPatchCC();
+        } break;
+        case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAMED: {
+            // find out where it comes from (source-mesh or cut-mesh)
+            McSeamedConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
+
+            if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
+                testSrcMeshCC();
+            } else {
+                ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+                testPatchCC();
+            }
+        } break;
+        }
+    }
+}
+
+TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMapFlagMissing)
+{
+    mySetup(0);
+
+    for (int i = 0; i < (int)connComps_.size(); ++i) {
+        McConnectedComponent cc = connComps_[i]; // connected compoenent id
+
+        uint64_t numBytes = 0;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_INVALID_VALUE);
+    }
+}
+
+TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMapFlagMissing)
+{
+    mySetup(0);
+
+    for (int i = 0; i < (int)connComps_.size(); ++i) {
+        McConnectedComponent cc = connComps_[i]; // connected compoenent id
+
+        uint64_t numBytes = 0;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_INVALID_VALUE);
+    }
+}
+
 } //  namespace {

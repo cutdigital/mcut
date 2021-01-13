@@ -527,7 +527,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
         if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
             MCUT_ASSERT(halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1);
-            indexArrayMesh.pVertexMapIndices[i] = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter);
+            indexArrayMesh.pVertexMapIndices[i] = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter); // intersection points at set to uint_max
         }
     }
 
