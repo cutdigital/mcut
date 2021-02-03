@@ -640,7 +640,7 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
         ASSERT_GT((int)numberOfVertices, 0);
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McSeamedConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
 
         uint64_t numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
@@ -684,8 +684,8 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
         } break;
         case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAMED: {
             // find out where it comes from (source-mesh or cut-mesh)
-            McSeamedConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
+            McConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
 
             if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
                 testSrcMeshCC();
@@ -711,7 +711,7 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMap)
         ASSERT_GT((int)numberOfFaces, 0);
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McSeamedConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
 
         numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_NO_ERROR);

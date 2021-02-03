@@ -731,6 +731,8 @@ mesh_t extract_connected_components(
                             const bool is_cutmesh_vtx = ps_is_cutmesh_vertex(ps_descr, sm_vtx_cnt);
                             if (is_cutmesh_vtx) {
                                 input_mesh_descr = ps_to_cm_vtx.at(ps_descr);
+                                // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a vertex (map value) belongs to.
+                                input_mesh_descr = static_cast<vd_t>(input_mesh_descr + sm_vtx_cnt);
                             } else { // source-mesh vertex
                                 input_mesh_descr = ps_to_sm_vtx.at(ps_descr);
                             }
@@ -775,6 +777,8 @@ mesh_t extract_connected_components(
                     if (from_cutmesh_face) {
                         MCUT_ASSERT(ps_to_cm_face.count(ps_descr) == 1);
                         input_mesh_descr = ps_to_cm_face.at(ps_descr);
+                        // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                        input_mesh_descr = static_cast<fd_t>(input_mesh_descr + sm_face_count);
                     } else {
                         MCUT_ASSERT(ps_to_sm_face.count(ps_descr) == 1);
                         input_mesh_descr = ps_to_sm_face.at(ps_descr);
@@ -5218,6 +5222,9 @@ void dispatch(output_t& output, const input_t& input)
                             vd_t ps_descr = m0_to_ps_vtx_fiter->second;
                             MCUT_ASSERT(ps_to_cm_vtx.count(ps_descr) == 1);
                             cm_descr = ps_to_cm_vtx.at(ps_descr);
+
+                            // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                            cm_descr = static_cast<vd_t>(cm_descr + sm_face_count);
                         }
 
                         vd_t local_cc_descr = vmap_mesh_vertices.at(*v);
@@ -5230,7 +5237,11 @@ void dispatch(output_t& output, const input_t& input)
                 fd_t fd = m.add_face(remapped_face);
                 MCUT_ASSERT(fd != mesh_t::null_face());
 
-                output.seamed_cut_mesh.data_maps.face_map[fd] = fd_t(0); // only one (large) cut-mesh polygon!
+                fd_t inputMeshFaceDescr(0); // only one (large) cut-mesh polygon!
+                // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                inputMeshFaceDescr = static_cast<fd_t>(inputMeshFaceDescr + sm_face_count);
+
+                output.seamed_cut_mesh.data_maps.face_map[fd] = inputMeshFaceDescr;
             }
 
             output.seamed_cut_mesh.mesh = std::move(m);
@@ -6465,6 +6476,7 @@ void dispatch(output_t& output, const input_t& input)
         output_mesh_info_t omi;
         omi.mesh = md.first;
         omi.seam_vertices = std::move(md.second.seam_vertices);
+        omi.data_maps = std::move(md.second.data_maps);
         output.unsealed_cc[md.second.location].emplace_back(std::move(omi));
     }
 
@@ -7992,7 +8004,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 // map the reversed polygon to its patch
                 MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(cw_poly_idx) == 0);
-                m0_cm_poly_to_patch_idx[cw_poly_idx] = patch_idx;
+                m0_cm_poly_to_patch_idx[cw_poly_idx] = cw_patch_idx;
 
                 // map the reversed polygon to the same ps-face as its ccw counterpart!
                 if (m0_to_ps_face.count(cw_poly_idx) == 0) {
@@ -8213,6 +8225,9 @@ void dispatch(output_t& output, const input_t& input)
 
                         MCUT_ASSERT(ps_to_cm_vtx.count(as_ps_descr) == 1);
                         as_cm_descr = ps_to_cm_vtx.at(as_ps_descr);
+
+                        // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                        as_cm_descr = static_cast<vd_t>(as_cm_descr + sm_vtx_cnt);
                     }
 
                     MCUT_ASSERT(omi.data_maps.vertex_map.count(*v) == 0);
@@ -8232,7 +8247,10 @@ void dispatch(output_t& output, const input_t& input)
                     const fd_t as_ps_descr = m0_to_ps_face.at(as_m0_descr);
 
                     MCUT_ASSERT(ps_to_cm_face.count(as_ps_descr) == 1);
-                    const fd_t as_cm_descr = ps_to_cm_face.at(as_ps_descr);
+                    fd_t as_cm_descr = ps_to_cm_face.at(as_ps_descr);
+
+                    // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                    as_cm_descr = static_cast<fd_t>(as_cm_descr + sm_face_count);
 
                     MCUT_ASSERT(omi.data_maps.face_map.count(*f) == 0);
                     omi.data_maps.face_map[*f] = as_cm_descr;
@@ -9415,7 +9433,8 @@ void dispatch(output_t& output, const input_t& input)
                             }
 
                             // polygon has same winding-order as current patch, and polygon is part of the current patch
-                            // TODO: use the cs_poly_to_patch map for O(Log N) improvement
+                            // TODO: Using the cs_poly_to_patch map for O(Log N) improvement does not work i.e. replace the second condition
+                            // with "m0_cm_poly_to_patch_idx.at(poly_idx) == cur_patch_idx"
                             return has_patch_winding_orientation && m0_cm_poly_to_patch_idx.at(poly_idx) == cur_patch_idx; // std::find(patch_polys.cbegin(), patch_polys.cend(), poly_idx) != patch_polys.cend(); // NOTE: only one polygon in the current patch will match
                         });
 
@@ -9764,6 +9783,7 @@ void dispatch(output_t& output, const input_t& input)
             output_mesh_info_t omi;
             omi.mesh = std::move(cc_mesh_data.first);
             omi.seam_vertices = std::move(cc_mesh_data.second.seam_vertices);
+            omi.data_maps = std::move(cc_mesh_data.second.data_maps);
             out_sep_CCs[cc_mesh_data.second.location][location].emplace_back(std::move(omi));
         }
     }

@@ -386,6 +386,16 @@ McResult indexArrayMeshToHalfedgeMesh(
 
         numFaceVertices = ((uint32_t*)pFaceSizes)[i];
 
+        if (numFaceVertices < 3) {
+            result = McResult::MC_INVALID_VALUE;
+
+            if (result != McResult::MC_NO_ERROR) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid face-size for face - " + std::to_string(i) + " (size = " + std::to_string(numFaceVertices) + ")");
+
+                return result;
+            }
+        }
+
         faceVertices.reserve(numFaceVertices);
 
         for (int j = 0; j < numFaceVertices; ++j) {
@@ -405,6 +415,19 @@ McResult indexArrayMeshToHalfedgeMesh(
             }
 
             mcut::vd_t descr = fIter->second; //vmap[*fIter.first];
+
+            const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
+
+            if (isDuplicate) {
+                result = McResult::MC_INVALID_VALUE;
+
+                if (result != McResult::MC_NO_ERROR) {
+                    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "found duplicate vertex in face - " + std::to_string(i));
+
+                    return result;
+                }
+            }
+
             faceVertices.push_back(descr);
         }
 
@@ -1173,6 +1196,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         backendInput.keep_partially_sealed_connected_components = true;
     }
 
+    if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP) {
+        backendInput.populate_vertex_maps = true;
+    }
+
+    if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP) {
+        backendInput.populate_face_maps = true;
+    }
+
     mcut::output_t backendOutput;
 
     // cut!
@@ -1238,9 +1269,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             std::vector<mcut::output_mesh_info_t>::const_iterator start_off = first_cc_is_completely_sealed ? j->second.cbegin() : j->second.cbegin() + 1;
             for (std::vector<mcut::output_mesh_info_t>::const_iterator k = start_off; k != j->second.cend(); ++k) {
 
-                // Note: the last CC is always guarranteed to be fully sealed (see: "keep_partially_sealed_connected_components" in kernel)!
-                bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
-
                 std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> frag = std::unique_ptr<McFragmentConnComp, void (*)(McConnCompBase*)>(new McFragmentConnComp, ccDeletorFunc<McFragmentConnComp>);
                 McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(frag.get());
                 ctxtPtr->connComps.emplace(clientHandle, std::move(frag));
@@ -1252,16 +1280,18 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 if (asFragPtr->patchLocation == MC_PATCH_LOCATION_UNDEFINED) {
                     asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
                 } else {
+                    // Note: the last CC is always guarranteed to be fully sealed (see: "keep_partially_sealed_connected_components" in kernel)!
+                    bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
 
                     if (is_last_cc) {
                         asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
-                    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS) { // did the user tell us to keep partially sealed fragments
+                    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS) { // did the user tell us to keep partially sealed fragments??
                         asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL;
                     }
 
                     // Personal note: Do not be tempted to just deal with unsealed fragments here.
                     // Its not guarranteed that the first element of "j->second" is always completely unsealed! Only sometimes.
-                    // Thus, for simplicity we deal with unsealed fragment specifically below (next for-loop)
+                    // Thus, for simplicity we deal with unsealed fragments specifically below (next for-loop)
                 }
 
                 halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *k);
