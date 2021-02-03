@@ -38,11 +38,11 @@ int main(int argc, char* argv[])
     // -----------------
     InputMesh srcMesh;
 
-    srcMesh.fpath = DATA_DIR "/bunny.obj";
+    srcMesh.fpath = DATA_DIR "/a.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
     if (!srcMeshLoaded) {
-        std::fprintf(stderr, "error: could not load source mesh --> %s\n", srcMesh.fpath);
+        std::fprintf(stderr, "error: could not load source mesh --> %s\n", srcMesh.fpath.c_str());
         std::exit(1);
     }
 
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.UV_V, cutMesh.corner_normals, cutMesh.F, cutMesh.UV_F, cutMesh.fNormIndices);
 
     if (!cutMeshLoaded) {
-        std::fprintf(stderr, "error: could not load cut mesh --> %s\n", cutMesh.fpath);
+        std::fprintf(stderr, "error: could not load cut mesh --> %s\n", cutMesh.fpath.c_str());
         std::exit(1);
     }
 
@@ -288,32 +288,29 @@ int main(int argc, char* argv[])
 
         /// ------------------------------------------------------------------------------------
 
+        // Here we just build the name of each connected component based on its properties
         std::string name;
         if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
             name += "seam";
         } else {
             bool isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
             name += isFragment ? "frg" : "ptch";
+
+            McPatchLocation ploc = (McPatchLocation)0;
+            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &ploc, NULL);
+            assert(err == MC_NO_ERROR);
+            name += ploc == MC_PATCH_LOCATION_INSIDE ? ".ins" : (ploc == MC_PATCH_LOCATION_OUTSIDE ? ".out" : ".ndef");
+
             if (isFragment) {
                 McFragmentLocation floc = (McFragmentLocation)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &floc, NULL);
                 assert(err == MC_NO_ERROR);
                 name += floc == MC_FRAGMENT_LOCATION_ABOVE ? ".abv" : ".blw";
 
-                McPatchLocation ploc = (McPatchLocation)0;
-                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McFragmentLocation), &ploc, NULL);
-                assert(err == MC_NO_ERROR);
-                name += ploc == MC_PATCH_LOCATION_INSIDE ? ".in" : (ploc == MC_PATCH_LOCATION_OUTSIDE ? ".out" : ".ndef");
-
                 McFragmentSealType sType = (McFragmentSealType)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sType, NULL);
                 assert(err == MC_NO_ERROR);
                 name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".cmplt" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".prtl" : ".none");
-            } else { // patch
-                McPatchLocation ploc = (McPatchLocation)0;
-                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &ploc, NULL);
-                assert(err == MC_NO_ERROR);
-                name += ploc == MC_PATCH_LOCATION_INSIDE ? ".in" : (ploc == MC_PATCH_LOCATION_OUTSIDE ? ".out" : ".ndef");
             }
         }
         // otherwise is from cut mesh
@@ -433,19 +430,6 @@ int main(int argc, char* argv[])
                     // set texture coordinates from the values in the input mesh
                     // ---------------------------------------------------------
 
-                    // the current cc is a fragment, and the current face came from the cut mesh
-                    //bool isCutMeshFaceOnFragment = !faceIsBirthedFromSrcMesh && ccIsBirthedFromSrcMesh;
-
-                    // Cut-mesh faces on fragments have--by definition--undefined texture coordinates.
-                    // This is because a single mesh is associated with one texture, and that texture
-                    // will be the source-mesh texture for fragments. The implication here is that cut
-                    // mesh faces on fragments are mapped to texture coordinates which referred to
-                    // another texture, which is the texture of the cut mesh.
-                    //
-                    // Here I just set their coords to a constant 1/2 per texcoord
-                    Eigen::Vector2d imTexCoords(0.5, 0.5);
-
-                    //if (!isCutMeshFaceOnFragment) {
                     int faceVertexOffset = -1;
                     // for each vertex index in face
                     for (Eigen::Index i = 0; i < imFace.rows(); ++i) {
@@ -456,8 +440,7 @@ int main(int argc, char* argv[])
                     }
                     assert(faceVertexOffset != -1);
                     int texCoordsIdx = inputMeshPtr->UV_F.row(imFaceIdx)(faceVertexOffset);
-                    imTexCoords = inputMeshPtr->UV_V.row(texCoordsIdx);
-                    // }
+                    Eigen::Vector2d imTexCoords = inputMeshPtr->UV_V.row(texCoordsIdx);
 
                     ccFaceToInputMeshTexCoords[f].push_back(imTexCoords);
                 }
@@ -470,9 +453,9 @@ int main(int argc, char* argv[])
         // -------------------------
 
         char fnameBuf[32];
-        sprintf(fnameBuf, (name + "_%d.obj").c_str(), i);
+        sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), i);
         std::string fname(fnameBuf);
-        std::string fpath(OUTPUT_DIR "/" + fname);
+        std::string fpath(DATA_DIR "/" + fname);
         printf("write file: %s\n", fpath.c_str());
         std::ofstream file(fpath);
 
