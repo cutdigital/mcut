@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
     // -----------------
     InputMesh srcMesh;
 
-    srcMesh.fpath = DATA_DIR "/a.obj";
+    srcMesh.fpath = DATA_DIR "/bunny.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
     if (!srcMeshLoaded) {
@@ -434,7 +434,7 @@ int main(int argc, char* argv[])
                     // ---------------------------------------------------------
 
                     // the current cc is a fragment, and the current face came from the cut mesh
-                    bool isCutMeshFaceOnFragment = !faceIsBirthedFromSrcMesh && ccIsBirthedFromSrcMesh;
+                    //bool isCutMeshFaceOnFragment = !faceIsBirthedFromSrcMesh && ccIsBirthedFromSrcMesh;
 
                     // Cut-mesh faces on fragments have--by definition--undefined texture coordinates.
                     // This is because a single mesh is associated with one texture, and that texture
@@ -445,19 +445,19 @@ int main(int argc, char* argv[])
                     // Here I just set their coords to a constant 1/2 per texcoord
                     Eigen::Vector2d imTexCoords(0.5, 0.5);
 
-                    if (!isCutMeshFaceOnFragment) {
-                        int faceVertexOffset = -1;
-                        // for each vertex index in face
-                        for (Eigen::Index i = 0; i < imFace.rows(); ++i) {
-                            if (imFace(i) == imVertexIdx) {
-                                faceVertexOffset = i;
-                                break;
-                            }
+                    //if (!isCutMeshFaceOnFragment) {
+                    int faceVertexOffset = -1;
+                    // for each vertex index in face
+                    for (Eigen::Index i = 0; i < imFace.rows(); ++i) {
+                        if (imFace(i) == imVertexIdx) {
+                            faceVertexOffset = i;
+                            break;
                         }
-                        assert(faceVertexOffset != -1);
-                        int texCoordsIdx = inputMeshPtr->UV_F.row(imFaceIdx)(faceVertexOffset);
-                        imTexCoords = inputMeshPtr->UV_V.row(texCoordsIdx);
                     }
+                    assert(faceVertexOffset != -1);
+                    int texCoordsIdx = inputMeshPtr->UV_F.row(imFaceIdx)(faceVertexOffset);
+                    imTexCoords = inputMeshPtr->UV_V.row(texCoordsIdx);
+                    // }
 
                     ccFaceToInputMeshTexCoords[f].push_back(imTexCoords);
                 }
@@ -470,9 +470,9 @@ int main(int argc, char* argv[])
         // -------------------------
 
         char fnameBuf[32];
-        sprintf(fnameBuf, (std::string(ccIsBirthedFromSrcMesh ? "a" : "b") + "%d-" + name + ".obj").c_str(), i);
+        sprintf(fnameBuf, (name + "_%d.obj").c_str(), i);
         std::string fname(fnameBuf);
-        std::string fpath(DATA_DIR "/" + fname);
+        std::string fpath(OUTPUT_DIR "/" + fname);
         printf("write file: %s\n", fpath.c_str());
         std::ofstream file(fpath);
 
