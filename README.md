@@ -4,7 +4,7 @@ _A simple & robust mesh cutting library_
 
 Documentation, tutorial and instructions at https://cutdigital.github.io/mcut.github.io/.
 
-## Example
+## Examples
 
 ### Inputs
 
@@ -45,3 +45,16 @@ The 'fertility' model (courtesy of the AIM@SHAPE Shape Repository) is cut by an 
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/unsealed-frags.png?raw=true)
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/interior-patches.png?raw=true)
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/exterior-patches.png?raw=true)
+
+### Inputs 
+
+MCUT also supports textures. In this example, texture coordinates of the input meshes are propagated onto the output meshes.
+
+![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/texturedBunny/setup.jpg?raw=true)
+
+### Outputs
+
+![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/texturedBunny/img0.jpg?raw=true)
+![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/texturedBunny/img1.jpg?raw=true)
+![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/texturedBunny/img2.jpg?raw=true)
+![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/texturedBunny/img3.jpg?raw=true)
