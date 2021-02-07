@@ -9,5 +9,6 @@ else()
     set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
 endif()
 
+add_subdirectory(CmdLineTool)
 add_subdirectory(HelloWorld)
 add_subdirectory(TextureCoordinates)

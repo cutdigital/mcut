@@ -1431,24 +1431,24 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
          ++i) {
 
         //connectedComponentType const auto& connCompHandle = i.first;
-        if ((i->second->type & connectedComponentType)) {
+        //if ((i->second->type & connectedComponentType)) {
 
-            bool includeConnComp = (i->second->type & connectedComponentType) != 0;
+        bool includeConnComp = (i->second->type & connectedComponentType) != 0;
 
-            if (includeConnComp) {
-                if (pConnComps == nullptr) // query number
-                {
-                    (*numConnComps)++;
-                } else // populate pConnComps
-                {
-                    pConnComps[gatheredConnCompCounter] = i->first;
-                    gatheredConnCompCounter += 1;
-                    if (gatheredConnCompCounter == numEntries) {
-                        break;
-                    }
+        if (includeConnComp) {
+            if (pConnComps == nullptr) // query number
+            {
+                (*numConnComps)++;
+            } else // populate pConnComps
+            {
+                pConnComps[gatheredConnCompCounter] = i->first;
+                gatheredConnCompCounter += 1;
+                if (gatheredConnCompCounter == numEntries) {
+                    break;
                 }
             }
         }
+        //}
     }
 
     return result;
