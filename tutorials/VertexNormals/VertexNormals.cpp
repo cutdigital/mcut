@@ -105,10 +105,7 @@ int main(int argc, char* argv[])
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_DEBUG);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "error: could not create MCUT context (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 3. do the cutting
     // -----------------
@@ -128,10 +125,7 @@ int main(int argc, char* argv[])
         static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
         static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "error: dispatch call failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 4. query the number of available connected component (all types)
     // -------------------------------------------------------------
@@ -140,26 +134,17 @@ int main(int argc, char* argv[])
 
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "1:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     printf("connected components: %d\n", (int)numConnComps);
 
-    if (numConnComps == 0) {
-        fprintf(stdout, "no connected components found\n");
-        exit(0);
-    }
+    assert(err == MC_NO_ERROR);
 
     connComps.resize(numConnComps);
 
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps.size(), connComps.data(), NULL);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "2:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 5. query the data of each connected component from MCUT
     // -------------------------------------------------------
@@ -174,18 +159,12 @@ int main(int argc, char* argv[])
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         uint32_t ccVertexCount = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.2 query the ccVertices
         // ----------------------
@@ -193,20 +172,14 @@ int main(int argc, char* argv[])
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         std::vector<double> ccVertices;
         ccVertices.resize(ccVertexCount * 3u);
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.3 query the faces
         // -------------------
@@ -214,58 +187,40 @@ int main(int argc, char* argv[])
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         std::vector<uint32_t> ccFaceIndices;
         ccFaceIndices.resize(numBytes / sizeof(uint32_t));
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.4 query the face sizes
         // ------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         std::vector<uint32_t> faceSizes;
         faceSizes.resize(numBytes / sizeof(uint32_t));
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.5 query the vertex map
         // ------------------------
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes);
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         std::vector<uint32_t> ccVertexMap;
         ccVertexMap.resize(numBytes / sizeof(uint32_t));
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, numBytes, ccVertexMap.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.5 query the face map
         // ------------------------
@@ -273,29 +228,20 @@ int main(int argc, char* argv[])
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         std::vector<uint32_t> ccFaceMap;
         ccFaceMap.resize(numBytes / sizeof(uint32_t));
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // get type
         McConnectedComponentType ccType;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &ccType, NULL);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_TYPE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         uint32_t ccEdgeCount = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT, sizeof(uint32_t), &ccEdgeCount, NULL);
@@ -338,10 +284,7 @@ int main(int argc, char* argv[])
             McSeamedConnectedComponentOrigin ccOrig;
             err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &ccOrig, NULL);
 
-            if (err != MC_NO_ERROR) {
-                fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_ORIGIN) failed (err=%d)\n", (int)err);
-                exit(1);
-            }
+            assert(err == MC_NO_ERROR);
 
             ccIsBirthedFromSrcMesh = (ccOrig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH);
             name += ccIsBirthedFromSrcMesh ? ".sm" : ".cm";
