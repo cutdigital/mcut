@@ -1626,6 +1626,25 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             MCUT_ASSERT(byteOffset == allocatedBytes);
         }
     } break;
+    case MC_CONNECTED_COMPONENT_DATA_FACE_COUNT: {
+      if (pMem == nullptr) {
+        *pNumBytes = sizeof(uint32_t); 
+      }
+      else {
+        if (bytes > sizeof(uint32_t)) {
+          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+          result = McResult::MC_INVALID_VALUE;
+          return result;
+        }
+
+        if (bytes % sizeof(uint32_t) != 0) {
+          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+          result = McResult::MC_INVALID_VALUE;
+          return result;
+        }
+        memcpy(pMem, reinterpret_cast<void*>(&ccData->indexArrayMesh.numFaces), bytes);
+      }
+    } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
         if (pMem == nullptr) {
             MCUT_ASSERT(ccData->indexArrayMesh.numFaceIndices > 0);
@@ -1664,6 +1683,26 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pFaceSizes.get()), bytes);
         }
+    } break;
+    case MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT: {
+      if (pMem == nullptr) {
+        *pNumBytes = sizeof(uint32_t); // each face has a size (num verts)
+      }
+      else {
+        if (bytes > sizeof(uint32_t)) {
+          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+          result = McResult::MC_INVALID_VALUE;
+          return result;
+        }
+
+        if (bytes % sizeof(uint32_t) != 0) {
+          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+          result = McResult::MC_INVALID_VALUE;
+          return result;
+        }
+        uint32_t numEdges = ccData->indexArrayMesh.numEdgeIndices / 2;
+        memcpy(pMem, reinterpret_cast<void*>(&numEdges), bytes);
+      }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {

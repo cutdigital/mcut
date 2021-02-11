@@ -206,17 +206,19 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT = (1 << 3), /**< List of vertex coordinates as a character string representing arbitrary-precision numbers. Values are exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to using std::to_string. */
-    MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 4), /**< List of faces as an array of indices. */
-    MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 5), /**< List of face sizes (vertices per face) as an array. */
-    MC_CONNECTED_COMPONENT_DATA_EDGE = (1 << 6), /**< List of edges as an array of indices. */
-    MC_CONNECTED_COMPONENT_DATA_TYPE = (1 << 7), /**< The type of a connected component (See also: ::McConnectedComponentType.). */
-    MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION = (1 << 8), /**< The location of a fragment connected component with respect to the cut mesh (See also: ::McFragmentLocation). */
-    MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION = (1 << 9), /**< The location of a patch with respect to the source mesh (See also: ::McPatchLocation).*/
-    MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE = (1 << 10), /**< The Hole-filling configuration of a fragment connected component (See also: ::McFragmentSealType). */
-    MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX = (1 << 11), /**< List of seam-vertices as an array of indices. */
-    MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 12), /**< The input mesh (source- or cut-mesh) from which a seamed connected component is derived (See also: ::McSeamedConnectedComponentOrigin). */
-    MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP = (1 << 13), /**< List of a subset of vertex indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh vertex or MC_UNDEFINED_VALUE. This index-value corresponds to the connected component vertex at the accessed index. The value at index 0 of the queried array is the index of the vertex in the original input mesh. In order to clearly distinguish indices of the cut mesh from those of the source mesh, this index value corresponds to a cut mesh vertex index if it is great-than-or-equal-to the number of source-mesh vertices. Intersection points are mapped to MC_UNDEFINED_VALUE. The input mesh will be deduced by the user from the type of connected component with which the information is queried.*/
-    MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 14) /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces.*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1<<4),
+    MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. */
+    MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
+    MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7),
+    MC_CONNECTED_COMPONENT_DATA_EDGE = (1 << 8), /**< List of edges as an array of indices. */
+    MC_CONNECTED_COMPONENT_DATA_TYPE = (1 << 9), /**< The type of a connected component (See also: ::McConnectedComponentType.). */
+    MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION = (1 << 10), /**< The location of a fragment connected component with respect to the cut mesh (See also: ::McFragmentLocation). */
+    MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION = (1 << 11), /**< The location of a patch with respect to the source mesh (See also: ::McPatchLocation).*/
+    MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE = (1 << 12), /**< The Hole-filling configuration of a fragment connected component (See also: ::McFragmentSealType). */
+    MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX = (1 << 13), /**< List of seam-vertices as an array of indices. */
+    MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 14), /**< The input mesh (source- or cut-mesh) from which a "seam" is derived (See also: ::McSeamedConnectedComponentOrigin). */
+    MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP = (1 << 15), /**< List of a subset of vertex indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh vertex or MC_UNDEFINED_VALUE. This index-value corresponds to the connected component vertex at the accessed index. The value at index 0 of the queried array is the index of the vertex in the original input mesh. In order to clearly distinguish indices of the cut mesh from those of the source mesh, this index value corresponds to a cut mesh vertex index if it is great-than-or-equal-to the number of source-mesh vertices. Intersection points are mapped to MC_UNDEFINED_VALUE. The input mesh will be deduced by the user from the type of connected component with which the information is queried.*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 16) /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces.*/
 } McConnectedComponentData;
 
 /**
@@ -298,42 +300,20 @@ typedef enum McDispatchFlags {
     MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 5), /** Flag to enable connected component-to-input mesh vertex maps as queryable connected component data. */
     MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 6), /** Flag to enable connected component-to-input mesh face maps as queryable  connected component data. */
     // TODO
-    // MC_DISPATCH_INCLUDE_FRAGMENT_BELOW = (1<<7),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE = (1<<8),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED = (1<<9),
-    //
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED = (1<<10),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED | (1 << 11)),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INSIDE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED | (1 << 12)),
-    //
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_PARTIAL = (1<<13)
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_PARTIAL_OUTSIDE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_PARTIAL | (1 << 14)),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_PARTIAL_INSIDE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_PARTIAL | (1 << 15)),
-    //
-    // MC_DISPATCH_INCLUDE_PATCH_INSIDE = (1<<16),
-    // MC_DISPATCH_INCLUDE_PATCH_OUTSIDE = (1<<17),
-    // MC_DISPATCH_INCLUDE_PATCH = (MC_DISPATCH_INCLUDE_PATCH_INSIDE | MC_DISPATCH_INCLUDE_PATCH_OUTSIDE),
-    //
-    // MC_DISPATCH_INCLUDE_SEAM_SRCMESH = (1<<18),
-    // MC_DISPATCH_INCLUDE_SEAM_CUTMESH = (1<<19),
-    // MC_DISPATCH_INCLUDE_SEAM = (MC_DISPATCH_INCLUDE_SEAM_SRCMESH | MC_DISPATCH_INCLUDE_SEAM_CUTMESH),
-    //
-    // MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED_BELOW = (MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED | MC_DISPATCH_INCLUDE_FRAGMENT_BELOW), 
-    // MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED_ABOVE = (MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED | MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE), 
-    // 
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_BELOW = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED | MC_DISPATCH_INCLUDE_FRAGMENT_BELOW), 
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_ABOVE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED | MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE), 
-    //
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE_BELOW = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE | MC_DISPATCH_INCLUDE_FRAGMENT_BELOW),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE_ABOVE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE | MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE),
-    //
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INSIDE_BELOW = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INSIDE | MC_DISPATCH_INCLUDE_FRAGMENT_BELOW),
-    // MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INSIDE_ABOVE = (MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INSIDE | MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE),
-    //
-    // MC_DISPATCH_INCLUDE_REVERSED_POLYGON_WINDING_ORDER = (1 << 20), 
+    MC_DISPATCH_INCLUDE_FRAGMENT_BELOW = (1 << 7),
+    MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE = (1 << 8),
+    MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED = (1 << 9),
+    MC_DISPATCH_INCLUDE_FRAGMENT_OUTSIDE = (1 << 10),
+    MC_DISPATCH_INCLUDE_FRAGMENT_INSIDE = (1 << 11),
+    MC_DISPATCH_INCLUDE_FRAGMENT_OUTSIDE_PARTIAL = (1 << 12),
+    MC_DISPATCH_INCLUDE_FRAGMENT_INSIDE_PARTIAL = (1 << 13),
+    MC_DISPATCH_INCLUDE_PATCH_INSIDE = (1 << 14),
+    MC_DISPATCH_INCLUDE_PATCH_OUTSIDE = (1 << 15),
+    MC_DISPATCH_INCLUDE_SEAM_SRCMESH = (1 << 16),
+    MC_DISPATCH_INCLUDE_SEAM_CUTMESH = (1 << 17),
     //
     //MC_DISPATCH_BOOLEAN_OP_A_NOT_B = MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INTERIOR_ABOVE,
-    //MC_DISPATCH_BOOLEAN_OP_B_NOT_A = MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE_BELOW | MC_DISPATCH_INCLUDE_REVERSED_POLYGON_WINDING_ORDER,
+    //MC_DISPATCH_BOOLEAN_OP_B_NOT_A = MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE_BELOW,
     //MC_DISPATCH_BOOLEAN_OP_A_UNION_B =  MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE_ABOVE ,
     //MC_DISPATCH_BOOLEAN_OP_A_INTERSECT_B = MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INTERIOR_BELOW ,
 

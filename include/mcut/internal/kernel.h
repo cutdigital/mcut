@@ -84,6 +84,21 @@ struct input_t {
     bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
     bool populate_vertex_maps = false; // compute data relating vertices in cc to original input mesh
     bool populate_face_maps = false; // compute data relating face in cc to original input mesh
+    // TODO: apply output filters in kernel
+    bool include_fragment_below = false;
+    bool include_fragment_above = false;
+    bool include_fragment_unsealed = false;
+    bool include_fragment_inside = false;
+    bool include_fragment_outside = false;
+    //bool include_fragment_sealed_partial = false; // See: variable above "keep_partially_sealed_connected_components"
+    bool include_fragment_inside_partial = false;
+    bool include_fragment_outside_partial= false;
+    // NOTE TO SELF: if the user simply wants patches, then kernel should not have to proceed to stitching!!!
+    bool include_patch_inside = false;
+    bool include_patch_outside = false;
+    // NOTE TO SELF: if the user simply wants seams, then kernel should not have to proceed to stitching!!!
+    bool include_seam_srcmesh = false;
+    bool include_seam_cutmesh = false;
 };
 
 struct output_mesh_data_maps_t {

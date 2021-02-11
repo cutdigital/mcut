@@ -27,6 +27,11 @@ struct InputMesh {
     std::vector<double> vertexCoordsArray;
 };
 
+bool compare(double x, double y)
+{
+    return std::fabs(x - y) < 1e-6;
+}
+
 int main(int argc, char* argv[])
 {
     if (argc == 1) {
@@ -258,7 +263,7 @@ int main(int argc, char* argv[])
 
         // 5.5 query the face map
         // ------------------------
-        const uint32_t numberOfFaces = static_cast<uint32_t>(faceSizes.size());
+        const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
 
@@ -331,20 +336,24 @@ int main(int argc, char* argv[])
             name += ccIsBirthedFromSrcMesh ? ".sm" : ".cm";
         }
 
-        std::vector<std::vector<Eigen::Vector2d>> ccFaceToInputMeshTexCoords(numberOfFaces, std::vector<Eigen::Vector2d>());
         int faceVertexOffsetBase = 0;
 
-        // for each face in cc
-        for (int f = 0; f < numberOfFaces; ++f) {
+        std::vector<Eigen::Vector2d> ccTexCoords;
+        // CC vertex index to texture coordinate index/indices.
+        // Its possible to map to more than texture coordinates since such coordinates are specified to per-face.
+        std::map<int, std::vector<int>> ccVertexIndexToTexCoordIndices;
+        std::vector<uint32_t> ccFaceVertexTexCoordIndices;
 
-            // input mesh face index (which may be offsetted)
+        // for each face in CC
+        for (int f = 0; f < ccFaceCount; ++f) {
+
+            // input mesh face index (which may be offsetted!)
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
-
             // input mesh face index (actual index value, accounting for offset)
             uint32_t imFaceIdx = imFaceIdxRaw;
-            bool faceIsBirthedFromSrcMesh = (imFaceIdxRaw < srcMesh.F.rows());
+            bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.rows());
 
-            if (!faceIsBirthedFromSrcMesh) {
+            if (!faceIsFromSrcMesh) {
                 imFaceIdx = imFaceIdxRaw - srcMesh.F.rows(); // accounting for offset
             }
 
@@ -353,30 +362,29 @@ int main(int argc, char* argv[])
             // for each vertex in face
             for (int v = 0; v < faceSize; ++v) {
 
-                const int ccVertexIdx = ccFaceIndices.at(static_cast<size_t>(faceVertexOffsetBase + v));
-                // input mesh vertex index (which may be offsetted)
-                const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx); // vertex index in source mesh or cut mesh
-                bool vertexIsBirthedFromSrcMesh = (imVertexIdxRaw < srcMesh.V.rows());
-                const bool isIntersectionPoint = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
-                // input mesh vertex index (actual index value, accounting for offset)
-                uint32_t imVertexIdx = imVertexIdxRaw;
+                const int ccVertexIdx = ccFaceIndices.at((uint64_t)faceVertexOffsetBase + v);
+                // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
+                const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
+                bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMesh.V.rows());
+                const bool vertexIsIntersectionPoint = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
+                uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
-                if (!vertexIsBirthedFromSrcMesh) {
+                if (!vertexIsFromSrcMesh) {
                     imVertexIdx = (imVertexIdxRaw - srcMesh.V.rows()); // account for offset
                 }
 
                 const InputMesh* inputMeshPtr = &srcMesh; // assume origin face is from source mesh
 
-                if (!faceIsBirthedFromSrcMesh) {
+                if (!faceIsFromSrcMesh) {
                     inputMeshPtr = &cutMesh;
                 }
 
                 // the face on which the current cc face came from
                 const Eigen::Vector3i& imFace = inputMeshPtr->F.row(imFaceIdx);
 
-                if (isIntersectionPoint) { // texture coords unknown and must be computed
+                Eigen::Vector2d texCoord;
 
-                    //if (ccVertexToInputMeshTexCoord[ccVertexIdx] == Eigen::Vector2d(-1, -1)) { // we haven't already computed the texcoords
+                if (vertexIsIntersectionPoint) { // texture coords unknown and must be computed
 
                     // interpolate texture coords from source-mesh values
 
@@ -421,14 +429,9 @@ int main(int argc, char* argv[])
                     const Eigen::Vector3d& baryCoords = L.row(0);
 
                     // interpolate using barycentric coords
-                    const Eigen::Vector2d& interpolatedTexCoords = (TCa * baryCoords.x()) + (TCb * baryCoords.y()) + (TCc * baryCoords.z());
+                    texCoord = (TCa * baryCoords.x()) + (TCb * baryCoords.y()) + (TCc * baryCoords.z());
 
-                    // save
-                    ccFaceToInputMeshTexCoords[f].push_back(interpolatedTexCoords);
-                    //}
-                } else {
-                    // set texture coordinates from the values in the input mesh
-                    // ---------------------------------------------------------
+                } else { // texture coords are known must be inferred from input mesh
 
                     int faceVertexOffset = -1;
                     // for each vertex index in face
@@ -438,16 +441,33 @@ int main(int argc, char* argv[])
                             break;
                         }
                     }
-                    assert(faceVertexOffset != -1);
-                    int texCoordsIdx = inputMeshPtr->UV_F.row(imFaceIdx)(faceVertexOffset);
-                    Eigen::Vector2d imTexCoords = inputMeshPtr->UV_V.row(texCoordsIdx);
 
-                    ccFaceToInputMeshTexCoords[f].push_back(imTexCoords);
+                    assert(faceVertexOffset != -1);
+
+                    int texCoordsIdx = inputMeshPtr->UV_F.row(imFaceIdx)(faceVertexOffset);
+                    texCoord = inputMeshPtr->UV_V.row(texCoordsIdx);
                 }
+
+                int texCoordIndex = -1;
+
+                std::vector<Eigen::Vector2d>::const_iterator fiter = std::find_if(
+                    ccTexCoords.cbegin(), ccTexCoords.cend(),
+                    [&](const Eigen::Vector3d& e) { return compare(e.x(), texCoord.x()) && compare(e.y(), texCoord.y()); });
+
+                if (fiter != ccTexCoords.cend()) {
+                    texCoordIndex = std::distance(ccTexCoords.cbegin(), fiter);
+                }
+
+                if (texCoordIndex == -1) { // tex coord not yet stored for CC vertex in face
+                    texCoordIndex = ccTexCoords.size();
+                    ccTexCoords.push_back(texCoord);
+                }
+
+                ccFaceVertexTexCoordIndices.push_back(texCoordIndex);
             } // for (int v = 0; v < faceSize; ++v) {
 
             faceVertexOffsetBase += faceSize;
-        } // for (int f = 0; f < numberOfFaces; ++f) {
+        } // for (int f = 0; f < ccFaceCount; ++f) {
 
         // save cc mesh to .obj file
         // -------------------------
@@ -463,33 +483,29 @@ int main(int argc, char* argv[])
 
         // write vertices
         for (int i = 0; i < ccVertexCount; ++i) {
-            double x = ccVertices[i * 3 + 0];
-            double y = ccVertices[i * 3 + 1];
-            double z = ccVertices[i * 3 + 2];
+            double x = ccVertices[(uint64_t)i * 3 + 0];
+            double y = ccVertices[(uint64_t)i * 3 + 1];
+            double z = ccVertices[(uint64_t)i * 3 + 2];
             file << "v " << x << " " << y << " " << z << std::endl;
         }
 
         // write tex coords (including duplicates i.e. per face texture coords)
-        for (int i = 0; i < numberOfFaces; ++i) {
-            int faceSize = faceSizes.at(i);
-            const std::vector<Eigen::Vector2d>& faceTexCoords = ccFaceToInputMeshTexCoords[i];
 
-            for (int j = 0; j < faceSize; ++j) {
-                Eigen::Vector2d uv = faceTexCoords[j];
-                file << "vt " << uv.x() << " " << uv.y() << std::endl; // texcoords have same index as positions
-            }
+        for (int i = 0; i < ccTexCoords.size(); ++i) {
+            Eigen::Vector2d uv = ccTexCoords[i]; //faceTexCoords[j];
+            file << "vt " << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << uv.x() << " " << uv.y() << std::endl; // texcoords have same index as positions
         }
 
         // write faces
         faceVertexOffsetBase = 0;
-        for (int i = 0; i < numberOfFaces; ++i) {
+        for (int i = 0; i < ccFaceCount; ++i) {
             int faceSize = faceSizes.at(i);
 
             file << "f ";
             for (int j = 0; j < faceSize; ++j) {
                 const int idx = faceVertexOffsetBase + j;
                 const int ccVertexIdx = ccFaceIndices.at(static_cast<size_t>(idx));
-                file << (ccVertexIdx + 1) << "/" << (idx + 1) << " "; // texcoords have [global] index (we duplicate data for simplicity)
+                file << (ccVertexIdx + 1) << "/" << ccFaceVertexTexCoordIndices[idx] + 1 << " ";
             }
             file << std::endl;
 
