@@ -206,7 +206,7 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT = (1 << 3), /**< List of vertex coordinates as a character string representing arbitrary-precision numbers. Values are exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to using std::to_string. */
-    MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1<<4),
+    MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4),
     MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
     MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7),
@@ -296,21 +296,25 @@ typedef enum McDispatchFlags {
     MC_DISPATCH_VERTEX_ARRAY_DOUBLE = (1 << 1), /**< Interpret the input mesh vertices as arrays of 64-bit floating-point numbers.*/
     MC_DISPATCH_VERTEX_ARRAY_EXACT = (1 << 2), /**< Interpret the input mesh vertices as character strings representing arbitrary-precision numbers. Values are parsed exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to std::to_string.*/
     MC_DISPATCH_REQUIRE_SEVERING_SEAMS = (1 << 3), /**< Require that all intersection paths partition/divide the source mesh into two subsets of polygons. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts.*/
-    MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS = (1 << 4), /** Flag to include partially sealed fragments as queryable connected components. */
+    // MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS = (1 << 4), /** Flag to include partially sealed fragments as queryable connected components. */
     MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 5), /** Flag to enable connected component-to-input mesh vertex maps as queryable connected component data. */
     MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 6), /** Flag to enable connected component-to-input mesh face maps as queryable  connected component data. */
     // TODO
-    MC_DISPATCH_INCLUDE_FRAGMENT_BELOW = (1 << 7),
-    MC_DISPATCH_INCLUDE_FRAGMENT_ABOVE = (1 << 8),
-    MC_DISPATCH_INCLUDE_FRAGMENT_UNSEALED = (1 << 9),
-    MC_DISPATCH_INCLUDE_FRAGMENT_OUTSIDE = (1 << 10),
-    MC_DISPATCH_INCLUDE_FRAGMENT_INSIDE = (1 << 11),
-    MC_DISPATCH_INCLUDE_FRAGMENT_OUTSIDE_PARTIAL = (1 << 12),
-    MC_DISPATCH_INCLUDE_FRAGMENT_INSIDE_PARTIAL = (1 << 13),
-    MC_DISPATCH_INCLUDE_PATCH_INSIDE = (1 << 14),
-    MC_DISPATCH_INCLUDE_PATCH_OUTSIDE = (1 << 15),
-    MC_DISPATCH_INCLUDE_SEAM_SRCMESH = (1 << 16),
-    MC_DISPATCH_INCLUDE_SEAM_CUTMESH = (1 << 17),
+    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE = (1 << 7),
+    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW = (1 << 8),
+    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED = (1 << 9),
+    //
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE = (1 << 10),
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE = (1 << 11),
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_PARTIAL = (1 << 12),
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_PARTIAL = (1 << 13),
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE = (1 << 14),
+    //
+    MC_DISPATCH_FILTER_PATCH_INSIDE = (1 << 15),
+    MC_DISPATCH_FILTER_PATCH_OUTSIDE = (1 << 16),
+    //
+    MC_DISPATCH_FILTER_SEAM_SRCMESH = (1 << 17),
+    MC_DISPATCH_FILTER_SEAM_CUTMESH = (1 << 18),
     //
     //MC_DISPATCH_BOOLEAN_OP_A_NOT_B = MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_INTERIOR_ABOVE,
     //MC_DISPATCH_BOOLEAN_OP_B_NOT_A = MC_DISPATCH_INCLUDE_FRAGMENT_SEALED_OUTSIDE_BELOW,

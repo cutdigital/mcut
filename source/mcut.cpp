@@ -1184,25 +1184,36 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     backendInput.verbose = false;
     backendInput.require_looped_cutpaths = false;
 
-    if ((ctxtPtr->flags & MC_DEBUG) && (ctxtPtr->debugType & McDebugSource::MC_DEBUG_SOURCE_KERNEL)) {
-        backendInput.verbose = true;
+    backendInput.verbose = static_cast<bool>((ctxtPtr->flags & MC_DEBUG) && (ctxtPtr->debugType & McDebugSource::MC_DEBUG_SOURCE_KERNEL));
+    backendInput.require_looped_cutpaths = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_SEVERING_SEAMS);
+    backendInput.populate_vertex_maps = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
+    backendInput.populate_face_maps = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);
+    backendInput.keep_fragments_below_cutmesh = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW);
+    backendInput.keep_fragments_above_cutmesh = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE);
+
+    if ((ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_SEVERING_SEAMS) && //
+        (ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED)) {
+        // The user states that she does not want a partial cut but yet also states that she
+        // wants to keep fragments with partial cuts. These two options are mutually exclusive.
+        ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_KERNEL,
+            McDebugType::MC_DEBUG_TYPE_ERROR,
+            0,
+            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            "use of mutually exclusive dispatch flags: MC_DISPATCH_REQUIRE_SEVERING_SEAMS and MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED");
+        return McResult::MC_INVALID_VALUE;
     }
 
-    if (ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_SEVERING_SEAMS) {
-        backendInput.require_looped_cutpaths = true;
-    }
-
-    if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS) {
-        backendInput.keep_partially_sealed_connected_components = true;
-    }
-
-    if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP) {
-        backendInput.populate_vertex_maps = true;
-    }
-
-    if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP) {
-        backendInput.populate_face_maps = true;
-    }
+    backendInput.keep_fragments_partially_cut = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED);
+    backendInput.keep_unsealed_fragments = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE);
+    backendInput.keep_fragments_sealed_outside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE);
+    backendInput.keep_fragments_sealed_inside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE);
+    backendInput.keep_fragments_sealed_outside_partial = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_PARTIAL);
+    backendInput.keep_fragments_sealed_inside_partial = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_PARTIAL);
+    backendInput.keep_inside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_INSIDE);
+    backendInput.keep_outside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_OUTSIDE);
+    backendInput.keep_srcmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_SRCMESH);
+    backendInput.keep_cutmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_CUTMESH);
 
     mcut::output_t backendOutput;
 
@@ -1280,7 +1291,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 if (asFragPtr->patchLocation == MC_PATCH_LOCATION_UNDEFINED) {
                     asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
                 } else {
-                    // Note: the last CC is always guarranteed to be fully sealed (see: "keep_partially_sealed_connected_components" in kernel)!
+                    // Note: the last CC is always guarranteed to be fully sealed (see: "include_fragment_sealed_partial" in kernel)!
                     bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
 
                     if (is_last_cc) {
@@ -1353,7 +1364,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it);
     }
 
-    // seamed meshes
+    // seams
     // -----------
 
     // NOTE: seamed meshes are available if there was no partial cut intersection (due to constraints imposed by halfedge construction rules).
@@ -1627,23 +1638,22 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_COUNT: {
-      if (pMem == nullptr) {
-        *pNumBytes = sizeof(uint32_t); 
-      }
-      else {
-        if (bytes > sizeof(uint32_t)) {
-          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-          result = McResult::MC_INVALID_VALUE;
-          return result;
-        }
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(uint32_t);
+        } else {
+            if (bytes > sizeof(uint32_t)) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
 
-        if (bytes % sizeof(uint32_t) != 0) {
-          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
-          result = McResult::MC_INVALID_VALUE;
-          return result;
+            if (bytes % sizeof(uint32_t) != 0) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+            memcpy(pMem, reinterpret_cast<void*>(&ccData->indexArrayMesh.numFaces), bytes);
         }
-        memcpy(pMem, reinterpret_cast<void*>(&ccData->indexArrayMesh.numFaces), bytes);
-      }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
         if (pMem == nullptr) {
@@ -1685,24 +1695,23 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT: {
-      if (pMem == nullptr) {
-        *pNumBytes = sizeof(uint32_t); // each face has a size (num verts)
-      }
-      else {
-        if (bytes > sizeof(uint32_t)) {
-          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-          result = McResult::MC_INVALID_VALUE;
-          return result;
-        }
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(uint32_t); // each face has a size (num verts)
+        } else {
+            if (bytes > sizeof(uint32_t)) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
 
-        if (bytes % sizeof(uint32_t) != 0) {
-          ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
-          result = McResult::MC_INVALID_VALUE;
-          return result;
+            if (bytes % sizeof(uint32_t) != 0) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+            uint32_t numEdges = ccData->indexArrayMesh.numEdgeIndices / 2;
+            memcpy(pMem, reinterpret_cast<void*>(&numEdges), bytes);
         }
-        uint32_t numEdges = ccData->indexArrayMesh.numEdgeIndices / 2;
-        memcpy(pMem, reinterpret_cast<void*>(&numEdges), bytes);
-      }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {

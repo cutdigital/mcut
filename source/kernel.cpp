@@ -409,7 +409,10 @@ mesh_t extract_connected_components(
     const int ps_vtx_count,
     const int sm_face_count,
     bool popuplate_vertex_maps,
-    bool popuplate_face_maps)
+    bool popuplate_face_maps,
+    bool keep_fragments_below_cutmesh,
+    bool keep_fragments_above_cutmesh,
+    bool keep_fragments_partially_cut)
 {
     (*logger_ptr) << "extract connected components" << std::endl;
     (*logger_ptr).indent();
@@ -577,6 +580,28 @@ mesh_t extract_connected_components(
         }
     }
 
+    bool extractingSeams = (m1_num_vertices_after_srcmesh_partitioning == -1);
+
+    // stores a flag per connected component indicating whether we should
+    // keep this CC or throw it away, as per user flags.
+    std::map<size_t, bool> ccID_to_keepFlag;
+    for (std::map<size_t, mesh_t>::const_iterator it = ccID_to_mesh.cbegin(); it != ccID_to_mesh.cend(); ++it) {
+        int ccID = it->first;
+        connected_component_location_t ccLocation = ccID_to_cs_descriptor.at(ccID);
+        ccID_to_keepFlag[ccID] = (((keep_fragments_above_cutmesh && ccLocation == connected_component_location_t::ABOVE) || //
+                                      (keep_fragments_below_cutmesh && ccLocation == connected_component_location_t::BELOW) || //
+                                      (keep_fragments_partially_cut && ccLocation == connected_component_location_t::UNDEFINED))
+            &&
+            // i.e. we are extracting from "m0" to compute seams (not fragments).
+            // NOTE: this is not actually used but re-enforces intention (see
+            // if-statement where this function is called for Seams
+            extractingSeams);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // TODO: shift the logic to add vertices into CC to here (like for face below)
+    ///////////////////////////////////////////////////////////////////////////
+
     ///////////////////////////////////////////////////////////////////////////
     // Insert faces into connected components using mapped vertex descriptors
     ///////////////////////////////////////////////////////////////////////////
@@ -587,6 +612,13 @@ mesh_t extract_connected_components(
     for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter) {
         face_descriptor_t fd = *face_iter;
         const size_t cc_id = fccmap[fd]; // the connected component which contains the current face
+
+        bool userWantsCC = ccID_to_keepFlag.at(cc_id);
+
+        if (!userWantsCC) {
+            continue;
+        }
+
         std::vector<vd_t> remapped_face; // using remapped cc descriptors
         std::map<size_t, std::map<fd_t, fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
 
@@ -631,8 +663,6 @@ mesh_t extract_connected_components(
     // Note: at this stage we have our connected components (meshes) with their
     // vertices and faces defined
 
-    MCUT_ASSERT(ccID_to_mesh.size() == ccID_to_mX_to_cc_vertex.size());
-
     ///////////////////////////////////////////////////////////////////////////
     // Save the output connected components marked with location
     ///////////////////////////////////////////////////////////////////////////
@@ -643,6 +673,12 @@ mesh_t extract_connected_components(
          ++cc_iter) {
 
         const std::size_t& cc_id = cc_iter->first;
+        bool userWantsCC = ccID_to_keepFlag.at(cc_id);
+
+        if (!userWantsCC) {
+            continue;
+        }
+
         const mesh_t& cc = cc_iter->second;
 
         // The boolean is needed to prevent saving duplicate connected components into the vector "connected_components[cc_id]".
@@ -5106,151 +5142,176 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "dump traced-polygons if possible" << std::endl;
 
-    // dump traced src-mesh polygons.
-
-    // dump traced polygons only if the cut paths are circular or complete linear cuts (prevents us
-    // from violating halfedge construction rules)
     bool all_cutpaths_are_circular = (num_explicit_circular_cutpaths == num_explicit_cutpath_sequences);
-    bool all_cutpaths_linear_and_without_making_holes = (num_explicit_circular_cutpaths == 0) && ((int)explicit_cutpaths_severing_srcmesh.size() == num_explicit_linear_cutpaths);
 
-    if (cm_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_without_making_holes)) {
+    // dump traced src-mesh polygons.
+    if (input.keep_srcmesh_seam) {
+        // dump traced polygons only if the cut paths are circular or complete linear cuts (prevents us
+        // from violating halfedge construction rules)
 
-        std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_src_mesh_fragments;
+        bool all_cutpaths_linear_and_without_making_holes = (num_explicit_circular_cutpaths == 0) && ((int)explicit_cutpaths_severing_srcmesh.size() == num_explicit_linear_cutpaths);
 
-        // NOTE: The result is a mesh identical to the original source mesh except at the edges introduced by the cut..
-        extract_connected_components(
-            separated_src_mesh_fragments,
-            m0,
-            0, // no offset because traced source-mesh polygons start from the beginning of "m0_polygons"
-            std::vector<traced_polygon_t>(m0_polygons.begin(), traced_sm_polygons_iter_end),
-            std::vector<int>(), // sm_polygons_below_cs
-            std::vector<int>(), // sm_polygons_above_cs
-            m0_vertex_to_seam_flag,
-            std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-            std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-            std::map<int, int>(), // Unused ... because we are extracting from "m0"
-            m0_to_ps_vtx,
-            m0_to_ps_face,
-            ps_to_sm_vtx,
-            ps_to_sm_face,
-            ps_to_cm_vtx,
-            ps_to_cm_face,
-            -1, // Unused ... because we are extracting from "m0"
-            -1, // Unused ... because we are extracting from "m0"
-            sm_vtx_cnt,
-            ps_vtx_cnt,
-            sm_face_count,
-            input.populate_vertex_maps,
-            input.populate_face_maps);
+        if (cm_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_without_making_holes)) {
 
-        MCUT_ASSERT(separated_src_mesh_fragments.size() == 1); // one cc
-        MCUT_ASSERT(separated_src_mesh_fragments.cbegin()->second.size() == 1); // one instance
-        output.seamed_src_mesh.mesh = std::move(separated_src_mesh_fragments.begin()->second.front().first);
-        output.seamed_src_mesh.seam_vertices = std::move(separated_src_mesh_fragments.begin()->second.front().second.seam_vertices);
-        output.seamed_src_mesh.data_maps = std::move(separated_src_mesh_fragments.begin()->second.front().second.data_maps);
+            std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_src_mesh_fragments;
 
-        if (input.verbose) {
-            dump_mesh(output.seamed_src_mesh.mesh, "src-mesh-traced-poly");
+            // NOTE: The result is a mesh identical to the original source mesh except at the edges introduced by the cut..
+            extract_connected_components(
+                separated_src_mesh_fragments,
+                m0,
+                0, // no offset because traced source-mesh polygons start from the beginning of "m0_polygons"
+                std::vector<traced_polygon_t>(m0_polygons.begin(), traced_sm_polygons_iter_end),
+                std::vector<int>(), // sm_polygons_below_cs
+                std::vector<int>(), // sm_polygons_above_cs
+                m0_vertex_to_seam_flag,
+                std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
+                std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
+                std::map<int, int>(), // Unused ... because we are extracting from "m0"
+                m0_to_ps_vtx,
+                m0_to_ps_face,
+                ps_to_sm_vtx,
+                ps_to_sm_face,
+                ps_to_cm_vtx,
+                ps_to_cm_face,
+                -1, // Unused ... because we are extracting from "m0"
+                -1, // Unused ... because we are extracting from "m0"
+                sm_vtx_cnt,
+                ps_vtx_cnt,
+                sm_face_count,
+                input.populate_vertex_maps,
+                input.populate_face_maps,
+                false, // unused ...
+                false, // unused ...
+                false // unused ...
+            );
+
+            MCUT_ASSERT(separated_src_mesh_fragments.size() == 1); // one cc
+            MCUT_ASSERT(separated_src_mesh_fragments.cbegin()->second.size() == 1); // one instance
+            output.seamed_src_mesh.mesh = std::move(separated_src_mesh_fragments.begin()->second.front().first);
+            output.seamed_src_mesh.seam_vertices = std::move(separated_src_mesh_fragments.begin()->second.front().second.seam_vertices);
+            output.seamed_src_mesh.data_maps = std::move(separated_src_mesh_fragments.begin()->second.front().second.data_maps);
+
+            if (input.verbose) {
+                dump_mesh(output.seamed_src_mesh.mesh, "src-mesh-traced-poly");
+            }
         }
-    }
+    } // if (input.include_seam_srcmesh) {
 
     // dump traced cut-mesh polygons
+    if (input.keep_cutmesh_seam) {
+        bool all_cutpaths_linear_and_make_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == 0);
 
-    bool all_cutpaths_linear_and_make_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == 0);
+        if (sm_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_make_holes)) {
+            std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_cut_mesh_fragments;
 
-    if (sm_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_make_holes)) {
-        std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_cut_mesh_fragments;
+            mesh_t merged = extract_connected_components(
+                separated_cut_mesh_fragments,
+                m0,
+                traced_sm_polygon_count, // offset to start of traced cut-mesh polygons in "m0_polygons".
+                std::vector<traced_polygon_t>(traced_cs_polygons_iter_cbegin, m0_polygons.cend()),
+                std::vector<int>(),
+                std::vector<int>(),
+                m0_vertex_to_seam_flag,
+                std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
+                std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
+                std::map<int, int>(), // Unused ... because we are extracting from "m0"
+                m0_to_ps_vtx,
+                m0_to_ps_face,
+                ps_to_sm_vtx,
+                ps_to_sm_face,
+                ps_to_cm_vtx,
+                ps_to_cm_face,
+                -1, // Unused ... because we are extracting from "m0"
+                -1, // Unused ... because we are extracting from "m0"
+                sm_vtx_cnt,
+                ps_vtx_cnt,
+                sm_face_count,
+                input.populate_vertex_maps,
+                input.populate_face_maps,
+                false, // Unused ...
+                false, // Unused ...
+                false // Unused ...
+            );
 
-        mesh_t merged = extract_connected_components(
-            separated_cut_mesh_fragments,
-            m0,
-            traced_sm_polygon_count, // offset to start of traced cut-mesh polygons in "m0_polygons".
-            std::vector<traced_polygon_t>(traced_cs_polygons_iter_cbegin, m0_polygons.cend()),
-            std::vector<int>(),
-            std::vector<int>(),
-            m0_vertex_to_seam_flag,
-            std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-            std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-            std::map<int, int>(), // Unused ... because we are extracting from "m0"
-            m0_to_ps_vtx,
-            m0_to_ps_face,
-            ps_to_sm_vtx,
-            ps_to_sm_face,
-            ps_to_cm_vtx,
-            ps_to_cm_face,
-            -1, // Unused ... because we are extracting from "m0"
-            -1, // Unused ... because we are extracting from "m0"
-            sm_vtx_cnt,
-            ps_vtx_cnt,
-            sm_face_count,
-            input.populate_vertex_maps,
-            input.populate_face_maps);
+            if (separated_cut_mesh_fragments.size() == 1) { // usual case
+                MCUT_ASSERT(separated_cut_mesh_fragments.cbegin()->second.size() == 1); // one instance
+                output.seamed_cut_mesh.mesh = std::move(separated_cut_mesh_fragments.begin()->second.front().first);
+                output.seamed_cut_mesh.seam_vertices = std::move(separated_cut_mesh_fragments.begin()->second.front().second.seam_vertices);
+                output.seamed_cut_mesh.data_maps = std::move(separated_cut_mesh_fragments.begin()->second.front().second.data_maps);
+            } else // cutmesh is a single (large) polygon [and] we have multiple patches which are not connected at the edges
+            {
+                // here we create a new mesh containing only the polygons of the cut-mesh [and] where every vertex is referenced
+                // by a face (i.e. we just remove those vertices used only by the source mesh in "m0")
+                mesh_t m; // output (seamed connected component)
+                std::vector<vd_t> remapped_seam_vertices;
+                std::map<vd_t, vd_t> vmap_mesh_vertices;
 
-        if (separated_cut_mesh_fragments.size() == 1) { // usual case
-            MCUT_ASSERT(separated_cut_mesh_fragments.cbegin()->second.size() == 1); // one instance
-            output.seamed_cut_mesh.mesh = std::move(separated_cut_mesh_fragments.begin()->second.front().first);
-            output.seamed_cut_mesh.seam_vertices = std::move(separated_cut_mesh_fragments.begin()->second.front().second.seam_vertices);
-            output.seamed_cut_mesh.data_maps = std::move(separated_cut_mesh_fragments.begin()->second.front().second.data_maps);
-        } else // cutmesh is a single (large) polygon [and] we have multiple patches which are not connected at the edges
-        {
-            // here we create a new mesh containing only the polygons of the cut-mesh [and] where every vertex is referenced
-            // by a face (i.e. we just remove those vertices used only by the source mesh in "m0")
-            mesh_t m; // output (seamed connected component)
-            std::vector<vd_t> remapped_seam_vertices;
-            std::map<vd_t, vd_t> vmap_mesh_vertices;
+                // for each face in the merged mesh
+                for (mesh_t::face_iterator_t f = merged.faces_begin(); f != merged.faces_end(); ++f) {
+                    // get vertices on face
+                    const std::vector<vd_t> vertices_around_face = merged.get_vertices_around_face(*f);
+                    std::vector<vd_t> remapped_face;
 
-            // for each face in the merged mesh
-            for (mesh_t::face_iterator_t f = merged.faces_begin(); f != merged.faces_end(); ++f) {
-                // get vertices on face
-                const std::vector<vd_t> vertices_around_face = merged.get_vertices_around_face(*f);
-                std::vector<vd_t> remapped_face;
+                    // for each vertex on face
+                    for (std::vector<vd_t>::const_iterator v = vertices_around_face.cbegin(); v != vertices_around_face.cend(); ++v) {
+                        if (vmap_mesh_vertices.count(*v) == 0) { // not registered
+                            vmap_mesh_vertices[*v] = m.add_vertex(merged.vertex(*v)); // add vertex and save it new descriptor
 
-                // for each vertex on face
-                for (std::vector<vd_t>::const_iterator v = vertices_around_face.cbegin(); v != vertices_around_face.cend(); ++v) {
-                    if (vmap_mesh_vertices.count(*v) == 0) { // not registered
-                        vmap_mesh_vertices[*v] = m.add_vertex(merged.vertex(*v)); // add vertex and save it new descriptor
+                            if (m0_vertex_to_seam_flag.at(*v) == true) { // is it a seam vertex? (i.e. on a cutpath)
+                                remapped_seam_vertices.push_back(vmap_mesh_vertices[*v]);
+                            }
 
-                        if (m0_vertex_to_seam_flag.at(*v) == true) { // is it a seam vertex? (i.e. on a cutpath)
-                            remapped_seam_vertices.push_back(vmap_mesh_vertices[*v]);
+                            const vd_t m0_descr = *v; // ... because the vertex list in "merged" is the same as "m0"
+                            std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
+                            bool is_ps_vertex = m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
+                            vd_t cm_descr = mesh_t::null_vertex();
+                            if (is_ps_vertex) {
+                                vd_t ps_descr = m0_to_ps_vtx_fiter->second;
+                                MCUT_ASSERT(ps_to_cm_vtx.count(ps_descr) == 1);
+                                cm_descr = ps_to_cm_vtx.at(ps_descr);
+
+                                // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                                cm_descr = static_cast<vd_t>(cm_descr + sm_face_count);
+                            }
+
+                            vd_t local_cc_descr = vmap_mesh_vertices.at(*v);
+
+                            output.seamed_cut_mesh.data_maps.vertex_map[local_cc_descr] = cm_descr;
                         }
-
-                        const vd_t m0_descr = *v; // ... because the vertex list in "merged" is the same as "m0"
-                        std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
-                        bool is_ps_vertex = m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
-                        vd_t cm_descr = mesh_t::null_vertex();
-                        if (is_ps_vertex) {
-                            vd_t ps_descr = m0_to_ps_vtx_fiter->second;
-                            MCUT_ASSERT(ps_to_cm_vtx.count(ps_descr) == 1);
-                            cm_descr = ps_to_cm_vtx.at(ps_descr);
-
-                            // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
-                            cm_descr = static_cast<vd_t>(cm_descr + sm_face_count);
-                        }
-
-                        vd_t local_cc_descr = vmap_mesh_vertices.at(*v);
-
-                        output.seamed_cut_mesh.data_maps.vertex_map[local_cc_descr] = cm_descr;
+                        remapped_face.push_back(vmap_mesh_vertices[*v]);
                     }
-                    remapped_face.push_back(vmap_mesh_vertices[*v]);
+
+                    fd_t fd = m.add_face(remapped_face);
+                    MCUT_ASSERT(fd != mesh_t::null_face());
+
+                    fd_t inputMeshFaceDescr(0); // only one (large) cut-mesh polygon!
+                    // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                    inputMeshFaceDescr = static_cast<fd_t>(inputMeshFaceDescr + sm_face_count);
+
+                    output.seamed_cut_mesh.data_maps.face_map[fd] = inputMeshFaceDescr;
                 }
 
-                fd_t fd = m.add_face(remapped_face);
-                MCUT_ASSERT(fd != mesh_t::null_face());
-
-                fd_t inputMeshFaceDescr(0); // only one (large) cut-mesh polygon!
-                // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
-                inputMeshFaceDescr = static_cast<fd_t>(inputMeshFaceDescr + sm_face_count);
-
-                output.seamed_cut_mesh.data_maps.face_map[fd] = inputMeshFaceDescr;
+                output.seamed_cut_mesh.mesh = std::move(m);
+                output.seamed_cut_mesh.seam_vertices = std::move(remapped_seam_vertices);
             }
 
-            output.seamed_cut_mesh.mesh = std::move(m);
-            output.seamed_cut_mesh.seam_vertices = std::move(remapped_seam_vertices);
+            if (input.verbose) {
+                dump_mesh(output.seamed_src_mesh.mesh, "cut-mesh-traced-poly");
+            }
         }
+    } // if (input.include_seam_srcmesh) {
 
-        if (input.verbose) {
-            dump_mesh(output.seamed_src_mesh.mesh, "cut-mesh-traced-poly");
-        }
+    if (false == (input.keep_fragments_below_cutmesh || //
+            input.keep_fragments_above_cutmesh || //
+            input.keep_fragments_partially_cut || //
+            input.keep_unsealed_fragments || //
+            input.keep_fragments_sealed_inside || //
+            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_partial || //
+            input.keep_fragments_sealed_outside_partial || //
+            input.keep_inside_patches || //
+            input.keep_outside_patches)) {
+        // if the user simply wants seams, then we should not have to proceed further.
+        return;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -6427,60 +6488,65 @@ void dispatch(output_t& output, const input_t& input)
 
     MCUT_ASSERT(!m1_vertex_to_seam_flag.empty());
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Extract the partitioned connected components for output
-    ///////////////////////////////////////////////////////////////////////////
+    if (input.keep_unsealed_fragments || input.keep_fragments_partially_cut) {
+        ///////////////////////////////////////////////////////////////////////////
+        // Extract the partitioned connected components for output
+        ///////////////////////////////////////////////////////////////////////////
 
-    std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> unsealed_connected_components;
+        std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> unsealed_connected_components;
 
-    extract_connected_components(
-        unsealed_connected_components,
-        m1,
-        0,
-        m1_polygons,
-        sm_polygons_below_cs,
-        sm_polygons_above_cs,
-        m1_vertex_to_seam_flag,
-        m1_to_m0_ovtx,
-        std::map<vd_t, vd_t>(), // ... because data is only available during "m1" stitching stage (later), and its not needed here
-        m1_to_m0_face,
-        m0_to_ps_vtx,
-        m0_to_ps_face,
-        ps_to_sm_vtx,
-        ps_to_sm_face,
-        ps_to_cm_vtx,
-        ps_to_cm_face,
-        -1, // ... because data is only available during "m1" stitching stage (later)
-        m1_num_vertices_after_srcmesh_partitioning, // unused parameter until "m1" stitching stage (later)
-        sm_vtx_cnt,
-        ps_vtx_cnt,
-        sm_face_count,
-        input.populate_vertex_maps,
-        input.populate_face_maps);
+        extract_connected_components(
+            unsealed_connected_components,
+            m1,
+            0,
+            m1_polygons,
+            sm_polygons_below_cs,
+            sm_polygons_above_cs,
+            m1_vertex_to_seam_flag,
+            m1_to_m0_ovtx,
+            std::map<vd_t, vd_t>(), // ... because data is only available during "m1" stitching stage (later), and its not needed here
+            m1_to_m0_face,
+            m0_to_ps_vtx,
+            m0_to_ps_face,
+            ps_to_sm_vtx,
+            ps_to_sm_face,
+            ps_to_cm_vtx,
+            ps_to_cm_face,
+            -1, // ... because data is only available during "m1" stitching stage (later)
+            m1_num_vertices_after_srcmesh_partitioning, // unused parameter until "m1" stitching stage (later)
+            sm_vtx_cnt,
+            ps_vtx_cnt,
+            sm_face_count,
+            input.populate_vertex_maps,
+            input.populate_face_maps,
+            input.keep_fragments_below_cutmesh,
+            input.keep_fragments_above_cutmesh,
+            input.keep_fragments_partially_cut);
 
-    // for each connected component (i.e. mesh)
-    for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = unsealed_connected_components.begin();
-         cc_iter != unsealed_connected_components.end();
-         ++cc_iter) {
+        // for each connected component (i.e. mesh)
+        for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = unsealed_connected_components.begin();
+             cc_iter != unsealed_connected_components.end();
+             ++cc_iter) {
 
-        const int cc_id = static_cast<int>(cc_iter->first);
-        std::vector<std::pair<mesh_t, connected_component_info_t>>& mesh_data = cc_iter->second;
+            const int cc_id = static_cast<int>(cc_iter->first);
+            std::vector<std::pair<mesh_t, connected_component_info_t>>& mesh_data = cc_iter->second;
 
-        // there will only be one element of the mesh since "unsealed_connected_components"
-        // is empty before calling "extract_connected_components"
-        MCUT_ASSERT(mesh_data.size() == 1);
-        if (input.verbose) {
-            dump_mesh(mesh_data.front().first, ("fragment.unsealed." + std::to_string(cc_id) + "." + to_string(mesh_data.front().second.location)).c_str());
+            // there will only be one element of the mesh since "unsealed_connected_components"
+            // is empty before calling "extract_connected_components"
+            MCUT_ASSERT(mesh_data.size() == 1);
+            if (input.verbose) {
+                dump_mesh(mesh_data.front().first, ("fragment.unsealed." + std::to_string(cc_id) + "." + to_string(mesh_data.front().second.location)).c_str());
+            }
+            std::pair<mesh_t, connected_component_info_t>& md = mesh_data.front();
+            output_mesh_info_t omi;
+            omi.mesh = md.first;
+            omi.seam_vertices = std::move(md.second.seam_vertices);
+            omi.data_maps = std::move(md.second.data_maps);
+            output.unsealed_cc[md.second.location].emplace_back(std::move(omi));
         }
-        std::pair<mesh_t, connected_component_info_t>& md = mesh_data.front();
-        output_mesh_info_t omi;
-        omi.mesh = md.first;
-        omi.seam_vertices = std::move(md.second.seam_vertices);
-        omi.data_maps = std::move(md.second.data_maps);
-        output.unsealed_cc[md.second.location].emplace_back(std::move(omi));
-    }
 
-    unsealed_connected_components.clear();
+        unsealed_connected_components.clear();
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     // Check if the pipeline needs to terminate at this point
@@ -6506,6 +6572,17 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "end" << std::endl;
         return; // exit
+    }
+
+    if (false == (input.keep_fragments_below_cutmesh || //
+            input.keep_fragments_above_cutmesh || //
+            input.keep_fragments_sealed_inside || //
+            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_partial || //
+            input.keep_fragments_sealed_outside_partial || //
+            input.keep_inside_patches || //
+            input.keep_outside_patches)) {
+        // if the user simply wants [unsealed] fragments that may be [partially cut], then we should not have to proceed further.
+        return;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -8105,6 +8182,12 @@ void dispatch(output_t& output, const input_t& input)
             lg.indent();
             const int cur_patch_idx = *patch_iter;
 
+            const cut_surface_patch_location_t& patch_location = patch_color_label_to_location.at(color_id);
+            if ((patch_location == cut_surface_patch_location_t::INSIDE && !input.keep_inside_patches) || //
+                (patch_location == cut_surface_patch_location_t::OUTSIDE && !input.keep_outside_patches)) {
+                continue;
+            }
+
             //
             // create mesh for patch
             //
@@ -8201,8 +8284,6 @@ void dispatch(output_t& output, const input_t& input)
                 patch_to_m0_face.insert(std::make_pair(f, patch_poly_idx));
             }
 
-            const cut_surface_patch_location_t& patch_location = patch_color_label_to_location.at(color_id);
-
             if (input.verbose) {
                 dump_mesh(patch_mesh, ("patch" + std::to_string(cur_patch_idx) + "." + to_string(patch_location) + "." + cs_patch_descriptor_str).c_str());
             }
@@ -8265,6 +8346,16 @@ void dispatch(output_t& output, const input_t& input)
             lg.unindent();
         }
         lg.unindent();
+    }
+
+    if (false == (input.keep_fragments_below_cutmesh || //
+            input.keep_fragments_above_cutmesh || //
+            input.keep_fragments_partially_cut || //
+            input.keep_fragments_sealed_inside || //
+            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_partial || //
+            input.keep_fragments_sealed_outside_partial)) {
+        // if the user simply wants [patches], then we should not have to proceed further.
+        return;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -8464,6 +8555,13 @@ void dispatch(output_t& output, const input_t& input)
         const char color_id = color_to_patches_iter->first;
 
         lg << "color : " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
+
+        const cut_surface_patch_location_t& location = patch_color_label_to_location.at(color_id);
+
+        if ((location == cut_surface_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_partial)) || //
+            (location == cut_surface_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_partial))) {
+            continue; // skip stitching of exterior/ interior patches as user desires.
+        }
 
         MCUT_ASSERT(color_to_m1.count(color_id) == 1);
         // get the reference to the copy of "m1" to which patches of the current color will be stitched
@@ -9589,7 +9687,7 @@ void dispatch(output_t& output, const input_t& input)
                 // }
                 //const int ccsp_count_pre = numInstancesPrev; //separated_stitching_CCs.unseparated_stitching_CCs.size();
 
-                if (input.keep_partially_sealed_connected_components == true) {
+                if (input.keep_fragments_sealed_inside_partial || input.keep_fragments_sealed_outside_partial) {
                     ///////////////////////////////////////////////////////////////////////////
                     // create the sealed meshes defined by the [current] set of traced polygons
                     ///////////////////////////////////////////////////////////////////////////
@@ -9617,7 +9715,10 @@ void dispatch(output_t& output, const input_t& input)
                         ps_vtx_cnt,
                         sm_face_count,
                         input.populate_vertex_maps,
-                        input.populate_face_maps);
+                        input.populate_face_maps,
+                        input.keep_fragments_below_cutmesh,
+                        input.keep_fragments_above_cutmesh,
+                        input.keep_fragments_partially_cut);
                 }
                 //int numInstancesCur = 0;
                 // for (auto it = separated_stitching_CCs.cbegin(); it != separated_stitching_CCs.cend(); ++it) {
@@ -9696,10 +9797,15 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "total cut-mesh polygons stitched = " << global_cm_poly_stitch_counter << std::endl;
 
-    if (input.keep_partially_sealed_connected_components == false) {
-        ///////////////////////////////////////////////////////////////////////////
-        // create the sealed meshes defined by the final set of traced polygons
-        ///////////////////////////////////////////////////////////////////////////
+    bool userWantsFullySealedFragmentsANY = (input.keep_fragments_sealed_inside || input.keep_fragments_sealed_outside);
+    bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_partial || input.keep_fragments_sealed_outside_partial);
+
+    // if the user wants [only] fully sealed fragment (not partially sealed)
+    if (userWantsFullySealedFragmentsANY && //
+        !userWantsEvenPartiallySealedFragmentsANY) {
+        ///////////////////////////////////////////////////////////////////////////////
+        // create the [fully] sealed meshes defined by the final set of traced polygons
+        ///////////////////////////////////////////////////////////////////////////////
 
         lg << "create final sealed connected components" << std::endl;
 
@@ -9708,7 +9814,6 @@ void dispatch(output_t& output, const input_t& input)
              ++color_to_separated_CCs_iter) {
 
             const char color_label = color_to_separated_CCs_iter->first;
-            //const cut_surface_patch_location_t location = patch_color_label_to_location.at(color_label);
             std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>& separated_sealed_CCs = color_to_separated_CCs_iter->second;
 
             const mesh_t& m1_colored = color_to_m1.at(color_label);
@@ -9746,7 +9851,10 @@ void dispatch(output_t& output, const input_t& input)
                 ps_vtx_cnt,
                 sm_face_count,
                 input.populate_vertex_maps,
-                input.populate_face_maps);
+                input.populate_face_maps,
+                input.keep_fragments_below_cutmesh,
+                input.keep_fragments_above_cutmesh,
+                input.keep_fragments_partially_cut);
         }
     }
 
@@ -9759,32 +9867,50 @@ void dispatch(output_t& output, const input_t& input)
     ///////////////////////////////////////////////////////////////////////////
     // save output and finish
     ///////////////////////////////////////////////////////////////////////////
-    int ccc = 0;
+
+    std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>>& out = output.connected_components;
+
     for (std::map<char, std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>>::iterator color_to_separated_CCs_iter = color_to_separated_connected_ccsponents.begin();
          color_to_separated_CCs_iter != color_to_separated_connected_ccsponents.end();
          ++color_to_separated_CCs_iter) {
+
         const char color_label = color_to_separated_CCs_iter->first;
-        const cut_surface_patch_location_t location = patch_color_label_to_location.at(color_label);
+        // inside or outside or undefined
+        const cut_surface_patch_location_t patchLocation = patch_color_label_to_location.at(color_label);
         std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>& separated_sealed_CCs = color_to_separated_CCs_iter->second;
 
         for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = separated_sealed_CCs.begin();
              cc_iter != separated_sealed_CCs.end();
              ++cc_iter) {
 
-            //const int cc_id = (int)cc_iter->first;
+            // all instances of current connected component (from 0-or-1 stitched cm-polygon to all stitched cm-polygons)
+            // NOTE TO SELF: the first instance may have one or [zero] cut-mesh polygons since stitching works on a per-patch-per-polygon basis.
+            // I.e. if the 1st stitched cm-polygon is into an "above" fragmetn (inside or outside), then the opposite
+            // fragment that is "below" will have zero cut-mesh polygons. Hence.
             std::vector<std::pair<mesh_t, connected_component_info_t>>& cc_instances = cc_iter->second;
-            std::pair<mesh_t, connected_component_info_t>& cc_mesh_data = cc_instances.back(); // last element is the final version which is copy with all polygons stitched
 
-            std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>>& out_sep_CCs = output.connected_components;
-            if (input.verbose) {
-                dump_mesh(cc_mesh_data.first, (std::string("cc") + std::to_string(ccc++)).c_str());
+            if (!userWantsEvenPartiallySealedFragmentsANY) {
+                MCUT_ASSERT(cc_instances.size() == 1); // there is only one, fully sealed, copy
             }
 
-            output_mesh_info_t omi;
-            omi.mesh = std::move(cc_mesh_data.first);
-            omi.seam_vertices = std::move(cc_mesh_data.second.seam_vertices);
-            omi.data_maps = std::move(cc_mesh_data.second.data_maps);
-            out_sep_CCs[cc_mesh_data.second.location][location].emplace_back(std::move(omi));
+            // For each instance of CC (each instance differs by one stitched polygon)
+            for (std::vector<std::pair<mesh_t, connected_component_info_t>>::iterator cc_instance_iter = cc_instances.begin();
+                 cc_instance_iter != cc_instances.end();
+                 ++cc_instance_iter) {
+
+                std::pair<mesh_t, connected_component_info_t>& cc_instance = *cc_instance_iter;
+
+                if (input.verbose) {
+                    const int idx = std::distance(cc_instances.begin(), cc_instance_iter);
+                    dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
+                }
+
+                output_mesh_info_t omi;
+                omi.mesh = std::move(cc_instance.first);
+                omi.seam_vertices = std::move(cc_instance.second.seam_vertices);
+                omi.data_maps = std::move(cc_instance.second.data_maps);
+                out[cc_instance.second.location][patchLocation].emplace_back(std::move(omi));
+            }
         }
     }
 
