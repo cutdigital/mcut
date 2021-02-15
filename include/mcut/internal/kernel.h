@@ -41,10 +41,12 @@ enum class status_t {
     // * contains more than one connected component
     INVALID_SRC_MESH = -1,
     INVALID_CUT_MESH = -2,
+    EDGE_EDGE_INTERSECTION = -3, // Found an edge-edge intersection.
+    FACE_VERTEX_INTERSECTION = -4, // Found an face-vertex intersection.
     // there exists no edge in the input mesh which intersects cut-surface polygon
-    INVALID_MESH_INTERSECTION = -3,
+    INVALID_MESH_INTERSECTION = -5,
     // The bounding volume heirarchies of the input mesh and cut surface do not overlap
-    INVALID_BVH_INTERSECTION = -4
+    INVALID_BVH_INTERSECTION = -6
 };
 
 //

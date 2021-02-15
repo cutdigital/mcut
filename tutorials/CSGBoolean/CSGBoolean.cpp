@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     printf("\nInputs: \n\tShape A = 'cube.obj'.\n\tShape B = 'torus.obj'\n\n");
 
     // We can either let MCUT compute all possible meshes (including patches etc.), or we can
-    // constrain the library to compute exactly the boolean op mesh we want. This constrained case
+    // constrain the library to compute exactly the boolean op mesh we want. This 'constrained' case
     // is done with the following flags.
     const std::map<std::string, McFlags> booleanOps = {
         { "A_NOT_B", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE },
@@ -140,7 +140,6 @@ int main(int argc, char* argv[])
         // 4. query the number of available connected component (all types)
         // -------------------------------------------------------------
         uint32_t numConnComps;
-
         err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
         assert(err == MC_NO_ERROR);
 
@@ -154,7 +153,6 @@ int main(int argc, char* argv[])
         assert(numConnComps == 1); // exactly 1 result (for this example)
 
         std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
-
         connectedComponents.resize(numConnComps);
         err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
 

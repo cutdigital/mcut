@@ -465,6 +465,12 @@ McResult convert(const mcut::status_t& v)
     case mcut::status_t::INVALID_BVH_INTERSECTION:
         result = McResult::MC_INVALID_OPERATION;
         break;
+    case mcut::status_t::EDGE_EDGE_INTERSECTION:
+        result = McResult::MC_EDGE_EDGE_INTERSECTION;
+        break;
+    case mcut::status_t::FACE_VERTEX_INTERSECTION:
+        result = McResult::MC_FACE_VERTEX_INTERSECTION;
+        break;
     default:
         MCUT_ASSERT(false);
     }

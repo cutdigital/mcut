@@ -147,6 +147,12 @@ std::string to_string(const status_t& v)
     case status_t::INVALID_BVH_INTERSECTION:
         s = "INVALID_BVH_INTERSECTION";
         break;
+    case status_t::EDGE_EDGE_INTERSECTION:
+        s = "EDGE_EDGE_INTERSECTION";
+        break;
+    case status_t::FACE_VERTEX_INTERSECTION:
+        s = "FACE_VERTEX_INTERSECTION";
+        break;
     }
     return s;
 }
@@ -2213,7 +2219,7 @@ void dispatch(output_t& output, const input_t& input)
                             // then that implies a situation of cutting through a vertex which is undefined
                             // (topologically).
                             lg.set_reason_for_failure("invalid polygon intersection (vertex lies on face)");
-                            output.status = status_t::INVALID_MESH_INTERSECTION;
+                            output.status = status_t::FACE_VERTEX_INTERSECTION;
                             return;
                         }
 

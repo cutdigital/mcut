@@ -125,9 +125,11 @@ typedef enum McResult {
     MC_NO_ERROR = 0, /**< The function was successfully executed/enqueued. */
     MC_INVALID_SRC_MESH = -(1 << 0), /**< The input source-mesh does not the meet requirements of a valid mesh. */
     MC_INVALID_CUT_MESH = -(1 << 1), /**< The input cut-mesh does not the meet requirements of a valid mesh. */
-    MC_INVALID_OPERATION = -(1 << 2), /**< An internal operation could not be executed successively. */
-    MC_INVALID_VALUE = -(1 << 3), /**< An invalid value has been passed to the API. */
-    MC_OUT_OF_MEMORY = -(1 << 4), /** Memory allocation operation cannot allocate memory. */
+    MC_EDGE_EDGE_INTERSECTION = -(1 << 2), /** Found an edge-edge intersection. */
+    MC_FACE_VERTEX_INTERSECTION = -(1 << 3), /** Found an face-vertex intersection. */
+    MC_INVALID_OPERATION = -(1 << 4), /**< An internal operation could not be executed successively. */
+    MC_INVALID_VALUE = -(1 << 5), /**< An invalid value has been passed to the API. */
+    MC_OUT_OF_MEMORY = -(1 << 6), /** Memory allocation operation cannot allocate memory. */
     MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McResult;
 
