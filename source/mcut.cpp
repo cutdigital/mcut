@@ -1185,13 +1185,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     backendInput.require_looped_cutpaths = false;
 
     backendInput.verbose = static_cast<bool>((ctxtPtr->flags & MC_DEBUG) && (ctxtPtr->debugType & McDebugSource::MC_DEBUG_SOURCE_KERNEL));
-    backendInput.require_looped_cutpaths = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_SEVERING_SEAMS);
+    backendInput.require_looped_cutpaths = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS);
     backendInput.populate_vertex_maps = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
     backendInput.populate_face_maps = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);
-    backendInput.keep_fragments_below_cutmesh = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW);
-    backendInput.keep_fragments_above_cutmesh = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE);
 
-    if ((ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_SEVERING_SEAMS) && //
+    if ((ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS) && //
         (ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED)) {
         // The user states that she does not want a partial cut but yet also states that she
         // wants to keep fragments with partial cuts. These two options are mutually exclusive.
@@ -1200,20 +1198,74 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             McDebugType::MC_DEBUG_TYPE_ERROR,
             0,
             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-            "use of mutually exclusive dispatch flags: MC_DISPATCH_REQUIRE_SEVERING_SEAMS and MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED");
+            "use of mutually exclusive dispatch flags: MC_DISPATCH_REQUIRE_THROUGH_CUTS and MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED");
         return McResult::MC_INVALID_VALUE;
     }
 
-    backendInput.keep_fragments_partially_cut = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED);
-    backendInput.keep_unsealed_fragments = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE);
-    backendInput.keep_fragments_sealed_outside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE);
-    backendInput.keep_fragments_sealed_inside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE);
-    backendInput.keep_fragments_sealed_outside_partial = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_PARTIAL);
-    backendInput.keep_fragments_sealed_inside_partial = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_PARTIAL);
-    backendInput.keep_inside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_INSIDE);
-    backendInput.keep_outside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_OUTSIDE);
-    backendInput.keep_srcmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_SRCMESH);
-    backendInput.keep_cutmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_CUTMESH);
+    uint32_t filterFlagsAll = ( //
+        MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE | //
+        MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | //
+        MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED | //
+        MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | //
+        MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | //
+        MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE | //
+        MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE | //
+        MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE | //
+        MC_DISPATCH_FILTER_PATCH_INSIDE | //
+        MC_DISPATCH_FILTER_PATCH_OUTSIDE | //
+        MC_DISPATCH_FILTER_SEAM_SRCMESH | //
+        MC_DISPATCH_FILTER_SEAM_CUTMESH);
+
+    const bool dispatchFilteringEnabled = static_cast<bool>(ctxtPtr->dispatchFlags & filterFlagsAll); // any
+
+    if (dispatchFilteringEnabled) { // user only wants [some] output connected components
+        backendInput.keep_fragments_below_cutmesh = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW);
+        backendInput.keep_fragments_above_cutmesh = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE);
+        backendInput.keep_fragments_sealed_outside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE);
+        backendInput.keep_fragments_sealed_inside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE);
+        backendInput.keep_unsealed_fragments = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE);
+        backendInput.keep_fragments_partially_cut = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED);
+        backendInput.keep_fragments_sealed_outside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE);
+        backendInput.keep_fragments_sealed_inside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE);
+        backendInput.keep_inside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_INSIDE);
+        backendInput.keep_outside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_OUTSIDE);
+        backendInput.keep_srcmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_SRCMESH);
+        backendInput.keep_cutmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_CUTMESH);
+
+    } else { // compute all possible types of connected components
+        backendInput.keep_fragments_below_cutmesh = true;
+        backendInput.keep_fragments_above_cutmesh = true;
+        backendInput.keep_fragments_partially_cut = true;
+        backendInput.keep_unsealed_fragments = true;
+        backendInput.keep_fragments_sealed_outside = true; // mutually exclusive with exhaustive case
+        backendInput.keep_fragments_sealed_inside = true;
+        backendInput.keep_fragments_sealed_outside_exhaustive = false;
+        backendInput.keep_fragments_sealed_inside_exhaustive = false;
+        backendInput.keep_inside_patches = true;
+        backendInput.keep_outside_patches = true;
+        backendInput.keep_srcmesh_seam = true;
+        backendInput.keep_cutmesh_seam = true;
+    }
+
+    if ((backendInput.keep_fragments_sealed_outside && backendInput.keep_fragments_sealed_outside_exhaustive)) {
+        ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_API,
+            McDebugType::MC_DEBUG_TYPE_ERROR,
+            0,
+            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            "use of mutually exclusive flags MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE and MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE");
+        return MC_INVALID_VALUE;
+    }
+
+    if ((backendInput.keep_fragments_sealed_inside && backendInput.keep_fragments_sealed_inside_exhaustive)) {
+        ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_API,
+            McDebugType::MC_DEBUG_TYPE_ERROR,
+            0,
+            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            "use of mutually exclusive flags MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE and MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE");
+        return MC_INVALID_VALUE;
+    }
 
     mcut::output_t backendOutput;
 
@@ -1257,7 +1309,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     //
-    // sealed connected components (fragments)
+    // sealed (partially or completely) fragment connected components
     //
 
     for (std::map<mcut::connected_component_location_t, std::map<mcut::cut_surface_patch_location_t, std::vector<mcut::output_mesh_info_t>>>::const_iterator i = backendOutput.connected_components.cbegin();
@@ -1288,22 +1340,21 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 asFragPtr->fragmentLocation = convert(i->first);
                 asFragPtr->patchLocation = convert(j->first);
 
-                if (asFragPtr->patchLocation == MC_PATCH_LOCATION_UNDEFINED) {
-                    asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
-                } else {
-                    // Note: the last CC is always guarranteed to be fully sealed (see: "include_fragment_sealed_partial" in kernel)!
-                    bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
+                MCUT_ASSERT(asFragPtr->patchLocation != MC_PATCH_LOCATION_UNDEFINED);
 
-                    if (is_last_cc) {
-                        asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
-                    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_PARTIALLY_SEALED_FRAGMENTS) { // did the user tell us to keep partially sealed fragments??
-                        asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL;
-                    }
+                // Note: the last CC is always guarranteed to be fully sealed (see: "include_fragment_sealed_partial" in kernel)!
+                bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
 
-                    // Personal note: Do not be tempted to just deal with unsealed fragments here.
-                    // Its not guarranteed that the first element of "j->second" is always completely unsealed! Only sometimes.
-                    // Thus, for simplicity we deal with unsealed fragments specifically below (next for-loop)
+                if (is_last_cc) {
+                    asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
+                } else { // did the user tell us to keep partially sealed fragments??
+                    MCUT_ASSERT(backendInput.keep_fragments_sealed_inside_exhaustive || backendInput.keep_fragments_sealed_outside_exhaustive);
+                    asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL;
                 }
+
+                // Personal note: Do not be tempted to just deal with unsealed fragments here.
+                // Its not guarranteed that the first element of "j->second" is always completely unsealed! Only sometimes.
+                // Thus, for simplicity we deal with unsealed fragments specifically below (next for-loop)
 
                 halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *k);
             }

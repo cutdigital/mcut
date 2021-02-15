@@ -467,7 +467,7 @@ TEST_F(SeamedConnComp, dispatchRequireSeveringSeamsCompleteCut)
 
     ASSERT_EQ(mcDispatch(
                   context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_REQUIRE_SEVERING_SEAMS,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_REQUIRE_THROUGH_CUTS,
                   pSrcMeshVertices,
                   pSrcMeshFaceIndices,
                   pSrcMeshFaceSizes,
@@ -492,7 +492,7 @@ TEST_F(SeamedConnComp, dispatchRequireSeveringSeamsPartialCut)
 
     ASSERT_EQ(mcDispatch(
                   context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_REQUIRE_SEVERING_SEAMS,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_REQUIRE_THROUGH_CUTS,
                   pSrcMeshVertices,
                   pSrcMeshFaceIndices,
                   pSrcMeshFaceSizes,
@@ -640,7 +640,7 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
         ASSERT_GT((int)numberOfVertices, 0);
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McSeamedConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
 
         uint64_t numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
@@ -684,8 +684,8 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
         } break;
         case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAMED: {
             // find out where it comes from (source-mesh or cut-mesh)
-            McConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
-            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
+            McSeamedConnectedComponentOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+            ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &orig, NULL), MC_NO_ERROR);
 
             if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
                 testSrcMeshCC();
@@ -711,7 +711,7 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMap)
         ASSERT_GT((int)numberOfFaces, 0);
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McSeamedConnectedComponentOrigin), &type, NULL), MC_NO_ERROR);
 
         numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
@@ -787,6 +787,520 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMapFlagMissing)
         uint64_t numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_INVALID_VALUE);
     }
+}
+
+///
+
+class mcDispatchFILTER : public testing::Test {
+protected:
+    void SetUp() override
+    {
+        McResult err = mcCreateContext(&context_, MC_NULL_HANDLE);
+        EXPECT_TRUE(context_ != nullptr);
+        EXPECT_EQ(err, MC_NO_ERROR);
+    }
+
+    void mySetup(const std::string& srcMeshFileName, const std::string& cutMeshFileName)
+    {
+        const std::string srcMeshPath = std::string(ROOT_DIR) + "/meshes/" + srcMeshFileName;
+
+        readOFF(srcMeshPath.c_str(), &pSrcMeshVertices, &pSrcMeshFaceIndices, &pSrcMeshFaceSizes, &numSrcMeshVertices, &numSrcMeshFaces);
+
+        ASSERT_TRUE(pSrcMeshVertices != nullptr);
+        ASSERT_TRUE(pSrcMeshFaceIndices != nullptr);
+        ASSERT_TRUE(pSrcMeshVertices != nullptr);
+        ASSERT_GT((int)numSrcMeshVertices, 2);
+        ASSERT_GT((int)numSrcMeshFaces, 0);
+
+        const std::string cutMeshPath = std::string(ROOT_DIR) + "/meshes/" + cutMeshFileName;
+
+        readOFF(cutMeshPath.c_str(), &pCutMeshVertices, &pCutMeshFaceIndices, &pCutMeshFaceSizes, &numCutMeshVertices, &numCutMeshFaces);
+
+        ASSERT_TRUE(pCutMeshVertices != nullptr);
+        ASSERT_TRUE(pCutMeshFaceIndices != nullptr);
+        ASSERT_TRUE(pCutMeshFaceSizes != nullptr);
+        ASSERT_GT((int)numCutMeshVertices, 2);
+        ASSERT_GT((int)numCutMeshFaces, 0);
+    }
+
+    virtual void TearDown()
+    {
+        free(pSrcMeshVertices);
+        free(pSrcMeshFaceIndices);
+        free(pSrcMeshFaceSizes);
+        free(pCutMeshVertices);
+        free(pCutMeshFaceIndices);
+        free(pCutMeshFaceSizes);
+
+        EXPECT_EQ(mcReleaseConnectedComponents(context_, connComps_.size(), connComps_.data()), MC_NO_ERROR);
+        EXPECT_EQ(mcReleaseContext(context_), MC_NO_ERROR);
+    }
+
+    std::vector<McConnectedComponent> connComps_;
+    McContext context_;
+
+    float* pSrcMeshVertices = nullptr;
+    uint32_t* pSrcMeshFaceIndices = nullptr;
+    uint32_t* pSrcMeshFaceSizes = nullptr;
+    uint32_t numSrcMeshVertices = 0;
+    uint32_t numSrcMeshFaces = 0;
+    float* pCutMeshVertices = nullptr;
+    uint32_t* pCutMeshFaceIndices = nullptr;
+    uint32_t* pCutMeshFaceSizes = nullptr;
+    uint32_t numCutMeshVertices = 0;
+    uint32_t numCutMeshFaces = 0;
+};
+
+TEST_F(mcDispatchFILTER, all)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT, // if we dont filter anything, then MCUT computes everything
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 12); // including sealed, partially, unsealed, above, below, patches & seams
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+        McConnectedComponent cc = connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
+    }
+}
+
+TEST_F(mcDispatchFILTER, partialCutWithInsideSealing) // Partial cut (CURRENTLY FAILS)
+{
+    mySetup("/bunny.off", "/bunnyCuttingPlanePartial.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED | MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the inside) fragment
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+        McConnectedComponent cc = connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+        McFragmentLocation location;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED", thus a partially cut fragment will be neither above nor below.
+        ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_UNDEFINED);
+        McFragmentSealType sealType;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE", which mean "complete sealed from the inside".
+        ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
+        McPatchLocation patchLocation;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+    }
+}
+
+TEST_F(mcDispatchFILTER, fragmentLocationBelowInside)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the inside) fragment
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+        McConnectedComponent cc = connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW" and "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE"
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+        McFragmentLocation location;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW"
+        ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
+        McFragmentSealType sealType;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE", which mean "complete sealed from the inside".
+        ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
+        McPatchLocation patchLocation;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+    }
+}
+
+TEST_F(mcDispatchFILTER, fragmentLocationBelowOutside)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the outside) fragment
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+        McConnectedComponent cc = connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW" and "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE"
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+        McFragmentLocation location;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW"
+        ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
+        McFragmentSealType sealType;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
+        // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE", which mean "complete sealed from the inside".
+        ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
+        McPatchLocation patchLocation;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
+    }
+}
+
+TEST_F(mcDispatchFILTER, fragmentLocationBelowOutsidePartial)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_GE(numConnectedComponents, 1); // one completely filled (from the outside) fragment
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+        McConnectedComponent cc = connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+        McFragmentLocation location;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
+        ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
+        McFragmentSealType sealType;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
+        // When dispatch is called with MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE, it means that MCUT will compute both fully sealed and partially sealed
+        // fragments.
+        ASSERT_TRUE(sealType == McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL || sealType == McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
+        McPatchLocation patchLocation;
+        ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
+    }
+}
+
+TEST_F(mcDispatchFILTER, fragmentLocationBelowUnsealed)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one unsealed fragment
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    McConnectedComponent cc = connComps_[0];
+    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+    McConnectedComponentType type;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+    McFragmentLocation location;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
+    ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
+    McFragmentSealType sealType;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
+    ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE);
+    McPatchLocation patchLocation;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+    ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_UNDEFINED);
+}
+
+// TODO: fragments ABOVE
+
+TEST_F(mcDispatchFILTER, patchInside)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_PATCH_INSIDE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    McConnectedComponent cc = connComps_[0];
+    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+    McConnectedComponentType type;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH);
+    McPatchLocation patchLocation;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+    ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+}
+
+TEST_F(mcDispatchFILTER, patchOutside)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_PATCH_OUTSIDE, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    McConnectedComponent cc = connComps_[0];
+    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+    McConnectedComponentType type;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH);
+    McPatchLocation patchLocation;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+    ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
+}
+
+TEST_F(mcDispatchFILTER, seamFromSrcMesh)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_SEAM_SRCMESH, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    McConnectedComponent cc = connComps_[0];
+    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+    McConnectedComponentType type;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAMED);
+    McSeamedConnectedComponentOrigin origin;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &origin, NULL), MC_NO_ERROR);
+    ASSERT_EQ(origin, McSeamedConnectedComponentOrigin::MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH);
+}
+
+TEST_F(mcDispatchFILTER, seamFromCutMesh)
+{
+    // "src-mesh014.off" = cube with four-sided faces
+    // "cut-mesh014.off" = square made of two triangles
+    // complete cut
+    mySetup("/benchmarks/src-mesh014.off", "/benchmarks/cut-mesh014.off");
+
+    ASSERT_EQ(mcDispatch(
+                  context_,
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_SEAM_CUTMESH, // **
+                  // source mesh
+                  pSrcMeshVertices,
+                  pSrcMeshFaceIndices,
+                  pSrcMeshFaceSizes,
+                  numSrcMeshVertices,
+                  numSrcMeshFaces,
+                  // cut mesh
+                  pCutMeshVertices,
+                  pCutMeshFaceIndices,
+                  pCutMeshFaceSizes,
+                  numCutMeshVertices,
+                  numCutMeshFaces),
+        MC_NO_ERROR);
+
+    uint32_t numConnectedComponents = 0;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
+    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    connComps_.resize(numConnectedComponents);
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
+
+    McConnectedComponent cc = connComps_[0];
+    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+
+    McConnectedComponentType type;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAMED);
+    McSeamedConnectedComponentOrigin origin;
+    ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &origin, NULL), MC_NO_ERROR);
+    ASSERT_EQ(origin, McSeamedConnectedComponentOrigin::MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
 }
 
 } //  namespace {

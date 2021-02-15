@@ -580,22 +580,18 @@ mesh_t extract_connected_components(
         }
     }
 
-    bool extractingSeams = (m1_num_vertices_after_srcmesh_partitioning == -1);
+    //bool extractingSeams = (m1_num_vertices_after_srcmesh_partitioning == -1);
 
     // stores a flag per connected component indicating whether we should
     // keep this CC or throw it away, as per user flags.
     std::map<size_t, bool> ccID_to_keepFlag;
     for (std::map<size_t, mesh_t>::const_iterator it = ccID_to_mesh.cbegin(); it != ccID_to_mesh.cend(); ++it) {
         int ccID = it->first;
-        connected_component_location_t ccLocation = ccID_to_cs_descriptor.at(ccID);
-        ccID_to_keepFlag[ccID] = (((keep_fragments_above_cutmesh && ccLocation == connected_component_location_t::ABOVE) || //
-                                      (keep_fragments_below_cutmesh && ccLocation == connected_component_location_t::BELOW) || //
-                                      (keep_fragments_partially_cut && ccLocation == connected_component_location_t::UNDEFINED))
-            &&
-            // i.e. we are extracting from "m0" to compute seams (not fragments).
-            // NOTE: this is not actually used but re-enforces intention (see
-            // if-statement where this function is called for Seams
-            extractingSeams);
+        std::map<std::size_t, connected_component_location_t>::iterator fiter = ccID_to_cs_descriptor.find(ccID);
+        const bool isSeam = (fiter == ccID_to_cs_descriptor.cend()); // Seams have no notion of "location"
+        ccID_to_keepFlag[ccID] = isSeam || ((keep_fragments_above_cutmesh && fiter->second == connected_component_location_t::ABOVE) || //
+                                     (keep_fragments_below_cutmesh && fiter->second == connected_component_location_t::BELOW) || //
+                                     (keep_fragments_partially_cut && fiter->second == connected_component_location_t::UNDEFINED));
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -3151,6 +3147,8 @@ void dispatch(output_t& output, const input_t& input)
                 return m0_edge_to_disjoint_implicit_cutpath_sequence.find(incident_edge) == m0_edge_to_disjoint_implicit_cutpath_sequence.cend();
             });
 
+        MCUT_ASSERT(incident_edge_find_iter != cutpath_edges_connected_to_first_vertex.cend());
+
         const ed_t& first_edge = *incident_edge_find_iter;
 
         // now we will iteratively add edges into the current sequence, starting from "first_edge".
@@ -5306,8 +5304,8 @@ void dispatch(output_t& output, const input_t& input)
             input.keep_fragments_partially_cut || //
             input.keep_unsealed_fragments || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_partial || //
-            input.keep_fragments_sealed_outside_partial || //
+            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
+            input.keep_fragments_sealed_outside_exhaustive || //
             input.keep_inside_patches || //
             input.keep_outside_patches)) {
         // if the user simply wants seams, then we should not have to proceed further.
@@ -6577,8 +6575,8 @@ void dispatch(output_t& output, const input_t& input)
     if (false == (input.keep_fragments_below_cutmesh || //
             input.keep_fragments_above_cutmesh || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_partial || //
-            input.keep_fragments_sealed_outside_partial || //
+            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
+            input.keep_fragments_sealed_outside_exhaustive || //
             input.keep_inside_patches || //
             input.keep_outside_patches)) {
         // if the user simply wants [unsealed] fragments that may be [partially cut], then we should not have to proceed further.
@@ -8352,8 +8350,8 @@ void dispatch(output_t& output, const input_t& input)
             input.keep_fragments_above_cutmesh || //
             input.keep_fragments_partially_cut || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_partial || //
-            input.keep_fragments_sealed_outside_partial)) {
+            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
+            input.keep_fragments_sealed_outside_exhaustive)) {
         // if the user simply wants [patches], then we should not have to proceed further.
         return;
     }
@@ -8558,8 +8556,8 @@ void dispatch(output_t& output, const input_t& input)
 
         const cut_surface_patch_location_t& location = patch_color_label_to_location.at(color_id);
 
-        if ((location == cut_surface_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_partial)) || //
-            (location == cut_surface_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_partial))) {
+        if ((location == cut_surface_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_exhaustive)) || //
+            (location == cut_surface_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_exhaustive))) {
             continue; // skip stitching of exterior/ interior patches as user desires.
         }
 
@@ -9687,7 +9685,7 @@ void dispatch(output_t& output, const input_t& input)
                 // }
                 //const int ccsp_count_pre = numInstancesPrev; //separated_stitching_CCs.unseparated_stitching_CCs.size();
 
-                if (input.keep_fragments_sealed_inside_partial || input.keep_fragments_sealed_outside_partial) {
+                if (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive) {
                     ///////////////////////////////////////////////////////////////////////////
                     // create the sealed meshes defined by the [current] set of traced polygons
                     ///////////////////////////////////////////////////////////////////////////
@@ -9798,7 +9796,7 @@ void dispatch(output_t& output, const input_t& input)
     lg << "total cut-mesh polygons stitched = " << global_cm_poly_stitch_counter << std::endl;
 
     bool userWantsFullySealedFragmentsANY = (input.keep_fragments_sealed_inside || input.keep_fragments_sealed_outside);
-    bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_partial || input.keep_fragments_sealed_outside_partial);
+    bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
 
     // if the user wants [only] fully sealed fragment (not partially sealed)
     if (userWantsFullySealedFragmentsANY && //
