@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
         McFragmentLocation fragmentLocation = (McFragmentLocation)0;
         McPatchLocation pathLocation = (McPatchLocation)0;
         bool isFragment = false;
-        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             name += "seam";
         } else {
             isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
@@ -268,10 +268,10 @@ int main(int argc, char* argv[])
         bool ccIsBirthedFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
         // its not a fragment && its a seam cc
-        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             // get origin
-            McSeamedConnectedComponentOrigin ccOrig;
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &ccOrig, NULL);
+            McSeamOrigin ccOrig;
+            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
 
             assert(err == MC_NO_ERROR);
 
@@ -291,11 +291,10 @@ int main(int argc, char* argv[])
 
         // write vertices and normals
         for (int i = 0; i < ccVertexCount; ++i) {
-          double x = ccVertices[(uint64_t)i * 3 + 0];
-          double y = ccVertices[(uint64_t)i * 3 + 1];
-          double z = ccVertices[(uint64_t)i * 3 + 2];
-          file << "v " << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << x << " " << y << " " << z << std::endl;
-
+            double x = ccVertices[(uint64_t)i * 3 + 0];
+            double y = ccVertices[(uint64_t)i * 3 + 1];
+            double z = ccVertices[(uint64_t)i * 3 + 2];
+            file << "v " << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << x << " " << y << " " << z << std::endl;
         }
 
         int faceVertexOffsetBase = 0;
@@ -322,9 +321,9 @@ int main(int argc, char* argv[])
             int faceSize = faceSizes.at(f);
             file << "f ";
             // for each vertex in face
-            for (int v = (reverseWindingOrder ? (faceSize-1) : 0); 
-                (reverseWindingOrder? (v >= 0) : (v < faceSize)); 
-                v += (reverseWindingOrder ? -1 : 1)) {
+            for (int v = (reverseWindingOrder ? (faceSize - 1) : 0);
+                 (reverseWindingOrder ? (v >= 0) : (v < faceSize));
+                 v += (reverseWindingOrder ? -1 : 1)) {
                 const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
                 file << (ccVertexIdx + 1) << " ";
             } // for (int v = 0; v < faceSize; ++v) {

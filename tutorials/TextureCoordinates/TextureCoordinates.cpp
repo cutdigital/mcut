@@ -295,7 +295,7 @@ int main(int argc, char* argv[])
 
         // Here we just build the name of each connected component based on its properties
         std::string name;
-        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             name += "seam";
         } else {
             bool isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
@@ -322,10 +322,10 @@ int main(int argc, char* argv[])
         bool ccIsBirthedFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
         // its not a fragment && its a seam cc
-        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             // get origin
-            McSeamedConnectedComponentOrigin ccOrig;
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &ccOrig, NULL);
+            McSeamOrigin ccOrig;
+            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
 
             if (err != MC_NO_ERROR) {
                 fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_ORIGIN) failed (err=%d)\n", (int)err);

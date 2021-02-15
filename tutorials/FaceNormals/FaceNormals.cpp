@@ -1,6 +1,6 @@
 /*
-This tutorial show how to propagate per-face normals from input meshes and onto the output 
-connected components after cutting
+This tutorial show how to propagate per-face normals (flat shading) from input meshes and onto the output 
+connected components after cutting.
 */
 
 #include "mcut/mcut.h"
@@ -110,10 +110,7 @@ int main(int argc, char* argv[])
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_DEBUG);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "error: could not create MCUT context (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 3. do the cutting
     // -----------------
@@ -133,20 +130,15 @@ int main(int argc, char* argv[])
         static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
         static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "error: dispatch call failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 4. query the number of available connected component (all types)
     // ----------------------------------------------------------------
 
     uint32_t numConnectedComponents;
-    std::vector<McConnectedComponent> connectedComponents;
 
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents);
-
-    assert(err != MC_NO_ERROR);
+    assert(err == MC_NO_ERROR);
 
     printf("connected components: %d\n", (int)numConnectedComponents);
 
@@ -155,30 +147,23 @@ int main(int argc, char* argv[])
         exit(0);
     }
 
-    connectedComponents.resize(numConnectedComponents);
-
+    std::vector<McConnectedComponent> connectedComponents(numConnectedComponents, 0);
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
-
-    assert(err != MC_NO_ERROR);
+    assert(err == MC_NO_ERROR);
 
     // 5. query the data of each connected component from MCUT
     // -------------------------------------------------------
 
     for (int i = 0; i < (int)connectedComponents.size(); ++i) {
         McConnectedComponent connComp = connectedComponents[i]; // connected compoenent id
-
         uint64_t numBytes = 0;
 
         // 5.1 query the number of vertices
         // --------------------------------
-
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-
         assert(err == MC_NO_ERROR);
-
         uint32_t ccVertexCount = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
-
         assert(err == MC_NO_ERROR);
 
         // 5.2 query the vertices
@@ -252,7 +237,7 @@ int main(int argc, char* argv[])
 
             err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &pathLocation, NULL);
             assert(err == MC_NO_ERROR);
-            name += pathLocation == MC_PATCH_LOCATION_INSIDE ? ".in" : (pathLocation == MC_PATCH_LOCATION_OUTSIDE ? ".out" : ".undef");
+            name += pathLocation == MC_PATCH_LOCATION_INSIDE ? ".inside" : (pathLocation == MC_PATCH_LOCATION_OUTSIDE ? ".outside" : ".undefined");
 
             if (isFragment) {
 
@@ -490,19 +475,13 @@ int main(int argc, char* argv[])
     // --------------------------------
     err = mcReleaseConnectedComponents(context, 0, NULL);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "mcReleaseConnectedComponents failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 7. destroy context
     // ------------------
     err = mcReleaseContext(context);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "mcReleaseContext failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     return 0;
 }

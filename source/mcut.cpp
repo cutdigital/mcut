@@ -1428,7 +1428,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         ctxtPtr->connComps.emplace(clientHandle, std::move(srcMeshSeam));
         McSeamedConnComp* asSrcMeshSeamPtr = dynamic_cast<McSeamedConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
-        asSrcMeshSeamPtr->origin = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH;
+        asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh);
     }
 
@@ -1440,7 +1440,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         ctxtPtr->connComps.emplace(clientHandle, std::move(cutMeshSeam));
         McSeamedConnComp* asCutMeshSeamPtr = dynamic_cast<McSeamedConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
-        asCutMeshSeamPtr->origin = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH;
+        asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh);
     }
