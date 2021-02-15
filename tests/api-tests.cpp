@@ -396,10 +396,10 @@ TEST_F(SeamedConnComp, querySeamedMeshOriginPartialCut)
     ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
     ASSERT_GT((int)numberOfVertices, 0);
 
-    McSeamOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+    McSeamOrigin orig = MC_SEAM_ORIGIN_ALL;
     ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
 
-    ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+    ASSERT_TRUE(orig == MC_SEAM_ORIGIN_CUTMESH);
 
     ASSERT_TRUE(numberOfVertices > numCutMeshVertices);
 }
@@ -442,12 +442,12 @@ TEST_F(SeamedConnComp, querySeamedMeshTypeCompleteCut)
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
         ASSERT_GT((int)numberOfVertices, 0);
 
-        McSeamOrigin orig = McSeamOrigin::MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+        McSeamOrigin orig = McSeamOrigin::MC_SEAM_ORIGIN_ALL;
         ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
 
-        ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH || orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+        ASSERT_TRUE(orig == MC_SEAM_ORIGIN_SRCMESH || orig == MC_SEAM_ORIGIN_CUTMESH);
 
-        if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
+        if (orig == MC_SEAM_ORIGIN_SRCMESH) {
             foundSeamedMeshFromSrcMesh = true;
             ASSERT_TRUE(numberOfVertices > numSrcMeshVertices);
 
@@ -684,13 +684,13 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
         } break;
         case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM: {
             // find out where it comes from (source-mesh or cut-mesh)
-            McSeamOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+            McSeamOrigin orig = MC_SEAM_ORIGIN_ALL;
             ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
 
-            if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
+            if (orig == MC_SEAM_ORIGIN_SRCMESH) {
                 testSrcMeshCC();
             } else {
-                ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+                ASSERT_TRUE(orig == MC_SEAM_ORIGIN_CUTMESH);
                 testPatchCC();
             }
         } break;
@@ -751,13 +751,13 @@ TEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMap)
         } break;
         case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM: {
             // find out where it comes from (source-mesh or cut-mesh)
-            McSeamOrigin orig = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL;
+            McSeamOrigin orig = MC_SEAM_ORIGIN_ALL;
             ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
 
-            if (orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH) {
+            if (orig == MC_SEAM_ORIGIN_SRCMESH) {
                 testSrcMeshCC();
             } else {
-                ASSERT_TRUE(orig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+                ASSERT_TRUE(orig == MC_SEAM_ORIGIN_CUTMESH);
                 testPatchCC();
             }
         } break;
@@ -1259,7 +1259,7 @@ TEST_F(mcDispatchFILTER, seamFromSrcMesh)
     ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
     McSeamOrigin origin;
     ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
-    ASSERT_EQ(origin, McSeamOrigin::MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH);
+    ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
 }
 
 TEST_F(mcDispatchFILTER, seamFromCutMesh)
@@ -1300,7 +1300,7 @@ TEST_F(mcDispatchFILTER, seamFromCutMesh)
     ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
     McSeamOrigin origin;
     ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
-    ASSERT_EQ(origin, McSeamOrigin::MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH);
+    ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
 }
 
 } //  namespace {

@@ -1349,7 +1349,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 MCUT_ASSERT(asFragPtr->patchLocation != MC_PATCH_LOCATION_UNDEFINED);
 
                 // Note: the last CC is always guarranteed to be fully sealed (see: "include_fragment_sealed_partial" in kernel)!
-                bool is_last_cc = std::distance(j->second.cbegin(), k) == j->second.size() - 1;
+                bool is_last_cc = (size_t)std::distance(j->second.cbegin(), k) == (size_t)(j->second.size() - 1);
 
                 if (is_last_cc) {
                     asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;

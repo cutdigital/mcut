@@ -592,7 +592,7 @@ mesh_t extract_connected_components(
     // keep this CC or throw it away, as per user flags.
     std::map<size_t, bool> ccID_to_keepFlag;
     for (std::map<size_t, mesh_t>::const_iterator it = ccID_to_mesh.cbegin(); it != ccID_to_mesh.cend(); ++it) {
-        int ccID = it->first;
+        int ccID = (int)it->first;
         std::map<std::size_t, connected_component_location_t>::iterator fiter = ccID_to_cs_descriptor.find(ccID);
         const bool isSeam = (fiter == ccID_to_cs_descriptor.cend()); // Seams have no notion of "location"
         ccID_to_keepFlag[ccID] = isSeam || ((keep_fragments_above_cutmesh && fiter->second == connected_component_location_t::ABOVE) || //
@@ -9905,7 +9905,7 @@ void dispatch(output_t& output, const input_t& input)
                 std::pair<mesh_t, connected_component_info_t>& cc_instance = *cc_instance_iter;
 
                 if (input.verbose) {
-                    const int idx = std::distance(cc_instances.begin(), cc_instance_iter);
+                    const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
                     dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
                 }
 
