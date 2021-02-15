@@ -140,7 +140,7 @@ typedef enum McResult {
 typedef enum McConnectedComponentType {
     MC_CONNECTED_COMPONENT_TYPE_FRAGMENT = (1 << 0), /**< A connected component which is originates from the source-mesh. */
     MC_CONNECTED_COMPONENT_TYPE_PATCH = (1 << 2), /**< A connected component which is originates from the cut-mesh. */
-    MC_CONNECTED_COMPONENT_TYPE_SEAMED = (1 << 3), /**< A connected component which is the same as either the source-mesh or the cut-mesh, but with additional edges defining the intersection contour (seam). */
+    MC_CONNECTED_COMPONENT_TYPE_SEAM = (1 << 3), /**< A connected component which is the same as either the source-mesh or the cut-mesh, but with additional edges defining the intersection contour (seam). */
     MC_CONNECTED_COMPONENT_TYPE_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McConnectedComponentType;
 
@@ -184,16 +184,16 @@ typedef enum McPatchLocation {
 } McPatchLocation;
 
 /**
- * \enum McSeamedConnectedComponentOrigin
+ * \enum McSeamOrigin
  * @brief Input mesh from which a seamed connected component is derived.
  *
  * This enum structure defines the possible origins of a seamed connected component, which can be either the source-mesh or the cut-mesh. 
  */
-typedef enum McSeamedConnectedComponentOrigin {
-    MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH = 1 << 0, /**< Seamed connected component from the input source mesh. */
-    MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH = 1 << 1, /**< Seamed connected component from the input cut mesh. */
-    MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
-} McSeamedConnectedComponentOrigin;
+typedef enum McSeamOrigin {
+    MC_SEAM_ORIGIN_SRCMESH = 1 << 0, /**< Seam connected component from the input source mesh. */
+    MC_SEAM_ORIGIN_CUTMESH = 1 << 1, /**< Seam connected component from the input cut mesh. */
+    MC_SEAM_ORIGIN_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
+} McSeamOrigin;
 
 /**
  * \enum McConnectedComponentData

@@ -253,7 +253,7 @@ int main(int argc, char* argv[])
         McFragmentLocation fragmentLocation = (McFragmentLocation)0;
         McPatchLocation pathLocation = (McPatchLocation)0;
         bool isFragment = false;
-        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             name += "seam";
         } else {
             isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
         bool ccIsBirthedFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
         // its not a fragment && its a seam cc
-        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             // get origin
             McSeamedConnectedComponentOrigin ccOrig;
             err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamedConnectedComponentOrigin), &ccOrig, NULL);

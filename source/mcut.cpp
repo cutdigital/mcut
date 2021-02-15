@@ -170,7 +170,7 @@ struct McPatchConnComp : public McConnCompBase {
 };
 
 struct McSeamedConnComp : public McConnCompBase {
-    McSeamedConnectedComponentOrigin origin;
+    McSeamOrigin origin;
 };
 
 template <typename Derived>
@@ -1427,7 +1427,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(srcMeshSeam.get());
         ctxtPtr->connComps.emplace(clientHandle, std::move(srcMeshSeam));
         McSeamedConnComp* asSrcMeshSeamPtr = dynamic_cast<McSeamedConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
-        asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAMED;
+        asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH;
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh);
     }
@@ -1439,7 +1439,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(cutMeshSeam.get());
         ctxtPtr->connComps.emplace(clientHandle, std::move(cutMeshSeam));
         McSeamedConnComp* asCutMeshSeamPtr = dynamic_cast<McSeamedConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
-        asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAMED;
+        asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_CUT_MESH;
 
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh);
@@ -1886,22 +1886,22 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     } break;
         //
     case MC_CONNECTED_COMPONENT_DATA_ORIGIN: {
-        if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_SEAMED) {
+        if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid connected component type");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
 
         if (pMem == nullptr) {
-            *pNumBytes = sizeof(McSeamedConnectedComponentOrigin);
+            *pNumBytes = sizeof(McSeamOrigin);
         } else {
-            if (bytes > sizeof(McSeamedConnectedComponentOrigin)) {
+            if (bytes > sizeof(McSeamOrigin)) {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
-            if (bytes % sizeof(McSeamedConnectedComponentOrigin) != 0) {
+            if (bytes % sizeof(McSeamOrigin) != 0) {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
