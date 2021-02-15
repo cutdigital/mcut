@@ -1,3 +1,8 @@
+/*
+This tutorial shows how to propagate per-face texture coordinates from input meshes and onto the output
+connected components after cutting.
+*/
+
 #include "mcut/mcut.h"
 
 #include <map>
@@ -21,12 +26,14 @@ struct InputMesh {
     Eigen::MatrixXi F;
     std::vector<std::tuple<std::string, unsigned, unsigned>> FM;
 
-    std::string fpath;
-    std::vector<uint32_t> faceSizesArray; // number of ccVertices in each face in "F"
-    std::vector<uint32_t> faceIndicesArray;
-    std::vector<double> vertexCoordsArray;
+    // variables for mesh data in a format suited for MCUT
+    std::string fpath; // path to mesh file
+    std::vector<uint32_t> faceSizesArray; // vertices per face
+    std::vector<uint32_t> faceIndicesArray; // face indices
+    std::vector<double> vertexCoordsArray; // vertex coords
 };
 
+// basic comparison of doubles
 bool compare(double x, double y)
 {
     return std::fabs(x - y) < 1e-6;
@@ -43,6 +50,7 @@ int main(int argc, char* argv[])
     // -----------------
     InputMesh srcMesh;
 
+    // read file
     srcMesh.fpath = DATA_DIR "/a.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
@@ -51,13 +59,16 @@ int main(int argc, char* argv[])
         std::exit(1);
     }
 
+    // copy vertices
     for (int i = 0; i < srcMesh.V.rows(); ++i) {
         const Eigen::Vector3d& v = srcMesh.V.row(i);
+        assert(v.size() == 3);
         srcMesh.vertexCoordsArray.push_back(v.x());
         srcMesh.vertexCoordsArray.push_back(v.y());
         srcMesh.vertexCoordsArray.push_back(v.z());
     }
 
+    // copy faces
     for (int i = 0; i < srcMesh.F.rows(); ++i) {
         const Eigen::VectorXi& f = srcMesh.F.row(i);
         srcMesh.faceIndicesArray.push_back(f.x());
@@ -69,6 +80,8 @@ int main(int argc, char* argv[])
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.rows(), (int)srcMesh.F.rows());
 
     InputMesh cutMesh;
+
+    // read file
     cutMesh.fpath = DATA_DIR "/b.obj";
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.UV_V, cutMesh.corner_normals, cutMesh.F, cutMesh.UV_F, cutMesh.fNormIndices);
 
@@ -77,6 +90,7 @@ int main(int argc, char* argv[])
         std::exit(1);
     }
 
+    // copy vertices
     for (int i = 0; i < cutMesh.V.rows(); ++i) {
         const Eigen::Vector3d& v = cutMesh.V.row(i);
         cutMesh.vertexCoordsArray.push_back(v.x());
@@ -84,6 +98,7 @@ int main(int argc, char* argv[])
         cutMesh.vertexCoordsArray.push_back(v.z());
     }
 
+    // copy faces
     for (int i = 0; i < cutMesh.F.rows(); ++i) {
         const Eigen::VectorXi& f = cutMesh.F.row(i);
         cutMesh.faceIndicesArray.push_back(f.x());
@@ -99,10 +114,7 @@ int main(int argc, char* argv[])
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_DEBUG);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "error: could not create MCUT context (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 3. do the cutting
     // -----------------
@@ -122,44 +134,31 @@ int main(int argc, char* argv[])
         static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
         static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "error: dispatch call failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 4. query the number of available connected component (all types)
     // -------------------------------------------------------------
-    uint32_t numConnComps;
-    std::vector<McConnectedComponent> connComps;
+    uint32_t numConnectedComponents;
 
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
+    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents);
+    assert(err == MC_NO_ERROR);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "1:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    printf("connected components: %d\n", (int)numConnectedComponents);
 
-    printf("connected components: %d\n", (int)numConnComps);
-
-    if (numConnComps == 0) {
+    if (numConnectedComponents == 0) {
         fprintf(stdout, "no connected components found\n");
         exit(0);
     }
 
-    connComps.resize(numConnComps);
-
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps.size(), connComps.data(), NULL);
-
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "2:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    std::vector<McConnectedComponent> connectedComponents(numConnectedComponents, 0);
+    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
+    assert(err == MC_NO_ERROR);
 
     // 5. query the data of each connected component from MCUT
     // -------------------------------------------------------
 
-    for (int i = 0; i < (int)connComps.size(); ++i) {
-        McConnectedComponent connComp = connComps[i]; // connected compoenent id
+    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+        McConnectedComponent connComp = connectedComponents[i]; // connected compoenent id
 
         uint64_t numBytes = 0;
 
@@ -167,173 +166,107 @@ int main(int argc, char* argv[])
         // --------------------------------
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
+        assert(err == MC_NO_ERROR);
         uint32_t ccVertexCount = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.2 query the ccVertices
-        // ----------------------
+        // ------------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        std::vector<double> ccVertices;
-        ccVertices.resize(ccVertexCount * 3u);
-
+        assert(err == MC_NO_ERROR);
+        std::vector<double> ccVertices(ccVertexCount * 3u, 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.3 query the faces
         // -------------------
-
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        std::vector<uint32_t> ccFaceIndices;
-        ccFaceIndices.resize(numBytes / sizeof(uint32_t));
-
+        assert(err == MC_NO_ERROR);
+        std::vector<uint32_t> ccFaceIndices(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.4 query the face sizes
         // ------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        std::vector<uint32_t> faceSizes;
+        assert(err == MC_NO_ERROR);
+        std::vector<uint32_t> faceSizes(numBytes / sizeof(uint32_t), 0);
         faceSizes.resize(numBytes / sizeof(uint32_t));
-
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.5 query the vertex map
         // ------------------------
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes);
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        std::vector<uint32_t> ccVertexMap;
-        ccVertexMap.resize(numBytes / sizeof(uint32_t));
-
+        assert(err == MC_NO_ERROR);
+        std::vector<uint32_t> ccVertexMap(numBytes / sizeof(uint32_t));
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, numBytes, ccVertexMap.data(), NULL);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        assert(err == MC_NO_ERROR);
 
         // 5.5 query the face map
         // ------------------------
         const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
-
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        std::vector<uint32_t> ccFaceMap;
-        ccFaceMap.resize(numBytes / sizeof(uint32_t));
-
+        assert(err == MC_NO_ERROR);
+        std::vector<uint32_t> ccFaceMap(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
+        assert(err == MC_NO_ERROR);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_MAP) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
+        // 6 resolve fragment name
+        // -------------------------
+
+        // Here we create a name the connected component based on its properties
 
         // get type
         McConnectedComponentType ccType;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &ccType, NULL);
+        assert(err == MC_NO_ERROR);
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_TYPE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        /// ------------------------------------------------------------------------------------
-
-        // Here we just build the name of each connected component based on its properties
         std::string name;
+        McFragmentLocation fragmentLocation = (McFragmentLocation)0;
+        McPatchLocation pathLocation = (McPatchLocation)0;
+        bool isFragment = false;
+
         if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             name += "seam";
         } else {
-            bool isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
-            name += isFragment ? "frg" : "ptch";
+            isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+            name += isFragment ? "frag" : "patch";
 
-            McPatchLocation ploc = (McPatchLocation)0;
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &ploc, NULL);
+            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &pathLocation, NULL);
             assert(err == MC_NO_ERROR);
-            name += ploc == MC_PATCH_LOCATION_INSIDE ? ".ins" : (ploc == MC_PATCH_LOCATION_OUTSIDE ? ".out" : ".ndef");
+            name += pathLocation == MC_PATCH_LOCATION_INSIDE ? ".inside" : (pathLocation == MC_PATCH_LOCATION_OUTSIDE ? ".outside" : ".undefined");
 
             if (isFragment) {
-                McFragmentLocation floc = (McFragmentLocation)0;
-                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &floc, NULL);
+
+                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &fragmentLocation, NULL);
                 assert(err == MC_NO_ERROR);
-                name += floc == MC_FRAGMENT_LOCATION_ABOVE ? ".abv" : ".blw";
+                name += fragmentLocation == MC_FRAGMENT_LOCATION_ABOVE ? ".above" : ".below"; // missing loc="undefined" case
 
                 McFragmentSealType sType = (McFragmentSealType)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sType, NULL);
                 assert(err == MC_NO_ERROR);
-                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".cmplt" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".prtl" : ".none");
+                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".partial" : ".none");
             }
         }
-        // otherwise is from cut mesh
-        bool ccIsBirthedFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
-        // its not a fragment && its a seam cc
-        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
+        bool ccIsFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+
+        // connected-components is not a fragment && it is a seam
+        if (!ccIsFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             // get origin
-            McSeamOrigin ccOrig;
+            McSeamOrigin ccOrig = (McSeamOrigin)0;
             err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
+            assert(err = MC_NO_ERROR);
 
-            if (err != MC_NO_ERROR) {
-                fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_ORIGIN) failed (err=%d)\n", (int)err);
-                exit(1);
-            }
-
-            ccIsBirthedFromSrcMesh = (ccOrig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH);
-            name += ccIsBirthedFromSrcMesh ? ".sm" : ".cm";
+            ccIsFromSrcMesh = (ccOrig == McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
+            name += ccIsFromSrcMesh ? ".sm" : ".cm";
         }
 
         int faceVertexOffsetBase = 0;
@@ -390,9 +323,9 @@ int main(int argc, char* argv[])
 
                     // 1. get the origin face of the current cc face
 
-                    double x(ccVertices[(ccVertexIdx * 3) + 0]);
-                    double y(ccVertices[(ccVertexIdx * 3) + 1]);
-                    double z(ccVertices[(ccVertexIdx * 3) + 2]);
+                    double x(ccVertices[((uint64_t)ccVertexIdx * 3) + 0]);
+                    double y(ccVertices[((uint64_t)ccVertexIdx * 3) + 1]);
+                    double z(ccVertices[((uint64_t)ccVertexIdx * 3) + 2]);
 
                     // vertices of the origin face
                     const Eigen::Vector3d& a = inputMeshPtr->V.row(imFace.x());
@@ -452,7 +385,7 @@ int main(int argc, char* argv[])
 
                 std::vector<Eigen::Vector2d>::const_iterator fiter = std::find_if(
                     ccTexCoords.cbegin(), ccTexCoords.cend(),
-                    [&](const Eigen::Vector3d& e) { return compare(e.x(), texCoord.x()) && compare(e.y(), texCoord.y()); });
+                    [&](const Eigen::Vector2d& e) { return compare(e.x(), texCoord.x()) && compare(e.y(), texCoord.y()); });
 
                 if (fiter != ccTexCoords.cend()) {
                     texCoordIndex = std::distance(ccTexCoords.cbegin(), fiter);
@@ -472,21 +405,21 @@ int main(int argc, char* argv[])
         // save cc mesh to .obj file
         // -------------------------
 
-        char fnameBuf[32];
+        char fnameBuf[64];
         sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), i);
         std::string fname(fnameBuf);
         std::string fpath(DATA_DIR "/" + fname);
         printf("write file: %s\n", fpath.c_str());
         std::ofstream file(fpath);
 
-        file << (ccIsBirthedFromSrcMesh ? "mtllib a.mtl" : "mtllib b.mtl") << std::endl;
+        file << (ccIsFromSrcMesh ? "mtllib a.mtl" : "mtllib b.mtl") << std::endl;
 
         // write vertices
         for (int i = 0; i < ccVertexCount; ++i) {
             double x = ccVertices[(uint64_t)i * 3 + 0];
             double y = ccVertices[(uint64_t)i * 3 + 1];
             double z = ccVertices[(uint64_t)i * 3 + 2];
-            file << "v " << x << " " << y << " " << z << std::endl;
+            file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
         }
 
         // write tex coords (including duplicates i.e. per face texture coords)
@@ -517,19 +450,13 @@ int main(int argc, char* argv[])
     // --------------------------------
     err = mcReleaseConnectedComponents(context, 0, NULL);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "mcReleaseConnectedComponents failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     // 7. destroy context
     // ------------------
     err = mcReleaseContext(context);
 
-    if (err != MC_NO_ERROR) {
-        fprintf(stderr, "mcReleaseContext failed (err=%d)\n", (int)err);
-        exit(1);
-    }
+    assert(err == MC_NO_ERROR);
 
     return 0;
 }

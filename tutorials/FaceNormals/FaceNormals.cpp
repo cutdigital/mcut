@@ -1,5 +1,5 @@
 /*
-This tutorial show how to propagate per-face normals (flat shading) from input meshes and onto the output 
+This tutorial shows how to propagate per-face normals (flat shading) from input meshes and onto the output 
 connected components after cutting.
 */
 
