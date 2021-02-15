@@ -1,5 +1,5 @@
 /*
-  Tutorial on how to compute a boolean operation using MCUT.
+This tutorial shows how to compute boolean operations using MCUT.
 */
 
 #include "mcut/mcut.h"
@@ -16,23 +16,16 @@
 #include <igl/writeOBJ.h>
 
 struct InputMesh {
-    std::vector<std::vector<double>> V // positions
-        ,
-        TC // texture coordinates (unused)
-        ,
-        N; // per vertex normals (unused)
-
-    std::vector<std::vector<int>> F // faces which are assumed to be triangles for simplicity
-        ,
-        FTC // per-face texture coordinate indices (unused)
-        ,
-        FN; // per-face normal indices (unused)
+    // variables for reading .obj file data with libigl
+    std::vector<std::vector<double>> V, TC, N;
+    std::vector<std::vector<int>> F, FTC, FN;
     std::vector<std::tuple<std::string, unsigned, unsigned>> FM;
 
-    std::string fpath;
-    std::vector<uint32_t> faceSizesArray; // number of ccVertices in each face in "F"
-    std::vector<uint32_t> faceIndicesArray;
-    std::vector<double> vertexCoordsArray;
+    // variables for mesh data in a format suited for MCUT
+    std::string fpath; // path to mesh file
+    std::vector<uint32_t> faceSizesArray; // vertices per face
+    std::vector<uint32_t> faceIndicesArray; // face indices
+    std::vector<double> vertexCoordsArray; // vertex coords
 };
 
 int main(int argc, char* argv[])
@@ -49,7 +42,8 @@ int main(int argc, char* argv[])
         std::exit(1);
     }
 
-    for (int i = 0; i < srcMesh.V.size(); ++i) {
+    // copy vertices
+    for (int i = 0; i < (int)srcMesh.V.size(); ++i) {
         const std::vector<double>& v = srcMesh.V[i];
         assert(v.size() == 3);
         srcMesh.vertexCoordsArray.push_back(v[0]);
@@ -57,6 +51,7 @@ int main(int argc, char* argv[])
         srcMesh.vertexCoordsArray.push_back(v[2]);
     }
 
+    // copy faces
     for (int i = 0; i < srcMesh.F.size(); ++i) {
         const std::vector<int>& f = srcMesh.F[i];
         for (int j = 0; j < f.size(); ++j) {
@@ -77,6 +72,7 @@ int main(int argc, char* argv[])
         std::exit(1);
     }
 
+    // copy vertices
     for (int i = 0; i < cutMesh.V.size(); ++i) {
         const std::vector<double>& v = cutMesh.V[i];
         assert(v.size() == 3);
@@ -85,9 +81,9 @@ int main(int argc, char* argv[])
         cutMesh.vertexCoordsArray.push_back(v[2]);
     }
 
+    // copy faces
     for (int i = 0; i < cutMesh.F.size(); ++i) {
         const std::vector<int>& f = cutMesh.F[i];
-        assert(f.size() == 3); // tutorial assume's triangle meshes for simplicity
         for (int j = 0; j < f.size(); ++j) {
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
@@ -103,84 +99,90 @@ int main(int argc, char* argv[])
     McResult err = mcCreateContext(&context, MC_DEBUG);
     assert(err == MC_NO_ERROR);
 
-    // 3. do the cutting
-    // -----------------
-    err = mcDispatch(
-        context,
-        MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP,
-        // source mesh
-        reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
-        reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
-        srcMesh.faceSizesArray.data(),
-        static_cast<uint32_t>(srcMesh.vertexCoordsArray.size() / 3),
-        static_cast<uint32_t>(srcMesh.faceSizesArray.size()),
-        // cut mesh
-        reinterpret_cast<const void*>(cutMesh.vertexCoordsArray.data()),
-        cutMesh.faceIndicesArray.data(),
-        cutMesh.faceSizesArray.data(),
-        static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
-        static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
+    // 3. do the cutting (boolean ops)
+    // -------------------------------
+    printf("\nInputs: \n\tShape A = 'cube.obj'.\n\tShape B = 'torus.obj'\n\n");
 
-    assert(err == MC_NO_ERROR);
+    // We can either let MCUT compute all possible meshes (including patches etc.), or we can
+    // constrain the library to compute exactly the boolean op mesh we want. This constrained case
+    // is done with the following flags.
+    const std::map<std::string, McFlags> booleanOps = {
+        { "A_NOT_B", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE },
+        { "B_NOT_A", MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW },
+        { "UNION", MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE },
+        { "INTERSECTION", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW }
+    };
 
-    // 4. query the number of available connected component (all types)
-    // -------------------------------------------------------------
-    uint32_t numConnComps;
-    std::vector<McConnectedComponent> connComps;
+    for (std::map<std::string, McFlags>::const_iterator boolOpIter = booleanOps.cbegin(); boolOpIter != booleanOps.cend(); ++boolOpIter) {
+        const McFlags boolOpFlags = boolOpIter->second;
+        const std::string boolOpName = boolOpIter->first;
 
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
+        printf("compute %s\n", boolOpName.c_str());
 
-    assert(err == MC_NO_ERROR);
-
-    printf("connected components: %d\n", (int)numConnComps);
-
-    if (numConnComps == 0) {
-        fprintf(stdout, "no connected components found\n");
-        exit(0);
-    }
-
-    connComps.resize(numConnComps);
-
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps.size(), connComps.data(), NULL);
-
-    assert(err == MC_NO_ERROR);
-
-    // 5. query the data of each connected component from MCUT
-    // -------------------------------------------------------
-
-    for (int i = 0; i < (int)connComps.size(); ++i) {
-        McConnectedComponent connComp = connComps[i]; // connected compoenent id
-
-        uint64_t numBytes = 0;
-
-        // 5.1 query the number of ccVertices
-        // --------------------------------
-
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
+        err = mcDispatch(
+            context,
+            MC_DISPATCH_VERTEX_ARRAY_DOUBLE | boolOpFlags,
+            // source mesh
+            reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
+            reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
+            srcMesh.faceSizesArray.data(),
+            static_cast<uint32_t>(srcMesh.vertexCoordsArray.size() / 3),
+            static_cast<uint32_t>(srcMesh.faceSizesArray.size()),
+            // cut mesh
+            reinterpret_cast<const void*>(cutMesh.vertexCoordsArray.data()),
+            cutMesh.faceIndicesArray.data(),
+            cutMesh.faceSizesArray.data(),
+            static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
+            static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
 
         assert(err == MC_NO_ERROR);
 
-        uint32_t ccVertexCount = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
+        // 4. query the number of available connected component (all types)
+        // -------------------------------------------------------------
+        uint32_t numConnComps;
 
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
+        err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
+        assert(err == MC_NO_ERROR);
+
+        printf("connected components: %d\n", (int)numConnComps);
+
+        if (numConnComps == 0) {
+            fprintf(stdout, "no connected components found\n");
+            exit(0);
         }
 
-        // 5.2 query the ccVertices
+        assert(numConnComps == 1); // exactly 1 result (for this example)
+
+        std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
+
+        connectedComponents.resize(numConnComps);
+        err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
+
+        assert(err == MC_NO_ERROR);
+
+        // 5. query the data of each connected component from MCUT
+        // -------------------------------------------------------
+
+        McConnectedComponent connComp = connectedComponents[0];
+        uint64_t numBytes = 0;
+
+        // 5.1 query the number of vertices
+        // --------------------------------
+
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
+        assert(err == MC_NO_ERROR);
+        uint32_t ccVertexCount = 0;
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
+        assert(err == MC_NO_ERROR);
+
+        // 5.2 query the vertices
         // ----------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
-
         assert(err == MC_NO_ERROR);
-
-        std::vector<double> ccVertices;
-        ccVertices.resize(ccVertexCount * 3u);
-
+        std::vector<double> ccVertices((uint64_t)ccVertexCount * 3u, 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
-
         assert(err == MC_NO_ERROR);
 
         // 5.3 query the faces
@@ -188,14 +190,9 @@ int main(int argc, char* argv[])
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
-
         assert(err == MC_NO_ERROR);
-
-        std::vector<uint32_t> ccFaceIndices;
-        ccFaceIndices.resize(numBytes / sizeof(uint32_t));
-
+        std::vector<uint32_t> ccFaceIndices(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
-
         assert(err == MC_NO_ERROR);
 
         // 5.4 query the face sizes
@@ -203,90 +200,37 @@ int main(int argc, char* argv[])
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
         assert(err == MC_NO_ERROR);
-
-        std::vector<uint32_t> faceSizes;
-        faceSizes.resize(numBytes / sizeof(uint32_t));
-
+        std::vector<uint32_t> faceSizes(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
-
         assert(err == MC_NO_ERROR);
 
         // 5.5 query the face map
         // ------------------------
         const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
 
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
+        /// ------------------------------------------------------------------------------------
 
+        // Here we show, how to know when connected components, pertain particular boolean operations.
+
+        McPatchLocation patchLocation = (McPatchLocation)0;
+
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL);
         assert(err == MC_NO_ERROR);
 
-        std::vector<uint32_t> ccFaceMap;
-        ccFaceMap.resize(numBytes / sizeof(uint32_t));
-
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
-
-        assert(err == MC_NO_ERROR);
-
-        // get type
-        McConnectedComponentType ccType;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &ccType, NULL);
-
+        McFragmentLocation fragmentLocation = (McFragmentLocation)0;
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &fragmentLocation, NULL);
         assert(err == MC_NO_ERROR);
 
         uint32_t ccEdgeCount = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT, sizeof(uint32_t), &ccEdgeCount, NULL);
 
-        /// ------------------------------------------------------------------------------------
-
-        // Here we just build the name of each connected component based on its properties
-        std::string name;
-        McFragmentLocation fragmentLocation = (McFragmentLocation)0;
-        McPatchLocation pathLocation = (McPatchLocation)0;
-        bool isFragment = false;
-        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
-            name += "seam";
-        } else {
-            isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
-            name += isFragment ? "frg" : "ptch";
-
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &pathLocation, NULL);
-            assert(err == MC_NO_ERROR);
-            name += pathLocation == MC_PATCH_LOCATION_INSIDE ? ".ins" : (pathLocation == MC_PATCH_LOCATION_OUTSIDE ? ".out" : ".ndef");
-
-            if (isFragment) {
-
-                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &fragmentLocation, NULL);
-                assert(err == MC_NO_ERROR);
-                name += fragmentLocation == MC_FRAGMENT_LOCATION_ABOVE ? ".abv" : ".blw"; // missing loc="undefined" case
-
-                McFragmentSealType sType = (McFragmentSealType)0;
-                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sType, NULL);
-                assert(err == MC_NO_ERROR);
-                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".cmplt" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".prtl" : ".none");
-            }
-        }
-
-        bool ccIsBirthedFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
-
-        // its not a fragment && its a seam cc
-        if (!ccIsBirthedFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
-            // get origin
-            McSeamOrigin ccOrig;
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
-
-            assert(err == MC_NO_ERROR);
-
-            ccIsBirthedFromSrcMesh = (ccOrig == MC_SEAMED_CONNECTED_COMPONENT_ORIGIN_SRC_MESH);
-            name += ccIsBirthedFromSrcMesh ? ".sm" : ".cm";
-        }
-
         // save cc mesh to .obj file
         // -------------------------
 
-        char fnameBuf[32];
-        sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), i);
-        std::string fname(fnameBuf);
-        std::string fpath(DATA_DIR "/" + fname);
+        std::string fpath(DATA_DIR "/" + boolOpName + ".obj");
+
         printf("write file: %s\n", fpath.c_str());
+
         std::ofstream file(fpath);
 
         // write vertices and normals
@@ -301,23 +245,7 @@ int main(int argc, char* argv[])
 
         // for each face in CC
         for (int f = 0; f < ccFaceCount; ++f) {
-
-            // input mesh face index (which may be offsetted!)
-            const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
-            // input mesh face index (actual index value, accounting for offset)
-            uint32_t imFaceIdx = imFaceIdxRaw;
-            bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.size());
-
-            if (!faceIsFromSrcMesh) {
-                imFaceIdx = imFaceIdxRaw - srcMesh.F.size(); // accounting for offset
-            }
-
-            assert(err == MC_NO_ERROR);
-
-            // https://en.wikipedia.org/wiki/Euler_characteristic
-            //bool isWaterTight = (ccVertexCount + ccFaceCount - ccEdgeCount) == 2;
-            bool reverseWindingOrder = (isFragment /*&& isWaterTight*/ && fragmentLocation == MC_FRAGMENT_LOCATION_BELOW && pathLocation == MC_PATCH_LOCATION_OUTSIDE);
-
+            bool reverseWindingOrder = (fragmentLocation == MC_FRAGMENT_LOCATION_BELOW) && (patchLocation == MC_PATCH_LOCATION_OUTSIDE);
             int faceSize = faceSizes.at(f);
             file << "f ";
             // for each vertex in face
@@ -330,14 +258,13 @@ int main(int argc, char* argv[])
             file << std::endl;
 
             faceVertexOffsetBase += faceSize;
-        } // for (int f = 0; f < ccFaceCount; ++f) {
+        }
+
+        // 6. free connected component data
+        // --------------------------------
+        err = mcReleaseConnectedComponents(context, connectedComponents.size(), connectedComponents.data());
+        assert(err == MC_NO_ERROR);
     }
-
-    // 6. free connected component data
-    // --------------------------------
-    err = mcReleaseConnectedComponents(context, 0, NULL);
-
-    assert(err == MC_NO_ERROR);
 
     // 7. destroy context
     // ------------------
