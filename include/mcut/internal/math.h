@@ -233,18 +233,18 @@ namespace math {
         matrix_t(int rows, int cols)
             : m_row_count(rows)
             , m_column_count(cols)
-            , m_entries(std::vector<int>(rows * cols, 0))
+            , m_entries(std::vector<int>((size_t)rows * cols, 0))
         {
         }
 
         int& operator()(int i, int j)
         {
-            return m_entries[j * m_row_count + i];
+            return m_entries[(size_t)j * m_row_count + i];
         }
 
         int operator()(int i, int j) const
         {
-            return m_entries[j * m_row_count + i];
+            return m_entries[(size_t)j * m_row_count + i];
         }
 
         matrix_t operator*(const matrix_t& rhs) const

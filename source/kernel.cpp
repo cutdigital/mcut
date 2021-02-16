@@ -1711,7 +1711,7 @@ void dispatch(output_t& output, const input_t& input)
 
         MCUT_ASSERT(bvh_real_node_count >= real_leaf_node_count);
 
-        bvh.resize((size_t)(bvh_real_node_count - real_leaf_node_count)); // internal nodes stored separately from leafs
+        bvh.resize(((size_t)bvh_real_node_count - real_leaf_node_count)); // internal nodes stored separately from leafs
 
         const int leaf_level_index = bvh::get_leaf_level_from_real_leaf_count(real_leaf_node_count);
 
@@ -5912,7 +5912,7 @@ void dispatch(output_t& output, const input_t& input)
             const int i = (int)std::distance(traced_sm_polygon.cbegin(), traced_sm_polygon_halfedge_iter);
 
             const hd_t& cur = traced_sm_polygon.at(i);
-            const hd_t& next = traced_sm_polygon.at((i + 1) % traced_sm_polygon.size());
+            const hd_t& next = traced_sm_polygon.at(((size_t)i + 1) % traced_sm_polygon.size());
             m0.set_next(cur, next); // update state
         }
     }
