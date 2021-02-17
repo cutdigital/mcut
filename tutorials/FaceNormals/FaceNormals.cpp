@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
 
         std::string name;
         McFragmentLocation fragmentLocation = (McFragmentLocation)0;
-        McPatchLocation pathLocation = (McPatchLocation)0;
+        McPatchLocation patchLocation = (McPatchLocation)0;
         bool isFragment = false;
 
         if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
@@ -237,7 +237,7 @@ int main(int argc, char* argv[])
 
             err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &pathLocation, NULL);
             assert(err == MC_NO_ERROR);
-            name += pathLocation == MC_PATCH_LOCATION_INSIDE ? ".inside" : (pathLocation == MC_PATCH_LOCATION_OUTSIDE ? ".outside" : ".undefined");
+            name += patchLocation == MC_PATCH_LOCATION_INSIDE ? ".inside" : (patchLocation == MC_PATCH_LOCATION_OUTSIDE ? ".outside" : ".undefined");
 
             if (isFragment) {
 

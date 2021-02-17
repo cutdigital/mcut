@@ -20,20 +20,38 @@
  * Author(s)     : Floyd M. Chitalu
  */
 
-
 #ifndef MCUT_UTILS_H_
 #define MCUT_UTILS_H_
 
-#define stringize(s) #s
-#define XSTR(s) stringize(s)
+#if defined(_WIN64) || defined(_WIN32)
+#define MCUT_BUILD_WINDOWS 1
+#elif defined(__APPLE__)
+#define MCUT_BUILD_APPLE 1
+#elif defined(__linux__) || defined(__unix__)
+#define MCUT_BUILD_LINUX 1
+#endif // #if defined(_WIN64) || defined(_WIN32)
 
-#if WIN32
-#define MCUT_DEBUG_BREAKPOINT() __debugbreak()
-#else
-
-#endif
+#define MCUT_MAKE_STRING__(s) #s
+#define MCUT_MAKE_STRING_(s) MCUT_MAKE_STRING__(s)
 
 #ifndef NDEBUG
+#define MCUT_DEBUG_BUILD 1
+#endif
+
+// debug macros
+#if defined(MCUT_DEBUG_BUILD)
+//
+// MCUT_DEBUG_BREAKPOINT
+//
+#if defined(MCUT_BUILD_WINDOWS)
+#define MCUT_DEBUG_BREAKPOINT_() __debugbreak()
+#else // #if defined(MCUT_BUILD_WINDOWS)
+#define MCUT_DEBUG_BREAKPOINT_()
+#endif // #if defined(MCUT_BUILD_WINDOWS)
+
+//
+// MCUT_ASSERT
+//
 #define MCUT_ASSERT(a)                   \
     do {                                 \
         if (0 == (a)) {                  \
@@ -42,13 +60,17 @@
                 "%d at \'%s\'\n",        \
                 __FILE__,                \
                 __LINE__,                \
-                XSTR(a));                \
-            MCUT_DEBUG_BREAKPOINT();                \
+                MCUT_MAKE_STRING_(a));   \
+            MCUT_DEBUG_BREAKPOINT_();    \
         }                                \
     } while (0)
-#else
+
+#else // #if defined(MCUT_DEBUG_BUILD)
+//
+// MCUT_ASSERT
+//
 #define MCUT_ASSERT(a) // do nothing
-#endif // !NDEBUG
+#endif // #if defined(MCUT_DEBUG_BUILD)
 
 #include <fstream>
 #include <iostream>
