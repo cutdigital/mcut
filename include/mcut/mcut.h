@@ -130,6 +130,7 @@ typedef enum McResult {
     MC_INVALID_OPERATION = -(1 << 4), /**< An internal operation could not be executed successively. */
     MC_INVALID_VALUE = -(1 << 5), /**< An invalid value has been passed to the API. */
     MC_OUT_OF_MEMORY = -(1 << 6), /** Memory allocation operation cannot allocate memory. */
+    MC_INVALID_MESH_PLACEMENT = -(1 << 7), /** At least one vertex in the source mesh has the same coordinates as another vertex in the cut-mesh, or vice-versa. */
     MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McResult;
 
@@ -700,13 +701,21 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
 *   -# \p pSrcMeshFaceSizes is NULL.
 *   -# \p numSrcMeshVertices is less than three.
 *   -# \p numSrcMeshFaces is less than one.
-* - ::MC_INVALID_CUT_MESH
+* - ::MC_INVALID_CUT_MESH 
 *   -# mesh is not a single connected component
 *   -# \p pCutMeshVertices is NULL.
 *   -# \p pCutMeshFaceIndices is NULL.
 *   -# \p pCutMeshFaceSizes is NULL.
 *   -# \p numCutMeshVertices is less than three.
 *   -# \p numCutMeshFaces is less than one.
+* - ::MC_EDGE_EDGE_INTERSECTION
+*   -# Found two intersection edges between the source-mesh and the cut-mesh.
+* - ::MC_FACE_VERTEX_INTERSECTION
+*   -# Intersection test between a face and an edge failed because an edge vertex touches (but does not penetrate) the face.
+* - ::MC_INVALID_MESH_PLACEMENT
+*   -# One or more source-mesh vertices are colocated with one or more cut-mesh vertices.
+* - ::MC_OUT_OF_MEMORY
+*   -# Insufficient memory to perform operation.
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     McContext context,

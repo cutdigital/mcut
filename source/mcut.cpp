@@ -35,10 +35,14 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(MCUT_BUILD_WINDOWS)
+#pragma warning(disable : 26812)
+#endif
+
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags convertRoundingMode(int rm)
 {
-    McRoundingModeFlags rmf = MC_ROUNDING_MODE_TO_NEAREST;
+    McRoundingModeFlags rmf = (McRoundingModeFlags)MC_ROUNDING_MODE_TO_NEAREST;
     switch (rm) {
     case FE_TONEAREST:
         rmf = MC_ROUNDING_MODE_TO_NEAREST;
@@ -53,7 +57,9 @@ McRoundingModeFlags convertRoundingMode(int rm)
         rmf = MC_ROUNDING_MODE_TOWARD_NEG_INF;
         break;
     default:
-        MCUT_ASSERT(false);
+#if defined(MCUT_DEBUG_BUILD)
+        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
+#endif
         break;
     }
     return rmf;
@@ -76,7 +82,9 @@ int convertRoundingMode(McRoundingModeFlags rm)
         f = FE_DOWNWARD;
         break;
     default:
-        MCUT_ASSERT(false);
+#if defined(MCUT_DEBUG_BUILD)
+        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
+#endif
         break;
     }
     return f;
@@ -99,7 +107,9 @@ McRoundingModeFlags convertRoundingMode(mp_rnd_t rm)
         rmf = MC_ROUNDING_MODE_TOWARD_NEG_INF;
         break;
     default:
-        break;
+#if defined(MCUT_DEBUG_BUILD)
+        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
+#endif
     }
     return rmf;
 }
@@ -121,7 +131,9 @@ mp_rnd_t convertRoundingMode(McRoundingModeFlags rm)
         f = MPFR_RNDD;
         break;
     default:
-        MCUT_ASSERT(false);
+#if defined(MCUT_DEBUG_BUILD)
+        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
+#endif
         break;
     }
     return f;
@@ -155,22 +167,23 @@ struct IndexArrayMesh {
 
 struct McConnCompBase {
     virtual ~McConnCompBase() {};
-    McConnectedComponentType type;
+    McConnectedComponentType type = (McConnectedComponentType)0;
     IndexArrayMesh indexArrayMesh;
 };
 
 struct McFragmentConnComp : public McConnCompBase {
-    McFragmentLocation fragmentLocation;
-    McFragmentSealType srcMeshSealType;
-    McPatchLocation patchLocation;
+    McFragmentLocation fragmentLocation = (McFragmentLocation)0;
+    McFragmentSealType srcMeshSealType = (McFragmentSealType)0;
+    McPatchLocation patchLocation = (McPatchLocation)0;
 };
 
 struct McPatchConnComp : public McConnCompBase {
-    McPatchLocation patchLocation;
+    McPatchLocation patchLocation = (McPatchLocation)0;
+    ;
 };
 
-struct McSeamedConnComp : public McConnCompBase {
-    McSeamOrigin origin;
+struct McSeamConnComp : public McConnCompBase {
+    McSeamOrigin origin = (McSeamOrigin)0;
 };
 
 template <typename Derived>
@@ -184,8 +197,8 @@ struct McDispatchContextInternal {
 
     // state & dispatch flags
     // -----
-    McFlags flags;
-    McFlags dispatchFlags = 0;
+    McFlags flags = (McFlags)0;
+    McFlags dispatchFlags = (McFlags)0;
 
     // debugging
     // ---------
@@ -194,7 +207,7 @@ struct McDispatchContextInternal {
     McFlags debugSource = 0;
     McFlags debugType = 0;
     McFlags debugSeverity = 0;
-    std::string lastLoggedDebugDetail;
+    std::string lastLoggedDebugDetail = "";
 
     void log(McDebugSource source,
         McDebugType type,
@@ -472,7 +485,7 @@ McResult convert(const mcut::status_t& v)
         result = McResult::MC_FACE_VERTEX_INTERSECTION;
         break;
     default:
-        MCUT_ASSERT(false);
+        std::fprintf(stderr, "[MCUT]: warning - conversion error (McResult)\n");
     }
     return result;
 }
@@ -491,7 +504,7 @@ McPatchLocation convert(const mcut::cut_surface_patch_location_t& v)
         result = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
         break;
     default:
-        MCUT_ASSERT(false);
+        std::fprintf(stderr, "[MCUT]: warning - conversion error (McPatchLocation)\n");
     }
     return result;
 }
@@ -510,7 +523,7 @@ McFragmentLocation convert(const mcut::connected_component_location_t& v)
         result = McFragmentLocation::MC_FRAGMENT_LOCATION_UNDEFINED;
         break;
     default:
-        MCUT_ASSERT(false);
+        std::fprintf(stderr, "[MCUT]: warning - conversion error (McFragmentLocation)\n");
     }
     return result;
 }
@@ -535,9 +548,9 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     MCUT_ASSERT(indexArrayMesh.numVertices >= 3);
 
-    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[indexArrayMesh.numVertices * 3u]);
+    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[(size_t)indexArrayMesh.numVertices * 3u]);
     if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
-        indexArrayMesh.pVertexMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numVertices]);
+        indexArrayMesh.pVertexMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[(size_t)indexArrayMesh.numVertices]);
     }
 
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i) {
@@ -546,9 +559,9 @@ McResult halfedgeMeshToIndexArrayMesh(
         std::advance(vIter, i);
         const mcut::math::vec3& point = halfedgeMeshInfo.mesh.vertex(*vIter);
 
-        indexArrayMesh.pVertices[(i * 3u) + 0u] = point.x();
-        indexArrayMesh.pVertices[(i * 3u) + 1u] = point.y();
-        indexArrayMesh.pVertices[(i * 3u) + 2u] = point.z();
+        indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
+        indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
+        indexArrayMesh.pVertices[((size_t)i * 3u) + 2u] = point.z();
 
         //std::cout << indexArrayMesh.pVertices[(i * 3u) + 0u] << " " << indexArrayMesh.pVertices[(i * 3u) + 1u] << " " << indexArrayMesh.pVertices[(i * 3u) + 2u] << std::endl;
 
@@ -635,7 +648,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         for (int j = 0; j < (int)face.size(); ++j) {
             const mcut::vd_t vd = face[j];
 
-            indexArrayMesh.pFaceIndices[faceOffset + j] = vmap[vd];
+            indexArrayMesh.pFaceIndices[(size_t)faceOffset + j] = vmap[vd];
         }
         faceOffset += static_cast<int>(face.size());
     }
@@ -671,9 +684,9 @@ McResult halfedgeMeshToIndexArrayMesh(
         mcut::vd_t v1 = edge.second;
 
         MCUT_ASSERT(vmap.find(v0) != vmap.cend());
-        indexArrayMesh.pEdges[(i * 2u) + 0u] = vmap[v0];
+        indexArrayMesh.pEdges[((size_t)i * 2u) + 0u] = vmap[v0];
         MCUT_ASSERT(vmap.find(v1) != vmap.cend());
-        indexArrayMesh.pEdges[(i * 2u) + 1u] = vmap[v1];
+        indexArrayMesh.pEdges[((size_t)i * 2u) + 1u] = vmap[v1];
     }
 
     return result;
@@ -1092,6 +1105,31 @@ bool checkFrontendMesh(
     return result;
 }
 
+McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr, const mcut::mesh_t& srcMesh, const mcut::mesh_t& cutMesh)
+{
+    MCUT_ASSERT(srcMesh.number_of_vertices() >= 3);
+    MCUT_ASSERT(cutMesh.number_of_vertices() >= 3);
+
+    McResult result = McResult::MC_NO_ERROR;
+    for (mcut::mesh_t::vertex_iterator_t i = srcMesh.vertices_begin(); i != srcMesh.vertices_end(); ++i) {
+        const mcut::math::vec3& srcMeshVertex = srcMesh.vertex(*i);
+        for (mcut::mesh_t::vertex_iterator_t j = cutMesh.vertices_begin(); j != cutMesh.vertices_end(); ++j) {
+            const mcut::math::vec3& cutMeshVertex = cutMesh.vertex(*j);
+            if (srcMeshVertex.x() == cutMeshVertex.x() && srcMeshVertex.y() == cutMeshVertex.y() && srcMeshVertex.z() == cutMeshVertex.z()) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+                    "source-mesh vertex " + std::to_string(*i) + " is the same as cut-mesh vertex " + std::to_string(*j) + "\n");
+                result = McResult::MC_INVALID_MESH_PLACEMENT;
+                break;
+            }
+        }
+        if (result != McResult::MC_NO_ERROR) {
+            break;
+        }
+    }
+
+    return result;
+}
+
 MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const McContext context,
     McFlags dispatchFlags,
@@ -1153,9 +1191,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         return result;
     }
 
-    // TODO: add another check here to ensure that the source and cut mesh are not exact the save.
-    // i.e. vertex coordinates of one mesh are not colocated with any coordinates in the other mesh
-
     mcut::mesh_t srcMeshInternal;
     result = indexArrayMeshToHalfedgeMesh(
         ctxtPtr,
@@ -1180,6 +1215,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         numCutMeshVertices,
         numCutMeshFaces);
 
+    if (result != McResult::MC_NO_ERROR) {
+        return result;
+    }
+
+    // check here to ensure that vertex coordinates of one mesh are not colocated with any coordinates in the other mesh
+    result = checkMeshPlacement(ctxtPtr, srcMeshInternal, cutMeshInternal);
     if (result != McResult::MC_NO_ERROR) {
         return result;
     }
@@ -1429,10 +1470,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     //  src mesh
 
     if (backendOutput.seamed_src_mesh.mesh.number_of_faces() > 0) {
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> srcMeshSeam = std::unique_ptr<McSeamedConnComp, void (*)(McConnCompBase*)>(new McSeamedConnComp, ccDeletorFunc<McSeamedConnComp>);
+        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> srcMeshSeam = std::unique_ptr<McSeamConnComp, void (*)(McConnCompBase*)>(new McSeamConnComp, ccDeletorFunc<McSeamConnComp>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(srcMeshSeam.get());
         ctxtPtr->connComps.emplace(clientHandle, std::move(srcMeshSeam));
-        McSeamedConnComp* asSrcMeshSeamPtr = dynamic_cast<McSeamedConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
+        McSeamConnComp* asSrcMeshSeamPtr = dynamic_cast<McSeamConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
         halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh);
@@ -1441,10 +1482,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     //  cut mesh
 
     if (backendOutput.seamed_cut_mesh.mesh.number_of_faces() > 0) {
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> cutMeshSeam = std::unique_ptr<McSeamedConnComp, void (*)(McConnCompBase*)>(new McSeamedConnComp, ccDeletorFunc<McSeamedConnComp>);
+        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> cutMeshSeam = std::unique_ptr<McSeamConnComp, void (*)(McConnCompBase*)>(new McSeamConnComp, ccDeletorFunc<McSeamConnComp>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(cutMeshSeam.get());
         ctxtPtr->connComps.emplace(clientHandle, std::move(cutMeshSeam));
-        McSeamedConnComp* asCutMeshSeamPtr = dynamic_cast<McSeamedConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
+        McSeamConnComp* asCutMeshSeamPtr = dynamic_cast<McSeamConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
@@ -1913,7 +1954,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                 return result;
             }
 
-            McSeamedConnComp* ptr = dynamic_cast<McSeamedConnComp*>(ccData.get());
+            McSeamConnComp* ptr = dynamic_cast<McSeamConnComp*>(ccData.get());
             memcpy(pMem, reinterpret_cast<void*>(&ptr->origin), bytes);
         }
     } break;
