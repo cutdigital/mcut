@@ -2583,7 +2583,7 @@ void dispatch(output_t& output, const input_t& input)
 
     if (m0_ivtx_to_ps_faces.empty()) {
         lg.set_reason_for_failure("no face intersection found");
-        output.status = status_t::INVALID_MESH_INTERSECTION;
+        output.status = status_t::SUCCESS;
         return;
     }
 
