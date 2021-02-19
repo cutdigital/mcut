@@ -122,7 +122,7 @@ typedef uint32_t McBool;
  * This enum structure defines the possible return values of API functions (integer). The values identify whether a function executed successfully or returned with an error.
  */
 typedef enum McResult {
-    MC_NO_ERROR = 0, /**< The function was successfully executed/enqueued. */
+    MC_NO_ERROR = 0, /**< The function was successfully executed. */
     MC_INVALID_SRC_MESH = -(1 << 0), /**< The input source-mesh does not the meet requirements of a valid mesh. */
     MC_INVALID_CUT_MESH = -(1 << 1), /**< The input cut-mesh does not the meet requirements of a valid mesh. */
     MC_EDGE_EDGE_INTERSECTION = -(1 << 2), /** Found an edge-edge intersection. */
