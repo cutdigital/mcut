@@ -209,10 +209,10 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT = (1 << 3), /**< List of vertex coordinates as a character string representing arbitrary-precision numbers. Values are exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to using std::to_string. */
-    MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4),
+    MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
     MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
-    MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7),
+    MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
     MC_CONNECTED_COMPONENT_DATA_EDGE = (1 << 8), /**< List of edges as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_TYPE = (1 << 9), /**< The type of a connected component (See also: ::McConnectedComponentType.). */
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION = (1 << 10), /**< The location of a fragment connected component with respect to the cut mesh (See also: ::McFragmentLocation). */
