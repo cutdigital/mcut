@@ -378,6 +378,9 @@ struct oibvhNode {
 
 // uint32_t faceIdx; // MC_UNDEFINED_VALUE if internal node.
 
+
+// See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawArraysIndirect.xhtml
+// For example on documentation
 extern MCAPI_ATTR McResult MCAPI_CALL mcCreateInputConnectedComponent(
     McContext* pContext,
     McFlags meshFlags,
@@ -391,6 +394,8 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateInputConnectedComponent(
     const void* const pAccelerationStructure,
     McConnectedComponent* inputConnectedComponent);
 
+// See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawArraysIndirect.xhtml
+// For example on documentation
 extern MCAPI_ATTR McResult MCAPI_CALL mcDispatchIndirect(McContext context, McFlags flags, McConnectedComponent srcMesh, McConnectedComponent cutMesh);
 
 /**
