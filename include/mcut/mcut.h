@@ -343,16 +343,16 @@ typedef enum McDispatchFlags {
  */
 typedef enum McAccelerationStructure {
     /** 1 */
-    MC_ACCELERATION_STRUCTURE_LBVH = (1 << 0),
+    MC_ACCELERATION_STRUCTURE_TYPE_LBVH = (1 << 0),
     /** 2 */
-    MC_ACCELERATION_STRUCTURE_OIBVH = (1 << 1)
+    MC_ACCELERATION_STRUCTURE_TYPE_OIBVH = (1 << 1)
 } McAccelerationStructure;
 
 // Storage format:
 //
-// array where nodes (connectivity + AABB) come first followed by N uint32_t values denoting the face IDs of each leaf node.
+// array where nodes (connectivity + AABB) come first followed by N=numFaces uint32_t values denoting the face IDs of each leaf node.
 // NOTE: in LBVH, if leftChildNodeIdx == rightChildNodeIdx, then leaf node idx == rightChildNodeIdx (OR leftChildNodeIdx)
-// NOTE: in LBVH, leaf node idx is inferred from relative position of node on level in implicit tree.
+// NOTE: in OIBVH, leaf node idx is inferred from relative position of node on level in implicit tree.
 
 struct lbvhNode {
     uint32_t parentNodeIdx; // == MC_UNDEFINED_VALUE if root node.
@@ -392,7 +392,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateInputConnectedComponent(
     McFlags accelerationStructureFlags,
     // pIdx,lIdx,rIdx,AABB|...|pIdx,lIdx,rIdx,AABB|...|pIdx,lIdx,rIdx,AABB|
     const void* const pAccelerationStructure,
-    McConnectedComponent* inputConnectedComponent);
+    McConnectedComponent* pOutConnectedComponent);
 
 // See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawArraysIndirect.xhtml
 // For example on documentation

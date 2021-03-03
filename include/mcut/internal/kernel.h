@@ -81,6 +81,7 @@ enum class cut_surface_patch_winding_order_t : unsigned char {
 struct input_t {
     const mesh_t* src_mesh = nullptr;
     const mesh_t* cut_mesh = nullptr;
+    const std::vector<std::pair<fd_t, fd_t>> *intersecting_sm_cm_face_pairs = nullptr;
     bool verbose = true;
     //bool keep_partially_sealed_connected_components = false;
     bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
