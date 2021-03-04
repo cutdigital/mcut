@@ -1138,9 +1138,8 @@ McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
 
 void constructOIBVH(
     const mcut::mesh_t& mesh,
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& bvhInternalNodes,
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& face_bboxes,
-    std::vector<std::pair<mcut::fd_t, uint32_t>>& bvhLeafNodeDescriptors)
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& bvhAABBs,
+    std::vector<mcut::fd_t>& bvhLeafNodeFaces)
 {
     const int meshFaceCount = mesh.number_of_faces();
     const int bvhNodeCount = mcut::bvh::get_ostensibly_implicit_bvh_size(meshFaceCount);
@@ -1148,7 +1147,7 @@ void constructOIBVH(
     // compute mesh-face bounding boxes and their centers
     // ::::::::::::::::::::::::::::::::::::::::::::::::::
 
-    face_bboxes.resize(meshFaceCount);
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> face_bboxes(meshFaceCount, mcut::geom::bounding_box_t<mcut::math::fast_vec3>());
     std::vector<mcut::math::fast_vec3> face_bbox_centers(meshFaceCount, mcut::math::fast_vec3());
 
     // for each face in mesh
@@ -1171,9 +1170,8 @@ void constructOIBVH(
     // compute mesh bounding box
     // :::::::::::::::::::::::::
 
-    const int bvhInternalNodeCount = mcut::bvh::get_ostensibly_implicit_bvh_size(meshFaceCount >> 1);
-    bvhInternalNodes.resize(bvhInternalNodeCount);
-    mcut::geom::bounding_box_t<mcut::math::fast_vec3>& meshBbox = bvhInternalNodes.front(); // root bounding box
+    bvhAABBs.resize(bvhNodeCount);
+    mcut::geom::bounding_box_t<mcut::math::fast_vec3>& meshBbox = bvhAABBs.front(); // root bounding box
 
     // for each vertex in mesh
     for (mcut::mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v) {
@@ -1184,7 +1182,7 @@ void constructOIBVH(
     // compute morton codes
     // ::::::::::::::::::::
 
-    bvhLeafNodeDescriptors.resize(meshFaceCount);
+    std::vector<std::pair<mcut::fd_t, uint32_t>> bvhLeafNodeDescriptors(meshFaceCount, std::pair<mcut::fd_t, uint32_t>());
 
     for (mcut::mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f) {
         const uint32_t faceIdx = static_cast<uint32_t>(*f);
@@ -1212,7 +1210,29 @@ void constructOIBVH(
             return a.second < b.second;
         });
 
+    bvhLeafNodeFaces.resize(meshFaceCount);
+
     const int leaf_level_index = mcut::bvh::get_leaf_level_from_real_leaf_count(meshFaceCount);
+    const int leftmost_real_node_on_leaf_level = mcut::bvh::get_level_leftmost_node(leaf_level_index);
+    const int rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(leaf_level_index, meshFaceCount);
+    const int rightmost_real_node_on_leaf_level = mcut::bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, leaf_level_index);
+
+    // save sorted leaf node bvhAABBs and their corrresponding face id
+    for (std::vector<std::pair<mcut::fd_t, uint32_t>>::const_iterator it = bvhLeafNodeDescriptors.cbegin(); it != bvhLeafNodeDescriptors.cend(); ++it) {
+        const int index_on_leaf_level = std::distance(bvhLeafNodeDescriptors.cbegin(), it);
+
+        bvhLeafNodeFaces[index_on_leaf_level] = it->first;
+
+        const int implicit_idx = leftmost_real_node_on_leaf_level + index_on_leaf_level;
+        const int memory_idx = mcut::bvh::get_node_mem_index(
+            implicit_idx,
+            leftmost_real_node_on_leaf_level,
+            0,
+            rightmost_real_node_on_leaf_level);
+
+        const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& face_bbox = face_bboxes[(uint32_t)it->first];
+        bvhAABBs[memory_idx] = face_bbox;
+    }
 
     // construct internal-node bounding boxes
     // ::::::::::::::::::::::::::::::::::::::
@@ -1220,7 +1240,6 @@ void constructOIBVH(
     // for each level in the oi-bvh tree (starting from the penultimate level)
     for (int level_index = leaf_level_index - 1; level_index >= 0; --level_index) {
 
-        const int rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(leaf_level_index, meshFaceCount);
         const int rightmost_real_node_on_level = mcut::bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_index);
         const int leftmost_real_node_on_level = mcut::bvh::get_level_leftmost_node(level_index);
         const int number_of_real_nodes_on_level = (rightmost_real_node_on_level - leftmost_real_node_on_level) + 1;
@@ -1241,14 +1260,14 @@ void constructOIBVH(
             if (is_penultimate_level) { // both children are leaves
 
                 const int left_child_index_on_level = left_child_implicit_idx - leftmost_real_node_on_child_level;
-                const mcut::fd_t& left_child_face = bvhLeafNodeDescriptors.at(left_child_index_on_level).first;
+                const mcut::fd_t& left_child_face = bvhLeafNodeFaces.at(left_child_index_on_level);
                 const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& left_child_bbox = face_bboxes.at(left_child_face);
 
                 node_bbox.expand(left_child_bbox);
 
                 if (right_child_exists) {
                     const int right_child_index_on_level = right_child_implicit_idx - leftmost_real_node_on_child_level;
-                    const mcut::fd_t& right_child_face = bvhLeafNodeDescriptors.at(right_child_index_on_level).first;
+                    const mcut::fd_t& right_child_face = bvhLeafNodeFaces.at(right_child_index_on_level);
                     const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& right_child_bbox = face_bboxes.at(right_child_face);
                     node_bbox.expand(right_child_bbox);
                 }
@@ -1259,7 +1278,7 @@ void constructOIBVH(
                     leftmost_real_node_on_child_level,
                     0,
                     rightmost_real_node_on_child_level);
-                const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& left_child_bbox = bvhInternalNodes.at(left_child_memory_idx);
+                const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& left_child_bbox = bvhAABBs.at(left_child_memory_idx);
 
                 node_bbox.expand(left_child_bbox);
 
@@ -1269,7 +1288,7 @@ void constructOIBVH(
                         leftmost_real_node_on_child_level,
                         0,
                         rightmost_real_node_on_child_level);
-                    const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& right_child_bbox = bvhInternalNodes.at(right_child_memory_idx);
+                    const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& right_child_bbox = bvhAABBs.at(right_child_memory_idx);
                     node_bbox.expand(right_child_bbox);
                 }
             }
@@ -1280,32 +1299,32 @@ void constructOIBVH(
                 0,
                 rightmost_real_node_on_level);
 
-            bvhInternalNodes.at(node_memory_idx) = node_bbox;
+            bvhAABBs.at(node_memory_idx) = node_bbox;
         } // for each real node on level
     } // for each internal level
 }
 
 void intersectOIBVHs(
     std::vector<std::pair<mcut::fd_t, mcut::fd_t>>& intersecting_sm_cm_face_pairs,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhInternalNodeAABBs,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhLeafNodeAABBs,
-    const std::vector<std::pair<mcut::fd_t, uint32_t>>& srcMeshBvhLeafNodeDescriptors,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhInternalNodeAABBs,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhLeafNodeAABBs,
-    const std::vector<std::pair<mcut::fd_t, uint32_t>>& cutMeshBvhLeafNodeDescriptors)
+    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhAABBs,
+    const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
+    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhAABBs,
+    const std::vector<mcut::fd_t>& cutMeshBvhLeafNodeFaces)
 {
     // simultaneuosly traverse both BVHs to find intersecting pairs
     std::queue<mcut::bvh::node_pair_t> traversalQueue;
     traversalQueue.push({ 0, 0 }); // left = sm BVH; right = cm BVH
 
-    const int numSrcMeshFaces = (int)srcMeshBvhLeafNodeDescriptors.size();
-    const int numCutMeshFaces = (int)cutMeshBvhLeafNodeDescriptors.size();
+    const int numSrcMeshFaces = (int)srcMeshBvhLeafNodeFaces.size();
+    MCUT_ASSERT(numSrcMeshFaces >= 1);
+    const int numCutMeshFaces = (int)cutMeshBvhLeafNodeFaces.size();
+    MCUT_ASSERT(numCutMeshFaces >= 1);
 
     const int sm_bvh_leaf_level_idx = mcut::bvh::get_leaf_level_from_real_leaf_count(numSrcMeshFaces);
     const int cs_bvh_leaf_level_idx = mcut::bvh::get_leaf_level_from_real_leaf_count(numCutMeshFaces);
 
-    const int cs_bvh_rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(cs_bvh_leaf_level_idx, numCutMeshFaces);
     const int sm_bvh_rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(sm_bvh_leaf_level_idx, numSrcMeshFaces);
+    const int cs_bvh_rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(cs_bvh_leaf_level_idx, numCutMeshFaces);
 
     do {
         mcut::bvh::node_pair_t ct_front_node = traversalQueue.front();
@@ -1319,20 +1338,17 @@ void intersectOIBVHs(
         const bool sm_bvh_node_is_leaf = sm_bvh_node_level_idx == sm_bvh_leaf_level_idx;
         const int sm_bvh_node_level_leftmost_node = mcut::bvh::get_level_leftmost_node(sm_bvh_node_level_idx);
         mcut::fd_t sm_node_face = mcut::mesh_t::null_face();
+        const int sm_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(sm_bvh_rightmost_real_leaf, sm_bvh_leaf_level_idx, sm_bvh_node_level_idx);
+        const int sm_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
+            sm_bvh_node_implicit_idx,
+            sm_bvh_node_level_leftmost_node,
+            0,
+            sm_bvh_node_level_rightmost_node);
+        sm_bvh_node_bbox = srcMeshBvhAABBs.at(sm_bvh_node_mem_idx);
 
         if (sm_bvh_node_is_leaf) {
             const int sm_bvh_node_idx_on_level = sm_bvh_node_implicit_idx - sm_bvh_node_level_leftmost_node;
-            sm_node_face = srcMeshBvhLeafNodeDescriptors.at(sm_bvh_node_idx_on_level).first;
-            sm_bvh_node_bbox = srcMeshBvhLeafNodeAABBs.at(sm_node_face);
-        } else {
-
-            const int sm_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(sm_bvh_rightmost_real_leaf, sm_bvh_leaf_level_idx, sm_bvh_node_level_idx);
-            const int sm_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
-                sm_bvh_node_implicit_idx,
-                sm_bvh_node_level_leftmost_node,
-                0,
-                sm_bvh_node_level_rightmost_node);
-            sm_bvh_node_bbox = srcMeshBvhInternalNodeAABBs.at(sm_bvh_node_mem_idx);
+            sm_node_face = srcMeshBvhLeafNodeFaces.at(sm_bvh_node_idx_on_level);
         }
 
         // cs
@@ -1341,25 +1357,22 @@ void intersectOIBVHs(
         const int cs_bvh_node_level_leftmost_node = mcut::bvh::get_level_leftmost_node(cs_bvh_node_level_idx);
         const bool cs_bvh_node_is_leaf = cs_bvh_node_level_idx == cs_bvh_leaf_level_idx;
         mcut::fd_t cs_node_face = mcut::mesh_t::null_face();
+        const int cs_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(cs_bvh_rightmost_real_leaf, cs_bvh_leaf_level_idx, cs_bvh_node_level_idx);
+        const int cs_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
+            cs_bvh_node_implicit_idx,
+            cs_bvh_node_level_leftmost_node,
+            0,
+            cs_bvh_node_level_rightmost_node);
+        cs_bvh_node_bbox = cutMeshBvhAABBs.at(cs_bvh_node_mem_idx);
 
         if (cs_bvh_node_is_leaf) {
-
             const int cs_bvh_node_idx_on_level = cs_bvh_node_implicit_idx - cs_bvh_node_level_leftmost_node;
-            cs_node_face = cutMeshBvhLeafNodeDescriptors.at(cs_bvh_node_idx_on_level).first;
-            cs_bvh_node_bbox = cutMeshBvhLeafNodeAABBs.at(cs_node_face);
-
-        } else {
-
-            const int cs_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(cs_bvh_rightmost_real_leaf, cs_bvh_leaf_level_idx, cs_bvh_node_level_idx);
-            const int cs_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
-                cs_bvh_node_implicit_idx,
-                cs_bvh_node_level_leftmost_node,
-                0,
-                cs_bvh_node_level_rightmost_node);
-            cs_bvh_node_bbox = cutMeshBvhInternalNodeAABBs.at(cs_bvh_node_mem_idx);
+            cs_node_face = cutMeshBvhLeafNodeFaces.at(cs_bvh_node_idx_on_level);
         }
 
-        if (intersect_bounding_boxes(sm_bvh_node_bbox, cs_bvh_node_bbox)) {
+        const bool haveOverlap = intersect_bounding_boxes(sm_bvh_node_bbox, cs_bvh_node_bbox);
+
+        if (haveOverlap) {
 
             if (cs_bvh_node_is_leaf && sm_bvh_node_is_leaf) {
                 MCUT_ASSERT(cs_node_face != mcut::mesh_t::null_face());
@@ -1623,19 +1636,17 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     // ::::::::::::::
 
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshBvhInternalNodeAABBs;
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshBvhLeafNodeAABBs;
-    std::vector<std::pair<mcut::fd_t, uint32_t>> srcMeshBvhLeafNodeDescriptors;
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshBvhAABBs;
+    std::vector<mcut::fd_t> srcMeshBvhLeafNodeFaces;
 
-    constructOIBVH(srcMeshInternal, srcMeshBvhInternalNodeAABBs, srcMeshBvhLeafNodeAABBs, srcMeshBvhLeafNodeDescriptors);
+    constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces);
 
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhInternalNodeAABBs;
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhLeafNodeAABBs;
-    std::vector<std::pair<mcut::fd_t, uint32_t>> cutMeshBvhLeafNodeDescriptors;
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
+    std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
 
-    constructOIBVH(cutMeshInternal, cutMeshBvhInternalNodeAABBs, cutMeshBvhLeafNodeAABBs, cutMeshBvhLeafNodeDescriptors);
+    constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 
 #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
     ///////////////////////////////////////////////////////////////////////////
@@ -1702,9 +1713,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     std::vector<std::pair<mcut::fd_t, mcut::fd_t>> intersecting_sm_cm_face_pairs;
 
-    intersectOIBVHs(intersecting_sm_cm_face_pairs, //
-        srcMeshBvhInternalNodeAABBs, srcMeshBvhLeafNodeAABBs, srcMeshBvhLeafNodeDescriptors, //
-        cutMeshBvhInternalNodeAABBs, cutMeshBvhLeafNodeAABBs, cutMeshBvhLeafNodeDescriptors);
+    intersectOIBVHs(intersecting_sm_cm_face_pairs, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
 

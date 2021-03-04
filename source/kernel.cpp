@@ -1643,24 +1643,18 @@ void dispatch(output_t& output, const input_t& input)
     // edges of the polygon soup mesh which intersect a face
     std::vector<ed_t> ps_intersecting_edges;
 
-    // A mapping from an intersecting ps-face to the new edges. These edges are those whose
-    // src and tgt vertices contain the respective face in their registry entry
-    // (note: all or some may be used for used to clip the face).
-    std::map<
-        fd_t, // A face intersecting another
-        std::vector<ed_t> // edges touching/incident on the intersecting face
-        >
-        ps_iface_to_m0_edge_list;
-
-    // Edges defining the cut path/line of intersecton/intersection contour
-    std::vector<ed_t> m0_cutpath_edges;
-
-    // A mapping from and ivertex to the incoming halfedges
-    std::map<
-        vd_t, // intersection point
-        std::vector<hd_t> // list of halfedges whose target is the intersection point
-        >
-        ivtx_to_incoming_hlist;
+    // A vector of lists-of-information used to create edges along the intersection path.
+    // Each element is the information such as intersection points that arise from testing two polygons.
+    // The size of thos vector is dependent on the number of polygon pairs (in "input.intersecting_sm_cm_face_pairs")
+    // which intersect.
+    std::vector<
+        std::pair< // information needed to build edges along the cut-path
+            std::pair< // pair of intersecting polygons
+                fd_t, // source-mesh polygon
+                fd_t>, // cut-mesh polygon
+            std::vector<vd_t> // resulting intersection points
+            >>
+        cutpath_edge_creation_info;
 
     // Face intersection tests (narrow-phase)
     // -----------------------------------------
@@ -1678,8 +1672,9 @@ void dispatch(output_t& output, const input_t& input)
             >& intersection_pair
             = *i;
 
-        const fd_t& sm_face = intersection_pair.first;
-        const fd_t& cm_face = intersection_pair.second;
+        const fd_t sm_face = intersection_pair.first;
+        const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
+        const fd_t cm_face((uint32_t)intersection_pair.second + cm_faces_start_offset);
 
         lg << "src-mesh polygon = " << fstr(sm_face) << std::endl;
         lg << "cut-mesh polygon = " << fstr(cm_face) << std::endl;
@@ -2040,139 +2035,18 @@ void dispatch(output_t& output, const input_t& input)
 
         const int new_ivertices_count = (int)intersection_test_ivtx_list.size();
 
-        lg << "create edge(s) from " << new_ivertices_count << " intersection points" << std::endl;
-
-        if (new_ivertices_count == 2) { // one edge
-            vd_t first_new_ivertex = intersection_test_ivtx_list.front();
-            vd_t second_new_ivertex = intersection_test_ivtx_list.back();
-
-            MCUT_ASSERT(m0_is_intersection_point(first_new_ivertex, ps_vtx_cnt));
-            MCUT_ASSERT(m0_is_intersection_point(second_new_ivertex, ps_vtx_cnt));
-
-            bool cutpath_edge_exists = m0.halfedge(first_new_ivertex, second_new_ivertex, true) != mesh_t::null_halfedge();
-            if (
-                cutpath_edge_exists == false
-                //!interior_edge_exists(m0, first_new_ivertex, second_new_ivertex /*, m0_cutpath_edges*/)
-            ) {
-                lg << "add edge (xx) : " << estr(first_new_ivertex, second_new_ivertex) << std::endl;
-
-                hd_t h = m0.add_edge(first_new_ivertex, second_new_ivertex);
-                MCUT_ASSERT(h != mesh_t::null_halfedge());
-
-                m0_cutpath_edges.emplace_back(m0.edge(h));
-
-                // all newly created edges will lie on both face A and face B since intersection
-                // points lie on a line which is the intersection of the two planes of face A and B
-                ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
-                ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
-
-                update_neighouring_ps_iface_m0_edge_list(
-                    first_new_ivertex,
-                    second_new_ivertex,
-                    ps,
-                    sm_face,
-                    cm_face,
-                    m0_ivtx_to_ps_faces,
-                    ps_iface_to_m0_edge_list,
-                    m0_cutpath_edges);
-
-                MCUT_ASSERT(m0.target(h) == second_new_ivertex);
-                ivtx_to_incoming_hlist[second_new_ivertex].push_back(h);
-
-                MCUT_ASSERT(m0.target(m0.opposite(h)) == first_new_ivertex);
-                ivtx_to_incoming_hlist[first_new_ivertex].push_back(m0.opposite(h));
-            }
-
-        } else if (new_ivertices_count > 2) { // create N edges (N >= 3)
-            MCUT_ASSERT(new_ivertices_count >= 4); // concave polygon intersection produce a minimum of 4 intersection point if not 2
-
-            // our produced intersection points
-            std::vector<
-                std::pair<
-                    vd_t, // descriptor
-                    math::vec3 // coordinates
-                    >>
-                ivertex_coords;
-
-            for (int v = 0; v < new_ivertices_count; ++v) {
-                vd_t new_ivertex_descr = intersection_test_ivtx_list.at(v);
-                MCUT_ASSERT(m0_is_intersection_point(new_ivertex_descr, ps_vtx_cnt));
-                ivertex_coords.emplace_back(new_ivertex_descr, m0.vertex(new_ivertex_descr));
-            }
-#if 0
-            // TODO: use projection sort
-
-            // since all points are on straight line, we sort them by x-coord, and (possibly) by y-coord if x-coord is the same for all vertices
-            std::sort(ivertex_coords.begin(), ivertex_coords.end(),
-                [&](const std::pair<vd_t, math::vec3>& a,
-                    const std::pair<vd_t, math::vec3>& b) {
-                    {
-                        return (a.second.x() < b.second.x());
-                    }
-                });
-
-            const bool x_coordinate_is_same = have_same_coordinate(ivertex_coords, 0);
-
-            if (x_coordinate_is_same) {
-                // ... then  sort on y-coord
-                std::sort(ivertex_coords.begin(), ivertex_coords.end(),
-                    [&](const std::pair<vd_t, math::vec3>& a,
-                        const std::pair<vd_t, math::vec3>& b) {
-                        {
-                            return (a.second.y() < b.second.y());
-                        }
-                    });
-            }
-#endif
-            std::vector<vd_t> sorted_descriptors = linear_projection_sort(ivertex_coords);
-
-            //for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator iter = ivertex_coords.cbegin() + 1; iter != ivertex_coords.cend(); ++iter) {
-            for (std::vector<vd_t>::const_iterator iter = sorted_descriptors.cbegin() + 1; iter != sorted_descriptors.cend(); ++iter) {
-                //const vd_t src_vertex = (iter - 1)->first;
-                //const vd_t tgt_vertex = (iter)->first;
-                const vd_t src_vertex = *(iter - 1);
-                const vd_t tgt_vertex = *(iter);
-
-                bool cutpath_edge_exists = m0.halfedge(src_vertex, tgt_vertex, true) != mesh_t::null_halfedge();
-
-                if (
-                    cutpath_edge_exists == false
-                    // !interior_edge_exists(m0, src_vertex, tgt_vertex /*, m0_cutpath_edges*/)
-                ) {
-
-                    lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;
-
-                    const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
-
-                    MCUT_ASSERT(h != mesh_t::null_halfedge());
-                    m0_cutpath_edges.emplace_back(m0.edge(h));
-
-                    // NOTE: here we add all edge without assuming anything about which of the will be used to clip either polygon
-                    ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
-                    ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
-
-                    update_neighouring_ps_iface_m0_edge_list(src_vertex, tgt_vertex, ps,
-                        sm_face,
-                        cm_face,
-                        m0_ivtx_to_ps_faces,
-                        ps_iface_to_m0_edge_list,
-                        m0_cutpath_edges);
-
-                    MCUT_ASSERT(m0.target(h) == tgt_vertex);
-                    ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
-
-                    MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
-                    ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
-                }
-            }
-        } else {
-            if (new_ivertices_count != 0) // edge-case scenario: an edge intersects with another edge exactly
-            {
-                lg.set_reason_for_failure("unresolvable edge-case: (vertex-face OR edge-edge intersection)");
-                output.status = status_t::INVALID_MESH_INTERSECTION;
-                return;
-            }
-        } // else if (new_ivertices_count > 2) {
+        if (new_ivertices_count == 1) // edge-case scenario: an edge intersects with another edge exactly
+        {
+            // NOTE: This scope will only be entered if symbolic perturbation is disabled!
+            lg.set_reason_for_failure("unresolvable edge-case: (vertex-face OR edge-edge intersection)");
+            output.status = status_t::INVALID_MESH_INTERSECTION;
+            return;
+        } else if (new_ivertices_count >= 2) {
+            cutpath_edge_creation_info.push_back(
+                std::make_pair(
+                    std::make_pair(sm_face, cm_face),
+                    intersection_test_ivtx_list));
+        }
         lg.unindent();
     } // for (std::vector<std::pair<fd_t, fd_t> >::const_iterator i = intersecting_sm_cm_face_pairs.cbegin(); i != intersecting_sm_cm_face_pairs.cend(); ++i) {
 
@@ -2276,6 +2150,162 @@ void dispatch(output_t& output, const input_t& input)
         return;
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Create new edges along the intersection
+    ///////////////////////////////////////////////////////////////////////////
+
+    // A mapping from an intersecting ps-face to the new edges. These edges are those whose
+    // src and tgt vertices contain the respective face in their registry entry
+    // (note: all or some may be used for used to clip the face).
+    std::map<
+        fd_t, // A face intersecting another
+        std::vector<ed_t> // edges touching/incident on the intersecting face
+        >
+        ps_iface_to_m0_edge_list;
+
+    // Edges defining the cut path/line of intersecton/intersection contour
+    std::vector<ed_t> m0_cutpath_edges;
+
+    // A mapping from and ivertex to the incoming halfedges
+    std::map<
+        vd_t, // intersection point
+        std::vector<hd_t> // list of halfedges whose target is the intersection point
+        >
+        ivtx_to_incoming_hlist;
+
+    for (std::vector<std::pair<std::pair<fd_t, fd_t>, std::vector<vd_t>>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin(); cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend(); ++iter) {
+        const fd_t sm_face = cutpath_edge_creation_info_iter->first.first;
+        const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
+        const std::vector<vd_t>& intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
+        const uint32_t new_ivertices_count = (uint32_t)intersection_test_ivtx_list.size();
+
+        lg << "create edge(s) from " << new_ivertices_count << " intersection points" << std::endl;
+
+        if (new_ivertices_count == 2) { // one edge
+            vd_t first_new_ivertex = intersection_test_ivtx_list.front();
+            vd_t second_new_ivertex = intersection_test_ivtx_list.back();
+
+            MCUT_ASSERT(m0_is_intersection_point(first_new_ivertex, ps_vtx_cnt));
+            MCUT_ASSERT(m0_is_intersection_point(second_new_ivertex, ps_vtx_cnt));
+
+            bool cutpath_edge_exists = m0.halfedge(first_new_ivertex, second_new_ivertex, true) != mesh_t::null_halfedge();
+            if (
+                cutpath_edge_exists == false
+                //!interior_edge_exists(m0, first_new_ivertex, second_new_ivertex /*, m0_cutpath_edges*/)
+            ) {
+                lg << "add edge (xx) : " << estr(first_new_ivertex, second_new_ivertex) << std::endl;
+
+                hd_t h = m0.add_edge(first_new_ivertex, second_new_ivertex);
+                MCUT_ASSERT(h != mesh_t::null_halfedge());
+
+                m0_cutpath_edges.emplace_back(m0.edge(h));
+
+                // all newly created edges will lie on both face A and face B since intersection
+                // points lie on a line which is the intersection of the two planes of face A and B
+                ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
+                ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
+
+                update_neighouring_ps_iface_m0_edge_list(
+                    first_new_ivertex,
+                    second_new_ivertex,
+                    ps,
+                    sm_face,
+                    cm_face,
+                    m0_ivtx_to_ps_faces,
+                    ps_iface_to_m0_edge_list,
+                    m0_cutpath_edges);
+
+                MCUT_ASSERT(m0.target(h) == second_new_ivertex);
+                ivtx_to_incoming_hlist[second_new_ivertex].push_back(h);
+
+                MCUT_ASSERT(m0.target(m0.opposite(h)) == first_new_ivertex);
+                ivtx_to_incoming_hlist[first_new_ivertex].push_back(m0.opposite(h));
+            }
+
+        } else if (new_ivertices_count > 2) { // create N edges (N >= 3)
+            MCUT_ASSERT(new_ivertices_count >= 4); // concave polygon intersection produce a minimum of 4 intersection point if not 2
+
+            // our produced intersection points
+            std::vector<
+                std::pair<
+                    vd_t, // descriptor
+                    math::vec3 // coordinates
+                    >>
+                ivertex_coords;
+
+            for (uint32_t v = 0; v < new_ivertices_count; ++v) {
+                vd_t new_ivertex_descr = intersection_test_ivtx_list.at(v);
+                MCUT_ASSERT(m0_is_intersection_point(new_ivertex_descr, ps_vtx_cnt));
+                ivertex_coords.emplace_back(new_ivertex_descr, m0.vertex(new_ivertex_descr));
+            }
+#if 0
+        // TODO: use projection sort
+
+        // since all points are on straight line, we sort them by x-coord, and (possibly) by y-coord if x-coord is the same for all vertices
+        std::sort(ivertex_coords.begin(), ivertex_coords.end(),
+          [&](const std::pair<vd_t, math::vec3>& a,
+            const std::pair<vd_t, math::vec3>& b) {
+              {
+                return (a.second.x() < b.second.x());
+              }
+          });
+
+        const bool x_coordinate_is_same = have_same_coordinate(ivertex_coords, 0);
+
+        if (x_coordinate_is_same) {
+          // ... then  sort on y-coord
+          std::sort(ivertex_coords.begin(), ivertex_coords.end(),
+            [&](const std::pair<vd_t, math::vec3>& a,
+              const std::pair<vd_t, math::vec3>& b) {
+                {
+                  return (a.second.y() < b.second.y());
+                }
+            });
+        }
+#endif
+            std::vector<vd_t> sorted_descriptors = linear_projection_sort(ivertex_coords);
+
+            //for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator iter = ivertex_coords.cbegin() + 1; iter != ivertex_coords.cend(); ++iter) {
+            for (std::vector<vd_t>::const_iterator iter = sorted_descriptors.cbegin() + 1; iter != sorted_descriptors.cend(); ++iter) {
+                //const vd_t src_vertex = (iter - 1)->first;
+                //const vd_t tgt_vertex = (iter)->first;
+                const vd_t src_vertex = *(iter - 1);
+                const vd_t tgt_vertex = *(iter);
+
+                bool cutpath_edge_exists = m0.halfedge(src_vertex, tgt_vertex, true) != mesh_t::null_halfedge();
+
+                if (
+                    cutpath_edge_exists == false
+                    // !interior_edge_exists(m0, src_vertex, tgt_vertex /*, m0_cutpath_edges*/)
+                ) {
+
+                    lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;
+
+                    const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
+
+                    MCUT_ASSERT(h != mesh_t::null_halfedge());
+                    m0_cutpath_edges.emplace_back(m0.edge(h));
+
+                    // NOTE: here we add all edge without assuming anything about which of the will be used to clip either polygon
+                    ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
+                    ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
+
+                    update_neighouring_ps_iface_m0_edge_list(src_vertex, tgt_vertex, ps,
+                        sm_face,
+                        cm_face,
+                        m0_ivtx_to_ps_faces,
+                        ps_iface_to_m0_edge_list,
+                        m0_cutpath_edges);
+
+                    MCUT_ASSERT(m0.target(h) == tgt_vertex);
+                    ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
+
+                    MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
+                    ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
+                }
+            }
+        } // else if (new_ivertices_count > 2) {
+    }
     ///////////////////////////////////////////////////////////////////////////
     // Create new edges partitioning the intersecting ps edges (2-part process)
     ///////////////////////////////////////////////////////////////////////////
