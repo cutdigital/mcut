@@ -22,6 +22,39 @@
 
 #include "mcut/internal/geom.h"
 
+#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+#include "mcut/../source/shewchuk_predicates.c"
+#else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
+// basically the Shewchuk's orient2dfast()
+mcut::math::real_number_t orient2d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc)
+{
+    const mcut::math::real_number_t acx = pa[0] - pc[0];
+    const mcut::math::real_number_t bcx = pb[0] - pc[0];
+    const mcut::math::real_number_t acy = pa[1] - pc[1];
+    const mcut::math::real_number_t bcy = pb[1] - pc[1];
+
+    return (acx * bcy) - (acy * bcx);
+}
+
+// basically the Shewchuk's orient3dfast()
+mcut::math::real_number_t orient3d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc, const mcut::math::real_number_t* pd)
+{
+    const mcut::math::real_number_t adx = pa[0] - pd[0];
+    const mcut::math::real_number_t bdx = pb[0] - pd[0];
+    const mcut::math::real_number_t cdx = pc[0] - pd[0];
+    const mcut::math::real_number_t ady = pa[1] - pd[1];
+    const mcut::math::real_number_t bdy = pb[1] - pd[1];
+    const mcut::math::real_number_t cdy = pc[1] - pd[1];
+    const mcut::math::real_number_t adz = pa[2] - pd[2];
+    const mcut::math::real_number_t bdz = pb[2] - pd[2];
+    const mcut::math::real_number_t cdz = pc[2] - pd[2];
+
+    return (adx * ((bdy * cdz) - (bdz * cdy))) + (bdx * ((cdy * adz) - (cdz * ady))) + (cdx * ((ady * bdz) - (adz * bdy)));
+}
+
+#endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
 namespace mcut {
 namespace geom {
 
@@ -122,11 +155,10 @@ namespace geom {
 
     bool point_on_segment(const math::vec2& pi, const math::vec2& pj, const math::vec2& pk)
     {
-        return (  math::min(pi.x(), pj.x()) <= pk.x() && //
-                  pk.x() <= math::max(pi.x(), pj.x()) && //
-                  math::min(pi.y(), pj.y()) <= pk.y() && //
-                  pk.y() <= math::max(pi.y(), pj.y())
-          );
+        return (math::min(pi.x(), pj.x()) <= pk.x() && //
+            pk.x() <= math::max(pi.x(), pj.x()) && //
+            math::min(pi.y(), pj.y()) <= pk.y() && //
+            pk.y() <= math::max(pi.y(), pj.y()));
     }
 
     // segment 0: ab

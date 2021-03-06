@@ -351,7 +351,7 @@ typedef enum McAccelerationStructure {
 // Storage format:
 //
 // array where nodes (connectivity + AABB) come first followed by N=numFaces uint32_t values denoting the face IDs of each leaf node.
-// NOTE: in LBVH, if leftChildNodeIdx == rightChildNodeIdx, then leaf node idx == rightChildNodeIdx (OR leftChildNodeIdx)
+// NOTE: in LBVH, if leftChildNodeIdx == rightChildNodeIdx, then leaf node idx == rightChildNodeIdx (OR == leftChildNodeIdx)
 // NOTE: in OIBVH, leaf node idx is inferred from relative position of node on level in implicit tree.
 
 struct lbvhNode {
@@ -377,7 +377,6 @@ struct oibvhNode {
 };
 
 // uint32_t faceIdx; // MC_UNDEFINED_VALUE if internal node.
-
 
 // See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawArraysIndirect.xhtml
 // For example on documentation
