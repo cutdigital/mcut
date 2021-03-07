@@ -185,9 +185,17 @@ namespace geom {
         return largestComponentIdx;
     }
 
+    // Intersect a line segment with a plane
+    //
+    // Return values:
+    // 'p': The segment lies wholly within the plane.
+    // 'q': The(first) q endpoint is on the plane (but not 'p').
+    // 'r' : The(second) r endpoint is on the plane (but not 'p').
+    // '0' : The segment lies strictly to one side or the other of the plane.
+    // '1': The segment intersects the plane, and none of {p, q, r} hold.
     char SegPlaneInt(math::vec3& p, int& planeNormalLargestComponent, const math::vec3& q, const math::vec3& r, const math::vec3* polygonVertices, const int polygonVertexCount)
     {
-        double num, denom, t;
+        math::real_number_t num, denom, t;
         int i;
 
         math::vec3 planeNormal;
@@ -225,10 +233,76 @@ namespace geom {
         }
     }
 
-    char InPoly2D(const math::vec2 p, const math::vec2* polygonVertices, const int polygonVertexCount)
+    // Count the number ray crossings to determine if a point 'q' lies inside or outside a given polygon.
+    //
+    // Return values:
+    // 'i': q is strictly interior
+    // 'o': q is strictly exterior (outside).
+    // 'e': q is on an edge, but not an endpoint.
+    // 'v': q is a vertex.
+    char InPoly2D(const math::vec2 q, math::vec2* polygonVertices, const int polygonVertexCount)
     {
+        int i, il; /* point index; il = i—1 mod n */
+        int d; /* dimension index */
+        double x; /* x intersection ofe with ray */
+        int Rcross = 0; /* number of right edge/ray crossings */
+        int Lcross = 0; /* number ofleft edge/ray crossings */
+        bool Rstrad, Lstrad; /*flags indicating the edge strads the x axis. */
+
+        /* Shift so that q is the origin. Note this destroys the polygon.
+        This is done for pedagogical clarity. */
+        for (i = 0; i < polygonVertexCount; i++) {
+            for (d = 0; d < 3; d++) {
+                polygonVertices[i][d] = polygonVertices[i][d] - q[d];
+            }
+        }
+
+        /* For each edge e = (i—lj), see if crosses ray. */
+        for (i = 0; i < polygonVertexCount; i++) {
+
+            /* First check ifq = (0, 0) is a vertex. */
+            if (polygonVertices[i].x() == 0 && polygonVertices[i].y() == 0) {
+                return 'v';
+            }
+
+            il = (i + polygonVertexCount - 1) % polygonVertexCount;
+
+            /* Check ife straddles x axis, with bias above/below.*/
+
+            // Rstrad is TRUE iff one endpoint of e is strictly above the x axisand the other is not (i.e., the other is on or below)
+            Rstrad = (polygonVertices[i].y() > 0) != (polygonVertices[il].y() > 0);
+            Lstrad = (polygonVertices[i].y() < 0) != (polygonVertices[il].y() < 0);
+
+            if (Rstrad || Lstrad) {
+                /* Compute intersection ofe with x axis. */
+
+                // the computation of x is needed whenever either of these straddle variables is TRUE, which
+                // only excludes edges passing through q = (0, 0) (and incidentally protects against division by 0).
+                x = (polygonVertices[i].x() * polygonVertices[il].y() - polygonVertices[il].x() * polygonVertices[i].y())
+                    / (polygonVertices[il].y() - polygonVertices[i].y());
+                if (Rstrad && x > 0) {
+                    Rcross++;
+                }
+                if (Lstrad && x < 0) {
+                    Lcross++;
+                }
+            } /* end straddle computation*/
+        } // end for
+
+        /* q on an edge if L/Rcross counts are not the same parity.*/
+        if ((Rcross % 2) != (Lcross % 2)) {
+            return 'e';
+        }
+
+        /* q inside iff an odd number of crossings. */
+        if ((Rcross % 2) == 1) {
+            return 'i';
+        } else {
+            return 'o';
+        }
     }
 
+    // Checks if p point is in a polygon (3D)
     char InPoly3D(const math::vec3 p, const math::vec3* polygonVertices, const int polygonVertexCount, const int planeNormalLargestComponent)
     {
         /* Project out coordinate m in both p and the triangular face */
