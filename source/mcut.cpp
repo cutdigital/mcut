@@ -43,6 +43,8 @@
 #include "mcut/internal/bvh.h"
 #include "mcut/internal/geom.h"
 
+const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-10;
+
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags convertRoundingMode(int rm)
 {
@@ -481,15 +483,15 @@ McResult convert(const mcut::status_t& v)
         result = McResult::MC_INVALID_CUT_MESH;
         break;
     case mcut::status_t::INVALID_MESH_INTERSECTION:
-    case mcut::status_t::INVALID_BVH_INTERSECTION:
-        result = McResult::MC_INVALID_OPERATION;
-        break;
-    case mcut::status_t::EDGE_EDGE_INTERSECTION:
-        result = McResult::MC_EDGE_EDGE_INTERSECTION;
-        break;
-    case mcut::status_t::FACE_VERTEX_INTERSECTION:
-        result = McResult::MC_FACE_VERTEX_INTERSECTION;
-        break;
+    //case mcut::status_t::INVALID_BVH_INTERSECTION:
+    //    result = McResult::MC_INVALID_OPERATION;
+    //    break;
+    //case mcut::status_t::EDGE_EDGE_INTERSECTION:
+    //    result = McResult::MC_EDGE_EDGE_INTERSECTION;
+    //   break;
+    //case mcut::status_t::FACE_VERTEX_INTERSECTION:
+    //    result = McResult::MC_FACE_VERTEX_INTERSECTION;
+    //    break;
     default:
         std::fprintf(stderr, "[MCUT]: warning - conversion error (McResult)\n");
     }
@@ -1634,21 +1636,22 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     mcut::output_t backendOutput;
 
-    constexpr double epsilon = 1e-8;
-
     int perturbationIters = -1;
     do {
         backendOutput.status = mcut::status_t::SUCCESS;
         perturbationIters++;
+        printf("perturbationIters=%d\n", perturbationIters);
 
-        mcut::math::vec3 perturbation(0.0, 0.0, 0.0);
+        mcut::math::vec3 perturbation;
 
         if (perturbationIters > 0) {
             std::default_random_engine rd(perturbationIters);
             std::mt19937 mt(rd());
             std::uniform_real_distribution<double> dist(0.1, 1.0);
-
-            perturbation = mcut::math::vec3(dist(mt) * epsilon, dist(mt) * epsilon, dist(mt) * epsilon);
+            perturbation = mcut::math::vec3(
+                dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
+                dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
+                dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT);
         }
 
         mcut::mesh_t cutMeshInternal;
@@ -1659,11 +1662,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             pCutMeshFaceIndices,
             pCutMeshFaceSizes,
             numCutMeshVertices,
-            numCutMeshFaces, &perturbation);
+            numCutMeshFaces,
+            ((perturbationIters == 0) ? NULL : &perturbation));
 
         if (result != McResult::MC_NO_ERROR) {
             return result;
         }
+
         backendInput.cut_mesh = &cutMeshInternal;
 
         std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
@@ -1742,9 +1747,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         if (intersecting_sm_cm_face_pairs.empty()) {
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
-            //lg.set_reason_for_failure("meshes are too far apart.");
-            //output.status = mcut::status_t::SUCCESS; //mcut::status_t::INVALID_BVH_INTERSECTION;
-            result = MC_NO_ERROR;
             return result;
         }
 
@@ -1753,28 +1755,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         // cut!
         // ----
 
-        /*
-        "Writers of libraries using MPFR should be aware that the application and/or another library
-        used by the application may also use MPFR, so that changing the exponent range, the default
-        precision, or the default rounding mode may have an effect on this other use of MPFR since
-        these data are not duplicated (unless they are in a different thread). Therefore any such value
-        changed in a library function should be restored before the function returns (unless the purpose
-        of the function is to do such a change). Writers of software using MPFR should also be careful
-        when changing such a value if they use a library using MPFR (directly or indirectly), in order
-        to make sure that such a change is compatible with the library."
-
-    */
         try {
             ctxtPtr->applyPrecisionAndRoundingModeSettings();
             mcut::dispatch(backendOutput, backendInput);
             ctxtPtr->revertPrecisionAndRoundingModeSettings();
-        } catch (const mcut::general_position_violation_t& e) {
-            continue;
         } catch (const std::exception* e) {
-            fprintf(stderr, "fatal: exception caught\n");
+            fprintf(stderr, "fatal: exception caught : %s\n", e->what());
+            result = MC_INVALID_OPERATION;
         }
-
-        intersecting_sm_cm_face_pairs.clear(); // free
 
     } while (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION);
 

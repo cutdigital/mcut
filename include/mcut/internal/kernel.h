@@ -39,15 +39,30 @@ enum class status_t {
     // * no faces
     // * non-manifold
     // * contains more than one connected component
-    INVALID_SRC_MESH = -1,
+    INVALID_SRC_MESH = -1, // TODO: these error flags should be generated in mcut.cpp not the kernel
     INVALID_CUT_MESH = -2,
-    EDGE_EDGE_INTERSECTION = -3, // Found an edge-edge intersection.
-    FACE_VERTEX_INTERSECTION = -4, // Found an face-vertex intersection.
+    //EDGE_EDGE_INTERSECTION = -3, // Found an edge-edge intersection.
+    //FACE_VERTEX_INTERSECTION = -4, // Found an face-vertex intersection.
+
     // there exists no edge in the input mesh which intersects cut-surface polygon
-    INVALID_MESH_INTERSECTION = -5,
+    INVALID_MESH_INTERSECTION = -3,
+
     // The bounding volume heirarchies of the input mesh and cut surface do not overlap
-    INVALID_BVH_INTERSECTION = -6,
-    GENERAL_POSITION_VIOLATION = -7
+    //INVALID_BVH_INTERSECTION = -6,
+    /*
+        MCUT is formulated for inputs in general position. Here the notion of general position is defined with
+        respect to the orientation predicate (as evaluated on the intersecting polygons). Thus, a set of points 
+        is in general position if no three points are collinear and also no four points are coplanar.
+
+        MCUT uses the "GENERAL_POSITION_VIOLATION" flag to inform of when to use perturbation (of the
+        cut-mesh) so as to bring the input into general position. In such cases, the idea is to solve the cutting
+        problem not on the given input, but on a nearby input. The nearby input is obtained by perturbing the given
+        input. The perturbed input will then be in general position and, since it is near the original input,
+        the result for the perturbed input will hopefully still be useful.  This is justified by the fact that
+        the task of MCUT is not to decide whether the input is in general position but rather to make perturbation
+        on the input (if) necessary within the available precision of the computing device.
+    */
+    GENERAL_POSITION_VIOLATION = -4
 };
 
 //
@@ -147,29 +162,6 @@ struct output_t {
     // NOTE: not always defined (depending on the arising cutpath configurations)
     output_mesh_info_t seamed_src_mesh;
     output_mesh_info_t seamed_cut_mesh;
-};
-
-/*
-  MCUT is formulated for inputs in general position. Here the notion of general position is defined with 
-  respect to the orientation predicate. Thus, a set of points is in general position if no three points 
-  are collinear.
-
-  MCUT uses the "general_position_violation_t" exception to inform of when to use perturbation (of the 
-  cut-mesh) so as to bring the input into general position. In such cases, the idea is to solve the cutting 
-  problem not on the given input, but on a nearby input. The nearby input is obtained by perturbing the given 
-  input. The perturbed input will then be in general position and, since it is near the original input, 
-  the result for the perturbed input will hopefully still be useful.  This is justified by the fact that 
-  the task of MCUT is not to decide whether the input is in general position but rather to make perturbation 
-  on the input (if) necessary within the available precision of the computing device.
-*/
-class general_position_violation_t : std::exception {
-public:
-    general_position_violation_t()
-        : std::exception()
-    {
-    }
-
-private:
 };
 
 //
