@@ -1721,7 +1721,7 @@ void dispatch(output_t& output, const input_t& input)
 
             // compute plane of face B
             // -----------------------
-
+#if 0
             // compute normal of face B
             math::vec3 face_B_plane_normal;
             geom::polygon_normal(face_B_plane_normal, face_B_vertices.data(), (int)face_B_vertices.size());
@@ -1733,7 +1733,15 @@ void dispatch(output_t& output, const input_t& input)
             geom::polygon_plane_d_param(face_B_plane_param_d, face_B_plane_normal, face_B_vertices.data(), (int)face_B_vertices.size());
 
             lg << "d param: " << face_B_plane_param_d << std::endl;
+#else
+            math::vec3 face_B_plane_normal;
+            math::real_number_t face_B_plane_param_d;
 
+            const int face_B_plane_normal_max_comp = geom::PlaneCoeff(face_B_plane_normal, face_B_plane_param_d, face_B_vertices.data(), (int)face_B_vertices.size());
+            lg << "normal vec: " << face_B_plane_normal << std::endl;
+            lg << "largest component: " << face_B_plane_normal_max_comp << std::endl;
+            lg << "d param: " << face_B_plane_param_d << std::endl;
+#endif
             // A mapping between each [newly added] intersection-point and the halfedge of face A that intersected face B
             std::map<
                 vd_t, // newly added intersection point
@@ -1772,6 +1780,7 @@ void dispatch(output_t& output, const input_t& input)
                 const math::vec3& face_A_halfedge_target_vertex = ps.vertex(face_A_halfedge_target_descr);
 
                 math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
+#if 0
                 math::real_number_t tparam = 0.0; // how far along the halfedge the intersection point is i.e. [0.0...1.0].
 
                 // check if halfedge of face A intersects the plane of face B
@@ -1784,36 +1793,86 @@ void dispatch(output_t& output, const input_t& input)
                     // segment
                     face_A_halfedge_source_vertex,
                     face_A_halfedge_target_vertex);
+#else
+                int face_B_plane_normal_max_comp_ = 0;
+                char segment_intersection_type = geom::SegPlaneInt(
+                    intersection_point,
+                    face_B_plane_normal_max_comp_,
+                    face_A_halfedge_source_vertex,
+                    face_A_halfedge_target_vertex,
+                    face_B_vertices.data(),
+                    (int)face_B_vertices.size());
 
-                lg << "plane intersection exists = " << std::boolalpha << (bool)have_plane_intersection << std::endl;
+                if (segment_intersection_type == 'p' || segment_intersection_type == 'q' || segment_intersection_type == 'r') {
+                    if (input.disable_general_position_enforcement) {
+                        // Our assuption of having inputs in general position has been violated, we need to terminate
+                        // with an error since perturbation (enforment of general positions) is disabled.
+                        // If any one of a segment's vertices only touch (i.e. lie on) the plane (in 3D)
+                        // then that implies a situation of cutting through a vertex which is undefined.
+                        lg.set_reason_for_failure("invalid segment-plane intersection ('" + std::to_string(segment_intersection_type) + "')");
+                        output.status = status_t::FACE_VERTEX_INTERSECTION;
+                    } else {
+                        output.status = status_t::GENERAL_POSITION_VIOLATION;
+                        throw general_position_violation_t();
+                    }
+                }
+
+                bool have_plane_intersection = (segment_intersection_type == '1');
+
+#endif
+                lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;
 
                 if (have_plane_intersection) { // does the halfedge segment intersect the plane?
                     lg.indent();
 
                     lg << "intersection point: " << intersection_point << std::endl;
 
+#if 0
                     // check if the computed intersection point is inside face B
                     bool have_point_in_polygon = geom::point_in_polygon(
                         intersection_point,
                         face_B_plane_normal,
                         face_B_vertices.data(),
                         (int)face_B_vertices.size());
+#else
+                    char in_poly_test_intersection_type = geom::InPoly3D(
+                        intersection_point,
+                        face_B_vertices.data(),
+                        (int)face_B_vertices.size(),
+                        face_B_plane_normal_max_comp);
+#endif
+                    if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e') {
+                        if (input.disable_general_position_enforcement) {
+                            // Our assuption of having inputs in general position has been violated, we need to terminate
+                            // with an error since perturbation (enforment of general positions) is disabled.
+                            // This is because our intersection registry formulation requires that edges completely
+                            // penetrate/intersect through polygon's area.
+                            lg.set_reason_for_failure("invalid point-in-polygon test result ('" + std::to_string(in_poly_test_intersection_type) + "')");
+                            output.status = status_t::FACE_VERTEX_INTERSECTION;
+                            return;
+                        } else {
+                            output.status = status_t::GENERAL_POSITION_VIOLATION;
+                            throw general_position_violation_t();
+                        }
+                    }
+
+                    bool have_point_in_polygon = in_poly_test_intersection_type == 'i';
 
                     lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;
 
                     if (have_point_in_polygon) { // NOTE: polygon must be [inside] for this to pass
 
-                        if (tparam == math::real_number_t(0.0) || tparam == math::real_number_t(1.0)) {
-                            // NOTE: if t == 0 or t == 1, then we need to terminate with an error.
-                            // This is because 1) our intersection registry formulation requires that
-                            // edges completely penetrate/intersect through polygon's area. Also, 2) If any
-                            // one of a segment's vertices only touch (i.e. lie on) the polygon (in 3D)
-                            // then that implies a situation of cutting through a vertex which is undefined
-                            // (topologically).
-                            lg.set_reason_for_failure("invalid polygon intersection (vertex lies on face)");
-                            output.status = status_t::FACE_VERTEX_INTERSECTION;
-                            return;
-                        }
+                        //if (tparam == math::real_number_t(0.0) || tparam == math::real_number_t(1.0)) {
+                        // NOTE: if t == 0 or t == 1, then we need to terminate with an error.
+                        // This is because 1) our intersection registry formulation requires that
+                        // edges completely penetrate/intersect through polygon's area. Also, 2) If any
+                        // one of a segment's vertices only touch (i.e. lie on) the polygon (in 3D)
+                        // then that implies a situation of cutting through a vertex which is undefined
+                        // (topologically).
+                        //    lg.set_reason_for_failure("invalid polygon intersection (vertex lies on face)");
+                        //    output.status = status_t::FACE_VERTEX_INTERSECTION;
+                        //    return;
+                        //}
 
                         vd_t pre_existing_copy = mesh_t::null_vertex(); // set to correct value if intersection has already been computed
 
@@ -2173,7 +2232,10 @@ void dispatch(output_t& output, const input_t& input)
         >
         ivtx_to_incoming_hlist;
 
-    for (std::vector<std::pair<std::pair<fd_t, fd_t>, std::vector<vd_t>>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin(); cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend(); ++iter) {
+    for (std::vector<std::pair<std::pair<fd_t, fd_t>, std::vector<vd_t>>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
+         cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
+         ++cutpath_edge_creation_info_iter) {
+
         const fd_t sm_face = cutpath_edge_creation_info_iter->first.first;
         const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
         const std::vector<vd_t>& intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;

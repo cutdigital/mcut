@@ -32,6 +32,7 @@
 
 #include <fstream>
 #include <memory>
+#include <random> // perturbation
 #include <stdio.h>
 #include <string.h>
 
@@ -311,7 +312,8 @@ McResult indexArrayMeshToHalfedgeMesh(
     const uint32_t* pFaceIndices,
     const uint32_t* pFaceSizes,
     const uint32_t numVertices,
-    const uint32_t numFaces)
+    const uint32_t numFaces,
+    const mcut::math::vec3* perturbation = NULL)
 {
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
 
@@ -321,20 +323,21 @@ McResult indexArrayMeshToHalfedgeMesh(
     if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) {
         const float* vptr = reinterpret_cast<const float*>(pVertices);
         for (uint32_t i = 0; i < numVertices; ++i) {
-            const float& x = vptr[(i * 3) + 0];
-            const float& y = vptr[(i * 3) + 1];
-            const float& z = vptr[(i * 3) + 2];
+            const float& x = vptr[(i * 3) + 0] + (perturbation != NULL ? (*perturbation).x() : 0.f);
+            const float& y = vptr[(i * 3) + 1] + (perturbation != NULL ? (*perturbation).y() : 0.f);
+            const float& z = vptr[(i * 3) + 2] + (perturbation != NULL ? (*perturbation).z() : 0.f);
             vmap[i] = halfedgeMesh.add_vertex(x, y, z);
         }
     } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) {
         const double* vptr = reinterpret_cast<const double*>(pVertices);
         for (uint32_t i = 0; i < numVertices; ++i) {
-            const double& x = vptr[(i * 3) + 0];
-            const double& y = vptr[(i * 3) + 1];
-            const double& z = vptr[(i * 3) + 2];
+            const double& x = vptr[(i * 3) + 0] + (perturbation != NULL ? (*perturbation).x() : 0.f);
+            const double& y = vptr[(i * 3) + 1] + (perturbation != NULL ? (*perturbation).y() : 0.f);
+            const double& z = vptr[(i * 3) + 2] + (perturbation != NULL ? (*perturbation).z() : 0.f);
             vmap[i] = halfedgeMesh.add_vertex(x, y, z);
         }
     } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_EXACT) {
+#pragma warning "Implement  + (perturbation != NULL ? (*perturbation).x() : 0.f) "
         const char* vptr = reinterpret_cast<const char*>(pVertices);
         const char* vptr_ = vptr; // shifted
 
@@ -1523,29 +1526,15 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         return result;
     }
 
-    mcut::mesh_t cutMeshInternal;
-    result = indexArrayMeshToHalfedgeMesh(
-        ctxtPtr,
-        cutMeshInternal,
-        pCutMeshVertices,
-        pCutMeshFaceIndices,
-        pCutMeshFaceSizes,
-        numCutMeshVertices,
-        numCutMeshFaces);
-
-    if (result != McResult::MC_NO_ERROR) {
-        return result;
-    }
-
     // check here to ensure that vertex coordinates of one mesh are not colocated with any coordinates in the other mesh
-    result = checkMeshPlacement(ctxtPtr, srcMeshInternal, cutMeshInternal);
-    if (result != McResult::MC_NO_ERROR) {
-        return result;
-    }
+    //result = checkMeshPlacement(ctxtPtr, srcMeshInternal, cutMeshInternal);
+    //if (result != McResult::MC_NO_ERROR) {
+    //    return result;
+    //}
 
     mcut::input_t backendInput;
     backendInput.src_mesh = &srcMeshInternal;
-    backendInput.cut_mesh = &cutMeshInternal;
+
     backendInput.verbose = false;
     backendInput.require_looped_cutpaths = false;
 
@@ -1643,115 +1632,151 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
-    std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
-
-    constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
-
-#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
-    ///////////////////////////////////////////////////////////////////////////
-    // generate BVH meshes
-    ///////////////////////////////////////////////////////////////////////////
-
-    if (input.verbose) {
-        lg << "create BVH meshes\n";
-
-        for (std::map<std::string, std::vector<geom::bounding_box_t<math::fast_vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
-             mesh_bvh_iter != bvh_internal_nodes_array.end();
-             ++mesh_bvh_iter) {
-
-            const std::string mesh_name = mesh_bvh_iter->first;
-            const std::vector<geom::bounding_box_t<math::fast_vec3>>& internal_nodes_array = mesh_bvh_iter->second;
-            const std::vector<std::pair<fd_t, unsigned int>>& leaf_nodes_array = bvh_leaf_nodes_array.at(mesh_name);
-            const int real_leaf_node_count = (int)leaf_nodes_array.size();
-            //const int bvh_real_node_count = bvh::get_ostensibly_implicit_bvh_size(real_leaf_node_count);
-            const int leaf_level_index = bvh::get_leaf_level_from_real_leaf_count(real_leaf_node_count);
-
-            mesh_t bvh_mesh;
-
-            // internal levels
-            for (int level_idx = 0; level_idx <= leaf_level_index; ++level_idx) {
-
-                const int rightmost_real_leaf = bvh::get_rightmost_real_leaf(leaf_level_index, real_leaf_node_count);
-                const int rightmost_real_node_on_level = bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_idx);
-                const int leftmost_real_node_on_level = bvh::get_level_leftmost_node(level_idx);
-                const int number_of_real_nodes_on_level = (rightmost_real_node_on_level - leftmost_real_node_on_level) + 1;
-
-                for (int level_node_idx_iter = 0; level_node_idx_iter < number_of_real_nodes_on_level; ++level_node_idx_iter) {
-
-                    geom::bounding_box_t<math::fast_vec3> node_bbox;
-                    const bool is_leaf_level = (level_idx == leaf_level_index);
-
-                    if (is_leaf_level) {
-                        const fd_t leaf_node_face = leaf_nodes_array.at(level_node_idx_iter).first;
-                        //node_bbox = ps_face_bboxes.at(leaf_node_face);
-                        node_bbox.expand(ps_face_bboxes.at(leaf_node_face));
-                    } else {
-                        const int node_implicit_idx = leftmost_real_node_on_level + level_node_idx_iter;
-                        const int node_memory_idx = bvh::get_node_mem_index(
-                            node_implicit_idx,
-                            leftmost_real_node_on_level,
-                            0,
-                            rightmost_real_node_on_level);
-                        node_bbox.expand(internal_nodes_array.at(node_memory_idx));
-                    }
-
-                    std::vector<vd_t> node_bbox_vertices = insert_bounding_box_mesh(bvh_mesh, node_bbox);
-                }
-            }
-
-            dump_mesh(bvh_mesh, (mesh_name + ".bvh").c_str());
-        }
-
-    } // if (input.verbose)
-#endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
-
-    // Evaluate BVHs
-    // :::::::::::::
-
-    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
-
-    std::vector<std::pair<mcut::fd_t, mcut::fd_t>> intersecting_sm_cm_face_pairs;
-
-    intersectOIBVHs(intersecting_sm_cm_face_pairs, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
-
-    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
-
-    if (intersecting_sm_cm_face_pairs.empty()) {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
-        //lg.set_reason_for_failure("meshes are too far apart.");
-        //output.status = mcut::status_t::SUCCESS; //mcut::status_t::INVALID_BVH_INTERSECTION;
-        result = MC_NO_ERROR;
-        return result;
-    }
-
-    backendInput.intersecting_sm_cm_face_pairs = &intersecting_sm_cm_face_pairs;
-
     mcut::output_t backendOutput;
 
-    // cut!
-    // ----
-    {
-        /*
-            "Writers of libraries using MPFR should be aware that the application and/or another library
-            used by the application may also use MPFR, so that changing the exponent range, the default
-            precision, or the default rounding mode may have an effect on this other use of MPFR since
-            these data are not duplicated (unless they are in a different thread). Therefore any such value
-            changed in a library function should be restored before the function returns (unless the purpose
-            of the function is to do such a change). Writers of software using MPFR should also be careful
-            when changing such a value if they use a library using MPFR (directly or indirectly), in order
-            to make sure that such a change is compatible with the library."
+    constexpr double epsilon = 1e-8;
 
-        */
+    int perturbationIters = -1;
+    do {
+        backendOutput.status = mcut::status_t::SUCCESS;
+        perturbationIters++;
+
+        mcut::math::vec3 perturbation(0.0, 0.0, 0.0);
+
+        if (perturbationIters > 0) {
+            std::default_random_engine rd(perturbationIters);
+            std::mt19937 mt(rd());
+            std::uniform_real_distribution<double> dist(0.1, 1.0);
+
+            perturbation = mcut::math::vec3(dist(mt) * epsilon, dist(mt) * epsilon, dist(mt) * epsilon);
+        }
+
+        mcut::mesh_t cutMeshInternal;
+        result = indexArrayMeshToHalfedgeMesh(
+            ctxtPtr,
+            cutMeshInternal,
+            pCutMeshVertices,
+            pCutMeshFaceIndices,
+            pCutMeshFaceSizes,
+            numCutMeshVertices,
+            numCutMeshFaces, &perturbation);
+
+        if (result != McResult::MC_NO_ERROR) {
+            return result;
+        }
+        backendInput.cut_mesh = &cutMeshInternal;
+
+        std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
+        std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
+
+        constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+
+#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
+        ///////////////////////////////////////////////////////////////////////////
+        // generate BVH meshes
+        ///////////////////////////////////////////////////////////////////////////
+
+        if (input.verbose) {
+            lg << "create BVH meshes\n";
+
+            for (std::map<std::string, std::vector<geom::bounding_box_t<math::fast_vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
+                 mesh_bvh_iter != bvh_internal_nodes_array.end();
+                 ++mesh_bvh_iter) {
+
+                const std::string mesh_name = mesh_bvh_iter->first;
+                const std::vector<geom::bounding_box_t<math::fast_vec3>>& internal_nodes_array = mesh_bvh_iter->second;
+                const std::vector<std::pair<fd_t, unsigned int>>& leaf_nodes_array = bvh_leaf_nodes_array.at(mesh_name);
+                const int real_leaf_node_count = (int)leaf_nodes_array.size();
+                //const int bvh_real_node_count = bvh::get_ostensibly_implicit_bvh_size(real_leaf_node_count);
+                const int leaf_level_index = bvh::get_leaf_level_from_real_leaf_count(real_leaf_node_count);
+
+                mesh_t bvh_mesh;
+
+                // internal levels
+                for (int level_idx = 0; level_idx <= leaf_level_index; ++level_idx) {
+
+                    const int rightmost_real_leaf = bvh::get_rightmost_real_leaf(leaf_level_index, real_leaf_node_count);
+                    const int rightmost_real_node_on_level = bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_idx);
+                    const int leftmost_real_node_on_level = bvh::get_level_leftmost_node(level_idx);
+                    const int number_of_real_nodes_on_level = (rightmost_real_node_on_level - leftmost_real_node_on_level) + 1;
+
+                    for (int level_node_idx_iter = 0; level_node_idx_iter < number_of_real_nodes_on_level; ++level_node_idx_iter) {
+
+                        geom::bounding_box_t<math::fast_vec3> node_bbox;
+                        const bool is_leaf_level = (level_idx == leaf_level_index);
+
+                        if (is_leaf_level) {
+                            const fd_t leaf_node_face = leaf_nodes_array.at(level_node_idx_iter).first;
+                            //node_bbox = ps_face_bboxes.at(leaf_node_face);
+                            node_bbox.expand(ps_face_bboxes.at(leaf_node_face));
+                        } else {
+                            const int node_implicit_idx = leftmost_real_node_on_level + level_node_idx_iter;
+                            const int node_memory_idx = bvh::get_node_mem_index(
+                                node_implicit_idx,
+                                leftmost_real_node_on_level,
+                                0,
+                                rightmost_real_node_on_level);
+                            node_bbox.expand(internal_nodes_array.at(node_memory_idx));
+                        }
+
+                        std::vector<vd_t> node_bbox_vertices = insert_bounding_box_mesh(bvh_mesh, node_bbox);
+                    }
+                }
+
+                dump_mesh(bvh_mesh, (mesh_name + ".bvh").c_str());
+            }
+
+        } // if (input.verbose)
+#endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
+
+        // Evaluate BVHs
+        // :::::::::::::
+
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
+
+        std::vector<std::pair<mcut::fd_t, mcut::fd_t>> intersecting_sm_cm_face_pairs;
+
+        intersectOIBVHs(intersecting_sm_cm_face_pairs, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
+
+        if (intersecting_sm_cm_face_pairs.empty()) {
+            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+            //lg.set_reason_for_failure("meshes are too far apart.");
+            //output.status = mcut::status_t::SUCCESS; //mcut::status_t::INVALID_BVH_INTERSECTION;
+            result = MC_NO_ERROR;
+            return result;
+        }
+
+        backendInput.intersecting_sm_cm_face_pairs = &intersecting_sm_cm_face_pairs;
+
+        // cut!
+        // ----
+
+        /*
+        "Writers of libraries using MPFR should be aware that the application and/or another library
+        used by the application may also use MPFR, so that changing the exponent range, the default
+        precision, or the default rounding mode may have an effect on this other use of MPFR since
+        these data are not duplicated (unless they are in a different thread). Therefore any such value
+        changed in a library function should be restored before the function returns (unless the purpose
+        of the function is to do such a change). Writers of software using MPFR should also be careful
+        when changing such a value if they use a library using MPFR (directly or indirectly), in order
+        to make sure that such a change is compatible with the library."
+
+    */
         try {
             ctxtPtr->applyPrecisionAndRoundingModeSettings();
             mcut::dispatch(backendOutput, backendInput);
-        } catch (...) {
+            ctxtPtr->revertPrecisionAndRoundingModeSettings();
+        } catch (const mcut::general_position_violation_t& e) {
+            continue;
+        } catch (const std::exception* e) {
             fprintf(stderr, "fatal: exception caught\n");
         }
-        ctxtPtr->revertPrecisionAndRoundingModeSettings();
+
         intersecting_sm_cm_face_pairs.clear(); // free
-    }
+
+    } while (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION);
 
     result = convert(backendOutput.status);
 

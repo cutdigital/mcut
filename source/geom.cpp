@@ -58,6 +58,175 @@ mcut::math::real_number_t orient3d(const mcut::math::real_number_t* pa, const mc
 namespace mcut {
 namespace geom {
 
+    int PlaneCoeff(math::vec3& polygonNormal, math::real_number_t& d, const math::vec3* polygonVertices, const int polygonVertexCount)
+    {
+        // compute normal
+        polygon_normal(polygonNormal, polygonVertices, polygonVertexCount);
+
+        d = math::dot_product(polygonVertices[0], polygonNormal);
+
+        math::real_number_t largestComponent(0.0);
+        math::real_number_t tmp(0.0);
+        int largestComponentIdx = 0;
+
+        for (int i = 0; i < 3; ++i) {
+            tmp = math::absolute_value(polygonNormal[i]);
+            if (tmp > largestComponent) {
+                largestComponent = tmp;
+                largestComponentIdx = i;
+            }
+        }
+
+        return largestComponentIdx;
+    }
+
+    // Intersect a line segment with a plane
+    //
+    // Return values:
+    // 'p': The segment lies wholly within the plane.
+    // 'q': The(first) q endpoint is on the plane (but not 'p').
+    // 'r' : The(second) r endpoint is on the plane (but not 'p').
+    // '0' : The segment lies strictly to one side or the other of the plane.
+    // '1': The segment intersects the plane, and none of {p, q, r} hold.
+    char SegPlaneInt(math::vec3& p, int& planeNormalLargestComponent, const math::vec3& q, const math::vec3& r, const math::vec3* polygonVertices, const int polygonVertexCount)
+    {
+        math::real_number_t num, denom, t;
+        int i;
+
+        math::vec3 planeNormal;
+        math::real_number_t planeDCoeff;
+        planeNormalLargestComponent = PlaneCoeff(planeNormal, planeDCoeff, polygonVertices, polygonVertexCount);
+
+        num = planeDCoeff - math::dot_product(q, planeNormal);
+        const math::vec3 rq = (r - q);
+        denom = math::dot_product(rq, planeNormal);
+
+        if (denom == 0.0) { /// Segment is parallel to plane.
+            if (num == 0.0) { // 'q' is on plane.
+                return 'p'; // The segment lies wholly within the plane
+            } else {
+                return '0';
+            }
+        } else {
+            t = num / denom;
+        }
+
+        for (int i = 0; i < 3; ++i) {
+            p[i] = q[i] + t * (r[i] - q[i]);
+        }
+
+        if ((0.0 < t) && (t < 1.0)) {
+            return '1'; // The segment intersects the plane, and none of {p, q, r} hold
+        } else if (num == 0) // t==0
+        {
+            return 'q'; // The (first) q endpoint is on the plane (but not 'p').
+        } else if (num == denom) // t==1
+        {
+            return 'r'; // The (second) r endpoint is on the plane (but not 'p').
+        } else {
+            return '0'; // The segment lies strictly to one side or the other of the plane
+        }
+    }
+
+    // Count the number ray crossings to determine if a point 'q' lies inside or outside a given polygon.
+    //
+    // Return values:
+    // 'i': q is strictly interior
+    // 'o': q is strictly exterior (outside).
+    // 'e': q is on an edge, but not an endpoint.
+    // 'v': q is a vertex.
+    char InPoly2D(const math::vec2 q, math::vec2* polygonVertices, const int polygonVertexCount)
+    {
+        int i, il; /* point index; il = i—1 mod n */
+        int d; /* dimension index */
+        double x; /* x intersection ofe with ray */
+        int Rcross = 0; /* number of right edge/ray crossings */
+        int Lcross = 0; /* number ofleft edge/ray crossings */
+        bool Rstrad, Lstrad; /*flags indicating the edge strads the x axis. */
+
+        /* Shift so that q is the origin. Note this destroys the polygon.
+    This is done for pedagogical clarity. */
+        for (i = 0; i < polygonVertexCount; i++) {
+            for (d = 0; d < 2; d++) {
+                polygonVertices[i][d] = polygonVertices[i][d] - q[d];
+            }
+        }
+
+        /* For each edge e = (i—lj), see if crosses ray. */
+        for (i = 0; i < polygonVertexCount; i++) {
+
+            /* First check if q = (0, 0) is a vertex. */
+            if (polygonVertices[i].x() == 0 && polygonVertices[i].y() == 0) {
+                return 'v';
+            }
+
+            il = (i + polygonVertexCount - 1) % polygonVertexCount;
+
+            /* Check if e straddles x axis, with bias above/below.*/
+
+            // Rstrad is TRUE iff one endpoint of e is strictly above the x axis and the other is not (i.e., the other is on or below)
+            Rstrad = (polygonVertices[i].y() > 0) != (polygonVertices[il].y() > 0);
+            Lstrad = (polygonVertices[i].y() < 0) != (polygonVertices[il].y() < 0);
+
+            if (Rstrad || Lstrad) {
+                /* Compute intersection ofe with x axis. */
+
+                // the computation of x is needed whenever either of these straddle variables is TRUE, which
+                // only excludes edges passing through q = (0, 0) (and incidentally protects against division by 0).
+                x = (polygonVertices[i].x() * polygonVertices[il].y() - polygonVertices[il].x() * polygonVertices[i].y())
+                    / (polygonVertices[il].y() - polygonVertices[i].y());
+                if (Rstrad && x > 0) {
+                    Rcross++;
+                }
+                if (Lstrad && x < 0) {
+                    Lcross++;
+                }
+            } /* end straddle computation*/
+        } // end for
+
+        /* q on an edge if L/Rcross counts are not the same parity.*/
+        if ((Rcross % 2) != (Lcross % 2)) {
+            return 'e';
+        }
+
+        /* q inside iff an odd number of crossings. */
+        if ((Rcross % 2) == 1) {
+            return 'i';
+        } else {
+            return 'o';
+        }
+    }
+
+    char InPoly3D(const math::vec3 p, const math::vec3* polygonVertices, const int polygonVertexCount, const int planeNormalLargestComponent)
+    {
+        /* Project out coordinate m in both p and the triangular face */
+
+        int k = 0;
+        math::vec2 pp; /*projected p */
+        for (int j = 0; j < 3; j++) { // for each component
+            if (j != planeNormalLargestComponent) { /* skip largest coordinate */
+                pp[k] = p[j];
+                k++;
+            }
+        }
+
+        std::vector<math::vec2> polygonVertices2d(polygonVertexCount, math::vec3());
+
+        for (int i = 0; i < polygonVertexCount; ++i) { // for each vertex
+            math::vec2& Tp = polygonVertices2d[i];
+            k = 0;
+            for (int j = 0; j < 3; j++) { // for each component
+                if (j != planeNormalLargestComponent) { /* skip largest coordinate */
+
+                    Tp[k] = polygonVertices[i][j];
+                    k++;
+                }
+            }
+        }
+
+        return InPoly2D(pp, polygonVertices2d.data(), polygonVertices2d.size());
+    }
+
     bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox)
     {
         if ((point.x() < bbox.m_minimum.x() || point.x() > bbox.m_maximum.x()) || //
