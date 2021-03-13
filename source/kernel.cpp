@@ -1807,19 +1807,7 @@ void dispatch(output_t& output, const input_t& input)
                     face_A_halfedge_source_vertex,
                     face_A_halfedge_target_vertex);
 
-                if (segment_intersection_type == 'p' || segment_intersection_type == 'q' || segment_intersection_type == 'r') {
-                    output.status = status_t::GENERAL_POSITION_VIOLATION;
-                    if (input.disable_general_position_enforcement) {
-                        // Our assumption of having inputs in general position has been violated, we need to terminate
-                        // with an error since perturbation (i.e. enforcement of general positions) is disabled.
-                        // If any one of a segment's vertices only touch (i.e. lie on) the plane
-                        // then that implies a situation of cutting through a vertex which is undefined.
-                        lg.set_reason_for_failure("invalid segment-plane intersection ('" + std::to_string(segment_intersection_type) + "')");
-                    }
-                    return;
-                }
-
-                bool have_plane_intersection = (segment_intersection_type == '1');
+                bool have_plane_intersection = (segment_intersection_type != '0');
 
 #endif
                 lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;
@@ -1843,9 +1831,11 @@ void dispatch(output_t& output, const input_t& input)
                         (int)face_B_vertices.size(),
                         face_B_plane_normal_max_comp);
 #endif
-                    if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e') {
+                    if (
+                        // illegal on-edge and on-vertex intersections
+                        (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e')) {
                         output.status = status_t::GENERAL_POSITION_VIOLATION;
-                        if (input.disable_general_position_enforcement) {
+                        if (!input.enforce_general_position) {
                             // Our assuption of having inputs in general position has been violated, we need to terminate
                             // with an error since perturbation (enforment of general positions) is disabled.
                             // This is because our intersection registry formulation requires that edges completely
@@ -1859,7 +1849,24 @@ void dispatch(output_t& output, const input_t& input)
 
                     lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;
 
-                    if (have_point_in_polygon) { // NOTE: polygon must be [inside] for this to pass
+                    if (have_point_in_polygon) { // NOTE: point must be [inside] the polygon for us to consider it further
+
+                        // Intersection point is now determined to be in side face-B (our polygon), now we must use the information
+                        // we computed from the segment-plane intersection test to find out if general position has been violated (i.e.
+                        // invalid case of cutting through a vertex)
+                        if (segment_intersection_type == 'p' || segment_intersection_type == 'q' || segment_intersection_type == 'r') {
+
+                            output.status = status_t::GENERAL_POSITION_VIOLATION;
+
+                            if (!input.enforce_general_position) {
+                                // Our assumption of having inputs in general position has been violated, we need to terminate
+                                // with an error since perturbation (i.e. enforcement of general positions) is disabled.
+                                // If any one of a segment's vertices only touch (i.e. lie on) the plane
+                                // then that implies a situation of cutting through a vertex which is undefined.
+                                lg.set_reason_for_failure("segment-plane intersection ('" + std::to_string(segment_intersection_type) + "')");
+                            }
+                            return;
+                        }
 
                         vd_t pre_existing_copy = mesh_t::null_vertex(); // set to correct value if intersection has already been computed
 

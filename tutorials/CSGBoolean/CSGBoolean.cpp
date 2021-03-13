@@ -121,7 +121,9 @@ int main(int argc, char* argv[])
 
         err = mcDispatch(
             context,
-            MC_DISPATCH_VERTEX_ARRAY_DOUBLE | boolOpFlags,
+            MC_DISPATCH_VERTEX_ARRAY_DOUBLE | // vertices are in array of doubles
+                MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessarys
+                boolOpFlags, // filter flags which specify the type of output we want
             // source mesh
             reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
             reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),

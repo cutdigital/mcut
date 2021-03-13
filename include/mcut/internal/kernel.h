@@ -103,8 +103,7 @@ struct input_t {
     bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
     bool populate_vertex_maps = false; // compute data relating vertices in cc to original input mesh
     bool populate_face_maps = false; // compute data relating face in cc to original input mesh
-    bool disable_general_position_enforcement = false;
-    // TODO: apply output filters in kernel
+    bool enforce_general_position = false;
 
     // NOTE TO SELF: if the user simply wants seams, then kernel should not have to proceed to stitching!!!
     bool keep_srcmesh_seam = false;

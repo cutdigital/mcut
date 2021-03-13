@@ -123,14 +123,14 @@ typedef uint32_t McBool;
  */
 typedef enum McResult {
     MC_NO_ERROR = 0, /**< The function was successfully executed. */
-    MC_INVALID_SRC_MESH = -(1 << 0), /**< The input source-mesh does not the meet requirements of a valid mesh. */
-    MC_INVALID_CUT_MESH = -(1 << 1), /**< The input cut-mesh does not the meet requirements of a valid mesh. */
-    MC_EDGE_EDGE_INTERSECTION = -(1 << 2), /** Found an edge-edge intersection. */
-    MC_FACE_VERTEX_INTERSECTION = -(1 << 3), /** Found an face-vertex intersection. */
-    MC_INVALID_OPERATION = -(1 << 4), /**< An internal operation could not be executed successively. */
-    MC_INVALID_VALUE = -(1 << 5), /**< An invalid value has been passed to the API. */
-    MC_OUT_OF_MEMORY = -(1 << 6), /** Memory allocation operation cannot allocate memory. */
-    MC_INVALID_MESH_PLACEMENT = -(1 << 7), /** At least one vertex in the source mesh has the same coordinates as another vertex in the cut-mesh, or vice-versa. */
+    //MC_INVALID_SRC_MESH = -(1 << 0), /**< The input source-mesh does not the meet requirements of a valid mesh. */
+    //MC_INVALID_CUT_MESH = -(1 << 1), /**< The input cut-mesh does not the meet requirements of a valid mesh. */
+    //MC_EDGE_EDGE_INTERSECTION = -(1 << 2), /** Found an edge-edge intersection. */
+    //MC_FACE_VERTEX_INTERSECTION = -(1 << 3), /** Found an face-vertex intersection. */
+    MC_INVALID_OPERATION = -(1 << 1), /**< An internal operation could not be executed successively. */
+    MC_INVALID_VALUE = -(1 << 2), /**< An invalid value has been passed to the API. */
+    MC_OUT_OF_MEMORY = -(1 << 3), /** Memory allocation operation cannot allocate memory. */
+    //MC_INVALID_MESH_PLACEMENT = -(1 << 7), /** At least one vertex in the source mesh has the same coordinates as another vertex in the cut-mesh, or vice-versa. */
     MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McResult;
 
@@ -332,7 +332,8 @@ typedef enum McDispatchFlags {
         MC_DISPATCH_FILTER_PATCH_INSIDE | //
         MC_DISPATCH_FILTER_PATCH_OUTSIDE | //
         MC_DISPATCH_FILTER_SEAM_SRCMESH | //
-        MC_DISPATCH_FILTER_SEAM_CUTMESH) /** Keep all connected components resulting from the dispatched cut. */
+        MC_DISPATCH_FILTER_SEAM_CUTMESH), /** Keep all connected components resulting from the dispatched cut. */
+    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 19) /** Allow MCUT to perturb the cut-mesh if the inputs are not in general position.  */
 } McDispatchFlags;
 
 /**

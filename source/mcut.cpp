@@ -43,6 +43,8 @@
 #include "mcut/internal/bvh.h"
 #include "mcut/internal/geom.h"
 
+// If the inputs are found to not be in general position, then we perturb the
+// cut-mesh by this constant (scaled by a random variable). Otherwise not used.
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-10;
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -325,18 +327,24 @@ McResult indexArrayMeshToHalfedgeMesh(
     if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) {
         const float* vptr = reinterpret_cast<const float*>(pVertices);
         for (uint32_t i = 0; i < numVertices; ++i) {
-            const float& x = vptr[(i * 3) + 0] + (perturbation != NULL ? (*perturbation).x() : 0.f);
-            const float& y = vptr[(i * 3) + 1] + (perturbation != NULL ? (*perturbation).y() : 0.f);
-            const float& z = vptr[(i * 3) + 2] + (perturbation != NULL ? (*perturbation).z() : 0.f);
-            vmap[i] = halfedgeMesh.add_vertex(x, y, z);
+            const float& x = vptr[(i * 3) + 0];
+            const float& y = vptr[(i * 3) + 1];
+            const float& z = vptr[(i * 3) + 2];
+            vmap[i] = halfedgeMesh.add_vertex(
+                x + (perturbation != NULL ? (*perturbation).x() : 0.f),
+                y + (perturbation != NULL ? (*perturbation).y() : 0.f),
+                z + (perturbation != NULL ? (*perturbation).z() : 0.f));
         }
     } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) {
         const double* vptr = reinterpret_cast<const double*>(pVertices);
         for (uint32_t i = 0; i < numVertices; ++i) {
-            const double& x = vptr[(i * 3) + 0] + (perturbation != NULL ? (*perturbation).x() : 0.f);
-            const double& y = vptr[(i * 3) + 1] + (perturbation != NULL ? (*perturbation).y() : 0.f);
-            const double& z = vptr[(i * 3) + 2] + (perturbation != NULL ? (*perturbation).z() : 0.f);
-            vmap[i] = halfedgeMesh.add_vertex(x, y, z);
+            const double& x = vptr[(i * 3) + 0];
+            const double& y = vptr[(i * 3) + 1];
+            const double& z = vptr[(i * 3) + 2];
+            vmap[i] = halfedgeMesh.add_vertex(
+                x + (perturbation != NULL ? (*perturbation).x() : 0.f),
+                y + (perturbation != NULL ? (*perturbation).y() : 0.f),
+                z + (perturbation != NULL ? (*perturbation).z() : 0.f));
         }
     } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_EXACT) {
 #pragma warning "Implement  + (perturbation != NULL ? (*perturbation).x() : 0.f) "
@@ -471,18 +479,18 @@ McResult indexArrayMeshToHalfedgeMesh(
 
 McResult convert(const mcut::status_t& v)
 {
-    McResult result = McResult::MC_NO_ERROR;
+    McResult result = McResult::MC_RESULT_MAX_ENUM;
     switch (v) {
     case mcut::status_t::SUCCESS:
         result = McResult::MC_NO_ERROR;
         break;
-    case mcut::status_t::INVALID_SRC_MESH:
-        result = McResult::MC_INVALID_SRC_MESH;
+    case mcut::status_t::GENERAL_POSITION_VIOLATION:
+        result = McResult::MC_INVALID_OPERATION;
         break;
-    case mcut::status_t::INVALID_CUT_MESH:
-        result = McResult::MC_INVALID_CUT_MESH;
-        break;
-    case mcut::status_t::INVALID_MESH_INTERSECTION:
+    //case mcut::status_t::INVALID_CUT_MESH:
+    //    result = McResult::MC_INVALID_CUT_MESH;
+    //    break;
+    //case mcut::status_t::INVALID_MESH_INTERSECTION:
     //case mcut::status_t::INVALID_BVH_INTERSECTION:
     //    result = McResult::MC_INVALID_OPERATION;
     //    break;
@@ -1113,6 +1121,7 @@ bool checkFrontendMesh(
     return result;
 }
 
+#if 0
 McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr, const mcut::mesh_t& srcMesh, const mcut::mesh_t& cutMesh)
 {
     MCUT_ASSERT(srcMesh.number_of_vertices() >= 3);
@@ -1137,6 +1146,7 @@ McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
 
     return result;
 }
+#endif
 
 #include <algorithm> // std::sort
 #include <queue> // std::queue for traversal
@@ -1497,7 +1507,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         numSrcMeshFaces);
 
     if (!srcMeshOk) {
-        result = McResult::MC_INVALID_SRC_MESH;
+        result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
@@ -1510,7 +1520,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         numCutMeshFaces);
 
     if (!cutMeshOk) {
-        result = McResult::MC_INVALID_CUT_MESH;
+        result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
@@ -1548,13 +1558,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     if ((ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS) && //
         (ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED)) {
         // The user states that she does not want a partial cut but yet also states that she
-        // wants to keep fragments with partial cuts. These two options are mutually exclusive.
+        // wants to keep fragments with partial cuts. These two options are mutually exclusive!
         ctxtPtr->log(
             McDebugSource::MC_DEBUG_SOURCE_KERNEL,
             McDebugType::MC_DEBUG_TYPE_ERROR,
             0,
             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-            "use of mutually exclusive dispatch flags: MC_DISPATCH_REQUIRE_THROUGH_CUTS and MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED");
+            "use of mutually-exclusive flags: MC_DISPATCH_REQUIRE_THROUGH_CUTS & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED");
         return McResult::MC_INVALID_VALUE;
     }
 
@@ -1621,6 +1631,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
             "use of mutually exclusive flags MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE and MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE");
         return MC_INVALID_VALUE;
+    }
+
+    if (ctxtPtr->dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION) {
+        backendInput.enforce_general_position = true;
     }
 
     // Construct BVHs
@@ -1761,10 +1775,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             ctxtPtr->revertPrecisionAndRoundingModeSettings();
         } catch (const std::exception* e) {
             fprintf(stderr, "fatal: exception caught : %s\n", e->what());
-            result = MC_INVALID_OPERATION;
+            result = McResult::MC_RESULT_MAX_ENUM;
         }
 
-    } while (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION);
+    } while (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position);
 
     result = convert(backendOutput.status);
 

@@ -375,4 +375,239 @@ TEST_F(ExactCoordsInputMeshTest, dispatchExactCoords)
     }
 }
 
+class DegenerateInputMeshTest : public testing::Test {
+protected:
+    void SetUp() override
+    {
+        // create with no flags (default)
+        EXPECT_EQ(mcCreateContext(&context_, 0), MC_NO_ERROR);
+        EXPECT_TRUE(context_ != nullptr);
+    }
+
+    virtual void TearDown()
+    {
+        EXPECT_EQ(mcReleaseConnectedComponents(context_, (uint32_t)pConnComps_.size(), pConnComps_.data()), MC_NO_ERROR);
+        EXPECT_EQ(mcReleaseContext(context_), MC_NO_ERROR);
+    }
+
+    McContext context_ = MC_NULL_HANDLE;
+    std::vector<McConnectedComponent> pConnComps_;
+};
+
+// An intersection between two triangles where one intersection point would be the result of
+// two edges intersecting, which is not allowed (if perturbation is disabled).
+TEST_F(DegenerateInputMeshTest, edgeEdgeIntersection)
+{
+    std::vector<float> srcMeshVertices = {
+        0.f, 0.f, 0.f,
+        3.f, 0.f, 0.f,
+        0.f, 3.f, 0.f
+    };
+
+    std::vector<uint32_t> srcMeshFaceIndices = { 0, 1, 2 };
+    uint32_t srcMeshFaceSizes = 3; // array of one
+
+    std::vector<float> cutMeshVertices = {
+        0.f, 2.f, -1.f,
+        3.f, 2.f, -1.f,
+        0.f, 2.f, 2.f
+    };
+
+    std::vector<uint32_t> cutMeshFaceIndices = { 0, 1, 2 };
+    uint32_t cutMeshFaceSizes = 3; // array of one
+
+    ASSERT_EQ(mcDispatch(context_, MC_DISPATCH_VERTEX_ARRAY_FLOAT, //
+                  &srcMeshVertices[0], &srcMeshFaceIndices[0], &srcMeshFaceSizes, 3, 1, //
+                  &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 3, 1),
+        MC_INVALID_OPERATION);
+}
+
+// An intersection between two triangles where a vertex from the cut-mesh triangle
+// lies on the src-mesh triangle.
+TEST_F(DegenerateInputMeshTest, faceVertexIntersection)
+{
+    std::vector<float> srcMeshVertices = {
+        0.f, 0.f, 0.f,
+        3.f, 0.f, 0.f,
+        0.f, 3.f, 0.f
+    };
+
+    std::vector<uint32_t> srcMeshFaceIndices = { 0, 1, 2 };
+    uint32_t srcMeshFaceSizes = 3; // array of one
+
+    std::vector<float> cutMeshVertices = {
+        1.f, 1.f, -3.f,
+        3.f, 1.f, -3.f,
+        1.f, 1.f, 0.f
+    };
+
+    std::vector<uint32_t> cutMeshFaceIndices = { 0, 1, 2 };
+    uint32_t cutMeshFaceSizes = 3; // array of one
+
+    ASSERT_EQ(mcDispatch(context_, MC_DISPATCH_VERTEX_ARRAY_FLOAT, //
+                  &srcMeshVertices[0], &srcMeshFaceIndices[0], &srcMeshFaceSizes, 3, 1, //
+                  &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 3, 1),
+        MC_INVALID_OPERATION);
+}
+
+class BooleanOpTest : public testing::Test {
+protected:
+    void SetUp() override
+    {
+        // create with no flags (default)
+        EXPECT_EQ(mcCreateContext(&context_, 0), MC_NO_ERROR);
+        EXPECT_TRUE(context_ != nullptr);
+    }
+
+    virtual void TearDown()
+    {
+        EXPECT_EQ(mcReleaseConnectedComponents(context_, (uint32_t)pConnComps_.size(), pConnComps_.data()), MC_NO_ERROR);
+        EXPECT_EQ(mcReleaseContext(context_), MC_NO_ERROR);
+    }
+
+    McContext context_ = MC_NULL_HANDLE;
+    std::vector<McConnectedComponent> pConnComps_;
+
+    std::vector<float> srcMeshVertices = {
+        -1.f, -1.f, 1.f, // 0
+        1.f, -1.f, 1.f, // 1
+        1.f, -1.f, -1.f, // 2
+        -1.f, -1.f, -1.f, //3
+        -1.f, 1.f, 1.f, //4
+        1.f, 1.f, 1.f, //5
+        1.f, 1.f, -1.f, //6
+        -1.f, 1.f, -1.f //7
+    };
+
+    std::vector<uint32_t> meshFaceIndices = {
+        3, 2, 1, 0, // bottom
+        4, 5, 6, 7, //top
+        0, 1, 5, 4, //front
+        1, 2, 6, 5, // right
+        2, 3, 7, 6, //back
+        3, 0, 4, 7 // left
+    };
+
+    std::vector<uint32_t> meshFaceSizes = { 4, 4, 4, 4, 4, 4 };
+};
+
+// Performing a Boolean "union" operation with the same object, while forgetting to
+// pass the appropriate MC_DISPATCH_ENFORCE_GENERAL_POSITION flag.
+TEST_F(BooleanOpTest, selfUnionWithoutGeneralPositionEnforcement)
+{
+    const McFlags booleanUnionFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
+
+    ASSERT_EQ(mcDispatch(context_, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanUnionFlags,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_INVALID_OPERATION);
+}
+
+// Performing a Boolean "union" operation with the same object, while allowing general
+// position enforcement.
+TEST_F(BooleanOpTest, selfUnionWithGeneralPositionEnforcement)
+{
+    const McFlags booleanUnionFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
+
+    ASSERT_EQ(mcDispatch(context_, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanUnionFlags | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_NO_ERROR);
+}
+
+// Performing a Boolean "diff(A,B)" operation.
+TEST_F(BooleanOpTest, differenceA_Not_B)
+{
+    std::vector<float> cutMeshVertices = srcMeshVertices;
+
+    // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
+    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+        cutMeshVertices[i] += 1.f;
+    }
+
+    const McFlags booleanA_Not_BFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
+
+    ASSERT_EQ(mcDispatch(context_, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanA_Not_BFlags,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_NO_ERROR);
+
+    uint32_t numConnComps;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
+
+    ASSERT_EQ(numConnComps, 1);
+}
+
+TEST_F(BooleanOpTest, differenceB_Not_A)
+{
+    std::vector<float> cutMeshVertices = srcMeshVertices;
+
+    // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
+    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+        cutMeshVertices[i] += 1.f;
+    }
+
+    const McFlags booleanB_Not_AFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW;
+
+    ASSERT_EQ(mcDispatch(context_, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanB_Not_AFlags,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_NO_ERROR);
+
+    uint32_t numConnComps;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
+
+    ASSERT_EQ(numConnComps, 1);
+}
+
+TEST_F(BooleanOpTest, unionOp)
+{
+    std::vector<float> cutMeshVertices = srcMeshVertices;
+
+    // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
+    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+        cutMeshVertices[i] += 1.f;
+    }
+
+    const McFlags booleanB_Not_AFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
+
+    ASSERT_EQ(mcDispatch(context_, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanB_Not_AFlags,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_NO_ERROR);
+
+    uint32_t numConnComps;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
+
+    ASSERT_EQ(numConnComps, 1);
+}
+
+TEST_F(BooleanOpTest, intersectionOp)
+{
+    std::vector<float> cutMeshVertices = srcMeshVertices;
+
+    // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
+    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+        cutMeshVertices[i] += 1.f;
+    }
+
+    const McFlags booleanB_Not_AFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW;
+
+    ASSERT_EQ(mcDispatch(context_, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanB_Not_AFlags,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_NO_ERROR);
+
+    uint32_t numConnComps;
+    ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
+
+    ASSERT_EQ(numConnComps, 1);
+}
+
 } // namespace {

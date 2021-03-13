@@ -76,11 +76,13 @@ namespace geom {
     {
         // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
         normal = math::vec3(0.0);
-        for (int i = 0; i < polygon_vertex_count; ++i) {
+        for (int i = 1; i < polygon_vertex_count - 1; ++i) {
             normal = normal + cross_product(polygon_vertices[i] - polygon_vertices[0], polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0]);
         }
 
-        // NOTE: unnormalized normal
+        // In our calculations we need the normal be be of unit length so that the d-coeff
+        // represents the distance of the plane from the origin
+        //normal = math::normalize(normal);
 
         d_coeff = math::dot_product(polygon_vertices[0], normal);
 
@@ -114,7 +116,6 @@ namespace geom {
         const math::vec3& q,
         const math::vec3& r)
     {
-        math::real_number_t t;
 
         //math::vec3 planeNormal;
         //math::real_number_t planeDCoeff;
@@ -124,15 +125,15 @@ namespace geom {
         const math::vec3 rq = (r - q);
         math::real_number_t denom = math::dot_product(rq, normal);
 
-        if (denom == 0.0) { /// Segment is parallel to plane.
+        if (denom == 0.0 /* Segment is parallel to plane.*/) {
             if (num == 0.0) { // 'q' is on plane.
                 return 'p'; // The segment lies wholly within the plane
             } else {
                 return '0';
             }
-        } else {
-            t = num / denom;
         }
+
+        math::real_number_t t = num / denom;
 
         for (int i = 0; i < 3; ++i) {
             p[i] = q[i] + t * (r[i] - q[i]);
