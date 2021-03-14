@@ -877,7 +877,7 @@ TEST_F(mcDispatchFILTER, all)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 12); // including sealed, partially, unsealed, above, below, patches & seams
+    ASSERT_EQ(numConnectedComponents, 10); // including sealed, partially, unsealed, above, below, patches & seams
     connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(context_, MC_CONNECTED_COMPONENT_TYPE_ALL, connComps_.size(), &connComps_[0], NULL), MC_NO_ERROR);
 
@@ -889,6 +889,8 @@ TEST_F(mcDispatchFILTER, all)
 
 TEST_F(mcDispatchFILTER, partialCutWithInsideSealing) // Partial cut (CURRENTLY FAILS)
 {
+    ASSERT_EQ(0, 1) << "TODO: this needs to be fixed (partial cut)";
+
     mySetup("/bunny.off", "/bunnyCuttingPlanePartial.off");
 
     ASSERT_EQ(mcDispatch(
@@ -1300,7 +1302,7 @@ TEST_F(mcDispatchFILTER, seamFromCutMesh)
     ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
     McSeamOrigin origin;
     ASSERT_EQ(mcGetConnectedComponentData(context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
-    ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
+    ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_CUTMESH);
 }
 
 } //  namespace {

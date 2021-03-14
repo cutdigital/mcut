@@ -4,6 +4,12 @@
 #include "gtest/gtest.h"
 #include <cstring>
 
+#if defined(_WIN32)
+
+#define _CRT_SECURE_NO_WARNINGS
+
+#endif
+
 namespace {
 
 class BenchmarkInputMeshTest : public testing::Test {

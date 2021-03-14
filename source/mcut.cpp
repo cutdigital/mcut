@@ -347,7 +347,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                 z + (perturbation != NULL ? (*perturbation).z() : 0.f));
         }
     } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_EXACT) {
-#pragma warning "Implement  + (perturbation != NULL ? (*perturbation).x() : 0.f) "
+#pragma warning("TODO: perturbation code")
         const char* vptr = reinterpret_cast<const char*>(pVertices);
         const char* vptr_ = vptr; // shifted
 
@@ -1211,7 +1211,7 @@ void constructOIBVH(
             static_cast<float>(offset.y() / dims.y()),
             static_cast<float>(offset.z() / dims.z()));
 
-        const int idx = std::distance(mesh.faces_begin(), f);
+        const uint32_t idx = (uint32_t)std::distance(mesh.faces_begin(), f);
         bvhLeafNodeDescriptors[idx].first = *f;
         bvhLeafNodeDescriptors[idx].second = mortion_code;
     }
@@ -1234,7 +1234,7 @@ void constructOIBVH(
 
     // save sorted leaf node bvhAABBs and their corrresponding face id
     for (std::vector<std::pair<mcut::fd_t, uint32_t>>::const_iterator it = bvhLeafNodeDescriptors.cbegin(); it != bvhLeafNodeDescriptors.cend(); ++it) {
-        const int index_on_leaf_level = std::distance(bvhLeafNodeDescriptors.cbegin(), it);
+        const uint32_t index_on_leaf_level = (uint32_t)std::distance(bvhLeafNodeDescriptors.cbegin(), it);
 
         bvhLeafNodeFaces[index_on_leaf_level] = it->first;
 
@@ -1654,7 +1654,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     do {
         backendOutput.status = mcut::status_t::SUCCESS;
         perturbationIters++;
-        printf("perturbationIters=%d\n", perturbationIters);
 
         mcut::math::vec3 perturbation;
 

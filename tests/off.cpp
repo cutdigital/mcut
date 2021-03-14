@@ -5,6 +5,7 @@
 #include <string.h>
 
 #if defined(_WIN32)
+
 // https://stackoverflow.com/questions/735126/are-there-alternate-implementations-of-gnu-getline-interface/735472#735472
 /* Modifications, public domain as well, by Antti Haapala, 11/10/17
 - Switched to getc on 5/23/19 */
@@ -231,7 +232,7 @@ void writeOFF(
     fprintf(file, "%d %d %d\n", numVertices, numFaces, 0 /*numEdges*/);
     int i;
     for (i = 0; i < (int)numVertices; ++i) {
-        float* vptr = pVertices + (i * 3);
+        float* vptr = pVertices + ((size_t)i * 3);
         fprintf(file, "%f %f %f\n", vptr[0], vptr[1], vptr[2]);
     }
 #if 0
@@ -246,7 +247,7 @@ void writeOFF(
     for (i = 0; i < (int)numFaces; ++i) {
         unsigned int faceVertexCount = isTriangleMesh ? 3 : pFaceSizes[i];
         fprintf(file, "%d", (int)faceVertexCount);
-        int j;
+        unsigned int j;
         for (j = 0; j < faceVertexCount; ++j) {
             unsigned int* fptr = pFaceIndices + faceBaseOffset + j;
             fprintf(file, " %d", *fptr);

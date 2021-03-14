@@ -111,7 +111,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	list(APPEND compilation_flags w3 -diag-disable:remark)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	list(APPEND compilation_flags /W4)
-	list(APPEND preprocessor_defs _CRT_SECURE_NO_WARNINGS)
+	list(APPEND preprocessor_defs -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 message(STATUS "[MCUT] compilation_flags=${compilation_flags}")
@@ -137,7 +137,8 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/source/halfedge_mesh.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/math.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/geom.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/number.cpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/source/number.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/bvh.cpp)
 
 #
 # Create MCUT target(s)

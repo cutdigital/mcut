@@ -253,7 +253,7 @@ namespace geom {
             }
         }
 
-        return compute_point_in_polygon_test(pp, polygon_vertices2d.data(), polygon_vertices2d.size());
+        return compute_point_in_polygon_test(pp, polygon_vertices2d.data(), (int)polygon_vertices2d.size());
     }
 
     bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox)

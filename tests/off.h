@@ -1,5 +1,9 @@
-#ifndef OFFLOADER_H_
-#define OFFLOADER_H_
+#ifndef OFF_FILE_H_
+#define OFF_FILE_H_
+
+#if defined(_WIN32)
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif
 
 extern "C" void readOFF(
     const char* fpath,

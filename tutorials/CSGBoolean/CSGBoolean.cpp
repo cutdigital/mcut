@@ -1,3 +1,6 @@
+#if defined(_WIN32)
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif
 /*
 This tutorial shows how to compute boolean operations using MCUT.
 */
@@ -58,7 +61,7 @@ int main(int argc, char* argv[])
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
-        srcMesh.faceSizesArray.push_back(f.size());
+        srcMesh.faceSizesArray.push_back((uint32_t)f.size());
     }
 
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.size(), (int)srcMesh.F.size());
@@ -88,7 +91,7 @@ int main(int argc, char* argv[])
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
 
-        cutMesh.faceSizesArray.push_back(f.size());
+        cutMesh.faceSizesArray.push_back((uint32_t)f.size());
     }
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.size(), (int)cutMesh.F.size());
@@ -96,7 +99,7 @@ int main(int argc, char* argv[])
     // 2. create a context
     // -------------------
     McContext context = MC_NULL_HANDLE;
-    McResult err = mcCreateContext(&context, MC_DEBUG);
+    McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
     assert(err == MC_NO_ERROR);
 
     // 3. do the cutting (boolean ops)
@@ -234,7 +237,7 @@ int main(int argc, char* argv[])
         std::ofstream file(fpath);
 
         // write vertices and normals
-        for (int i = 0; i < ccVertexCount; ++i) {
+        for (uint32_t i = 0; i < ccVertexCount; ++i) {
             double x = ccVertices[(uint64_t)i * 3 + 0];
             double y = ccVertices[(uint64_t)i * 3 + 1];
             double z = ccVertices[(uint64_t)i * 3 + 2];
@@ -244,7 +247,7 @@ int main(int argc, char* argv[])
         int faceVertexOffsetBase = 0;
 
         // for each face in CC
-        for (int f = 0; f < ccFaceCount; ++f) {
+        for (uint32_t f = 0; f < ccFaceCount; ++f) {
             bool reverseWindingOrder = (fragmentLocation == MC_FRAGMENT_LOCATION_BELOW) && (patchLocation == MC_PATCH_LOCATION_OUTSIDE);
             int faceSize = faceSizes.at(f);
             file << "f ";
@@ -262,7 +265,7 @@ int main(int argc, char* argv[])
 
         // 6. free connected component data
         // --------------------------------
-        err = mcReleaseConnectedComponents(context, connectedComponents.size(), connectedComponents.data());
+        err = mcReleaseConnectedComponents(context, (uint32_t)connectedComponents.size(), connectedComponents.data());
         assert(err == MC_NO_ERROR);
     }
 
