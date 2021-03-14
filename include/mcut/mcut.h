@@ -337,68 +337,6 @@ typedef enum McDispatchFlags {
 } McDispatchFlags;
 
 /**
- * \enum McAccelerationStructure
- * @brief Flags indicating the type of spatial-partitioning data structure e.g. bounding volume heirarchy (BVH).
- *
- * This enum structure defines the flags indicating the type of acceleration structure that is used for culling the search-space during polygon intersection tests.
- */
-typedef enum McAccelerationStructure {
-    /** 1 */
-    MC_ACCELERATION_STRUCTURE_TYPE_LBVH = (1 << 0),
-    /** 2 */
-    MC_ACCELERATION_STRUCTURE_TYPE_OIBVH = (1 << 1)
-} McAccelerationStructure;
-
-// Storage format:
-//
-// array where nodes (connectivity + AABB) come first followed by N=numFaces uint32_t values denoting the face IDs of each leaf node.
-// NOTE: in LBVH, if leftChildNodeIdx == rightChildNodeIdx, then leaf node idx == rightChildNodeIdx (OR == leftChildNodeIdx)
-// NOTE: in OIBVH, leaf node idx is inferred from relative position of node on level in implicit tree.
-
-struct lbvhNode {
-    uint32_t parentNodeIdx; // == MC_UNDEFINED_VALUE if root node.
-    uint32_t leftChildNodeIdx;
-    uint32_t rightChildNodeIdx;
-    //
-    float minX;
-    float minY;
-    float minZ;
-    float maxX;
-    float maxY;
-    float maxZ;
-};
-
-struct oibvhNode {
-    float minX;
-    float minY;
-    float minZ;
-    float maxX;
-    float maxY;
-    float maxZ;
-};
-
-// uint32_t faceIdx; // MC_UNDEFINED_VALUE if internal node.
-
-// See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawArraysIndirect.xhtml
-// For example on documentation
-extern MCAPI_ATTR McResult MCAPI_CALL mcCreateInputConnectedComponent(
-    McContext* pContext,
-    McFlags meshFlags,
-    const void* pVertices,
-    const uint32_t* pFaceIndices,
-    const uint32_t* pFaceSizes,
-    uint32_t numVertices,
-    uint32_t numFaces,
-    McFlags accelerationStructureFlags,
-    // pIdx,lIdx,rIdx,AABB|...|pIdx,lIdx,rIdx,AABB|...|pIdx,lIdx,rIdx,AABB|
-    const void* const pAccelerationStructure,
-    McConnectedComponent* pOutConnectedComponent);
-
-// See: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawArraysIndirect.xhtml
-// For example on documentation
-extern MCAPI_ATTR McResult MCAPI_CALL mcDispatchIndirect(McContext context, McFlags flags, McConnectedComponent srcMesh, McConnectedComponent cutMesh);
-
-/**
  * \enum McQueryFlags
  * @brief Flags for querying fixed API state.
  *
