@@ -43,7 +43,6 @@ if(NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose build type (None Debug Release RelWithDebInfo MinSizeRel)." FORCE)
 endif()
 
-# ... location of mpfr and mpir (gmp) search modules
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(MCUT_MAJOR 1)
@@ -195,6 +194,41 @@ endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 set (MCUT_LIB_PATH $<TARGET_FILE:mcut>)
 message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
+
+#
+# tests, tutorials etc. are dependant on third-party libs (file loaders etc.)
+# We enable the code that is used to download those projects here:
+#
+if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
+	include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadProject.cmake)
+
+	if (CMAKE_VERSION VERSION_LESS 3.2)
+		set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
+	else()
+		set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
+	endif()
+
+	# used by tests & tutorials
+	download_project(PROJ                libigl
+					 GIT_REPOSITORY      https://github.com/libigl/libigl.git
+					 GIT_TAG             v2.3.0
+					 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+	)
+
+	set(libigl_include_dir ${CMAKE_BINARY_DIR}/libigl-src/include)
+
+	set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Default version of Eigen used by libigl.")
+
+	# used by tests & tutorials
+	download_project(PROJ                eigen
+					 GIT_REPOSITORY      https://gitlab.com/libeigen/eigen.git
+					 GIT_TAG             ${LIBIGL_EIGEN_VERSION}
+					 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+	)
+
+	set(eigen_include_dir ${CMAKE_BINARY_DIR}/eigen-src)
+endif()
+
 #
 # tests
 #
@@ -203,17 +237,17 @@ if(MCUT_BUILD_TESTS)
 endif()
 
 #
+# tutorials
+#
+if(MCUT_BUILD_TUTORIALS)
+	add_subdirectory(tutorials)
+endif()
+
+#
 # documentation
 #
 if(MCUT_BUILD_THE_DOCS)
 	add_subdirectory(docs)
-endif()
-
-#
-# Tutorials
-#
-if(MCUT_BUILD_TUTORIALS)
-	add_subdirectory(tutorials)
 endif()
 
 ########################################################
