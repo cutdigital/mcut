@@ -35,6 +35,7 @@
 #include <random> // perturbation
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 
 #if defined(MCUT_BUILD_WINDOWS)
 #pragma warning(disable : 26812)
@@ -443,7 +444,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                 }
             }
 
-            mcut::vd_t descr = fIter->second; //vmap[*fIter.first];
+            const mcut::vertex_descriptor_t descr = fIter->second; //vmap[*fIter.first];
 
             const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 

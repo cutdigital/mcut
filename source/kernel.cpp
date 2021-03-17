@@ -144,9 +144,9 @@ std::string to_string(const status_t& v)
     case status_t::INVALID_MESH_INTERSECTION:
         s = "INVALID_MESH_INTERSECTION";
         break;
-        //case status_t::INVALID_BVH_INTERSECTION:
-        //    s = "INVALID_BVH_INTERSECTION";
-        //    break;
+    case status_t::GENERAL_POSITION_VIOLATION:
+        s = "GENERAL_POSITION_VIOLATION";
+        break;
         //case status_t::EDGE_EDGE_INTERSECTION:
         //    s = "EDGE_EDGE_INTERSECTION";
         //    break;
@@ -409,10 +409,7 @@ mesh_t extract_connected_components(
     const std::map<fd_t /*"sm" face*/, fd_t /*"ps" face*/>& ps_to_sm_face,
     const std::map<vd_t /*"cm" vtx*/, vd_t /*"ps" vtx*/>& ps_to_cm_vtx,
     const std::map<fd_t /*"cs" face*/, fd_t /*"ps" face*/>& ps_to_cm_face,
-    const int total_patches_with_default_winding_order,
-    const int m1_num_vertices_after_srcmesh_partitioning,
     const int sm_vtx_cnt,
-    const int ps_vtx_count,
     const int sm_face_count,
     bool popuplate_vertex_maps,
     bool popuplate_face_maps,
@@ -4860,10 +4857,7 @@ void dispatch(output_t& output, const input_t& input)
                 ps_to_sm_face,
                 ps_to_cm_vtx,
                 ps_to_cm_face,
-                -1, // Unused ... because we are extracting from "m0"
-                -1, // Unused ... because we are extracting from "m0"
                 sm_vtx_cnt,
-                ps_vtx_cnt,
                 sm_face_count,
                 input.populate_vertex_maps,
                 input.populate_face_maps,
@@ -4908,10 +4902,7 @@ void dispatch(output_t& output, const input_t& input)
                 ps_to_sm_face,
                 ps_to_cm_vtx,
                 ps_to_cm_face,
-                -1, // Unused ... because we are extracting from "m0"
-                -1, // Unused ... because we are extracting from "m0"
                 sm_vtx_cnt,
-                ps_vtx_cnt,
                 sm_face_count,
                 input.populate_vertex_maps,
                 input.populate_face_maps,
@@ -6199,10 +6190,7 @@ void dispatch(output_t& output, const input_t& input)
             ps_to_sm_face,
             ps_to_cm_vtx,
             ps_to_cm_face,
-            -1, // ... because data is only available during "m1" stitching stage (later)
-            m1_num_vertices_after_srcmesh_partitioning, // unused parameter until "m1" stitching stage (later)
             sm_vtx_cnt,
-            ps_vtx_cnt,
             sm_face_count,
             input.populate_vertex_maps,
             input.populate_face_maps,
@@ -9396,10 +9384,7 @@ void dispatch(output_t& output, const input_t& input)
                         ps_to_sm_face,
                         ps_to_cm_vtx,
                         ps_to_cm_face,
-                        total_ccw_patch_count,
-                        m1_num_vertices_after_srcmesh_partitioning,
                         sm_vtx_cnt,
-                        ps_vtx_cnt,
                         sm_face_count,
                         input.populate_vertex_maps,
                         input.populate_face_maps,
@@ -9532,10 +9517,7 @@ void dispatch(output_t& output, const input_t& input)
                 ps_to_sm_face,
                 ps_to_cm_vtx,
                 ps_to_cm_face,
-                total_ccw_patch_count,
-                m1_num_vertices_after_srcmesh_partitioning,
                 sm_vtx_cnt,
-                ps_vtx_cnt,
                 sm_face_count,
                 input.populate_vertex_maps,
                 input.populate_face_maps,

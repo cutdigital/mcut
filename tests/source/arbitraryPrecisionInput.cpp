@@ -3,6 +3,8 @@
 
 #include <cctype> // std::isdigit
 #include <vector>
+#include <cstdio>
+#include <cstring>
 
 struct ArbitraryPrecisionInput {
     McContext myContext = MC_NULL_HANDLE;
