@@ -28,7 +28,8 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/source/booleanOperation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/degenerateInput.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/arbitraryPrecisionInput.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/benchmark.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/benchmark.cpp,
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/createContext.cpp)
 
 target_include_directories(mcut_tests PRIVATE ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
 target_link_libraries(mcut_tests PRIVATE mcut)
