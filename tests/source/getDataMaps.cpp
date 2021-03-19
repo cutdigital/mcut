@@ -137,9 +137,10 @@ UTEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeVertexMap)
         auto testPatchCC = [&]() {
             const int numberOfCutMeshVertices = utest_fixture->pCutMeshVertices.size() / 3;
             for (int i = 0; i < numberOfVertices; i++) {
-                const uint32_t correspondingCutMeshVertex = vertexMap[i];
+                uint32_t correspondingCutMeshVertex = vertexMap[i];
                 const bool isIntersectionPoint = (correspondingCutMeshVertex == MC_UNDEFINED_VALUE);
                 if (!isIntersectionPoint) {
+                    correspondingCutMeshVertex -= utest_fixture->pSrcMeshVertices.size() / 3; // account for offset
                     ASSERT_GE(correspondingCutMeshVertex, 0);
                     ASSERT_LT(correspondingCutMeshVertex, numberOfCutMeshVertices);
                 }
@@ -225,12 +226,12 @@ UTEST_F(FaceAndVertexDataMapsQueryTest, dispatchIncludeFaceMap)
         };
 
         auto testPatchCC = [&]() {
-            const int numberOfCutMeshVertices = utest_fixture->pCutMeshFaceSizes.size();
+            const int numberOfCutMeshFaces = utest_fixture->pCutMeshFaceSizes.size();
             for (int i = 0; i < numberOfFaces; i++) {
-                const uint32_t correspondingCutMeshVertex = faceMap[i];
-                ASSERT_TRUE(correspondingCutMeshVertex != MC_UNDEFINED_VALUE);
-                ASSERT_GE(correspondingCutMeshVertex, 0);
-                ASSERT_LT(correspondingCutMeshVertex, numberOfCutMeshVertices);
+                const uint32_t correspondingCutMeshFace = faceMap[i];
+                ASSERT_TRUE(correspondingCutMeshFace != MC_UNDEFINED_VALUE); // face always have an origin (unlike vertices)
+                ASSERT_GE(correspondingCutMeshFace, 0);
+                ASSERT_LT(correspondingCutMeshFace, numberOfCutMeshFaces);
             }
         };
 

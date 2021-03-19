@@ -45,7 +45,8 @@
 #include "mcut/internal/geom.h"
 
 // If the inputs are found to not be in general position, then we perturb the
-// cut-mesh by this constant (scaled by a random variable). Otherwise not used.
+// cut-mesh by this constant (scaled by a random variable [0.1-1.0]). Otherwise 
+// not used.
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-10;
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
