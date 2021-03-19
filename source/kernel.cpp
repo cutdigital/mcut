@@ -5097,7 +5097,7 @@ void dispatch(output_t& output, const input_t& input)
             //const traced_polygon_t& cs_poly = *cs_poly_iter;
             //const int cs_poly_idx = (int)std::distance(m0_polygons.cbegin(), cs_poly_iter);
             const int cs_poly_idx = *cs_ipoly_iter;
-            MCUT_ASSERT(cs_poly_idx < m0_polygons.size());
+            MCUT_ASSERT(cs_poly_idx < (int)m0_polygons.size());
             const traced_polygon_t& cs_poly = m0_polygons.at(cs_poly_idx);
 
             // for each halfedge of polygon
@@ -5227,7 +5227,7 @@ void dispatch(output_t& output, const input_t& input)
         //const traced_polygon_t& sm_poly = *sm_poly_iter;
         //const int sm_poly_idx = (int)std::distance(m0_polygons.cbegin(), sm_poly_iter);
         const int sm_poly_idx = *sm_ipoly_iter;
-        MCUT_ASSERT(sm_poly_idx < m0_polygons.size());
+        MCUT_ASSERT(sm_poly_idx < (int)m0_polygons.size());
         const traced_polygon_t& sm_poly = m0_polygons.at(sm_poly_idx);
 
         // for each halfedge of polygon

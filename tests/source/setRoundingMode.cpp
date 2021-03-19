@@ -21,7 +21,7 @@ UTEST_I_SETUP(SetRoundingMode)
         McResult err = mcCreateContext(&utest_fixture->context_, MC_DEBUG);
         ASSERT_TRUE(utest_fixture->context_ != nullptr);
         ASSERT_EQ(err, MC_NO_ERROR);
-        utest_fixture->context_ = modes[utest_index];
+        utest_fixture->mode = modes[utest_index];
     }
 }
 
