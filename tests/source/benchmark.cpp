@@ -10,18 +10,25 @@
 #include <Eigen/Core>
 #include <igl/readOFF.h>
 
+
+#define NUMBER_OF_BENCHMARKS 25 //
+
 struct Benchmark {
     McContext myContext = MC_NULL_HANDLE;
+    int benchmarkIndex = 0;
 };
 
-UTEST_F_SETUP(Benchmark)
+UTEST_I_SETUP(Benchmark)
 {
+    if (utest_index < NUMBER_OF_BENCHMARKS) {
     // create with no flags (default)
     EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_NULL_HANDLE), MC_NO_ERROR);
     EXPECT_TRUE(utest_fixture->myContext != nullptr);
+    utest_fixture->benchmarkIndex = utest_index;
+    }
 }
 
-UTEST_F_TEARDOWN(Benchmark)
+UTEST_I_TEARDOWN(Benchmark)
 {
     EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
 }
@@ -37,13 +44,13 @@ struct InputMesh {
     std::vector<double> vertexCoordsArray; // vertex coords
 };
 
-void readOFF(InputMesh& srcMesh)
+bool readOFF(InputMesh& srcMesh)
 {
     bool srcMeshLoaded = igl::readOFF(srcMesh.fpath, srcMesh.V, srcMesh.F);
 
     if (!srcMeshLoaded) {
-        std::fprintf(stderr, "error: could not load source mesh --> %s\n", srcMesh.fpath.c_str());
-        std::exit(1);
+        std::fprintf(stderr, "error: could not load mesh --> %s\n", srcMesh.fpath.c_str());
+        return false;
     }
 
     // copy vertices
@@ -63,31 +70,25 @@ void readOFF(InputMesh& srcMesh)
         }
         srcMesh.faceSizesArray.push_back(f.rows());
     }
+    return true;
 }
 
-#include <iostream>
-UTEST_F(Benchmark, benchmarks)
+UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
 {
     std::vector<std::pair<std::string, std::string>> benchmarkMeshPairs;
 
-    const int NUMBER_OF_BENCHMARKS = 25; //
-
-    for (int i = 0; i < NUMBER_OF_BENCHMARKS; ++i) {
         std::stringstream ss;
-        ss << std::setfill('0') << std::setw(3) << i;
+        ss << std::setfill('0') << std::setw(3) << utest_fixture->benchmarkIndex;
         std::string s = ss.str();
         benchmarkMeshPairs.emplace_back("src-mesh" + s + ".off", "cut-mesh" + s + ".off");
-    }
 
     for (auto& i : benchmarkMeshPairs) {
         const std::string srcMeshName = i.first;
         const std::string cutMeshName = i.second;
 
-        std::cout << srcMeshName << " " << cutMeshName << std::endl;
-
         InputMesh srcMesh;
         srcMesh.fpath = std::string(MESHES_DIR) + "/benchmarks/" + srcMeshName;
-        readOFF(srcMesh);
+        ASSERT_EQ(readOFF(srcMesh), true);
 
         ASSERT_GT((int)srcMesh.faceIndicesArray.size(), 2);
         ASSERT_GT((int)srcMesh.faceSizesArray.size(), 0);
@@ -95,7 +96,7 @@ UTEST_F(Benchmark, benchmarks)
 
         InputMesh cutMesh;
         cutMesh.fpath = std::string(MESHES_DIR) + "/benchmarks/" + cutMeshName;
-        readOFF(cutMesh);
+        ASSERT_EQ(readOFF(cutMesh), true);
 
         ASSERT_GT((int)cutMesh.faceIndicesArray.size(), 2);
         ASSERT_GT((int)cutMesh.faceSizesArray.size(), 0);

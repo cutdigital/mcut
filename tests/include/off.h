@@ -23,4 +23,4 @@ extern "C" void writeOFF(
     unsigned int numFaces,
     unsigned int numEdges);
 
-#endif // #ifndef OFFLOADER_H_
+#endif

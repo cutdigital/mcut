@@ -35,6 +35,7 @@
 #include <random> // perturbation
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 
 #if defined(MCUT_BUILD_WINDOWS)
 #pragma warning(disable : 26812)
@@ -44,7 +45,8 @@
 #include "mcut/internal/geom.h"
 
 // If the inputs are found to not be in general position, then we perturb the
-// cut-mesh by this constant (scaled by a random variable). Otherwise not used.
+// cut-mesh by this constant (scaled by a random variable [0.1-1.0]). Otherwise 
+// not used.
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-10;
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -443,7 +445,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                 }
             }
 
-            mcut::vd_t descr = fIter->second; //vmap[*fIter.first];
+            const mcut::vertex_descriptor_t descr = fIter->second; //vmap[*fIter.first];
 
             const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 

@@ -28,9 +28,19 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/source/booleanOperation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/degenerateInput.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/arbitraryPrecisionInput.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/benchmark.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/benchmark.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/createContext.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/arbitraryPrecisionInput.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/computeSeams.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/debugCallback.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/debugVerboseLog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/dispatchFilterFlags.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/getContextInfo.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/getDataMaps.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/setPrecision.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/setRoundingMode.cpp)
 
-target_include_directories(mcut_tests PRIVATE ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
+target_include_directories(mcut_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
 target_link_libraries(mcut_tests PRIVATE mcut)
 target_compile_definitions(mcut_tests PRIVATE -DMESHES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/meshes" )
 

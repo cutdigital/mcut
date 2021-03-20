@@ -225,7 +225,7 @@ int main(int argc, char* argv[])
             isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
             name += isFragment ? "frag" : "patch";
 
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &pathLocation, NULL);
+            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL);
             assert(err == MC_NO_ERROR);
             name += patchLocation == MC_PATCH_LOCATION_INSIDE ? ".inside" : (patchLocation == MC_PATCH_LOCATION_OUTSIDE ? ".outside" : ".undefined");
 
