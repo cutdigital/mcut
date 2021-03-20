@@ -7052,6 +7052,12 @@ void dispatch(output_t& output, const input_t& input)
     // check for further degeneracy before we proceed further
     ///////////////////////////////////////////////////////////////////////////
 
+    // TODO: This check should happen just after we trace polygons. Thats the
+    // earliest point at which the current check for degeneracy can be made.
+    // Essenstially we are check for the case where the cut would result in 
+    // an output with topological holes (as if we holes could be specified in 
+    // addition to polygons)!
+
     //
     // Here we look for cut-mesh patches whose boundary/border is not defined by
     // an intersection point with a src-mesh halfedge in its registry.
