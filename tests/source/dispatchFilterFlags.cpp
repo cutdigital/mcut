@@ -1,80 +1,84 @@
 #include "utest.h"
 #include <mcut/mcut.h>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "off.h"
 
+#ifdef _WIN32
+#pragma warning(disable : 26812) // Unscoped enums from mcut.h
+#endif // _WIN32
+
 struct DispatchFilterFlags {
-    std::vector<McConnectedComponent> connComps_;
-    McContext context_;
+    std::vector<McConnectedComponent> connComps_ = {};
+    McContext context_ = MC_NULL_HANDLE;
 
-    float* pSrcMeshVertices;
-    uint32_t* pSrcMeshFaceIndices;
-    uint32_t* pSrcMeshFaceSizes;
-    uint32_t numSrcMeshVertices;
-    uint32_t numSrcMeshFaces;
+    float* pSrcMeshVertices = NULL;
+    uint32_t* pSrcMeshFaceIndices = NULL;
+    uint32_t* pSrcMeshFaceSizes = NULL;
+    uint32_t numSrcMeshVertices = NULL;
+    uint32_t numSrcMeshFaces = NULL;
 
-    float* pCutMeshVertices;
-    uint32_t* pCutMeshFaceIndices;
-    uint32_t* pCutMeshFaceSizes;
-    uint32_t numCutMeshVertices;
-    uint32_t numCutMeshFaces;
+    float* pCutMeshVertices = NULL;
+    uint32_t* pCutMeshFaceIndices = NULL;
+    uint32_t* pCutMeshFaceSizes = NULL;
+    uint32_t numCutMeshVertices = NULL;
+    uint32_t numCutMeshFaces = NULL;
 };
 
 UTEST_F_SETUP(DispatchFilterFlags)
 {
     McResult err = mcCreateContext(&utest_fixture->context_, 0);
-    EXPECT_TRUE(utest_fixture->context_ != nullptr);
+    EXPECT_TRUE(utest_fixture->context_ != NULL);
     EXPECT_EQ(err, MC_NO_ERROR);
 
-    utest_fixture->pSrcMeshVertices = nullptr;
-    utest_fixture->pSrcMeshFaceIndices = nullptr;
-    utest_fixture->pSrcMeshFaceSizes = nullptr;
+    utest_fixture->pSrcMeshVertices = NULL;
+    utest_fixture->pSrcMeshFaceIndices = NULL;
+    utest_fixture->pSrcMeshFaceSizes = NULL;
     utest_fixture->numSrcMeshVertices = 0;
     utest_fixture->numSrcMeshFaces = 0;
 
-    utest_fixture->pCutMeshVertices = nullptr;
-    utest_fixture->pCutMeshFaceIndices = nullptr;
-    utest_fixture->pCutMeshFaceSizes = nullptr;
+    utest_fixture->pCutMeshVertices = NULL;
+    utest_fixture->pCutMeshFaceIndices = NULL;
+    utest_fixture->pCutMeshFaceSizes = NULL;
     utest_fixture->numCutMeshVertices = 0;
     utest_fixture->numCutMeshFaces = 0;
 }
 
 UTEST_F_TEARDOWN(DispatchFilterFlags)
 {
-    if(utest_fixture->connComps_.size() > 0)
-    {
+    if (utest_fixture->connComps_.size() > 0) {
         EXPECT_EQ(mcReleaseConnectedComponents(
-            utest_fixture->context_,
-            utest_fixture->connComps_.size(),
-            utest_fixture->connComps_.data()), MC_NO_ERROR);
+                      utest_fixture->context_,
+                      (int)utest_fixture->connComps_.size(),
+                      utest_fixture->connComps_.data()),
+            MC_NO_ERROR);
     }
-    
+
     EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
 
-    if(utest_fixture->pSrcMeshVertices)
+    if (utest_fixture->pSrcMeshVertices)
         free(utest_fixture->pSrcMeshVertices);
 
-    if(utest_fixture->pSrcMeshFaceIndices)
+    if (utest_fixture->pSrcMeshFaceIndices)
         free(utest_fixture->pSrcMeshFaceIndices);
 
-    if(utest_fixture->pSrcMeshFaceSizes)
+    if (utest_fixture->pSrcMeshFaceSizes)
         free(utest_fixture->pSrcMeshFaceSizes);
 
-    if(utest_fixture->pCutMeshVertices)
+    if (utest_fixture->pCutMeshVertices)
         free(utest_fixture->pCutMeshVertices);
 
-    if(utest_fixture->pCutMeshFaceIndices)
+    if (utest_fixture->pCutMeshFaceIndices)
         free(utest_fixture->pCutMeshFaceIndices);
 
-    if(utest_fixture->pCutMeshFaceSizes)
+    if (utest_fixture->pCutMeshFaceSizes)
         free(utest_fixture->pCutMeshFaceSizes);
 }
 
 UTEST_F(DispatchFilterFlags, noFiltering)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -113,7 +117,7 @@ UTEST_F(DispatchFilterFlags, noFiltering)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 10); // including sealed, partially, unsealed, above, below, patches & seams
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     for (uint32_t i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
@@ -125,7 +129,7 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
 {
     ASSERT_EQ(0, 1); // "TODO: this needs to be fixed (partial cut)"
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/bunny.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/bunny.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -164,24 +168,24 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the inside) fragment
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     for (uint32_t i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
-        McConnectedComponentType type;
+        McConnectedComponentType type = (McConnectedComponentType)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
         ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
-        McFragmentLocation location;
+        McFragmentLocation location = (McFragmentLocation)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED", thus a partially cut fragment will be neither above nor below.
         ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_UNDEFINED);
-        McFragmentSealType sealType;
+        McFragmentSealType sealType = (McFragmentSealType)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE", which mean "complete sealed from the inside".
         ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
-        McPatchLocation patchLocation;
+        McPatchLocation patchLocation = (McPatchLocation)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
         ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
     }
@@ -189,7 +193,7 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
 
 UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -228,7 +232,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the inside) fragment
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     for (uint32_t i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
@@ -254,7 +258,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
 
 UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -293,7 +297,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the outside) fragment
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     for (uint32_t i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
@@ -315,12 +319,11 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
         ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
     }
-
 }
 
 UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutsidePartial)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -359,7 +362,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutsidePartial)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_GE(numConnectedComponents, 1); // one completely filled (from the outside) fragment
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     for (uint32_t i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
@@ -384,7 +387,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutsidePartial)
 
 UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -423,7 +426,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one unsealed fragment
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0];
     ASSERT_TRUE(cc != MC_NULL_HANDLE);
@@ -440,14 +443,13 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
     McPatchLocation patchLocation;
     ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
     ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_UNDEFINED);
-
 }
 
 // TODO: fragments ABOVE
 
 UTEST_F(DispatchFilterFlags, patchInside)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -486,7 +488,7 @@ UTEST_F(DispatchFilterFlags, patchInside)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one interior patch
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0];
     ASSERT_TRUE(cc != MC_NULL_HANDLE);
@@ -501,7 +503,7 @@ UTEST_F(DispatchFilterFlags, patchInside)
 
 UTEST_F(DispatchFilterFlags, patchOutside)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -540,7 +542,7 @@ UTEST_F(DispatchFilterFlags, patchOutside)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one interior patch
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0];
     ASSERT_TRUE(cc != MC_NULL_HANDLE);
@@ -555,7 +557,7 @@ UTEST_F(DispatchFilterFlags, patchOutside)
 
 UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -594,7 +596,7 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one interior patch
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0];
     ASSERT_TRUE(cc != MC_NULL_HANDLE);
@@ -609,7 +611,7 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
 
 UTEST_F(DispatchFilterFlags, seamFromCutMesh)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -648,7 +650,7 @@ UTEST_F(DispatchFilterFlags, seamFromCutMesh)
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
     ASSERT_EQ(numConnectedComponents, 1); // one interior patch
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0];
     ASSERT_TRUE(cc != MC_NULL_HANDLE);

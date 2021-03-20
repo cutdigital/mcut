@@ -1,3 +1,7 @@
+#if defined(_WIN32)
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif
+
 #include "utest.h"
 
 #include <stdio.h>
@@ -258,6 +262,5 @@ extern "C" void writeOFF(
 
     fclose(file);
 }
-
 
 UTEST_MAIN();

@@ -1,25 +1,29 @@
 #include "utest.h"
 #include <mcut/mcut.h>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "off.h"
 
+#ifdef _WIN32
+#pragma warning(disable : 26812) // Unscoped enums from mcut.h
+#endif // _WIN32
+
 struct SeamConnectedComponent {
-    std::vector<McConnectedComponent> connComps_;
-    McContext context_;
+    std::vector<McConnectedComponent> connComps_ = {};
+    McContext context_ = MC_NULL_HANDLE;
 
-    float* pSrcMeshVertices;
-    uint32_t* pSrcMeshFaceIndices;
-    uint32_t* pSrcMeshFaceSizes;
-    uint32_t numSrcMeshVertices;
-    uint32_t numSrcMeshFaces;
+    float* pSrcMeshVertices = NULL;
+    uint32_t* pSrcMeshFaceIndices = NULL;
+    uint32_t* pSrcMeshFaceSizes = NULL;
+    uint32_t numSrcMeshVertices = NULL;
+    uint32_t numSrcMeshFaces = NULL;
 
-    float* pCutMeshVertices;
-    uint32_t* pCutMeshFaceIndices;
-    uint32_t* pCutMeshFaceSizes;
-    uint32_t numCutMeshVertices;
-    uint32_t numCutMeshFaces;
+    float* pCutMeshVertices = NULL;
+    uint32_t* pCutMeshFaceIndices = NULL;
+    uint32_t* pCutMeshFaceSizes = NULL;
+    uint32_t numCutMeshVertices = NULL;
+    uint32_t numCutMeshFaces = NULL;
 };
 
 UTEST_F_SETUP(SeamConnectedComponent)
@@ -43,32 +47,32 @@ UTEST_F_SETUP(SeamConnectedComponent)
 
 UTEST_F_TEARDOWN(SeamConnectedComponent)
 {
-    if(utest_fixture->connComps_.size() > 0)
-    {
+    if (utest_fixture->connComps_.size() > 0) {
         EXPECT_EQ(mcReleaseConnectedComponents(
-            utest_fixture->context_,
-            utest_fixture->connComps_.size(),
-            utest_fixture->connComps_.data()), MC_NO_ERROR);
+                      utest_fixture->context_,
+                      (uint32_t)utest_fixture->connComps_.size(),
+                      utest_fixture->connComps_.data()),
+            MC_NO_ERROR);
     }
-    
+
     EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
 
-    if(utest_fixture->pSrcMeshVertices)
+    if (utest_fixture->pSrcMeshVertices)
         free(utest_fixture->pSrcMeshVertices);
 
-    if(utest_fixture->pSrcMeshFaceIndices)
+    if (utest_fixture->pSrcMeshFaceIndices)
         free(utest_fixture->pSrcMeshFaceIndices);
 
-    if(utest_fixture->pSrcMeshFaceSizes)
+    if (utest_fixture->pSrcMeshFaceSizes)
         free(utest_fixture->pSrcMeshFaceSizes);
 
-    if(utest_fixture->pCutMeshVertices)
+    if (utest_fixture->pCutMeshVertices)
         free(utest_fixture->pCutMeshVertices);
 
-    if(utest_fixture->pCutMeshFaceIndices)
+    if (utest_fixture->pCutMeshFaceIndices)
         free(utest_fixture->pCutMeshFaceIndices);
 
-    if(utest_fixture->pCutMeshFaceSizes)
+    if (utest_fixture->pCutMeshFaceSizes)
         free(utest_fixture->pCutMeshFaceSizes);
 }
 
@@ -76,7 +80,7 @@ UTEST_F(SeamConnectedComponent, queryVertices)
 {
     // partial cut intersection between a cube and a quad
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -149,7 +153,7 @@ UTEST_F(SeamConnectedComponent, queryVertices)
 
 UTEST_F(SeamConnectedComponent, queryOriginPartialCut)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -212,7 +216,7 @@ UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
     // complete cut: cube and quad with two polygons
     //mySetup("src-mesh014.off", "cut-mesh014.off");
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -280,7 +284,7 @@ UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
         }
     }
 
-    ASSERT_TRUE(foundSeamedMeshFromCutMesh && foundSeamedMeshFromCutMesh);
+    ASSERT_TRUE(foundSeamedMeshFromSrcMesh || foundSeamedMeshFromCutMesh);
 }
 
 UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_CompleteCut)
@@ -288,7 +292,7 @@ UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_CompleteCut)
     // complete cut: cube and quad with two polygons
     //mySetup("src-mesh014.off", "cut-mesh014.off");
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -333,7 +337,7 @@ UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_PartialCut)
 {
     //mySetup("src-mesh013.off", "cut-mesh013.off");
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off" ;
+    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
 
@@ -371,5 +375,5 @@ UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_PartialCut)
     uint32_t numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
-    ASSERT_EQ(numConnComps, 0u);// there should be no connected components
+    ASSERT_EQ(numConnComps, 0u); // there should be no connected components
 }

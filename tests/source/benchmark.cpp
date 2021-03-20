@@ -1,3 +1,7 @@
+#if defined(_WIN32)
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif
+
 #include "utest.h"
 #include <mcut/mcut.h>
 
@@ -6,25 +10,46 @@
 #include <string>
 #include <vector>
 
-// libigl dependencies
-#include <Eigen/Core>
-#include <igl/readOFF.h>
-
+#include "off.h"
 
 #define NUMBER_OF_BENCHMARKS 25 //
 
 struct Benchmark {
     McContext myContext = MC_NULL_HANDLE;
     int benchmarkIndex = 0;
+
+    float* pSrcMeshVertices = NULL;
+    uint32_t* pSrcMeshFaceIndices = NULL;
+    uint32_t* pSrcMeshFaceSizes = NULL;
+    uint32_t numSrcMeshVertices = NULL;
+    uint32_t numSrcMeshFaces = NULL;
+
+    float* pCutMeshVertices = NULL;
+    uint32_t* pCutMeshFaceIndices = NULL;
+    uint32_t* pCutMeshFaceSizes = NULL;
+    uint32_t numCutMeshVertices = NULL;
+    uint32_t numCutMeshFaces = NULL;
 };
 
 UTEST_I_SETUP(Benchmark)
 {
     if (utest_index < NUMBER_OF_BENCHMARKS) {
-    // create with no flags (default)
-    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_NULL_HANDLE), MC_NO_ERROR);
-    EXPECT_TRUE(utest_fixture->myContext != nullptr);
-    utest_fixture->benchmarkIndex = utest_index;
+        // create with no flags (default)
+        EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_NULL_HANDLE), MC_NO_ERROR);
+        EXPECT_TRUE(utest_fixture->myContext != nullptr);
+        utest_fixture->benchmarkIndex = (int)utest_index;
+
+        utest_fixture->pSrcMeshVertices = nullptr;
+        utest_fixture->pSrcMeshFaceIndices = nullptr;
+        utest_fixture->pSrcMeshFaceSizes = nullptr;
+        utest_fixture->numSrcMeshVertices = 0;
+        utest_fixture->numSrcMeshFaces = 0;
+
+        utest_fixture->pCutMeshVertices = nullptr;
+        utest_fixture->pCutMeshFaceIndices = nullptr;
+        utest_fixture->pCutMeshFaceSizes = nullptr;
+        utest_fixture->numCutMeshVertices = 0;
+        utest_fixture->numCutMeshFaces = 0;
     }
 }
 
@@ -33,90 +58,53 @@ UTEST_I_TEARDOWN(Benchmark)
     EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
 }
 
-struct InputMesh {
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
-
-    // variables for mesh data in a format suited for MCUT
-    std::string fpath; // path to mesh file
-    std::vector<uint32_t> faceSizesArray; // vertices per face
-    std::vector<uint32_t> faceIndicesArray; // face indices
-    std::vector<double> vertexCoordsArray; // vertex coords
-};
-
-bool readOFF(InputMesh& srcMesh)
-{
-    bool srcMeshLoaded = igl::readOFF(srcMesh.fpath, srcMesh.V, srcMesh.F);
-
-    if (!srcMeshLoaded) {
-        std::fprintf(stderr, "error: could not load mesh --> %s\n", srcMesh.fpath.c_str());
-        return false;
-    }
-
-    // copy vertices
-    for (int i = 0; i < srcMesh.V.rows(); ++i) {
-        const Eigen::Vector3d& v = srcMesh.V.row(i);
-        assert(v.size() == 3);
-        srcMesh.vertexCoordsArray.push_back(v.x());
-        srcMesh.vertexCoordsArray.push_back(v.y());
-        srcMesh.vertexCoordsArray.push_back(v.z());
-    }
-
-    // copy faces
-    for (int i = 0; i < srcMesh.F.rows(); ++i) {
-        const Eigen::VectorXi& f = srcMesh.F.row(i);
-        for (int j = 0; j < f.rows(); ++j) {
-            srcMesh.faceIndicesArray.push_back(f[j]);
-        }
-        srcMesh.faceSizesArray.push_back(f.rows());
-    }
-    return true;
-}
-
 UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
 {
     std::vector<std::pair<std::string, std::string>> benchmarkMeshPairs;
 
-        std::stringstream ss;
-        ss << std::setfill('0') << std::setw(3) << utest_fixture->benchmarkIndex;
-        std::string s = ss.str();
-        benchmarkMeshPairs.emplace_back("src-mesh" + s + ".off", "cut-mesh" + s + ".off");
+    std::stringstream ss;
+    ss << std::setfill('0') << std::setw(3) << utest_fixture->benchmarkIndex;
+    std::string s = ss.str();
+    benchmarkMeshPairs.emplace_back("src-mesh" + s + ".off", "cut-mesh" + s + ".off");
 
     for (auto& i : benchmarkMeshPairs) {
         const std::string srcMeshName = i.first;
         const std::string cutMeshName = i.second;
 
-        InputMesh srcMesh;
-        srcMesh.fpath = std::string(MESHES_DIR) + "/benchmarks/" + srcMeshName;
-        ASSERT_EQ(readOFF(srcMesh), true);
-
-        ASSERT_GT((int)srcMesh.faceIndicesArray.size(), 2);
-        ASSERT_GT((int)srcMesh.faceSizesArray.size(), 0);
-        ASSERT_GT((int)srcMesh.vertexCoordsArray.size(), 3);
-
-        InputMesh cutMesh;
-        cutMesh.fpath = std::string(MESHES_DIR) + "/benchmarks/" + cutMeshName;
-        ASSERT_EQ(readOFF(cutMesh), true);
-
-        ASSERT_GT((int)cutMesh.faceIndicesArray.size(), 2);
-        ASSERT_GT((int)cutMesh.faceSizesArray.size(), 0);
-        ASSERT_GT((int)cutMesh.vertexCoordsArray.size(), 3);
-
         // do the cutting
         // --------------
+        const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/" + srcMeshName;
+
+        readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+
+        ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
+        ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
+        ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
+        ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
+        ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+
+        const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/" + cutMeshName;
+
+        readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
+        ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
+        ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
+        ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
+        ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
+        ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+
         ASSERT_EQ(mcDispatch(
                       utest_fixture->myContext,
-                      MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
-                      &srcMesh.vertexCoordsArray[0],
-                      &srcMesh.faceIndicesArray[0],
-                      &srcMesh.faceSizesArray[0],
-                      srcMesh.vertexCoordsArray.size() / 3,
-                      srcMesh.faceSizesArray.size(),
-                      &cutMesh.vertexCoordsArray[0],
-                      &cutMesh.faceIndicesArray[0],
-                      &cutMesh.faceSizesArray[0],
-                      cutMesh.vertexCoordsArray.size() / 3,
-                      cutMesh.faceSizesArray.size()),
+                      MC_DISPATCH_VERTEX_ARRAY_FLOAT,
+                      utest_fixture->pSrcMeshVertices,
+                      utest_fixture->pSrcMeshFaceIndices,
+                      utest_fixture->pSrcMeshFaceSizes,
+                      utest_fixture->numSrcMeshVertices,
+                      utest_fixture->numSrcMeshFaces,
+                      utest_fixture->pCutMeshVertices,
+                      utest_fixture->pCutMeshFaceIndices,
+                      utest_fixture->pCutMeshFaceSizes,
+                      utest_fixture->numCutMeshVertices,
+                      utest_fixture->numCutMeshFaces),
             MC_NO_ERROR);
 
         uint32_t numConnComps = 0;

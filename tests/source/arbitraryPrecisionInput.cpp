@@ -1,10 +1,14 @@
+#if defined(_WIN32)
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif
+
 #include "utest.h"
 #include <mcut/mcut.h>
 
 #include <cctype> // std::isdigit
-#include <vector>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 struct ArbitraryPrecisionInput {
     McContext myContext = MC_NULL_HANDLE;
