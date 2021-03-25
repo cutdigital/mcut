@@ -30,12 +30,12 @@
 #include <cfenv>
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
+#include <algorithm>
 #include <fstream>
 #include <memory>
 #include <random> // perturbation
 #include <stdio.h>
 #include <string.h>
-#include <algorithm>
 
 #if defined(MCUT_BUILD_WINDOWS)
 #pragma warning(disable : 26812)
@@ -45,7 +45,7 @@
 #include "mcut/internal/geom.h"
 
 // If the inputs are found to not be in general position, then we perturb the
-// cut-mesh by this constant (scaled by a random variable [0.1-1.0]). Otherwise 
+// cut-mesh by this constant (scaled by a random variable [0.1-1.0]). Otherwise
 // not used.
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-10;
 
@@ -487,6 +487,7 @@ McResult convert(const mcut::status_t& v)
         result = McResult::MC_NO_ERROR;
         break;
     case mcut::status_t::GENERAL_POSITION_VIOLATION:
+    case mcut::status_t::INVALID_MESH_INTERSECTION:
         result = McResult::MC_INVALID_OPERATION;
         break;
     //case mcut::status_t::INVALID_CUT_MESH:

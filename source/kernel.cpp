@@ -3444,6 +3444,82 @@ void dispatch(output_t& output, const input_t& input)
         }
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // check for further degeneracy before we proceed further
+    ///////////////////////////////////////////////////////////////////////////
+
+    //
+    // Here we look for cut-mesh patches whose boundary/border is not defined by
+    // an intersection point with a src-mesh halfedge in its registry.
+    // (stab cut)
+    //
+
+    bool all_cutpaths_making_holes_are_okay = true;
+    // for each color
+    for (std::vector<int>::const_iterator cpmh_iter = explicit_cutpaths_making_holes.cbegin();
+         cpmh_iter != explicit_cutpaths_making_holes.cend();
+         cpmh_iter++) {
+
+        const int cpmh_index = *cpmh_iter;
+
+        const std::vector<ed_t>& explicit_cutpath_making_hole = m0_explicit_cutpath_sequences.at(cpmh_index);
+
+        vd_t v0_prev = mesh_t::null_vertex(); // prevents duplicate checks
+        vd_t v1_prev = mesh_t::null_vertex();
+
+        bool cutpath_is_good = false;
+        for (std::vector<ed_t>::const_iterator cpe_iter = explicit_cutpath_making_hole.cbegin();
+             cpe_iter != explicit_cutpath_making_hole.cend();
+             ++cpe_iter) {
+
+            const vd_t v0 = m0.vertex(*cpe_iter, 0);
+            if (v0 != v0_prev) {
+                MCUT_ASSERT(m0_is_intersection_point(v0, ps_vtx_cnt));
+
+                const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(v0);
+                const bool v0_coincident_ps_halfedge_is_sm_halfedge = !ps_is_cutmesh_vertex(ps.target(v0_coincident_ps_halfedge), sm_vtx_cnt);
+
+                if (v0_coincident_ps_halfedge_is_sm_halfedge) {
+                    cutpath_is_good = true;
+                    break;
+                }
+
+                v0_prev = v0;
+            }
+
+            const vd_t v1 = m0.vertex(*cpe_iter, 1);
+
+            if (v1 != v1_prev) {
+
+                MCUT_ASSERT(m0_is_intersection_point(v1, ps_vtx_cnt));
+
+                const hd_t v1_ps_h = m0_ivtx_to_ps_he.at(v1);
+                const bool v1_coincident_ps_halfedge_is_sm_halfedge = !ps_is_cutmesh_vertex(ps.target(v1_ps_h), sm_vtx_cnt);
+                if (v1_coincident_ps_halfedge_is_sm_halfedge) {
+                    cutpath_is_good = true;
+                    break;
+                }
+
+                v1_prev = v1;
+            }
+        }
+
+        if (!cutpath_is_good) {
+            all_cutpaths_making_holes_are_okay = false;
+            break;
+        }
+    }
+
+    if (!all_cutpaths_making_holes_are_okay) {
+
+        lg.set_reason_for_failure("found dangling cut-mesh patch."); // ... which cannot be connected to source-mesh because the cut-mesh is intersecting a source-mesh face without cutting its edges
+        output.status = status_t::INVALID_MESH_INTERSECTION;
+
+        // This can happen when the cut would result in an output with topological holes (i.e. polygons with holes)!
+
+        return; // exit
+    }
+
     // The following sections of code are about clipping intersecting polygons,
     // and the information we need in order to do that.
     // -----------------------------------------------------------------------
@@ -7037,100 +7113,6 @@ void dispatch(output_t& output, const input_t& input)
     primary_interior_ihalfedge_pool.clear();
 
     ///////////////////////////////////////////////////////////////////////////
-    // check for further degeneracy before we proceed further
-    ///////////////////////////////////////////////////////////////////////////
-
-    // TODO: This check should happen just after we trace polygons. Thats the
-    // earliest point at which the current check for degeneracy can be made.
-    // Essenstially we are check for the case where the cut would result in 
-    // an output with topological holes (as if we holes could be specified in 
-    // addition to polygons)!
-
-    //
-    // Here we look for cut-mesh patches whose boundary/border is not defined by
-    // an intersection point with a src-mesh halfedge in its registry.
-    // (stab cut)
-    //
-
-    if (sm_is_watertight && !cm_is_watertight) // The only scenario in which we may get a degenerate (partial cut) intersection
-    {
-        bool all_patches_okay = true;
-        // for each color
-        for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin();
-             color_to_ccw_patches_iter != color_to_patch.cend();
-             ++color_to_ccw_patches_iter) {
-
-            //const char color_label = color_to_ccw_patches_iter->first;
-            const std::vector<int>& colored_patches = color_to_ccw_patches_iter->second;
-
-            // for each patch
-            for (std::vector<int>::const_iterator patch_idx_iter = colored_patches.cbegin();
-                 patch_idx_iter != colored_patches.cend();
-                 ++patch_idx_iter) {
-
-                const int& patch_idx = *patch_idx_iter;
-                const std::vector<int>& patch = patches.at(patch_idx);
-                bool patch_is_good = false;
-
-                // for each polygon
-                for (std::vector<int>::const_iterator patch_poly_idx_iter = patch.cbegin();
-                     patch_poly_idx_iter != patch.cend();
-                     ++patch_poly_idx_iter) {
-
-                    const int& patch_poly_idx = *patch_poly_idx_iter;
-                    const traced_polygon_t& patch_poly = m0_polygons.at(patch_poly_idx);
-
-                    // for each halfedge of polygon
-                    for (traced_polygon_t::const_iterator patch_poly_he_iter = patch_poly.cbegin(); patch_poly_he_iter != patch_poly.cend(); ++patch_poly_he_iter) {
-
-                        const hd_t& patch_poly_he = *patch_poly_he_iter;
-                        const vd_t patch_poly_he_src = m0.source(patch_poly_he);
-                        const vd_t patch_poly_he_tgt = m0.target(patch_poly_he);
-                        const bool patch_poly_he_src_is_ivertex = m0_is_intersection_point(patch_poly_he_src, ps_vtx_cnt);
-                        const bool patch_poly_he_tgt_is_ivertex = m0_is_intersection_point(patch_poly_he_tgt, ps_vtx_cnt);
-
-                        if (patch_poly_he_src_is_ivertex) {
-
-                            const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_he.at(patch_poly_he_src);
-                            const bool src_coincident_ps_halfedge_is_sm_halfedge = !ps_is_cutmesh_vertex(ps.target(src_coincident_ps_halfedge), sm_vtx_cnt);
-
-                            if (src_coincident_ps_halfedge_is_sm_halfedge) {
-                                patch_is_good = true;
-                                break;
-                            }
-                        } else if (patch_poly_he_tgt_is_ivertex) {
-                            const hd_t tgt_ps_h = m0_ivtx_to_ps_he.at(patch_poly_he_tgt);
-                            const bool tgt_coincident_ps_halfedge_is_sm_halfedge = !ps_is_cutmesh_vertex(ps.target(tgt_ps_h), sm_vtx_cnt);
-                            if (tgt_coincident_ps_halfedge_is_sm_halfedge) {
-                                patch_is_good = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (patch_is_good) {
-                        break;
-                    }
-                }
-
-                if (!patch_is_good) {
-                    all_patches_okay = false;
-                    break;
-                }
-            }
-
-            if (!all_patches_okay) {
-                break;
-            }
-        }
-
-        if (!all_patches_okay) {
-            lg << "found dangling cut-mesh patch" << std::endl;
-            output.status = status_t::INVALID_MESH_INTERSECTION; // ... which cannot be connected to source-mesh because the cut-mesh is intersecting a source-mesh face without cutting its edges
-            return; // exit
-        }
-    } // if (sm_is_watertight && !cs_watertight )
-
-    ///////////////////////////////////////////////////////////////////////////
     // Find the cut-mesh vertices that must not be duplicated
     ///////////////////////////////////////////////////////////////////////////
 
@@ -7842,8 +7824,6 @@ void dispatch(output_t& output, const input_t& input)
     ///////////////////////////////////////////////////////////////////////////
     // save the patches into the output
     ///////////////////////////////////////////////////////////////////////////
-
-    // TODO: need to save texture coordinate mapping for patches too!
 
     lg << "save patch meshes" << std::endl;
 
