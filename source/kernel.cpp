@@ -6460,6 +6460,70 @@ void dispatch(output_t& output, const input_t& input)
     }
 #endif
 
+    //
+    // Save the traced polygons (from source mesh and cut mesh) that have at least
+    // one edge on a cut-path making a hole.
+    // These are use to speed up the cost of searching for seed-polygons for sticthing
+    //
+
+    // for each cutpath that makes a hole
+    for (std::vector<int>::const_iterator ecpmh_iter = explicit_cutpaths_making_holes.cbegin();
+         ecpmh_iter != explicit_cutpaths_making_holes.cend();
+         ++ecpmh_iter) {
+
+        const int ecpmh_idx = *ecpmh_iter; // index of cutpath
+        MCUT_ASSERT(ecpmh_idx < (int)m0_explicit_cutpath_sequences.size());
+        const std::vector<ed_t>& m0_explicit_cutpath_sequence = m0_explicit_cutpath_sequences.at(ecpmh_idx);
+
+        for (std::vector<ed_t>::const_iterator ecps_iter = m0_explicit_cutpath_sequence.cbegin(); ecps_iter != m0_explicit_cutpath_sequence.cend(); ++ecps_iter) {
+            const ed_t cutpath_edge = *ecps_iter;
+            for (int hIter = 0; hIter < 2; ++hIter) { // foe each half edge on edge
+
+                hd_t h = m0.halfedge(cutpath_edge, 0);
+                MCUT_ASSERT(h != mesh_t::null_halfedge());
+
+                /*
+                 1. get the cut-mesh polygon using the halfedge
+                 2. save polygon and halfedge index
+                */
+
+                MCUT_ASSERT(m0_h_to_ply.find(h) != m0_h_to_ply.cend());
+                const std::vector<int>& h_polygons = m0_h_to_ply.at(h);
+
+                MCUT_ASSERT(h_polygons.size() == 2); // used by two polygons in m0 always
+
+                bool firstPolyIsCutMeshPoly = h_polygons.front() >= traced_sm_polygon_count;
+                if (firstPolyIsCutMeshPoly) {
+                }
+
+                // get the cut-mesh polygon using h0
+                std::vector<int>::const_iterator h_cutmesh_polygon_find_iter = std::find_if(
+                    h_polygons.cbegin(),
+                    h_polygons.cend(),
+                    [&](const int& e) {
+                        return e >= traced_sm_polygon_count; // match cutmesh polygon!
+                    });
+
+                MCUT_ASSERT(h_cutmesh_polygon_find_iter != h_polygons.cend()); // cut path halfedge are always used by 2 polygons (for tracing)
+                const int h_polygon_idx = *h_cutmesh_polygon_find_iter;
+                // the actual polygon
+                MCUT_ASSERT(h_polygon_idx < (int)m0_polygons.size());
+
+                const std::vector<hd_t>& h_polygon = m0_polygons.at(h_polygon_idx);
+                // find the index of h0 in the polygon
+                std::vector<hd_t>::const_iterator h_polygon_find_iter = std::find_if(
+                    h_polygon.cbegin(), h_polygon.cend(),
+                    [&](const hd_t& e) {
+                        return e == h;
+                    });
+
+                MCUT_ASSERT(h_polygon_find_iter != h_polygon.cend());
+
+                const int h_idx = (int)std::distance(h_polygon.cbegin(), h_polygon_find_iter);
+            }
+        }
+    }
+
     m0_explicit_cutpath_sequences.clear(); // free, no longer needed.
 
     ///////////////////////////////////////////////////////////////////////////
@@ -9333,20 +9397,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 const std::string color_tag_stri = to_string(patch_color_label_to_location.at(color_id)); // == cut_surface_patch_location_t::OUTSIDE ? "e" : "i");
 
-//dump_mesh_summary(m1_colored, color_tag_stri);
-#if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
-                unseparated_stitching_CCs.clear();
-//unseparated_stitching_CCs.erase(unseparated_stitching_CCs.begin(), unseparated_stitching_CCs.begin() + unseparated_stitching_CCs.size() - 1);
-#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
-
                 // save meshes and dump
-
-                // std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_location_t> > >
-                //int numInstancesPrev = 0; // Fragment history: an instance is a fragment containing at least one more/less polygon than all other fragments (history)
-                //for (auto it = separated_stitching_CCs.cbegin(); it != separated_stitching_CCs.cend(); ++it) {
-                //    numInstancesPrev += it->second.size();
-                // }
-                //const int ccsp_count_pre = numInstancesPrev; //separated_stitching_CCs.unseparated_stitching_CCs.size();
 
                 if (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive) {
                     ///////////////////////////////////////////////////////////////////////////
@@ -9378,46 +9429,6 @@ void dispatch(output_t& output, const input_t& input)
                         input.keep_fragments_above_cutmesh,
                         input.keep_fragments_partially_cut);
                 }
-                //int numInstancesCur = 0;
-                // for (auto it = separated_stitching_CCs.cbegin(); it != separated_stitching_CCs.cend(); ++it) {
-                //     numInstancesCur += it->second.size();
-                // }
-                //const int ccsp_count_post = numInstancesCur; //unseparated_stitching_CCs.size();
-
-                // TODO: enable this assert later once we start using "connected_components". This is
-                // because at the moment, all fragments (upper/lower) are added into "separated_stitching_CCs"
-                // at the moment. Thus we get duplicate copies of meshes!!
-                // If you forget what you meant, re-enable the assert line below and run with the example "src-mesh000.off" "cut-mesh000.off"
-                // MCUT_ASSERT(numInstancesPrev == 0 || (ccsp_count_post - ccsp_count_pre == 1));
-
-#if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
-                //
-                // TODO: the following code is messy and could do with some cleaning up
-                // It has one possible use, which is to allows for the user to choose if we
-                // we different instances of the fragments or not.
-                //
-
-                //for (int index = ccsp_count_pre; index < ccsp_count_post; ++index) { // TODO: this loop may be redundant because unseparated_stitching_CCs.size() always increases by one.
-
-                //const mesh_t& new_unseparated_connected_ccsponent = unseparated_stitching_CCs.back();
-                //dump_mesh(new_unseparated_connected_ccsponent, ("c." + color_tag_stri + "." + "p" + std::to_string(stitched_poly_counter)).c_str());
-
-                for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = separated_stitching_CCs.begin();
-                     cc_iter != separated_stitching_CCs.end();
-                     ++cc_iter) {
-
-                    //int cc_id = static_cast<int>(cc_iter->first);
-                    std::vector<std::pair<mesh_t, output_mesh_info_t>>& incremental_instances = cc_iter->second;
-
-                    //const mesh_t& mesh_inst = incremental_instances.back().first;
-                    //const connected_component_location_t location = incremental_instances.back().second;
-
-                    //dump_mesh(mesh_inst, ("cc" + std::to_string(cc_id) + "." + color_tag_stri + "." + "p" + std::to_string(stitched_poly_counter) + "." + to_string(location)).c_str());
-
-                    // keep only the last (most up-to-date) copy
-                    incremental_instances.erase(incremental_instances.cbegin(), incremental_instances.cbegin() + incremental_instances.size() - 1);
-                }
-#endif // #if !MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING
 
                 ++global_cm_poly_stitch_counter;
                 stitched_poly_counter++;
