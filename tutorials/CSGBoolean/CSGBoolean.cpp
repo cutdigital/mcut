@@ -1,6 +1,11 @@
 #if defined(_WIN32)
 #define _CRT_SECURE_NO_WARNINGS 1
+
+#ifdef _WIN32
+#pragma warning(disable : 26812) // Unscoped enums from mcut.h
+#endif // _WIN32
 #endif
+
 /*
 This tutorial shows how to compute boolean operations using MCUT.
 */
