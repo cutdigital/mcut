@@ -1523,7 +1523,7 @@ void edge_face_intersection_test_func(
     std::map<vd_t, ed_t>& m0_ivtx_to_ps_edge,
     std::vector<vd_t>& cm_border_reentrant_ivtx_list,
     std::map<vd_t, math::vec3>& m0_ivtx_to_tested_polygon_normal,
-    std::map<ed_t, std::vector<fd_t>>& ps_edge_to_intersected_faces, // guarded by mutex-lock
+    std::map<ed_t, std::vector<fd_t>>& ps_intersecting_edges, // guarded by mutex-lock
     std::map<std::pair<fd_t, fd_t>, std::vector<vd_t>>& cutpath_edge_creation_info,
     std::map<ed_t, std::vector<fd_t>>& ps_edge_face_intersection_pairs,
     std::vector<math::vec3>& intersection_points)
@@ -1540,7 +1540,7 @@ void parallel_polygon_intersection_tests(
     std::map<vd_t, ed_t>& m0_ivtx_to_ps_edge,
     std::vector<vd_t>& cm_border_reentrant_ivtx_list,
     std::map<vd_t, math::vec3>& m0_ivtx_to_tested_polygon_normal,
-    std::map<ed_t, std::vector<fd_t>>& ps_edge_to_intersected_faces, // guarded by mutex-lock
+    std::map<ed_t, std::vector<fd_t>>& ps_intersecting_edges, // guarded by mutex-lock
     std::map<std::pair<fd_t, fd_t>, std::vector<vd_t>>& cutpath_edge_creation_info,
     std::map<ed_t, std::vector<fd_t>>& ps_edge_face_intersection_pairs)
 {
@@ -1741,14 +1741,14 @@ void dispatch(output_t& output, const input_t& input)
     // re-entrant vertices on the border of the cut-mesh
     std::vector<vd_t> cm_border_reentrant_ivtx_list;
 
-    std::map<
-        vd_t, // intersection point
-        math::vec3 // the normal vector of intersected face from which intersection point came from
-        >
-        m0_ivtx_to_tested_polygon_normal;
+    //std::map<
+    ///    vd_t, // intersection point
+    ///    math::vec3 // the normal vector of intersected face from which intersection point came from
+    //    >
+    //    m0_ivtx_to_tested_polygon_normal;
 
     // edges of the polygon soup mesh which intersect a face
-    std::map<ed_t, std::vector<fd_t>> ps_edge_to_intersected_faces;
+    std::set<ed_t> ps_intersecting_edges;
 
     // A map of used to create edges along the intersection path.
     // Each element is the information such as intersection points that arise from testing two polygons.
@@ -1818,6 +1818,59 @@ void dispatch(output_t& output, const input_t& input)
 
     TIME_PROFILE_END();
 
+    // compute/extract unique list of faces that are tested for intersection
+    //--------------------------------------------------------
+
+    // unique list of faces that are tested for intersection
+    std::set<fd_t> ps_tested_faces;
+
+    // These two sets offer an optimization to prevent collisions during insertions into "ps_tested_faces"
+    // We first collect the cut-mesh faces and then the source mesh faces
+    std::set<fd_t>& tested_faces_sm = ps_tested_faces;
+    std::set<fd_t> tested_faces_cm;
+
+    // for each pair of polygons to be tested for intersection
+    for (std::vector<std::pair<fd_t, fd_t>>::const_iterator i = input.intersecting_sm_cm_face_pairs->cbegin();
+         i != input.intersecting_sm_cm_face_pairs->cend();
+         ++i) {
+        tested_faces_sm.insert(i->first);
+
+        const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
+        const fd_t cm_face((uint32_t)i->second + cm_faces_start_offset);
+        tested_faces_cm.insert(cm_face);
+    }
+
+    ps_tested_faces.insert(tested_faces_cm.cbegin(), tested_faces_cm.cend()); // add unique list of cut-mesh faces
+    tested_faces_cm.clear(); // clear (no longer needed)
+
+    // compute/extract geometry properties of each tested face
+    //--------------------------------------------------------
+    std::map<fd_t, math::vec3> ps_tested_face_to_plane_normal;
+    std::map<fd_t, math::real_number_t> ps_tested_face_to_plane_normal_d_param;
+    std::map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
+    std::map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
+
+    for (std::set<fd_t>::const_iterator tested_faces_iter = ps_tested_faces.cbegin(); tested_faces_iter != ps_tested_faces.cend(); tested_faces_iter++) {
+        // get the vertices of tested_face (used to estimate its normal etc.)
+        std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(*tested_faces_iter);
+        std::vector<math::vec3>& tested_face_vertices = ps_tested_face_to_vertices[*tested_faces_iter]; // insert and get reference
+
+        for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
+            const math::vec3& vertex = ps.vertex(*it);
+            tested_face_vertices.push_back(vertex);
+        }
+
+        math::vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal[*tested_faces_iter];
+        math::real_number_t& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param[*tested_faces_iter];
+        int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp[*tested_faces_iter];
+
+        tested_face_plane_normal_max_comp = geom::compute_polygon_plane_coefficients(
+            tested_face_plane_normal,
+            tested_face_plane_param_d,
+            tested_face_vertices.data(),
+            (int)tested_face_vertices.size());
+    }
+
     // edge-to-face intersection tests (narrow-phase)
     // -----------------------------------------
     TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
@@ -1858,32 +1911,35 @@ void dispatch(output_t& output, const input_t& input)
             // where each halfedge of face A intersects the area defined by face B (if it exists).
 
             // get the vertices of tested_face (used to estimate its normal etc.)
-            std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_face);
-            std::vector<math::vec3> tested_face_vertices;
+            //std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_face);
+            MCUT_ASSERT(ps_tested_face_to_vertices.find(tested_face) != ps_tested_face_to_vertices.end());
+            const std::vector<math::vec3>& tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
 
-            lg << "face " << fstr(tested_face) << " vertices = " << tested_face_descriptors.size() << std::endl;
+            //lg << "face " << fstr(tested_face) << " vertices = " << tested_face_descriptors.size() << std::endl;
 
-            for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
-                const math::vec3& vertex = ps.vertex(*it);
-                lg << "v: " << vertex << std::endl;
-                tested_face_vertices.push_back(vertex);
-            }
+            //for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
+            //    const math::vec3& vertex = ps.vertex(*it);
+            //    lg << "v: " << vertex << std::endl;
+            //    tested_face_vertices.push_back(vertex);
+            //}
 
             // compute plane of tested_face
             // -----------------------
 
-            math::vec3 tested_face_plane_normal;
-            math::real_number_t tested_face_plane_param_d;
+            MCUT_ASSERT(ps_tested_face_to_plane_normal.find(tested_face) != ps_tested_face_to_plane_normal.end());
+            const math::vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal.at(tested_face);
+            MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
+            const math::real_number_t& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param.at(tested_face);
+            MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
+            const int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face); // geom::compute_polygon_plane_coefficients(
+                /// tested_face_plane_normal,
+                // tested_face_plane_param_d,
+                // tested_face_vertices.data(),
+            //  (int)tested_face_vertices.size());
 
-            const int tested_face_plane_normal_max_comp = geom::compute_polygon_plane_coefficients(
-                tested_face_plane_normal,
-                tested_face_plane_param_d,
-                tested_face_vertices.data(),
-                (int)tested_face_vertices.size());
-
-            lg << "face " << fstr(tested_face) << " normal = " << tested_face_plane_normal << std::endl;
-            lg << "face " << fstr(tested_face) << " largest normal component = " << tested_face_plane_normal_max_comp << std::endl;
-            lg << "face " << fstr(tested_face) << " plane d-coeff = " << tested_face_plane_param_d << std::endl;
+            //lg << "face " << fstr(tested_face) << " normal = " << tested_face_plane_normal << std::endl;
+            //lg << "face " << fstr(tested_face) << " largest normal component = " << tested_face_plane_normal_max_comp << std::endl;
+            //lg << "face " << fstr(tested_face) << " plane d-coeff = " << tested_face_plane_param_d << std::endl;
 
             math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
 
@@ -1997,9 +2053,9 @@ void dispatch(output_t& output, const input_t& input)
                     m0_ivtx_to_ps_edge.insert(std::make_pair(new_vertex_descr, tested_edge));
 
                     // ed_t e = ps.edge(halfedge_pq);
-                    //bool edge_registered_as_intersecting = ps_edge_to_intersected_faces.find(tested_edge) != ps_edge_to_intersected_faces.cend();
+                    //bool edge_registered_as_intersecting = ps_intersecting_edges.find(tested_edge) != ps_intersecting_edges.cend();
 
-                    ps_edge_to_intersected_faces[tested_edge].push_back(tested_face);
+                    ps_intersecting_edges.insert(tested_edge);
 
                     //intersection_test_ivtx_list.push_back(new_vertex_descr);
 
@@ -2024,9 +2080,9 @@ void dispatch(output_t& output, const input_t& input)
                         }
                     }
 
-                    MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.count(new_vertex_descr) == 0);
-                    m0_ivtx_to_tested_polygon_normal[new_vertex_descr] = tested_face_plane_normal;
-                    MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.count(new_vertex_descr) == 1);
+                    //MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.count(new_vertex_descr) == 0);
+                    //m0_ivtx_to_tested_polygon_normal[new_vertex_descr] = tested_face_plane_normal;
+                    //MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.count(new_vertex_descr) == 1);
 
                     if (tested_edge_belongs_to_cm) { // halfedge_pq belongs to cut mesh
 
@@ -2327,26 +2383,26 @@ void dispatch(output_t& output, const input_t& input)
 
     std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
 
-    for (std::map<ed_t, std::vector<fd_t>>::const_iterator iter_ps_edge = ps_edge_to_intersected_faces.cbegin(); iter_ps_edge != ps_edge_to_intersected_faces.cend(); ++iter_ps_edge) {
+    for (std::set<ed_t>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge) {
         lg.indent();
 
         // vertices that lie on current ps edge
-        const std::vector<vd_t> vertices_on_ps_edge = get_vertices_on_ps_edge(iter_ps_edge->first, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
+        const std::vector<vd_t> vertices_on_ps_edge = get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
 
         if (vertices_on_ps_edge.size() > 3) {
 
-            lg << "ps-edge " << estr(ps, iter_ps_edge->first) << " : ";
+            lg << "ps-edge " << estr(ps, *iter_ps_edge) << " : ";
 
-            MCUT_ASSERT(ps_edge_to_vertices.find(iter_ps_edge->first) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
+            MCUT_ASSERT(ps_edge_to_vertices.find(*iter_ps_edge) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
 
-            ps_edge_to_vertices.insert(std::make_pair(iter_ps_edge->first, std::vector<std::pair<vd_t, math::vec3>>()));
+            ps_edge_to_vertices.insert(std::make_pair(*iter_ps_edge, std::vector<std::pair<vd_t, math::vec3>>()));
 
             for (std::vector<vd_t>::const_iterator it = vertices_on_ps_edge.cbegin(); it != vertices_on_ps_edge.cend(); ++it) {
 
                 lg << vstr(*it) << " ";
 
                 const math::vec3& vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
-                ps_edge_to_vertices.at(iter_ps_edge->first).push_back(std::make_pair(*it, vertex_coordinates));
+                ps_edge_to_vertices.at(*iter_ps_edge).push_back(std::make_pair(*it, vertex_coordinates));
 
                 //if (m0_is_intersection_point(*it, ps_vtx_cnt)) { // is intersection point
                 //m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
@@ -2358,7 +2414,7 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
     }
 
-    ps_edge_to_intersected_faces.clear();
+    ps_intersecting_edges.clear();
 
     lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices.size() << std::endl;
 
@@ -5205,8 +5261,40 @@ void dispatch(output_t& output, const input_t& input)
                 // coordinates and the normal of the face which was intersected to produce
                 // the tgt vertex.
                 //const math::vec3& polygon_normal = cs_nonborder_reentrant_ivertices_find_iter->second;
-                MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.find(cs_poly_he_tgt) != m0_ivtx_to_tested_polygon_normal.cend());
-                const math::vec3& polygon_normal = m0_ivtx_to_tested_polygon_normal.at(cs_poly_he_tgt);
+                //MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.find(cs_poly_he_tgt) != m0_ivtx_to_tested_polygon_normal.cend());
+
+                // get the registry entry edge
+
+                const ed_t& registry_entry_edge = m0_ivtx_to_ps_edge.at(cs_poly_he_tgt);
+                // get registry entry faces
+
+                const std::vector<fd_t>& registry_entry_faces = m0_ivtx_to_ps_faces.at(cs_poly_he_tgt);
+                // get the registry-entry face which is not incident to edge
+                const vd_t registry_entry_edge_v0 = ps.vertex(registry_entry_edge, 0);
+                std::vector<fd_t>::const_iterator tested_face; // which was intersected by "registry_entry_edge" to get "cs_poly_he_tgt"
+                bool registry_entry_edge_is_from_cutmesh = ps_is_cutmesh_vertex(registry_entry_edge_v0, sm_vtx_cnt);
+                if (registry_entry_edge_is_from_cutmesh) {
+                    // ... then intersected face was from the source mesh
+                    tested_face = std::find_if(registry_entry_faces.cbegin(), registry_entry_faces.cend(),
+                        [&](const fd_t& f) {
+                            bool is_sm_face = !ps_is_cutmesh_face(f, sm_face_count) && f != mesh_t::null_face();
+                            return is_sm_face;
+                        });
+
+                } else {
+                    // ... then intersected face was from the cut mesh
+                    tested_face = std::find_if(registry_entry_faces.cbegin(), registry_entry_faces.cend(),
+                        [&](const fd_t& f) {
+                            bool is_cm_face = ps_is_cutmesh_face(f, sm_face_count) && f != mesh_t::null_face();
+                            return is_cm_face;
+                        });
+                }
+
+                MCUT_ASSERT(tested_face != registry_entry_faces.cend()); // "registry_entry_faces" must have at least one face from cm and at least one from sm
+                MCUT_ASSERT(ps_tested_face_to_plane_normal.find(*tested_face) != ps_tested_face_to_plane_normal.cend());
+
+                // get normal of face
+                const math::vec3& polygon_normal = ps_tested_face_to_plane_normal.at(*tested_face); //m0_ivtx_to_tested_polygon_normal.at(cs_poly_he_tgt);
                 // const math::vec3& polygon_normal = geometric_data.first; // source-mesh face normal
                 //const math::real_number_t& orig_scalar_prod = geometric_data.second; // the dot product result we computed earlier
 
@@ -5312,8 +5400,39 @@ void dispatch(output_t& output, const input_t& input)
             // the tgt-ivertex (scalar product using the halfedge's src and tgt coordinates
             // and and the normal of the cut-mesh face that was intersected to produce
             // the tgt vertex).
-            MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.find(sm_poly_he_tgt) != m0_ivtx_to_tested_polygon_normal.cend());
-            const math::vec3& polygon_normal = m0_ivtx_to_tested_polygon_normal.at(sm_poly_he_tgt);
+            //MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.find(sm_poly_he_tgt) != m0_ivtx_to_tested_polygon_normal.cend());
+            // get the registry entry edge
+
+            const ed_t& registry_entry_edge = m0_ivtx_to_ps_edge.at(sm_poly_he_tgt);
+            // get registry entry faces
+            const std::vector<fd_t>& registry_entry_faces = m0_ivtx_to_ps_faces.at(sm_poly_he_tgt);
+            // get the registry-entry face which is not incident to edge
+            const vd_t registry_entry_edge_v0 = ps.vertex(registry_entry_edge, 0);
+            std::vector<fd_t>::const_iterator tested_face; // which was intersected by "registry_entry_edge" to get "cs_poly_he_tgt"
+            bool registry_entry_edge_is_from_cutmesh = ps_is_cutmesh_vertex(registry_entry_edge_v0, sm_vtx_cnt);
+            if (registry_entry_edge_is_from_cutmesh) {
+                // ... then intersected face was from the source mesh
+                tested_face = std::find_if(registry_entry_faces.cbegin(), registry_entry_faces.cend(),
+                    [&](const fd_t& f) {
+                        bool is_sm_face = !ps_is_cutmesh_face(f, sm_face_count) && f != mesh_t::null_face();
+                        return is_sm_face;
+                    });
+
+            } else {
+                // ... then intersected face was from the cut mesh
+                tested_face = std::find_if(registry_entry_faces.cbegin(), registry_entry_faces.cend(),
+                    [&](const fd_t& f) {
+                        bool is_cm_face = ps_is_cutmesh_face(f, sm_face_count) && f != mesh_t::null_face();
+                        return is_cm_face;
+                    });
+            }
+
+            MCUT_ASSERT(tested_face != registry_entry_faces.cend()); // "registry_entry_faces" must have at least one face from cm and at least one from sm
+            MCUT_ASSERT(ps_tested_face_to_plane_normal.find(*tested_face) != ps_tested_face_to_plane_normal.cend());
+
+            // get normal of face
+            const math::vec3& polygon_normal = ps_tested_face_to_plane_normal.at(*tested_face);
+            //const math::vec3& polygon_normal = m0_ivtx_to_tested_polygon_normal.at(sm_poly_he_tgt);
             //const math::vec3& polygon_normal = geometric_data.first;
             //const math::real_number_t& orig_scalar_prod = geometric_data.second;
 
