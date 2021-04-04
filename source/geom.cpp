@@ -222,6 +222,28 @@ namespace geom {
         }
     }
 
+    void project2D(
+        std::vector<math::vec2>& out,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_plane_normal_largest_component)
+    {
+        out.clear();
+        out.resize(polygon_vertex_count);
+        for (int i = 0; i < polygon_vertex_count; ++i) { // for each vertex
+            math::vec2& Tp = out[i];
+            int k = 0;
+            for (int j = 0; j < 3; j++) { // for each component
+                if (j != polygon_plane_normal_largest_component) { /* skip largest coordinate */
+
+                    Tp[k] = polygon_vertices[i][j];
+                    k++;
+                }
+            }
+        }
+    }
+
+    // TODO: update this function to use "project2D" for projection step
     char compute_point_in_polygon_test(
         const math::vec3& p,
         const math::vec3* polygon_vertices,

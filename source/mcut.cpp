@@ -22,6 +22,7 @@
 
 #include "mcut/mcut.h"
 
+#include "mcut/internal/geom.h"
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
@@ -1652,45 +1653,234 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
     mcut::output_t backendOutput;
-
+    mcut::mesh_t cutMeshInternal;
     int perturbationIters = -1;
+    int kernelDispatchCallCounter = -1;
     do {
+        kernelDispatchCallCounter++;
+
+        bool general_position_assumption_was_violated = (perturbationIters != -1 && (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION));
+        bool floating_polygon_was_detected = backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON;
+        // ::::::::::::::::::::::::::::::::::::::::::::::::::::
         backendOutput.status = mcut::status_t::SUCCESS;
-        perturbationIters++;
-
-        mcut::math::vec3 perturbation;
-
-        if (perturbationIters > 0) {
-            std::default_random_engine rd(perturbationIters);
-            std::mt19937 mt(rd());
-            std::uniform_real_distribution<double> dist(0.1, 1.0);
-            perturbation = mcut::math::vec3(
-                dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
-                dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
-                dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT);
-        }
-
-        mcut::mesh_t cutMeshInternal;
-        result = indexArrayMeshToHalfedgeMesh(
-            ctxtPtr,
-            cutMeshInternal,
-            pCutMeshVertices,
-            pCutMeshFaceIndices,
-            pCutMeshFaceSizes,
-            numCutMeshVertices,
-            numCutMeshFaces,
-            ((perturbationIters == 0) ? NULL : &perturbation));
-
-        if (result != McResult::MC_NO_ERROR) {
-            return result;
-        }
-
-        backendInput.cut_mesh = &cutMeshInternal;
 
         std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
         std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
+        mcut::math::vec3 perturbation;
 
-        constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+        if (general_position_assumption_was_violated) {
+            perturbationIters++;
+
+            if (perturbationIters > 0) {
+                std::default_random_engine rd(perturbationIters);
+                std::mt19937 mt(rd());
+                std::uniform_real_distribution<double> dist(0.1, 1.0);
+                perturbation = mcut::math::vec3(
+                    dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
+                    dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
+                    dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT);
+            }
+        } // if (general_position_assumption_was_violated) {
+
+        if (perturbationIters == -1 /*no perturbs required*/ || general_position_assumption_was_violated) {
+            result = indexArrayMeshToHalfedgeMesh(
+                ctxtPtr,
+                cutMeshInternal,
+                pCutMeshVertices,
+                pCutMeshFaceIndices,
+                pCutMeshFaceSizes,
+                numCutMeshVertices,
+                numCutMeshFaces,
+                ((perturbationIters == 0) ? NULL : &perturbation));
+
+            if (result != McResult::MC_NO_ERROR) {
+                return result;
+            }
+
+            backendInput.cut_mesh = &cutMeshInternal;
+
+            constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+        }
+
+        if (floating_polygon_was_detected) {
+            const mcut::floating_polygon_info_t& fpi = backendOutput.detected_floating_polygon_info;
+
+            bool floating_polygon_was_on_srcmesh = fpi.origin_mesh == backendInput.src_mesh;
+            mcut::fd_t origin_face = fpi.origin_face;
+            // pointer to input mesh with face containing floating polygon
+            mcut::mesh_t* origin_input_mesh = &srcMeshInternal;
+
+            if (!floating_polygon_was_on_srcmesh) {
+                origin_input_mesh = &cutMeshInternal;
+            }
+
+            MCUT_ASSERT(origin_face < origin_input_mesh->number_of_faces());
+
+            // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+            // Here we now need to partition "origin_face" in "origin_input_mesh"
+            // by adding a new edge which is guarranteed to pass through the area
+            // spanned by the floating polygon.
+            std::vector<mcut::vd_t> originFaceVertexDescriptors = origin_input_mesh->get_vertices_around_face(origin_face);
+            std::vector<mcut::math::vec3> originFaceVertices3d;
+            originFaceVertices3d.resize(originFaceVertexDescriptors.size());
+
+            for (std::vector<mcut::vd_t>::const_iterator it = originFaceVertexDescriptors.cbegin(); it != originFaceVertexDescriptors.cend(); ++it) {
+                const int idx = std::distance(originFaceVertexDescriptors.cbegin(), it);
+                const mcut::math::vec3& vert = origin_input_mesh->vertex(*it);
+                originFaceVertices3d[idx] = vert;
+            }
+
+            MCUT_ASSERT(fpi.origin_face_normal_largest_comp != -1); // should be defined when we identify the floating polygon in the kernel
+
+            std::vector<mcut::math::vec2> originFaceVertices2d;
+            originFaceVertices3d.resize(originFaceVertices3d.size());
+            mcut::geom::project2D(originFaceVertices2d, originFaceVertices3d.data(), originFaceVertices3d.size(), fpi.origin_face_normal_largest_comp);
+
+            const std::vector<mcut::hd_t>& originFaceHalfedges = origin_input_mesh->get_halfedges_around_face(origin_face);
+
+            const int floatingPolyNumVerts = fpi.floating_polygon_vertex_positions->size();
+            MCUT_ASSERT(floatingPolyNumVerts >= 3);
+            const int floatingPolyNumEdges = floatingPolyNumVerts; // num edges is same as num verts
+
+            // Since the operations we are concerned about are inherently in 2d, here we project
+            // our coords from 3D to 2D. We project by eliminating the component corresponding
+            // to the "origin_face"'s normal vector's largest component. ("origin_face" and our
+            // floating polygon have the same normal!)
+            //
+            std::vector<mcut::math::vec2> floatingPolyVerts2d;
+            floatingPolyVerts2d.resize(fpi.floating_polygon_vertex_positions->size());
+
+            mcut::geom::project2D(
+                floatingPolyVerts2d,
+                fpi.floating_polygon_vertex_positions->data(),
+                fpi.floating_polygon_vertex_positions->size(),
+                fpi.origin_face_normal_largest_comp);
+
+            // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
+            // 1. pick two edges in the floating polygon
+            // 2. compute their mid-points
+            // 3. construct a [segment] with these mid-points
+            // 4. if any vertex of the floating-poly is on the [line] defined by the segment OR
+            //  ... if if any vertex of the origin_face on the [line] defined by the segment:
+            //  --> GOTO step 1 and select another pair of edges in the floating poly
+            // 5. construct a ray with the segment whose origin lies outside origin_face
+            // 6. intersect the ray with all edges of origin_face, and keep the intersection points on the boundary of origin_face
+            // 7. compute mid-point of our segment
+            // 8. Get the two closest intersection points to the mid-point of our segment
+            // 9. Partition origin_face using the two closest intersection points
+            // 10. Likewise update the connectivity of neighbouring faces of origin_face
+            // --> Neighbours to update are inferred from the halfedges that are partitioned at the two intersection points
+            // 11. remove "origin_face" from "origin_input_mesh"
+            // 12. remove neighbours of "origin_face" from "origin_input_mesh" that shared the edge on which the two intersection points lie.
+            // 13. add the child_polygons of "origin_face" and the re-traced neighbours into "origin_input_mesh"
+            // 14. if the user enabled vertex and/or face mapping
+            // ... store a mapping from newly traced polygons to the original (user provided) input mesh elements
+            // --> This will be used to ensure that our mapping refers to correct data elements in the input mesh
+
+            std::queue<std::pair<int, int>> floatingPolyEdgePairQueue;
+
+            // populate queue with [unique] pairs of edges from the floating poly
+            for (int i = 0; i < floatingPolyNumEdges; ++i) {
+                for (int j = i + 1; j < floatingPolyNumEdges; ++j) {
+                    floatingPolyEdgePairQueue.push(std::make_pair(i, j));
+                }
+            }
+
+            MCUT_ASSERT(floatingPolyEdgePairQueue.size() >= 2); // we can have at least two pair for the simplest polygon (triangle)
+
+            // each iteration will attempt to contruct a line that will then be used partition "origin_face" [while passing
+            // through our floating polygon]
+            // NOTE: the reason we have a do-while loop is because it allows us to test several possible lines
+            // with which "origin_face" can be partitioned. Some lines may not usable because they pass through
+            // a vertex of the floating polygon or the "origin_face" - in which case GP will be violated (difficult to
+            // resolve even though nonetheless possible, i think).
+            //
+            while (floatingPolyEdgePairQueue.size() > 0) {
+                const std::pair<int, int> floatingPolyCurEdgeIdxPair = floatingPolyEdgePairQueue.front();
+                floatingPolyEdgePairQueue.pop();
+                // get vertices of edges
+
+                // e0
+                auto getFloatingPolyEdgeVertices = [&](const int fpEdgeIdx, mcut::math::vec3& fpEdgeV0, mcut::math::vec3& fpEdgeV1) {
+                    const int fpFirstEdgeV0Idx = (((size_t)fpEdgeIdx * 2) + 0);
+                    fpEdgeV0 = fpi.floating_polygon_vertex_positions->at(fpFirstEdgeV0Idx);
+                    const int fpFirstEdgeV1Idx = (((size_t)fpEdgeIdx * 2) + 1) % floatingPolyNumEdges;
+                    fpEdgeV1 = fpi.floating_polygon_vertex_positions->at(fpFirstEdgeV1Idx);
+                };
+
+                const int fpFirstEdgeIdx = floatingPolyCurEdgeIdxPair.first;
+                mcut::math::vec3 fpFirstEdgeV0;
+                mcut::math::vec3 fpFirstEdgeV1;
+                getFloatingPolyEdgeVertices(fpFirstEdgeIdx, fpFirstEdgeV0, fpFirstEdgeV1);
+
+                const mcut::math::vec3 fpFirstEdgeMidPoint = (fpFirstEdgeV0 + fpFirstEdgeV1) * .5;
+
+                // e1
+                const int fpSecondEdgeIdx = floatingPolyCurEdgeIdxPair.second;
+                mcut::math::vec3 fpSecondEdgeV0;
+                mcut::math::vec3 fpSecondEdgeV1;
+                getFloatingPolyEdgeVertices(fpSecondEdgeIdx, fpSecondEdgeV0, fpSecondEdgeV1);
+
+                const mcut::math::vec3 fpSecondEdgeMidPoint = (fpSecondEdgeV0 + fpSecondEdgeV1) * .5;
+
+                // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+                // if the line intersects a vertex in "origin_face" or floating poly then
+                // we also try to perturb it's direction a number of times before we try another pair
+                // of edges. (a single pertubation should suffice).
+
+                auto anyPointIsOnSegment = [&](const std::pair<mcut::math::vec3, mcut::math::vec3>& segment, const std::vector<mcut::math::vec2>& polyVerts) {
+                    bool result = true;
+                    for (std::vector<mcut::math::vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it) {
+                        bool are_collinear = mcut::geom::orient2d(
+                            reinterpret_cast<const mcut::math::real_number_t*>(&segment.first),
+                            reinterpret_cast<const mcut::math::real_number_t*>(&segment.second),
+                            reinterpret_cast<const mcut::math::real_number_t*>(&(*it)));
+
+                        if (are_collinear) {
+                            result = false;
+                            break;
+                        }
+                    }
+                    return result;
+                };
+
+                int proposedLinePerturbationTrials = 0;
+                const int MAX_LINE_PERTUBATION_TRIALS = 4;
+                // construct our line segment between the mid-points
+                //const std::pair<mcut::math::vec3, mcut::math::vec3> segment_default(fpSecondEdgeMidPoint, fpFirstEdgeMidPoint);
+                std::pair<mcut::math::vec3, mcut::math::vec3> segment_cur;
+                std::pair<mcut::math::vec3, mcut::math::vec3> segment_next(fpSecondEdgeMidPoint, fpFirstEdgeMidPoint);
+
+                auto perturbSegment = [&]() { // TODO
+                    std::pair<mcut::math::vec3, mcut::math::vec3> out;
+                    return out;
+                };
+
+                do {
+                    segment_cur = segment_next;
+                    const bool proposedLineWillViolateGeneralPosition = anyPointIsOnSegment(segment_cur, floatingPolyVerts2d) || anyPointIsOnSegment(segment_cur, originFaceVertices2d);
+
+                    if (proposedLineWillViolateGeneralPosition) {
+                        // compute a newly perturbed instance of our segment
+                        segment_next = perturbSegment();
+                    }
+
+                    proposedLinePerturbationTrials++;
+                } while (proposedLinePerturbationTrials < MAX_LINE_PERTUBATION_TRIALS);
+
+                if (proposedLinePerturbationTrials == MAX_LINE_PERTUBATION_TRIALS) {
+                    // we could not get a (perturbed) instance of the current segment that does not
+                    // violate general position. So we will move into another pair of edges from which
+                    // we can try to contruct another line which (hopefully) will allow us to go ahead
+                    // partition "orgin_face".
+                    continue;
+                }
+
+                // At this point we have a valid line segment with which we can proceed to
+                // partition the "origin_mesh".
+
+            } // while (floatingPolyEdgePairQueue.size() > 0) {
+        }
 
 #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
         ///////////////////////////////////////////////////////////////////////////
@@ -1780,7 +1970,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             result = McResult::MC_RESULT_MAX_ENUM;
         }
 
-    } while (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position);
+    } while (
+        // general position voliation
+        (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //
+        // kernel detected a floating polygon and we now need to re-partition the origin polygon (in src mesh or cut-mesh) and restart the cuttings
+        backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON);
 
     result = convert(backendOutput.status);
 

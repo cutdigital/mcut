@@ -2292,6 +2292,34 @@ void dispatch(output_t& output, const input_t& input)
     // 2) the face fd_t (in the std::pair that is our key to our std::map )
     // In effect, each value in our map (i.e. our std::vector<vd_t>) will be a list of intersection
     // points between which we must put an edge (i.e. those edges along the cutpath).
+#if 0
+    std::map<std::pair<vd_t, vd_t>, int> ivtx_adj_mat;
+    for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator i = m0_ivtx_to_intersection_registry_entry.cbegin();
+      i != m0_ivtx_to_intersection_registry_entry.cend();
+      i++) {
+      const std::vector<fd_t> ireg_faces = ps_get_ivtx_registry_entry_faces(ps, i->second);
+      for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator j = m0_ivtx_to_intersection_registry_entry.cbegin();
+        j != m0_ivtx_to_intersection_registry_entry.cend();
+        j++) {
+
+        const std::vector<fd_t> jreg_faces = ps_get_ivtx_registry_entry_faces(ps, j->second);
+        int shared_faces = 0;
+        for (std::vector<fd_t>::const_iterator k = jreg_faces.cbegin(); k != jreg_faces.cend(); ++k) {
+          if (*k != mesh_t::null_face()) {
+            shared_faces = std::count(ireg_faces.cbegin(), ireg_faces.cend(), *k);
+                }
+            }
+
+        bool connectable = (shared_faces >= 2);
+
+        if (connectable) {
+          ivtx_adj_mat.emplace(
+            std::make_pair(i->first, j->second),
+            i != j ? 1 : 0);
+        }
+        }
+    }
+#endif
 
     for (std::map<std::pair<fd_t, fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
          cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
@@ -4795,6 +4823,9 @@ void dispatch(output_t& output, const input_t& input)
             do { // each iteration traces a child polygon
 
                 traced_polygon_t child_polygon;
+                bool child_poly_has_only_ivtxs_from_srcmesh = true;
+                bool child_poly_has_only_ivtxs_from_cutmesh = true;
+
                 hd_t current_halfedge = mesh_t::null_halfedge();
                 // can be any boundary halfedge in vector (NOTE: boundary halfedges come first in the std::vector)
                 // Its important that we start from boundary halfedge as it simplies the conditions for when a
@@ -4888,6 +4919,36 @@ void dispatch(output_t& output, const input_t& input)
                                 }
                             }
                         }
+
+                        // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+                        // Here we progressively check if all vertices of the (being built)
+                        // child polygon are all intersection points [from the src- or cut-mesh]
+                        // The point of this is to test for "floating polygons" which are illegal.
+
+                        bool tgt_is_ivtx = m0_is_intersection_point(current_halfedge_target, ps_vtx_cnt);
+
+                        if (tgt_is_ivtx) {
+                            std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator fiter = m0_ivtx_to_intersection_registry_entry.find(current_halfedge_target);
+
+                            MCUT_ASSERT(fiter != m0_ivtx_to_intersection_registry_entry.cend());
+
+                            const fd_t intersected_face = fiter->second.second;
+                            bool intersected_face_is_from_cut_mesh = ps_is_cutmesh_face(intersected_face, sm_face_count);
+                            bool intersecting_edge_is_from_src_mesh = intersected_face_is_from_cut_mesh;
+                            bool intersecting_edge_is_from_cut_mesh = !intersected_face_is_from_cut_mesh;
+
+                            if (child_poly_has_only_ivtxs_from_srcmesh == true && intersecting_edge_is_from_src_mesh == false) {
+                                child_poly_has_only_ivtxs_from_srcmesh = false;
+                            }
+
+                            if (child_poly_has_only_ivtxs_from_cutmesh == true && intersecting_edge_is_from_cut_mesh == false) {
+                                child_poly_has_only_ivtxs_from_cutmesh = false;
+                            }
+
+                        } else {
+                            child_poly_has_only_ivtxs_from_srcmesh = false;
+                            child_poly_has_only_ivtxs_from_cutmesh = false;
+                        }
                     }
 
                     // 2. find next halfedge
@@ -4945,6 +5006,33 @@ void dispatch(output_t& output, const input_t& input)
 
                 if (is_valid_polygon) {
                     lg << "valid" << std::endl;
+
+                    // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+                    // Detect a floating polygon: one which is not connectable to other
+                    // traced polygons by an edge
+
+                    // check if all vertices are intersection points AND the ps-edge from each intersection point is from the same input mesh (source-mesh or cut-mesh but not both)
+                    // if this is true then we have a floating polygon
+                    if (child_poly_has_only_ivtxs_from_srcmesh || child_poly_has_only_ivtxs_from_cutmesh) {
+                        output.status = status_t::DETECTED_FLOATING_POLYGON;
+                        floating_polygon_info_t fpi;
+                        bool ps_face_is_from_cutmesh = ps_is_cutmesh_face(ps_face, sm_face_count);
+                        fpi.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
+                        const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
+                        fpi.origin_face = (ps_face_is_from_cutmesh ? fd_t(ps_face - cm_faces_start_offset) : ps_face);
+                        fpi.floating_polygon_vertex_positions = std::unique_ptr<std::vector<math::vec3>>(new std::vector<math::vec3>);
+
+                        for (std::vector<hd_t>::const_iterator child_poly_he_iter = child_polygon.cbegin(); child_poly_he_iter != child_polygon.cend(); child_poly_he_iter++) {
+                            vd_t tgt_descr = m0.target(*child_poly_he_iter);
+                            fpi.floating_polygon_vertex_positions->emplace_back(m0.vertex(tgt_descr));
+                        }
+
+                        MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(ps_face) != ps_tested_face_to_plane_normal_max_comp.end());
+                        fpi.origin_face_normal_largest_comp = ps_tested_face_to_plane_normal_max_comp.at(ps_face); // used for 2d project
+
+                        return; // abort, so that the front-end can partition ps_face to prevent use from getting a floating polygon on ps_face with the current child polygon
+                    }
+
                     const int poly_idx = (int)(m0_polygons.size() + child_polygons.size());
                     if (ps_is_cutmesh_face(ps_face, sm_face_count)) {
                         m0_cm_cutpath_adjacent_polygons.push_back(poly_idx);

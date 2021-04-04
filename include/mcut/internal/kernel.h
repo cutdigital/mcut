@@ -62,7 +62,11 @@ enum class status_t {
         the task of MCUT is not to decide whether the input is in general position but rather to make perturbation
         on the input (if) necessary within the available precision of the computing device.
     */
-    GENERAL_POSITION_VIOLATION = -4
+    GENERAL_POSITION_VIOLATION = -4,
+    /*
+      TODO: add documentation
+    */
+    DETECTED_FLOATING_POLYGON = -5
 };
 
 //
@@ -89,6 +93,18 @@ enum class connected_component_location_t : unsigned char {
 enum class cut_surface_patch_winding_order_t : unsigned char {
     DEFAULT, // + : The polygons of the patch have the [same] winding order as the cut-surface (e.g. CCW)
     REVERSE, // - : The polygons of the patch have the [opposite] winding order as the cut-surface (e.g. CW)
+};
+
+struct floating_polygon_info_t {
+    // the input mesh (source-mesh or cut-mesh) containing the face on which the floating polygon was discovered.
+    // This is a pointer to input_t::src_mesh or input_t::cut_mesh
+    const mesh_t* origin_mesh = nullptr;
+    // the face of the origin-mesh on which the floating polygon was discovered
+    fd_t origin_face = mesh_t::null_face();
+    // largest component of the normal of the origin_face
+    int origin_face_normal_largest_comp = -1;
+    // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
+    std::unique_ptr<std::vector<math::vec3>> floating_polygon_vertex_positions;
 };
 
 //
@@ -161,6 +177,9 @@ struct output_t {
     // NOTE: not always defined (depending on the arising cutpath configurations)
     output_mesh_info_t seamed_src_mesh;
     output_mesh_info_t seamed_cut_mesh;
+
+    // floating polygon handling
+    floating_polygon_info_t detected_floating_polygon_info;
 };
 
 //

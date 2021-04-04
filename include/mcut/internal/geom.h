@@ -28,6 +28,21 @@
 namespace mcut {
 namespace geom {
 
+#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+    // NOTE: if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS is defined, then mcut::math::real_number_t will implicitely be cast to double here
+    // which is a faster alternative to using full exact arithmetic here
+    double orient2d(const double* pa, const double* pb, const double* pc);
+    double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
+#else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
+    // basically the Shewchuk's orient2dfast()
+    mcut::math::real_number_t orient2d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc);
+
+    // basically the Shewchuk's orient3dfast()
+    mcut::math::real_number_t orient3d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc, const mcut::math::real_number_t* pd);
+
+#endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
     // Compute a polygon's plane coefficients (i.e. normal and d parameters).
     // The computed normal is not normalized. This function returns the largest component of the normal.
     int compute_polygon_plane_coefficients(
@@ -72,6 +87,13 @@ namespace geom {
     // 'v': q is a vertex.
     char compute_point_in_polygon_test(
         const math::vec3& p,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_plane_normal_largest_component);
+
+    // project a 3d polygon to 3d by eliminating the largest component of its normal
+    void project2D(
+        std::vector<math::vec2>& out,
         const math::vec3* polygon_vertices,
         const int polygon_vertex_count,
         const int polygon_plane_normal_largest_component);
