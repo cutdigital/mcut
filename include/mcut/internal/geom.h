@@ -98,6 +98,27 @@ namespace geom {
         const int polygon_vertex_count,
         const int polygon_plane_normal_largest_component);
 
+    bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c);
+
+    /*
+     Compute the intersection of two line segments. Can also be used to calculate where the respective lines intersect.
+
+     Parameters:
+       'a' and 'b': end points of first segment
+       'c' and 'd': end points of second segment
+       'p': the intersection point
+       's': the parameter for parametric equation of segment a,b (0..1)
+       't': the parameter for parametric equation of segment c,d (0..1)
+
+     Return values:
+
+       'e': The segments collinearly overlap, sharing a point; 'e' stands for 'edge.'
+       'v': An endpoint of one segment is on the other segment, but 'e' doesn't hold; 'v' stands for 'vertex.'
+       '1': The segments intersect properly (i.e., they share a point and neither 'v' nor 'e' holds); '1' stands for TRUE.
+       '0': The segments do not intersect (i.e., they share no points); '0' stands for FALSE
+   */
+    char compute_segment_intersection(const math::vec2& a, const math::vec2& b, const math::vec2& c, const math::vec2& d, math::vec2& p, math::real_number_t& s, math::real_number_t& t);
+
     template <typename vector_type>
     struct bounding_box_t {
 

@@ -60,11 +60,11 @@ namespace geom {
 #if 0
     void polygon_normal(math::vec3& normal, const math::vec3* vertices, const int num_vertices)
     {
-        normal = math::vec3(0.0);
-        for (int i = 0; i < num_vertices; ++i) {
-            normal = normal + cross_product(vertices[i] - vertices[0], vertices[(i + 1) % num_vertices] - vertices[0]);
-        }
-        normal = normalize(normal);
+      normal = math::vec3(0.0);
+      for (int i = 0; i < num_vertices; ++i) {
+        normal = normal + cross_product(vertices[i] - vertices[0], vertices[(i + 1) % num_vertices] - vertices[0]);
+      }
+      normal = normalize(normal);
     }
 #endif
 
@@ -276,6 +276,105 @@ namespace geom {
         }
 
         return compute_point_in_polygon_test(pp, polygon_vertices2d.data(), (int)polygon_vertices2d.size());
+    }
+
+    bool Between(math::vec2 a, math::vec2 b, math::vec2 c)
+    {
+        math::vec2 ba, ca;
+        /* If ab not vertical check betweenness on x; else on y. */
+        if (a[0] != b[0])
+            return ((a[0] <= c[0]) && (c[0] <= b[0])) || //
+                ((a[0] >= c[0]) && (c[0] >= b[0]));
+        else
+            return ((a[1] <= c[1]) && (c[1] <= b[1])) || //
+                ((a[1] >= c[1]) && (c[1] >= b[1]));
+    }
+
+    bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c)
+    {
+        bool are_collinear = mcut::geom::orient2d(
+                                 reinterpret_cast<const mcut::math::real_number_t*>(&a),
+                                 reinterpret_cast<const mcut::math::real_number_t*>(&b),
+                                 reinterpret_cast<const mcut::math::real_number_t*>(&c))
+            == 0;
+        return are_collinear;
+    }
+
+    char Parallellnt(const math::vec2& a, const math::vec2& b, const math::vec2& c, const math::vec2& d, math::vec2& p)
+    {
+        if (!collinear(a, b, c)) {
+            return '0';
+        }
+
+        if (Between(a, b, c)) {
+            p = c;
+            return 'e';
+        }
+
+        if (Between(a, b, d)) {
+            p = d;
+            return 'e';
+        }
+
+        if (Between(c, d, a)) {
+            p = a;
+            return 'e';
+        }
+
+        if (Between(c, d, b)) {
+            p = b;
+            return 'e';
+        }
+
+        return '0';
+    }
+
+    char compute_segment_intersection(const math::vec2& a, const math::vec2& b, const math::vec2& c, const math::vec2& d, math::vec2& p, math::real_number_t& s, math::real_number_t& t)
+    {
+        //math::real_number_t s, t; /* The two parameters of the parametric eqns. */
+        math::real_number_t num, denom; /* Numerator and denominator of equations. */
+        char code = '?'; /* Return char characterizing intersection.*/
+
+        denom = a[0] * (d[1] - c[1]) + //
+            b[0] * (c[1] - d[1]) + //
+            d[0] * (b[1] - a[1]) + //
+            c[0] * (a[1] - b[1]);
+
+        /* If denom is zero, then segments are parallel: handle separately. */
+        if (denom == math::real_number_t(0.0)) {
+            return Parallellnt(a, b, c, d, p);
+        }
+
+        num = a[0] * (d[1] - c[1]) + //
+            c[0] * (a[1] - d[1]) + //
+            d[0] * (c[1] - a[1]);
+
+        if ((num == math::real_number_t(0.0)) || (num == denom)) {
+            code = 'v';
+        }
+
+        s = num / denom;
+
+        num = -(a[0] * (c[1] - b[1]) + //
+            b[0] * (a[1] - c[1]) + //
+            c[0] * (b[1] - a[1]));
+
+        if ((num == math::real_number_t(0.0)) || (num == denom)) {
+            code = 'v';
+        }
+
+        t = num / denom;
+
+        if ((math::real_number_t(0.0) < s) && (s < math::real_number_t(1.0)) && (math::real_number_t(0.0) < t) && (t < math::real_number_t(1.0))) {
+            code = '1';
+        } else if ((math::real_number_t(0.0) > s) || (s > math::real_number_t(1.0)) || (math::real_number_t(0.0) > t) || (t > math::real_number_t(1.0))) {
+            code = '0';
+        }
+
+        p[0] = a[0] + s * (b[0] - a[0]);
+        p[1] = a[1] + s * (b[1] - a[1]);
+
+        return code;
     }
 
     bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox)

@@ -1736,8 +1736,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             originFaceVertices3d.resize(originFaceVertices3d.size());
             mcut::geom::project2D(originFaceVertices2d, originFaceVertices3d.data(), originFaceVertices3d.size(), fpi.origin_face_normal_largest_comp);
 
-            const std::vector<mcut::hd_t>& originFaceHalfedges = origin_input_mesh->get_halfedges_around_face(origin_face);
-
             const int floatingPolyNumVerts = fpi.floating_polygon_vertex_positions->size();
             MCUT_ASSERT(floatingPolyNumVerts >= 3);
             const int floatingPolyNumEdges = floatingPolyNumVerts; // num edges is same as num verts
@@ -1831,10 +1829,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 auto anyPointIsOnSegment = [&](const std::pair<mcut::math::vec3, mcut::math::vec3>& segment, const std::vector<mcut::math::vec2>& polyVerts) {
                     bool result = true;
                     for (std::vector<mcut::math::vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it) {
-                        bool are_collinear = mcut::geom::orient2d(
-                            reinterpret_cast<const mcut::math::real_number_t*>(&segment.first),
-                            reinterpret_cast<const mcut::math::real_number_t*>(&segment.second),
-                            reinterpret_cast<const mcut::math::real_number_t*>(&(*it)));
+                        bool are_collinear = mcut::geom::collinear(
+                            segment.first,
+                            segment.second,
+                            (*it));
 
                         if (are_collinear) {
                             result = false;
@@ -1842,17 +1840,19 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         }
                     }
                     return result;
-                };
+                }; // end lambda
 
                 int proposedLinePerturbationTrials = 0;
                 const int MAX_LINE_PERTUBATION_TRIALS = 4;
                 // construct our line segment between the mid-points
-                //const std::pair<mcut::math::vec3, mcut::math::vec3> segment_default(fpSecondEdgeMidPoint, fpFirstEdgeMidPoint);
+                const std::pair<mcut::math::vec3, mcut::math::vec3> segment_default(fpSecondEdgeMidPoint, fpFirstEdgeMidPoint);
                 std::pair<mcut::math::vec3, mcut::math::vec3> segment_cur;
-                std::pair<mcut::math::vec3, mcut::math::vec3> segment_next(fpSecondEdgeMidPoint, fpFirstEdgeMidPoint);
+                std::pair<mcut::math::vec3, mcut::math::vec3> segment_next = segment_default;
 
                 auto perturbSegment = [&]() { // TODO
-                    std::pair<mcut::math::vec3, mcut::math::vec3> out;
+                    std::pair<mcut::math::vec3, mcut::math::vec3> out = segment_cur;
+                    out.first[0] += 0.001; // hack
+                    std::cout << "TODO: FIGURE OUT HOW TO PERTURB" << std::endl;
                     return out;
                 };
 
@@ -1876,11 +1876,347 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     continue;
                 }
 
+                const std::pair<mcut::math::vec3, mcut::math::vec3>& fpSegment = segment_cur;
                 // At this point we have a valid line segment with which we can proceed to
                 // partition the "origin_mesh".
 
+                // compute intersection points between every edge in "origin_face" and
+                // our segment
+
+                //const std::vector<mcut::hd_t>& originFaceHalfedges = origin_input_mesh->get_halfedges_around_face(origin_face);
+                const int originFaceNumVerts = fpi.floating_polygon_vertex_positions->size();
+                MCUT_ASSERT(originFaceNumVerts >= 3);
+                const int originFaceNumEdges = originFaceNumVerts;
+
+                std::vector<std::pair<int /*edge idx*/
+                    ,
+                    std::pair<
+                        mcut::math::vec2, // intersection point
+                        mcut::math::real_number_t> // parameter value (t) corresponding to intersection point along edge
+                    >>
+                    origFaceEdge_to_intersectionPointInfo;
+
+                // *************************************************************************************************************
+                // NOTE: origFaceEdgeIter==0 corresponds to the second halfedge in the list returned by "get_halfeedges_around_face(origin_face)".
+                // This is because that function builds the list of vertices by storing the target (not source) of each halfedge of
+                // the respective face.
+                // *************************************************************************************************************
+
+                for (int origFaceEdgeIter = 0; origFaceEdgeIter < originFaceNumEdges; ++origFaceEdgeIter) {
+                    const mcut::math::vec2& origFaceEdgeV0 = originFaceVertices2d.at(((size_t)origFaceEdgeIter * 2) + 0);
+                    const mcut::math::vec2& origFaceEdgeV1 = originFaceVertices2d.at(((origFaceEdgeIter * 2) + 1) % originFaceNumVerts);
+
+                    mcut::math::real_number_t garbageVal(0xdeadbeef);
+                    mcut::math::vec2 intersectionPoint(garbageVal);
+
+                    mcut::math::real_number_t origFaceEdgeParam;
+                    mcut::math::real_number_t fpEdgeParam;
+
+                    char intersectionResult = mcut::geom::compute_segment_intersection(
+                        origFaceEdgeV0, origFaceEdgeV1, fpSegment.first, fpSegment.second, intersectionPoint, origFaceEdgeParam, fpEdgeParam);
+
+                    // These assertion must hold since, by construction, "fpSegment" (which is computed
+                    // from two edges of the floating polygon) partitions the floating polygon. And,
+                    // as a floating polygon, it lives/lies inside the area of "origin_face".
+                    // Thus our segment can never intersect any edge/segment of "origin_face" (but the
+                    // lines represented by the segments can intersect!)
+                    MCUT_ASSERT(intersectionResult != '1');
+                    MCUT_ASSERT(intersectionResult != 'v');
+                    MCUT_ASSERT(intersectionResult != 'e');
+
+                    if (
+                        /*intersection point was successively computed*/
+                        (intersectionPoint.x() != garbageVal && intersectionPoint.y() != garbageVal) &&
+                        /*the type of intersection we have is one which does not violate general position*/
+                        intersectionResult == '0' /*no seg intersection*/) {
+                        origFaceEdge_to_intersectionPointInfo.emplace_back(std::make_pair(origFaceEdgeIter, std::make_pair(intersectionPoint, origFaceEdgeParam)));
+                    }
+                }
+
+                // compute mid-point of our fp segment
+
+                const mcut::math::vec3 fpSegmentMidPoint = (fpSegment.first + fpSegment.second) * 0.5;
+
+                // Get the two closest intersection points to the mid-point of our segment
+                // we do so by sorting elements of "origFaceEdge_to_intersectionPointInfo" by distance their respective intersection point w.r.t "fpSegmentMidPoint"
+
+                std::sort(origFaceEdge_to_intersectionPointInfo.begin(), origFaceEdge_to_intersectionPointInfo.end(),
+                    [&](std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>>& a, std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>>& b) {
+                        const mcut::math::vec2 aVec = a.second.first - fpSegmentMidPoint;
+                        mcut::math::real_number_t aDist = mcut::math::squared_length(aVec);
+
+                        const mcut::math::vec2 bVec = b.second.first - fpSegmentMidPoint;
+                        mcut::math::real_number_t bDist = mcut::math::squared_length(bVec);
+
+                        return aDist < bDist;
+                    });
+
+                //
+                // At this point we have all information necessary to partition "origin_face" using the two closest intersection points to "fpSegmentMidPoint"
+                //
+
+                // a replaced face is any which uses an edge that will be partitioned
+                std::vector<mcut::fd_t> replaced_input_mesh_faces = { origin_face };
+
+                // get information about each edge (used by "origin_face") that needs to be split along the respective intersection point
+
+                const std::vector<mcut::hd_t>& origFaceHalfedges = origin_input_mesh->get_halfedges_around_face(origin_face);
+
+                MCUT_ASSERT(origFaceEdge_to_intersectionPointInfo.size() >= 2); // we to partition two edges of origin_face
+
+                // :::::::::::::
+                // origFaceEdge0
+
+                const std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>>& origFaceEdge0Info = origFaceEdge_to_intersectionPointInfo[0]; // first elem
+                const int origFaceEdge0Idx = origFaceEdge0Info.first;
+                const mcut::math::vec2& origFaceEdge0IntPoint = origFaceEdge0Info.second.first;
+                const mcut::math::real_number_t& origFaceEdge0IntPointEqnParam = origFaceEdge0Info.second.second;
+
+                // NOTE: plus-1 since "get_vertices_around_face(origin_face)" builds a list using halfedge target vertices
+                // See the starred note above
+                int halfedgeIdx = (origFaceEdge0Idx + 1) % originFaceNumEdges;
+                const mcut::hd_t origFaceEdge0Halfedge = origFaceHalfedges.at(halfedgeIdx);
+                MCUT_ASSERT(origin_face == origin_input_mesh->face(origFaceEdge0Halfedge));
+                const mcut::ed_t origFaceEdge0Descr = origin_input_mesh->edge(origFaceEdge0Halfedge);
+                const mcut::vd_t origFaceEdge0HalfedgeSrcDescr = origin_input_mesh->source(origFaceEdge0Halfedge);
+                const mcut::vd_t origFaceEdge0HalfedgeTgtDescr = origin_input_mesh->target(origFaceEdge0Halfedge);
+
+                // query src and tgt positions and build vector tgt - src
+                const mcut::math::vec3& origFaceEdge0HalfedgeSrc = origin_input_mesh->vertex(origFaceEdge0HalfedgeSrcDescr);
+                const mcut::math::vec3& origFaceEdge0HalfedgeTgt = origin_input_mesh->vertex(origFaceEdge0HalfedgeTgtDescr);
+
+                // infer intersection point in 3d using "origFaceEdge0IntPointEqnParam"
+                const mcut::math::vec3 origFaceEdge0Vec = origFaceEdge0HalfedgeTgt - origFaceEdge0HalfedgeSrc;
+                const mcut::math::vec3 origFaceEdge0IntPoint3d = origFaceEdge0HalfedgeSrc + (origFaceEdge0Vec * origFaceEdge0IntPointEqnParam);
+
+                const mcut::hd_t origFaceEdge0HalfedgeOpp = origin_input_mesh->opposite(origFaceEdge0Halfedge);
+                const mcut::fd_t origFaceEdge0HalfedgeOppFace = origin_input_mesh->face(origFaceEdge0HalfedgeOpp);
+
+                if (origFaceEdge0HalfedgeOppFace != mcut::mesh_t::null_face()) { // exists
+                    // this check is needed in the case that both partitioned edges in "origin_face"
+                    // are incident to the same two faces
+                    const bool contained = std::find(replaced_input_mesh_faces.cbegin(), replaced_input_mesh_faces.cend(), origFaceEdge0HalfedgeOppFace) != replaced_input_mesh_faces.cend();
+                    if (!contained) {
+                        replaced_input_mesh_faces.push_back(origFaceEdge0HalfedgeOppFace);
+                    }
+                }
+
+                // :::::::::::::
+                // origFaceEdge1
+
+                const std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>>& origFaceEdge1Info = origFaceEdge_to_intersectionPointInfo[1]; // second elem
+                const int origFaceEdge1Idx = origFaceEdge1Info.first;
+                const mcut::math::vec2& origFaceEdge1IntPoint = origFaceEdge1Info.second.first;
+                const mcut::math::real_number_t& origFaceEdge1IntPointEqnParam = origFaceEdge1Info.second.second;
+
+                halfedgeIdx = (origFaceEdge1Idx + 1) % originFaceNumEdges;
+                const mcut::hd_t origFaceEdge1Halfedge = origFaceHalfedges.at(halfedgeIdx);
+                MCUT_ASSERT(origin_face == origin_input_mesh->face(origFaceEdge1Halfedge));
+                const mcut::ed_t origFaceEdge1Descr = origin_input_mesh->edge(origFaceEdge1Halfedge);
+                const mcut::vd_t origFaceEdge1HalfedgeSrcDescr = origin_input_mesh->source(origFaceEdge1Halfedge);
+                const mcut::vd_t origFaceEdge1HalfedgeTgtDescr = origin_input_mesh->target(origFaceEdge1Halfedge);
+
+                // query src and tgt positions and build vector tgt - src
+                const mcut::math::vec3& origFaceEdge1HalfedgeSrc = origin_input_mesh->vertex(origFaceEdge1HalfedgeSrcDescr);
+                const mcut::math::vec3& origFaceEdge1HalfedgeTgt = origin_input_mesh->vertex(origFaceEdge1HalfedgeTgtDescr);
+
+                // infer intersection point in 3d using "origFaceEdge0IntPointEqnParam"
+                const mcut::math::vec3 origFaceEdge1Vec = origFaceEdge1HalfedgeTgt - origFaceEdge1HalfedgeSrc;
+                const mcut::math::vec3 origFaceEdge1IntPoint3d = origFaceEdge1HalfedgeSrc + (origFaceEdge1Vec * origFaceEdge1IntPointEqnParam);
+
+                const mcut::hd_t origFaceEdge1HalfedgeOpp = origin_input_mesh->opposite(origFaceEdge1Halfedge);
+                const mcut::fd_t origFaceEdge1HalfedgeOppFace = origin_input_mesh->face(origFaceEdge1HalfedgeOpp);
+
+                if (origFaceEdge1HalfedgeOppFace != mcut::mesh_t::null_face()) { // exists
+                    const bool contained = std::find(replaced_input_mesh_faces.cbegin(), replaced_input_mesh_faces.cend(), origFaceEdge1HalfedgeOppFace) != replaced_input_mesh_faces.cend();
+                    if (!contained) {
+                        replaced_input_mesh_faces.push_back(origFaceEdge1HalfedgeOppFace);
+                    }
+                }
+
+                // gather halfedges of each fac to be replaced
+                std::map<mcut::fd_t, std::vector<mcut::hd_t>> replacedOrigFaceNeighbourToOldHalfedges;
+                for (std::vector<mcut::fd_t>::const_iterator it = replaced_input_mesh_faces.cbegin(); it != replaced_input_mesh_faces.cend(); ++it) {
+                    if (*it == origin_face) {
+                        continue;
+                    } else {
+                        replacedOrigFaceNeighbourToOldHalfedges[*it] = origin_input_mesh->get_halfedges_around_face(*it);
+                    }
+                }
+
+                // add new intersection points into origin_input_mesh
+                const mcut::vd_t origFaceEdge0IntPoint3dDescr = origin_input_mesh->add_vertex(origFaceEdge0IntPoint3d);
+                const mcut::vd_t origFaceEdge1IntPoint3dDescr = origin_input_mesh->add_vertex(origFaceEdge1IntPoint3d);
+
+                // add edges
+
+                // halfedge between the intersection points
+                const mcut::hd_t intPointHalfedgeDescr = origin_input_mesh->add_edge(origFaceEdge0IntPoint3dDescr, origFaceEdge1IntPoint3dDescr);
+
+                // partitioning edges for origFaceEdge0
+                const mcut::hd_t origFaceEdge0FirstNewHalfedgeDescr = origin_input_mesh->add_edge(origFaceEdge0HalfedgeSrcDescr, origFaceEdge0IntPoint3dDescr); // o--> x
+                const mcut::hd_t origFaceEdge0SecondNewHalfedgeDescr = origin_input_mesh->add_edge(origFaceEdge0IntPoint3dDescr, origFaceEdge0HalfedgeTgtDescr); // x --> o
+
+                // partitioning edges for origFaceEdge1
+                const mcut::hd_t origFaceEdge1FirstNewHalfedgeDescr = origin_input_mesh->add_edge(origFaceEdge1HalfedgeSrcDescr, origFaceEdge1IntPoint3dDescr); // o--> x
+                const mcut::hd_t origFaceEdge1SecondNewHalfedgeDescr = origin_input_mesh->add_edge(origFaceEdge1IntPoint3dDescr, origFaceEdge1HalfedgeTgtDescr); // x --> o
+
+                // re-trace the incident to the partition edges
+                std::map<mcut::fd_t, std::vector<mcut::hd_t>> replacedOrigFaceNeighbourToNewHalfedges;
+
+                // NOTE: first we retrace the polygons that shared a partition edges with "origin_face".
+                // These are somewhat easier to deal with first.
+                auto replaceOldHalfdgeWithNew2Edges = [](
+                                                          const mcut::hd_t oldHalfedge,
+                                                          const mcut::mesh_t& origin_input_mesh,
+                                                          const mcut::ed_t origFaceEdgeX,
+                                                          const mcut::vd_t origFaceEdgeXHalfedgeSrcDescr,
+                                                          const mcut::hd_t origFaceEdgeXFirstNewHalfedgeDescr,
+                                                          const mcut::hd_t origFaceEdgeXSecondNewHalfedgeDescr,
+                                                          const mcut::vd_t origFaceEdgeXIntPoint3dDescr,
+                                                          std::vector<mcut::hd_t>& newFaceHalfedges) {
+                    const mcut::vd_t oldHalfedgeSrc = origin_input_mesh.source(oldHalfedge);
+                    mcut::hd_t newHalfedge = mcut::mesh_t::null_halfedge();
+
+                    if (oldHalfedgeSrc == origFaceEdgeXHalfedgeSrcDescr) { // comparing original vertex not an intersection point
+                        newHalfedge = origFaceEdgeXFirstNewHalfedgeDescr;
+                    } else {
+                        MCUT_ASSERT(oldHalfedgeSrc == origFaceEdge0HalfedgeTgtDescr);
+                        newHalfedge = origin_input_mesh.opposite(origFaceEdgeXSecondNewHalfedgeDescr);
+                    }
+
+                    if (newHalfedge != mcut::mesh_t::null_halfedge()) {
+                        // need to add a halfedge from one of the new edges
+                        newFaceHalfedges.push_back(newHalfedge);
+                        // now also need to add the halfedge connecting intersection points
+                        const mcut::vd_t newHalfedgeTgt = origin_input_mesh.target(newHalfedge);
+
+                        // add the other halfedge on the partitioned edge
+                        mcut::hd_t nextNewHalfedge = newHalfedgeTgt == origFaceEdgeXIntPoint3dDescr ? origFaceEdgeXSecondNewHalfedgeDescr : origin_input_mesh.opposite(origFaceEdgeXSecondNewHalfedgeDescr);
+                        newFaceHalfedges.push_back(nextNewHalfedge);
+                    }
+                };
+
+                for (std::map<mcut::fd_t, std::vector<mcut::hd_t>>::const_iterator i = replacedOrigFaceNeighbourToOldHalfedges.cbegin(); i != replacedOrigFaceNeighbourToOldHalfedges.cend(); ++i) {
+
+                    mcut::fd_t face = i->first;
+                    MCUT_ASSERT(face != origin_face); // avoid complex case here, where we need to partition the polygon in two. We'll handle that later (below)
+
+                    const std::vector<mcut::hd_t>& oldHalfedges = i->second;
+
+                    for (std::vector<mcut::hd_t>::const_iterator j = oldHalfedges.cbegin(); j != oldHalfedges.cend(); ++j) {
+                        const mcut::hd_t oldHalfedge = *j;
+                        mcut::hd_t newHalfedge = mcut::mesh_t::null_halfedge();
+                        const mcut::ed_t oldHalfedgeEdge = origin_input_mesh->edge(oldHalfedge);
+
+                        if (oldHalfedgeEdge == origFaceEdge0Descr) {
+                            replaceOldHalfdgeWithNew2Edges(
+                                oldHalfedge,
+                                *origin_input_mesh,
+                                origFaceEdge0Descr,
+                                origFaceEdge0HalfedgeSrcDescr,
+                                origFaceEdge0FirstNewHalfedgeDescr,
+                                origFaceEdge0SecondNewHalfedgeDescr,
+                                origFaceEdge0IntPoint3dDescr,
+                                replacedOrigFaceNeighbourToNewHalfedges[face]);
+
+                        } else if (oldHalfedgeEdge == origFaceEdge1Descr) {
+                            replaceOldHalfdgeWithNew2Edges(
+                                oldHalfedge,
+                                *origin_input_mesh,
+                                origFaceEdge1Descr,
+                                origFaceEdge1HalfedgeSrcDescr,
+                                origFaceEdge1FirstNewHalfedgeDescr,
+                                origFaceEdge1SecondNewHalfedgeDescr,
+                                origFaceEdge1IntPoint3dDescr,
+                                replacedOrigFaceNeighbourToNewHalfedges[face]);
+                        } else {
+                            replacedOrigFaceNeighbourToNewHalfedges[face].push_back(oldHalfedge);
+                        }
+                    }
+
+                } // for (std::map<mcut::fd_t, std::vector<mcut::hd_t>>::const_iterator i = replacedOrigFaceNeighbourToOldHalfedges.cbegin(); i != replacedOrigFaceNeighbourToOldHalfedges.cend(); ++i) {
+
+                // ::::::::::::::::::::
+                // Here we now handle the complex case where we need to partition "origin_face" in two new faces.
+
+                // This queue contains the halfegdes that we'll start to trace our new faces from (those connected to our new intersection points)
+                std::queue<mcut::hd_t> origFaceiHalfedges;
+                origFaceiHalfedges.push(intPointHalfedgeDescr);
+                origFaceiHalfedges.push(origin_input_mesh->opposite(intPointHalfedgeDescr));
+
+                // this list containing all halfedges along the boundary of "origin_face"
+                std::vector<mcut::hd_t> origFaceBoundaryHalfdges = { // first add the new boundary-edge partitioning halfedges, since we already know them
+                    origFaceEdge0FirstNewHalfedgeDescr,
+                    origFaceEdge0SecondNewHalfedgeDescr,
+                    origFaceEdge1FirstNewHalfedgeDescr,
+                    origFaceEdge1SecondNewHalfedgeDescr
+                };
+
+                // .... now we add the remaining boundary halfedges of "origin_face" i.e. those not partitioned
+
+                for (std::vector<mcut::hd_t>::const_iterator it = origFaceHalfedges.cbegin(); it != origFaceHalfedges.cend(); ++it) {
+
+                    if (*it != origFaceEdge0Halfedge && *it != origFaceEdge1Halfedge) { // if its not one of the replaced halfedges
+                        origFaceBoundaryHalfdges.push_back(*it);
+                    }
+                }
+
+                // here we store the two child polygon that result from partitioning "origin_face"
+                std::vector<std::vector<mcut::hd_t>> origFaceChildPolygons; // there will be two
+
+                do { // each iteration will trace a polygon
+                    mcut::hd_t childPolyHE_cur = mcut::mesh_t::null_halfedge();
+                    mcut::hd_t childPolyHE_next = origFaceiHalfedges.front(); // start
+                    origFaceiHalfedges.pop();
+                    bool finishTracingChildPoly = false;
+                    origFaceChildPolygons.push_back(std::vector<mcut::hd_t>());
+                    std::vector<mcut::hd_t>& origFaceChildPoly = origFaceChildPolygons.back();
+
+                    const mcut::hd_t firstHalfedge = childPolyHE_next;
+                    const mcut::vd_t firstHalfedgeSrc = origin_input_mesh->source(firstHalfedge);
+
+                    do {
+                        childPolyHE_cur = childPolyHE_next;
+                        origFaceChildPoly.push_back(childPolyHE_cur);
+                        const mcut::vd_t childPolyHE_curTgt = origin_input_mesh->target(childPolyHE_cur);
+                        childPolyHE_cur = mcut::mesh_t::null_halfedge();
+                        childPolyHE_next = mcut::mesh_t::null_halfedge();
+
+                        if (childPolyHE_curTgt != firstHalfedgeSrc) {
+                            // find next halfedge to continue building the  current child polygon
+                            std::vector<mcut::hd_t>::const_iterator fiter = std::find_if(origFaceBoundaryHalfdges.cbegin(), origFaceBoundaryHalfdges.cend(),
+                                [&](const mcut::hd_t h) { // find a boundary halfedge that can be connected to the current halfedge
+                                    const mcut::vd_t src = origin_input_mesh->source(h);
+                                    return src == childPolyHE_curTgt;
+                                });
+                            MCUT_ASSERT(fiter != origFaceBoundaryHalfdges.cend());
+
+                            childPolyHE_next = *fiter;
+                        }
+
+                    } while (childPolyHE_next != mcut::mesh_t::null_halfedge());
+                    MCUT_ASSERT(origFaceChildPoly.size() >= 3); // minimum size of valid polygon (triangle)
+                } while (origFaceiHalfedges.empty() == false);
+
+                MCUT_ASSERT(origFaceChildPolygons.size() == 2); // "origin_face" shall only even be partition into two child polygons
+
+                //
+                // At this point we now have the new halfedge connectivity defining child polygons of "origin_face" and
+                // the updated connectivity of the neighbouring faces to "origin_face" that were incident to at-least
+                // one of the partitioned edges.
+                // "origFaceChildPolygons" contains the child polygons of "origin_face".
+                // "replacedOrigFaceNeighbourToNewHalfedges" contains the updated connectivity of the relevant neighbours.
+                // NOTE: our newly computed faces have only been 'traced' but not yet inserted into "origin_input_mesh", which
+                // we must do now.
+
+                // The first step to adding the new faces is to remove "origin_face" and its relevant neighbours from "origin_input_mesh".
+                // Upon removal, we also maintaining a mapping of the face descriptors which will be useful when the user wishes
+                // include vertex- and face-maps.
+
             } // while (floatingPolyEdgePairQueue.size() > 0) {
-        }
+
+        } // while (floatingPolyEdgePairQueue.size() > 0) {
 
 #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
         ///////////////////////////////////////////////////////////////////////////
@@ -1969,7 +2305,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             fprintf(stderr, "fatal: exception caught : %s\n", e->what());
             result = McResult::MC_RESULT_MAX_ENUM;
         }
-
     } while (
         // general position voliation
         (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //

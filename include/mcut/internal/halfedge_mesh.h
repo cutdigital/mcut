@@ -248,6 +248,8 @@ public:
         {
             return M::const_iterator::operator*().first;
         }
+
+        // TODO: override the ++ operator to skip removed elements
     };
 
     typedef key_iterator_t<vertex_map_t> vertex_iterator_t;
@@ -328,6 +330,49 @@ public:
 
     face_descriptor_t add_face(const std::vector<vertex_descriptor_t>& vi);
 
+    void remove_face(const face_descriptor_t f)
+    {
+        MCUT_ASSERT(f != null_face());
+        MCUT_ASSERT(std::find(m_faces_removed.cbegin(), m_faces_removed.cend(), f) != m_faces_removed.cend());
+
+        face_data_t& fd = m_faces.at(f);
+        for (std::vector<halfedge_descriptor_t>::const_iterator it = fd.m_halfedges.cend(); it != fd.m_halfedges.cend(); ++it) {
+            halfedge_data_t& hd = m_halfedges.at(*it);
+            MCUT_ASSERT(hd.f != null_face());
+            hd.f = null_face();
+        }
+
+        m_faces_removed.push_back(f);
+    }
+
+    // also removes any face(s) incident to edge via its halfedges
+    void remove_edge(const edge_descriptor_t e)
+    {
+        MCUT_ASSERT(e != null_edge());
+        MCUT_ASSERT(std::find(m_edges_removed.cbegin(), m_edges_removed.cend(), f) != m_edges_removed.cend());
+
+        edge_data_t& ed = m_edges.at(e);
+        std::vector<hd_t> halfedges = { ed.h, opposite(ed.h) };
+
+        for (std::vector<hd_t>::const_iterator it = halfedges.cbegin(); it != halfedges.cend(); ++it) {
+            const hd_t h = *it;
+            MCUT_ASSERT(h != null_halfedge());
+            fd_t hface = face(h);
+            if (hface != null_face()) {
+                remove_face(hface);
+            }
+        }
+
+        ed.h = null_halfedge(); // we are removing the edge so every associated data element must be nullified
+
+        m_edges_removed.push_back(e);
+    }
+
+    void remove_vertex(const vertex_descriptor_t v)
+    {
+        // TODO:
+    }
+
     const math::vec3& vertex(const vertex_descriptor_t& vd) const;
 
     // returns vector of halfedges which point to vertex (i.e. "v" is their target)
@@ -366,6 +411,9 @@ private:
     std::map<edge_descriptor_t, edge_data_t> m_edges;
     std::map<halfedge_descriptor_t, halfedge_data_t> m_halfedges;
     std::map<face_descriptor_t, face_data_t> m_faces;
+    std::vector<face_descriptor_t> m_faces_removed;
+    std::vector<edge_descriptor_t> m_edges_removed;
+
 }; // class mesh_t {
 
 typedef vertex_descriptor_t vd_t;
