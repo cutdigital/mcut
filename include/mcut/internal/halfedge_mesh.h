@@ -28,6 +28,7 @@
 
 #include <limits>
 #include <map>
+#include <memory> // shared_ptr
 #include <vector>
 
 namespace mcut {
@@ -184,6 +185,23 @@ public:
     }
 };
 
+/*
+  Internal mesh data structure used for cutting meshes
+
+  Memory Management
+  
+  Memory management is semi-automatic. Memory grows as more elements are added to the structure but does not shrink when elements are removed. 
+  When you add elements and the capacity of the underlying vector is exhausted, the vector reallocates memory. 
+  As descriptors are basically indices, they refer to the same element after a reallocation. 
+  When you remove an element it is only marked as removed. 
+  Internally it is put in a free list, and when you add elements to the surface mesh, they are taken from the free list in case it is not empty.
+  
+  For all elements there is a function to obtain the number of used elements, as well as the number of used [and] removed elements. 
+  For vertices the functions are mesh_t::number_of_vertices() and mesh_t::number_of_internal_vertices(), respectively. 
+  The first function is slightly different from the free function num_vertices(const G&) of the BGL package. 
+ 
+  Iterators such as mesh_t::vertex_iterator_t only enumerate elements that are not marked as deleted.
+*/
 class mesh_t {
 
 public:
@@ -232,12 +250,14 @@ public:
     // iterator over the keys of a map (base class)
     template <typename M>
     class key_iterator_t : public M::const_iterator {
+        const mesh_t* const mesh_ptr;
 
     public:
         key_iterator_t()
             : M::const_iterator() {};
-        key_iterator_t(typename M::const_iterator it_)
-            : M::const_iterator(it_) {};
+        key_iterator_t(typename M::const_iterator it_, const mesh_t* const mesh)
+            : M::const_iterator(it_)
+            , mesh_ptr(mesh) {};
 
         typename M::key_type* operator->()
         {
@@ -249,7 +269,26 @@ public:
             return M::const_iterator::operator*().first;
         }
 
-        // TODO: override the ++ operator to skip removed elements
+        // prefix increment
+        typename M::key_type& operator++()
+        {
+            do {
+                M::const_iterator::operator++();
+            } while (mesh_ptr->is_removed(this->operator*().first)); // skip removed elements
+            return this->operator*().first;
+        }
+
+        // postfix increment
+        typename M::key_type operator++()
+        {
+            do {
+                M::const_iterator::operator++();
+            } while (mesh_ptr->is_removed(this->operator*().first)); // skip removed elements
+            return this->operator*().first;
+        }
+
+        // TODO: override the -- operator to skip removed elements
+        // (currently not used anywhere)
     };
 
     typedef key_iterator_t<vertex_map_t> vertex_iterator_t;
@@ -326,41 +365,139 @@ public:
 #else
     vertex_descriptor_t add_vertex(const char* x, const char* y, const char* z);
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+
+    // adds an edges into the mesh data structure, creating incident halfedges, and returns the
+    // halfedge whole target is "v1"
     halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);
 
     face_descriptor_t add_face(const std::vector<vertex_descriptor_t>& vi);
 
+    // also disassociates (not remove) any halfedges(s) and vertices incident to face
     void remove_face(const face_descriptor_t f)
     {
         MCUT_ASSERT(f != null_face());
         MCUT_ASSERT(std::find(m_faces_removed.cbegin(), m_faces_removed.cend(), f) != m_faces_removed.cend());
 
         face_data_t& fd = m_faces.at(f);
+
+        std::vector<vertex_descriptor_t> face_vertices; // ... that are used by face
+
+        // disassociate halfedges
+
         for (std::vector<halfedge_descriptor_t>::const_iterator it = fd.m_halfedges.cend(); it != fd.m_halfedges.cend(); ++it) {
             halfedge_data_t& hd = m_halfedges.at(*it);
             MCUT_ASSERT(hd.f != null_face());
             hd.f = null_face();
+
+            // NOTE: "next" and "previous" are only meaningful when the halfedge is used by a
+            // face. So we reset that information here since the halfedge is not longer used
+            // by a face
+            MCUT_ASSERT(hd.n != null_halfedge());
+            { // disassociate next
+                const halfedge_descriptor_t hn = hd.n;
+                halfedge_data_t& hnd = m_halfedges.at(hn);
+                MCUT_ASSERT(hnd.p == h);
+                hnd.p = null_halfedge();
+                //
+                hd.n = null_halfedge();
+            }
+
+            MCUT_ASSERT(hd.p != null_halfedge());
+            { // disassociate previous
+                const halfedge_descriptor_t hp = hd.p;
+                halfedge_data_t& hpd = m_halfedges.at(hp);
+                MCUT_ASSERT(hnd.n == h);
+                hpd.n = null_halfedge();
+                //
+                hd.p = null_halfedge();
+            }
+
+            face_vertices.push_back(hd.t);
+        }
+
+        // disassociate vertices
+
+        // for each vertex used by face
+        for (std::vector<vertex_descriptor_t>::const_iterator it = face_vertices.cend(); it != face_vertices.cend(); ++it) {
+            vertex_descriptor_t face_vertex = *it;
+            vertex_data_t& vd = m_vertices.at(face_vertex);
+
+            std::vector<face_descriptor_t>::const_iterator fIter = std::find(vd.m_faces.cbegin(), vd.m_faces.cend(), f);
+
+            MCUT_ASSERT(fIter != vd.m_faces.cend()); // because not yet removed f
+
+            vd.m_faces.erase(fIter); // remove association
         }
 
         m_faces_removed.push_back(f);
     }
 
-    // also removes any face(s) incident to edge via its halfedges
+    // also disassociates (not remove) the halfedges(s) and vertex incident to this halfedge
+    void remove_halfedge(halfedge_descriptor_t h)
+    {
+        MCUT_ASSERT(h != null_halfedge());
+        MCUT_ASSERT(std::find(m_halfedges_removed.cbegin(), m_halfedges_removed.cend(), h) != m_halfedges_removed.cend());
+
+        halfedge_data_t& hd = m_halfedges.at(h);
+
+        MCUT_ASSERT(hd.e == null_edge()); // there must not be an edge dependent on h if we are to remove h
+        MCUT_ASSERT(hd.f == null_face()); // there must not be a face dependent on h if we are to remove h
+
+        if (hd.n != null_halfedge()) { // disassociate next
+            const halfedge_descriptor_t hn = hd.n;
+            halfedge_data_t& hnd = m_halfedges.at(hn);
+            MCUT_ASSERT(hnd.p == h);
+            hnd.p = null_halfedge();
+            //
+            hd.n = null_halfedge();
+        }
+
+        if (hd.o != null_halfedge()) { // disassociate opposite
+            const halfedge_descriptor_t ho = hd.o;
+            halfedge_data_t& hod = m_halfedges.at(ho);
+            MCUT_ASSERT(hod.o == h);
+            hod.o = null_halfedge();
+            //
+            hd.o = null_halfedge();
+        }
+
+        if (hd.p != null_halfedge()) { // disassociate previous
+            const halfedge_descriptor_t hp = hd.p;
+            halfedge_data_t& hpd = m_halfedges.at(hp);
+            MCUT_ASSERT(hnd.n == h);
+            hpd.n = null_halfedge();
+            //
+            hd.p = null_halfedge();
+        }
+
+        MCUT_ASSERT(hd.t != null_vertex()); // every h has a target vertex which is effectively dependent on h
+
+        // disassociate target vertex
+        vertex_data_t& htd = m_vertices.at(hd.t);
+        std::vector<halfedge_descriptor_t>::const_iterator hIter = std::find(htd.m_halfedges.cbegin(), htd.m_halfedges.cend(), h);
+
+        MCUT_ASSERT(hIter != htd.m_halfedges.cend()); // because not yet removed h
+
+        htd.m_halfedges.erase(hIter); // remove association
+    }
+
+    // also disassociates (not remove) any face(s) incident to edge via its halfedges, and also disassociates the halfedges
     void remove_edge(const edge_descriptor_t e)
     {
         MCUT_ASSERT(e != null_edge());
-        MCUT_ASSERT(std::find(m_edges_removed.cbegin(), m_edges_removed.cend(), f) != m_edges_removed.cend());
+        MCUT_ASSERT(std::find(m_edges_removed.cbegin(), m_edges_removed.cend(), e) != m_edges_removed.cend());
 
         edge_data_t& ed = m_edges.at(e);
-        std::vector<hd_t> halfedges = { ed.h, opposite(ed.h) };
+        std::vector<hd_t> halfedges = { ed.h, opposite(ed.h) }; // both halfedges incident to edge must be disassociated
 
         for (std::vector<hd_t>::const_iterator it = halfedges.cbegin(); it != halfedges.cend(); ++it) {
             const hd_t h = *it;
             MCUT_ASSERT(h != null_halfedge());
-            fd_t hface = face(h);
-            if (hface != null_face()) {
-                remove_face(hface);
-            }
+
+            // disassociate halfedge
+            halfedge_data_t& hd = m_halfedges.at(h);
+            MCUT_ASSERT(hd.e == e);
+            hd.e = null_edge();
         }
 
         ed.h = null_halfedge(); // we are removing the edge so every associated data element must be nullified
@@ -370,7 +507,69 @@ public:
 
     void remove_vertex(const vertex_descriptor_t v)
     {
-        // TODO:
+        // TODO: not really needed so far for anything implemented
+        MCUT_ASSERT(false);
+    }
+
+    int number_of_internal_faces() const
+    {
+        return static_cast<int>(m_faces.size());
+    }
+
+    int number_of_internal_edges() const
+    {
+        return static_cast<int>(m_edges.size());
+    }
+
+    int number_of_internal_halfedges() const
+    {
+        return static_cast<int>(m_halfedges.size());
+    }
+
+    int number_of_internal_vertices() const
+    {
+        return static_cast<int>(m_vertices.size());
+    }
+
+    //
+    int number_of_vertices_removed() const
+    {
+        return (int)this->m_vertices_removed.size();
+    }
+
+    int number_of_edges_removed() const
+    {
+        return (int)this->m_edges_removed.size();
+    }
+
+    int number_of_halfedges_removed() const
+    {
+        return (int)this->m_halfedges_removed.size();
+    }
+
+    int number_of_faces_removed() const
+    {
+        return (int)this->m_faces_removed.size();
+    }
+
+    bool is_removed(face_descriptor_t f)
+    {
+        return std::find(m_faces_removed.cbegin(), m_faces_removed.cend(), f) != m_faces_removed.cend();
+    }
+
+    bool is_removed(edge_descriptor_t e)
+    {
+        return std::find(m_edges_removed.cbegin(), m_edges_removed.cend(), e) != m_edges_removed.cend();
+    }
+
+    bool is_removed(halfedge_descriptor_t h)
+    {
+        return std::find(m_halfedges_removed.cbegin(), m_halfedges_removed.cend(), h) != m_halfedges_removed.cend();
+    }
+
+    bool is_removed(vertex_descriptor_t v)
+    {
+        return std::find(m_vertices_removed.cbegin(), m_vertices_removed.cend(), v) != m_vertices_removed.cend();
     }
 
     const math::vec3& vertex(const vertex_descriptor_t& vd) const;
@@ -411,8 +610,15 @@ private:
     std::map<edge_descriptor_t, edge_data_t> m_edges;
     std::map<halfedge_descriptor_t, halfedge_data_t> m_halfedges;
     std::map<face_descriptor_t, face_data_t> m_faces;
+
+    // NOTE: I use std::vector because we'll have very few (typically zero)
+    // elements removed at a given time. In fact removal only happens during
+    // input-mesh face-partitioning to resolve floating polygons, which is
+    // rare. Maybe in the future thing change...
     std::vector<face_descriptor_t> m_faces_removed;
     std::vector<edge_descriptor_t> m_edges_removed;
+    std::vector<halfedge_descriptor_t> m_halfedges_removed;
+    std::vector<vertex_descriptor_t> m_vertices_removed;
 
 }; // class mesh_t {
 

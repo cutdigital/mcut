@@ -58,22 +58,22 @@ face_descriptor_t mesh_t::null_face()
 
 int mesh_t::number_of_vertices() const
 {
-    return (int)this->m_vertices.size();
+    return number_of_internal_vertices() - number_of_vertices_removed();
 }
 
 int mesh_t::number_of_edges() const
 {
-    return (int)this->m_edges.size();
+    return number_of_internal_edges() - number_of_edges_removed();
 }
 
 int mesh_t::number_of_halfedges() const
 {
-    return (int)this->m_halfedges.size();
+    return number_of_internal_halfedges() - number_of_halfedges_removed();
 }
 
 int mesh_t::number_of_faces() const
 {
-    return (int)this->m_faces.size();
+    return number_of_internal_faces() - number_of_faces_removed();
 }
 
 vertex_descriptor_t mesh_t::source(const halfedge_descriptor_t& h) const
@@ -273,6 +273,8 @@ vertex_descriptor_t mesh_t::add_vertex(const math::fast_vec3& point)
 
 vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z)
 {
+    // TODO: upate code to be able to re-use a removed vertex's slot (if feature is needed in the future)
+
     vertex_data_t vdata;
     vdata.p = math::vec3(x, y, z);
     const vertex_descriptor_t vd(static_cast<vertex_descriptor_t::index_type>(m_vertices.size()));
@@ -299,77 +301,143 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
 {
     MCUT_ASSERT(v0 != null_vertex());
     MCUT_ASSERT(v1 != null_vertex());
-    const halfedge_descriptor_t h0_idx(static_cast<face_descriptor_t::index_type>(m_halfedges.size())); // primary halfedge of new edge to be created
-    const edge_descriptor_t e_idx(static_cast<face_descriptor_t::index_type>(m_edges.size())); // index of new edge
 
-    std::pair<typename std::map<edge_descriptor_t, edge_data_t>::iterator, bool> eret = m_edges.insert(std::make_pair(e_idx, edge_data_t())); // create a new edge
+    // primary halfedge(0) of edge
+    halfedge_descriptor_t h0_idx(static_cast<face_descriptor_t::index_type>(number_of_halfedges())); // primary halfedge of new edge to be created
+    bool reusing_removed_h0_descr = (!m_halfedges_removed.empty());
 
-    MCUT_ASSERT(eret.second == true);
-    edge_data_t& edge_data = eret.first->second;
-    edge_data.h = h0_idx; // even/primary halfedge
+    if (reusing_removed_h0_descr) // can we re-use a slot?
+    {
+        std::vector<halfedge_descriptor_t>::const_iterator hIter = m_halfedges_removed.cbegin() + (m_halfedges_removed.size() - 1); // take the most recently removed
+        h0_idx = *hIter;
+        m_halfedges_removed.erase(hIter);
+        MCUT_ASSERT(m_halfedges.find(h0_idx) != m_halfedges.cend());
+    }
+
+    halfedge_data_t* halfedge0_data_ptr = nullptr;
+    if (reusing_removed_h0_descr) {
+        halfedge0_data_ptr = &m_halfedges.at(h0_idx);
+    } else {
+        // create new halfedge --> h0
+        std::pair<typename std::map<halfedge_descriptor_t, halfedge_data_t>::iterator, bool> h0_ret = m_halfedges.insert(std::make_pair(h0_idx, halfedge_data_t()));
+        MCUT_ASSERT(h0_ret.second == true);
+        halfedge0_data_ptr = &h0_ret.first->second;
+    }
+
+    // second halfedge(1) of edge
+    halfedge_descriptor_t h1_idx(static_cast<face_descriptor_t::index_type>(number_of_halfedges())); // second halfedge of new edge to be created (opposite of h0_idx)
+    bool reusing_removed_h1_descr = (!m_halfedges_removed.empty());
+
+    if (reusing_removed_h1_descr) // can we re-use a slot?
+    {
+        std::vector<halfedge_descriptor_t>::const_iterator hIter = m_halfedges_removed.cbegin() + (m_halfedges_removed.size() - 1); // take the most recently removed
+        h1_idx = *hIter;
+        m_halfedges_removed.erase(hIter);
+        MCUT_ASSERT(m_halfedges.find(h1_idx) != m_halfedges.cend());
+    }
+
+    halfedge_data_t* halfedge1_data_ptr = nullptr;
+    if (reusing_removed_h1_descr) {
+        halfedge1_data_ptr = &m_halfedges.at(h1_idx);
+    } else {
+        // create new halfedge --> h1
+        std::pair<typename std::map<halfedge_descriptor_t, halfedge_data_t>::iterator, bool> h1_ret = m_halfedges.insert(std::make_pair(h1_idx, halfedge_data_t()));
+        MCUT_ASSERT(h1_ret.second == true);
+        halfedge1_data_ptr = &h1_ret.first->second;
+    }
+
+    // edge
+
+    edge_descriptor_t e_idx(static_cast<face_descriptor_t::index_type>(number_of_edges())); // index of new edge
+    bool reusing_removed_edge_descr = (!m_edges_removed.empty());
+
+    if (reusing_removed_edge_descr) // can we re-use a slot?
+    {
+        std::vector<edge_descriptor_t>::const_iterator eIter = m_edges_removed.cbegin() + (m_edges_removed.size() - 1); // take the most recently removed
+        e_idx = *eIter;
+        m_edges_removed.erase(eIter);
+        MCUT_ASSERT(m_edges.find(e_idx) != m_edges.cend());
+    }
+
+    edge_data_t* edge_data_ptr = nullptr;
+    if (reusing_removed_edge_descr) {
+        edge_data_ptr = &m_edges.at(e_idx);
+    } else {
+        std::pair<typename std::map<edge_descriptor_t, edge_data_t>::iterator, bool> eret = m_edges.insert(std::make_pair(e_idx, edge_data_t())); // create a new edge
+        MCUT_ASSERT(eret.second == true);
+        edge_data_ptr = &eret.first->second;
+    }
+
+    // update incidence information
+
+    //edge_data_t& edge_data = eret.first->second;
+    edge_data_ptr->h = h0_idx; // even/primary halfedge
     //eret.first->h = h0_idx; // even/primary halfedge
 
-    // update halfedge incidence
+    //halfedge_data_t& halfedge0_data = h0_ret.first->second;
+    halfedge0_data_ptr->t = v1; // target vertex of h0
+    halfedge0_data_ptr->o = h1_idx; // ... because opp has idx differing by 1
+    halfedge0_data_ptr->e = e_idx;
 
-    // create new halfedge --> h0
-    std::pair<typename std::map<halfedge_descriptor_t, halfedge_data_t>::iterator, bool> h0_ret = m_halfedges.insert(std::make_pair(h0_idx, halfedge_data_t()));
+    //halfedge_data_t& halfedge1_data = h1_ret.first->second;
+    halfedge1_data_ptr->t = v0; // target vertex of h1
+    halfedge1_data_ptr->o = h0_idx; // ... because opp has idx differing by 1
+    halfedge1_data_ptr->e = e_idx;
 
-    MCUT_ASSERT(h0_ret.second == true);
-
-    halfedge_data_t& halfedge0_data = h0_ret.first->second;
-    halfedge0_data.t = v1; // target vertex of h0
-    halfedge0_data.o = halfedge_descriptor_t(h0_idx + 1); // ... because opp has idx differing by 1
-    halfedge0_data.e = e_idx;
-
-    // create new halfedge --> h1
-    std::pair<typename std::map<halfedge_descriptor_t, halfedge_data_t>::iterator, bool> h1_ret = m_halfedges.insert(std::make_pair(h0_idx + 1, halfedge_data_t()));
-
-    MCUT_ASSERT(h1_ret.second == true);
-
-    halfedge_data_t& halfedge1_data = h1_ret.first->second;
-    halfedge1_data.t = v0; // target vertex of h1
-    halfedge1_data.o = h0_idx; // ... because opp has idx differing by 1
-    halfedge1_data.e = e_idx;
-
-    MCUT_ASSERT(h1_ret.first->first == halfedge0_data.o); // h1 comes just afterward (its index)
+    //MCUT_ASSERT(h1_ret.first->first == halfedge0_data_ptr->o); // h1 comes just afterward (its index)
 
     // update vertex incidence
 
     // v0
     MCUT_ASSERT(m_vertices.count(v0) == 1);
     vertex_data_t& v0_data = m_vertices.at(v0);
-    if (std::find(v0_data.m_halfedges.cbegin(), v0_data.m_halfedges.cend(), h1_ret.first->first) == v0_data.m_halfedges.cend()) {
-        v0_data.m_halfedges.push_back(h1_ret.first->first); // halfedge whose target is v0
-    }
+    MCUT_ASSERT(std::find(v0_data.m_halfedges.cbegin(), v0_data.m_halfedges.cend(), h1_idx) == v0_data.m_halfedges.cend());
+    //if () {
+    v0_data.m_halfedges.push_back(h1_idx); // halfedge whose target is v0
+    //}
     // v1
     MCUT_ASSERT(m_vertices.count(v1) == 1);
     vertex_data_t& v1_data = m_vertices.at(v1);
-    if (std::find(v1_data.m_halfedges.cbegin(), v1_data.m_halfedges.cend(), h0_ret.first->first) == v1_data.m_halfedges.cend()) {
-        v1_data.m_halfedges.push_back(h0_ret.first->first); // halfedge whose target is v1
-    }
+    MCUT_ASSERT(std::find(v1_data.m_halfedges.cbegin(), v1_data.m_halfedges.cend(), h0_idx) == v1_data.m_halfedges.cend());
+    //if () {
+    v1_data.m_halfedges.push_back(h0_idx); // halfedge whose target is v1
+    //}
 
     return static_cast<halfedge_descriptor_t>(h0_idx); // return halfedge whose target is v1
 }
 
 face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 {
-    const int vertex_count = static_cast<int>(vi.size());
-    MCUT_ASSERT(vertex_count >= 3);
+    const int face_vertex_count = static_cast<int>(vi.size());
+    MCUT_ASSERT(face_vertex_count >= 3);
 
-    const int face_count = static_cast<int>(m_faces.size());
-    face_data_t new_face;
-    const face_descriptor_t new_face_idx(static_cast<face_descriptor_t::index_type>(face_count));
+    const int face_count = number_of_faces();
+    face_data_t new_face_data;
+    face_descriptor_t new_face_idx(static_cast<face_descriptor_t::index_type>(face_count));
+    bool reusing_removed_face_descr = (!m_faces_removed.empty());
 
-    for (int i = 0; i < vertex_count; ++i) {
+    if (reusing_removed_face_descr) // can we re-use a slot?
+    {
+        std::vector<face_descriptor_t>::const_iterator fIter = m_faces_removed.cbegin() + (m_faces_removed.size() - 1); // take the most recently removed
+        new_face_idx = *fIter;
+        m_faces_removed.erase(fIter); // slot is going to be used again
+
+        MCUT_ASSERT(m_faces.find(new_face_idx) != m_faces.cend());
+    }
+
+    face_data_t* face_data_ptr = reusing_removed_face_descr ? &m_faces.at(new_face_idx) : &new_face_data;
+
+    for (int i = 0; i < face_vertex_count; ++i) {
         const vertex_descriptor_t v0 = vi.at(i); // i.e. src
 
         MCUT_ASSERT(v0 != null_vertex());
 
-        const vertex_descriptor_t v1 = vi.at((i + 1) % vertex_count); // i.e. tgt
+        const vertex_descriptor_t v1 = vi.at((i + 1) % face_vertex_count); // i.e. tgt
 
         MCUT_ASSERT(v1 != null_vertex());
 
         // check if edge exists between v0 and v1 (using halfedges incident to either v0 or v1)
+        // TODO: use the halfedge(..., true) function
 
         vertex_data_t& v0_data = m_vertices.at(v0);
         vertex_data_t& v1_data = m_vertices.at(v1);
@@ -407,12 +475,15 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         {
             MCUT_ASSERT(m_halfedges.count(v1_h) == 1);
             v1_hd_ptr = &m_halfedges.at(v1_h);
-            new_face.m_halfedges.push_back(v1_h);
+
+            face_data_ptr->m_halfedges.push_back(v1_h);
+
         } else { // there exists no edge between v0 and v1, so we create it
             const halfedge_descriptor_t h = add_edge(v0, v1);
             MCUT_ASSERT(m_halfedges.count(h) == 1);
             v1_hd_ptr = &m_halfedges.at(h);
-            new_face.m_halfedges.push_back(h);
+
+            face_data_ptr->m_halfedges.push_back(h);
         }
 
         MCUT_ASSERT(v1_hd_ptr->f == null_face());
@@ -420,16 +491,18 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         v1_hd_ptr->f = new_face_idx; // associate halfedge with face
     }
 
-    std::pair<typename face_map_t::iterator, bool> tmp = m_faces.insert(std::make_pair(new_face_idx, new_face));
-    MCUT_ASSERT(tmp.second == true);
+    if (!reusing_removed_face_descr) {
+        std::pair<typename face_map_t::iterator, bool> tmp = m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
+        MCUT_ASSERT(tmp.second == true);
+    }
 
     // update halfedges (next halfedge)
-    const std::vector<halfedge_descriptor_t>& halfedges_around_new_face = get_halfedges_around_face(tmp.first->first);
-    const int num_halfedges = static_cast<int>(halfedges_around_new_face.size());
+    //const std::vector<halfedge_descriptor_t>& halfedges_around_new_face = get_halfedges_around_face(new_face_idx);
+    const int num_halfedges = static_cast<int>(face_data_ptr->m_halfedges.size());
 
     for (int i = 0; i < num_halfedges; ++i) {
-        const halfedge_descriptor_t h = halfedges_around_new_face.at(i);
-        const halfedge_descriptor_t nh = halfedges_around_new_face.at((i + 1) % num_halfedges);
+        const halfedge_descriptor_t h = face_data_ptr->m_halfedges.at(i);
+        const halfedge_descriptor_t nh = face_data_ptr->m_halfedges.at((i + 1) % num_halfedges);
         set_next(h, nh);
     }
 
@@ -503,42 +576,42 @@ const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(co
 
 mesh_t::vertex_iterator_t mesh_t::vertices_begin() const
 {
-    return vertex_iterator_t(m_vertices.cbegin());
+    return vertex_iterator_t(m_vertices.cbegin(), this);
 }
 
 mesh_t::vertex_iterator_t mesh_t::vertices_end() const
 {
-    return vertex_iterator_t(m_vertices.cend());
+    return vertex_iterator_t(m_vertices.cend(), this);
 }
 
 mesh_t::edge_iterator_t mesh_t::edges_begin() const
 {
-    return edge_iterator_t(m_edges.cbegin());
+    return edge_iterator_t(m_edges.cbegin(), this);
 }
 
 mesh_t::edge_iterator_t mesh_t::edges_end() const
 {
-    return edge_iterator_t(m_edges.cend());
+    return edge_iterator_t(m_edges.cend(), this);
 }
 
 mesh_t::halfedge_iterator_t mesh_t::halfedges_begin() const
 {
-    return halfedge_iterator_t(m_halfedges.cbegin());
+    return halfedge_iterator_t(m_halfedges.cbegin(), this);
 }
 
 mesh_t::halfedge_iterator_t mesh_t::halfedges_end() const
 {
-    return halfedge_iterator_t(m_halfedges.cend());
+    return halfedge_iterator_t(m_halfedges.cend(), this);
 }
 
 mesh_t::face_iterator_t mesh_t::faces_begin() const
 {
-    return face_iterator_t(m_faces.cbegin());
+    return face_iterator_t(m_faces.cbegin(), this);
 }
 
 mesh_t::face_iterator_t mesh_t::faces_end() const
 {
-    return face_iterator_t(m_faces.cend());
+    return face_iterator_t(m_faces.cend(), this);
 }
 
 void write_off(const char* fpath, const mcut::mesh_t& mesh)

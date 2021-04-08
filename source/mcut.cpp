@@ -589,6 +589,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
         if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
             MCUT_ASSERT(halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1);
+            // TODO: set vertices that were added as a result of discovering floating polygons to same value as intersection points i.e. uint_max
             indexArrayMesh.pVertexMapIndices[i] = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter); // intersection points at set to uint_max
         }
     }
@@ -1793,7 +1794,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             // a vertex of the floating polygon or the "origin_face" - in which case GP will be violated (difficult to
             // resolve even though nonetheless possible, i think).
             //
-            while (floatingPolyEdgePairQueue.size() > 0) {
+
+            bool successivelyPartitionedOriginFaceWithCurrentEdgePair = false;
+            while (floatingPolyEdgePairQueue.size() > 0 && successivelyPartitionedOriginFaceWithCurrentEdgePair == false) {
                 const std::pair<int, int> floatingPolyCurEdgeIdxPair = floatingPolyEdgePairQueue.front();
                 floatingPolyEdgePairQueue.pop();
                 // get vertices of edges
@@ -1852,7 +1855,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 auto perturbSegment = [&]() { // TODO
                     std::pair<mcut::math::vec3, mcut::math::vec3> out = segment_cur;
                     out.first[0] += 0.001; // hack
-                    std::cout << "TODO: FIGURE OUT HOW TO PERTURB" << std::endl;
+                    std::cout << "TODO: FIGURE OUT HOW TO PERTURB. MST BE ALONG EDGE" << std::endl;
                     return out;
                 };
 
@@ -2203,7 +2206,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                 //
                 // At this point we now have the new halfedge connectivity defining child polygons of "origin_face" and
-                // the updated connectivity of the neighbouring faces to "origin_face" that were incident to at-least
+                // the updated connectivity of the neighbouring face(s) to "origin_face" that was/ were incident to at-least
                 // one of the partitioned edges.
                 // "origFaceChildPolygons" contains the child polygons of "origin_face".
                 // "replacedOrigFaceNeighbourToNewHalfedges" contains the updated connectivity of the relevant neighbours.
@@ -2214,9 +2217,61 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 // Upon removal, we also maintaining a mapping of the face descriptors which will be useful when the user wishes
                 // include vertex- and face-maps.
 
-            } // while (floatingPolyEdgePairQueue.size() > 0) {
+                for (std::vector<mcut::fd_t>::const_iterator it = replaced_input_mesh_faces.cbegin(); it != replaced_input_mesh_faces.cend(); ++it) {
+                    origin_input_mesh->remove_face(*it);
+                }
 
-        } // while (floatingPolyEdgePairQueue.size() > 0) {
+                // remove the partitioned edges too
+                origin_input_mesh->remove_edge(origFaceEdge0Descr);
+                origin_input_mesh->remove_edge(origFaceEdge1Descr);
+
+                // add new faces
+
+                // maps faces in the modified input mesh (that were added by MCUT to resolve floating polygon intersections) that partitioned a face
+                // in the user provided mesh, to the partitioned face user in the original user provided input mesh
+                std::map<mcut::fd_t, mcut::fd_t> floatingPolyPartitionChildFaceToUserInputMeshFace;
+
+                for (std::vector<std::vector<mcut::hd_t>>::const_iterator it = origFaceChildPolygons.cbegin(); it != origFaceChildPolygons.cend(); ++it) {
+                    std::vector<mcut::vd_t> faceVertices;
+                    for (std::vector<mcut::hd_t>::const_iterator hIt = it->cbegin(); hIt != it->cend(); ++hIt) {
+                        const mcut::vd_t tgt = origin_input_mesh->target(*hIt);
+                        faceVertices.push_back(tgt);
+                    }
+                    const mcut::fd_t fdescr = origin_input_mesh->add_face(faceVertices);
+                    floatingPolyPartitionChildFaceToUserInputMeshFace[fdescr] = origin_face;
+                }
+
+                for (std::map<mcut::fd_t, std::vector<mcut::hd_t>>::const_iterator it = replacedOrigFaceNeighbourToNewHalfedges.cbegin();
+                     it != replacedOrigFaceNeighbourToNewHalfedges.cend();
+                     ++it) {
+                    const mcut::fd_t origFaceNeighFace = it->first;
+                    std::vector<mcut::vd_t> origFaceNeighFaceVertices;
+                    for (std::vector<mcut::hd_t>::const_iterator hIt = it->second.cbegin(); hIt != it->second.cend(); ++hIt) {
+                        const mcut::vd_t tgt = origin_input_mesh->target(*hIt);
+                        origFaceNeighFaceVertices.push_back(tgt);
+                    }
+                    const mcut::fd_t fdescr = origin_input_mesh->add_face(origFaceNeighFaceVertices);
+                    floatingPolyPartitionChildFaceToUserInputMeshFace[fdescr] = origFaceNeighFace;
+                }
+
+                // :::::::::::::::::::::::::::::::::::::::::::
+                // rebuild the BVH again of "origin_input_mesh"
+
+                if (floating_polygon_was_on_srcmesh) {
+                    srcMeshBvhAABBs.clear();
+                    srcMeshBvhLeafNodeFaces.clear();
+                    constructOIBVH(*origin_input_mesh, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces);
+                } else { // cut-mesh
+                    cutMeshBvhAABBs.clear();
+                    cutMeshBvhLeafNodeFaces.clear();
+                    constructOIBVH(*origin_input_mesh, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+                }
+
+                break; // done
+
+            } // while (floatingPolyEdgePairQueue.size() > 0 && successivelyPartitionedOriginFaceWithCurrentEdgePair == false) {
+
+        } // if (floating_polygon_was_detected) {
 
 #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
         ///////////////////////////////////////////////////////////////////////////
@@ -2276,8 +2331,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         } // if (input.verbose)
 #endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
-        // Evaluate BVHs
-        // :::::::::::::
+        // Evaluate BVHs to find polygon pairs that will be tested for intersection
+        // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
@@ -2308,7 +2363,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     } while (
         // general position voliation
         (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //
-        // kernel detected a floating polygon and we now need to re-partition the origin polygon (in src mesh or cut-mesh) and restart the cuttings
+        // kernel detected a floating polygon and we now need to re-partition the origin polygon (in src mesh or cut-mesh) and then restart the cut
         backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON);
 
     result = convert(backendOutput.status);
