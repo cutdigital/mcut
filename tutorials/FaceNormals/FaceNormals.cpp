@@ -385,7 +385,7 @@ int main(int argc, char* argv[])
                         }
                     }
 
-                    assert(faceVertexOffset != -1);
+                    assert(imFaceVertexOffset != -1);
 
                     // get the normal index of the vertex
                     int imNormalIdx = inputMeshPtr->FN[imFaceIdx][imFaceVertexOffset];

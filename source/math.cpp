@@ -22,34 +22,34 @@
 
 #include "mcut/internal/math.h"
 #include <cstdlib>
+
 namespace mcut {
-namespace math{
+namespace math {
 
     real_number_t square_root(const real_number_t& number)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::sqrt(number);
-#else 
+#else
         arbitrary_precision_number_t out(number);
         mpfr_sqrt(out.get_mpfr_handle(), number.get_mpfr_handle(), arbitrary_precision_number_t::get_default_rounding_mode());
         return out;
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
-real_number_t absolute_value(const real_number_t& number)
-{
+    real_number_t absolute_value(const real_number_t& number)
+    {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    return std::fabs(number);
+        return std::fabs(number);
 #else
-    real_number_t out(number);
-    mpfr_abs(out.get_mpfr_handle(), number.get_mpfr_handle(), arbitrary_precision_number_t::get_default_rounding_mode());
-    return out;
+        real_number_t out(number);
+        mpfr_abs(out.get_mpfr_handle(), number.get_mpfr_handle(), arbitrary_precision_number_t::get_default_rounding_mode());
+        return out;
 #endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-}
+    }
 
-
-sign_t sign(const real_number_t& number)
-{
+    sign_t sign(const real_number_t& number)
+    {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         int s = (real_number_t(0) < number) - (number < real_number_t(0));
         sign_t result = sign_t::ZERO;
@@ -70,14 +70,14 @@ sign_t sign(const real_number_t& number)
         }
         return result;
 #endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-}
+    }
 
     std::ostream& operator<<(std::ostream& os, const vec3& v)
     {
         return os << static_cast<long double>(v.x()) << ", " << static_cast<long double>(v.y()) << ", " << static_cast<long double>(v.z());
     }
 
-     std::ostream& operator<<(std::ostream& os, const matrix_t& m)
+    std::ostream& operator<<(std::ostream& os, const matrix_t& m)
     {
         for (int i = 0; i < m.rows(); i++) {
             for (int j = 0; j < m.cols(); j++) {
@@ -87,8 +87,6 @@ sign_t sign(const real_number_t& number)
         }
         return os;
     }
-
-
 
     bool operator==(const vec3& a, const vec3& b)
     {
@@ -103,10 +101,5 @@ sign_t sign(const real_number_t& number)
             a.x() * b.y() - a.y() * b.x());
     }
 
-    real_number_t dot_product(const vec3& a, const vec3& b)
-    {
-        return (a.x() * b.x()) + (a.y() * b.y()) + (a.z() * b.z());
-    }
-
-    } // namespace math
+} // namespace math
 } // namespace mcut {

@@ -322,7 +322,16 @@ namespace math {
     }
 
     extern vec3 cross_product(const vec3& a, const vec3& b);
-    extern real_number_t dot_product(const vec3& a, const vec3& b);
+
+    template <typename vector_type>
+    math::real_number_t dot_product(const vector_type& a, const vector_type& b)
+    {
+        math::real_number_t out(0.0);
+        for (int i = 0; i < vector_type::cardinality(); ++i) {
+            out += (a[i] * b[i]);
+        }
+        return out;
+    }
 
     template <typename vector_type>
     typename math::real_number_t squared_length(const vector_type& v)

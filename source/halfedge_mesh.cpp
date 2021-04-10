@@ -391,17 +391,17 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
     // v0
     MCUT_ASSERT(m_vertices.count(v0) == 1);
     vertex_data_t& v0_data = m_vertices.at(v0);
-    MCUT_ASSERT(std::find(v0_data.m_halfedges.cbegin(), v0_data.m_halfedges.cend(), h1_idx) == v0_data.m_halfedges.cend());
-    //if () {
-    v0_data.m_halfedges.push_back(h1_idx); // halfedge whose target is v0
-    //}
+    //MCUT_ASSERT();
+    if (std::find(v0_data.m_halfedges.cbegin(), v0_data.m_halfedges.cend(), h1_idx) == v0_data.m_halfedges.cend()) {
+        v0_data.m_halfedges.push_back(h1_idx); // halfedge whose target is v0
+    }
     // v1
     MCUT_ASSERT(m_vertices.count(v1) == 1);
     vertex_data_t& v1_data = m_vertices.at(v1);
-    MCUT_ASSERT(std::find(v1_data.m_halfedges.cbegin(), v1_data.m_halfedges.cend(), h0_idx) == v1_data.m_halfedges.cend());
-    //if () {
-    v1_data.m_halfedges.push_back(h0_idx); // halfedge whose target is v1
-    //}
+    //MCUT_ASSERT();
+    if (std::find(v1_data.m_halfedges.cbegin(), v1_data.m_halfedges.cend(), h0_idx) == v1_data.m_halfedges.cend()) {
+        v1_data.m_halfedges.push_back(h0_idx); // halfedge whose target is v1
+    }
 
     return static_cast<halfedge_descriptor_t>(h0_idx); // return halfedge whose target is v1
 }
@@ -426,6 +426,7 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
     }
 
     face_data_t* face_data_ptr = reusing_removed_face_descr ? &m_faces.at(new_face_idx) : &new_face_data;
+    face_data_ptr->m_halfedges.clear();
 
     for (int i = 0; i < face_vertex_count; ++i) {
         const vertex_descriptor_t v0 = vi.at(i); // i.e. src
@@ -576,7 +577,11 @@ const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(co
 
 mesh_t::vertex_iterator_t mesh_t::vertices_begin() const
 {
-    return vertex_iterator_t(m_vertices.cbegin(), this);
+    vertex_map_t::const_iterator it = m_vertices.cbegin();
+    while (it != m_vertices.cend() && is_removed(it->first)) {
+        ++it; // shift the pointer to the first valid mesh element
+    }
+    return vertex_iterator_t(it, this);
 }
 
 mesh_t::vertex_iterator_t mesh_t::vertices_end() const
@@ -586,7 +591,11 @@ mesh_t::vertex_iterator_t mesh_t::vertices_end() const
 
 mesh_t::edge_iterator_t mesh_t::edges_begin() const
 {
-    return edge_iterator_t(m_edges.cbegin(), this);
+    edge_map_t::const_iterator it = m_edges.cbegin();
+    while (it != m_edges.cend() && is_removed(it->first)) {
+        ++it; // shift the pointer to the first valid mesh element
+    }
+    return edge_iterator_t(it, this);
 }
 
 mesh_t::edge_iterator_t mesh_t::edges_end() const
@@ -596,7 +605,11 @@ mesh_t::edge_iterator_t mesh_t::edges_end() const
 
 mesh_t::halfedge_iterator_t mesh_t::halfedges_begin() const
 {
-    return halfedge_iterator_t(m_halfedges.cbegin(), this);
+    halfedge_map_t::const_iterator it = m_halfedges.cbegin();
+    while (it != m_halfedges.cend() && is_removed(it->first)) {
+        ++it; // shift the pointer to the first valid mesh element
+    }
+    return halfedge_iterator_t(it, this);
 }
 
 mesh_t::halfedge_iterator_t mesh_t::halfedges_end() const
@@ -606,7 +619,11 @@ mesh_t::halfedge_iterator_t mesh_t::halfedges_end() const
 
 mesh_t::face_iterator_t mesh_t::faces_begin() const
 {
-    return face_iterator_t(m_faces.cbegin(), this);
+    face_map_t::const_iterator it = m_faces.cbegin();
+    while (it != m_faces.cend() && is_removed(it->first)) {
+        ++it; // shift the pointer to the first valid mesh element
+    }
+    return face_iterator_t(it, this);
 }
 
 mesh_t::face_iterator_t mesh_t::faces_end() const

@@ -26,37 +26,44 @@
 #include "mcut/../source/shewchuk_predicates.c"
 #else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
 
-// basically the Shewchuk's orient2dfast()
-mcut::math::real_number_t orient2d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc)
-{
-    const mcut::math::real_number_t acx = pa[0] - pc[0];
-    const mcut::math::real_number_t bcx = pb[0] - pc[0];
-    const mcut::math::real_number_t acy = pa[1] - pc[1];
-    const mcut::math::real_number_t bcy = pb[1] - pc[1];
-
-    return (acx * bcy) - (acy * bcx);
-}
-
-// basically the Shewchuk's orient3dfast()
-mcut::math::real_number_t orient3d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc, const mcut::math::real_number_t* pd)
-{
-    const mcut::math::real_number_t adx = pa[0] - pd[0];
-    const mcut::math::real_number_t bdx = pb[0] - pd[0];
-    const mcut::math::real_number_t cdx = pc[0] - pd[0];
-    const mcut::math::real_number_t ady = pa[1] - pd[1];
-    const mcut::math::real_number_t bdy = pb[1] - pd[1];
-    const mcut::math::real_number_t cdy = pc[1] - pd[1];
-    const mcut::math::real_number_t adz = pa[2] - pd[2];
-    const mcut::math::real_number_t bdz = pb[2] - pd[2];
-    const mcut::math::real_number_t cdz = pc[2] - pd[2];
-
-    return (adx * ((bdy * cdz) - (bdz * cdy))) + (bdx * ((cdy * adz) - (cdz * ady))) + (cdx * ((ady * bdz) - (adz * bdy)));
-}
-
 #endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
 
 namespace mcut {
 namespace geom {
+
+#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
+#else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
+    // basically the Shewchuk's orient2dfast()
+    mcut::math::real_number_t orient2d(const mcut::math::vec2& pa, const mcut::math::vec2& pb, const mcut::math::vec2& pc)
+    {
+        const mcut::math::real_number_t acx = pa[0] - pc[0];
+        const mcut::math::real_number_t bcx = pb[0] - pc[0];
+        const mcut::math::real_number_t acy = pa[1] - pc[1];
+        const mcut::math::real_number_t bcy = pb[1] - pc[1];
+
+        return (acx * bcy) - (acy * bcx);
+    }
+
+    // basically the Shewchuk's orient3dfast()
+    mcut::math::real_number_t orient3d(const mcut::math::vec3& pa, const mcut::math::vec3& pb, const mcut::math::vec3& pc, const mcut::math::vec3& pd)
+    {
+        const mcut::math::real_number_t adx = pa[0] - pd[0];
+        const mcut::math::real_number_t bdx = pb[0] - pd[0];
+        const mcut::math::real_number_t cdx = pc[0] - pd[0];
+        const mcut::math::real_number_t ady = pa[1] - pd[1];
+        const mcut::math::real_number_t bdy = pb[1] - pd[1];
+        const mcut::math::real_number_t cdy = pc[1] - pd[1];
+        const mcut::math::real_number_t adz = pa[2] - pd[2];
+        const mcut::math::real_number_t bdz = pb[2] - pd[2];
+        const mcut::math::real_number_t cdz = pc[2] - pd[2];
+
+        return (adx * ((bdy * cdz) - (bdz * cdy))) + (bdx * ((cdy * adz) - (cdz * ady))) + (cdx * ((ady * bdz) - (adz * bdy)));
+    }
+
+#endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+
 #if 0
     void polygon_normal(math::vec3& normal, const math::vec3* vertices, const int num_vertices)
     {
@@ -292,12 +299,7 @@ namespace geom {
 
     bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c)
     {
-        bool are_collinear = mcut::geom::orient2d(
-                                 reinterpret_cast<const mcut::math::real_number_t*>(&a),
-                                 reinterpret_cast<const mcut::math::real_number_t*>(&b),
-                                 reinterpret_cast<const mcut::math::real_number_t*>(&c))
-            == 0;
-        return are_collinear;
+        return mcut::geom::orient2d(a, b, c) == 0;
     }
 
     char Parallellnt(const math::vec2& a, const math::vec2& b, const math::vec2& c, const math::vec2& d, math::vec2& p)

@@ -62,7 +62,7 @@ std::string ptimeName;
     ptimeName = name;
 
 #define TIME_PROFILE_END() \
-    std::cout << "[MCUT PROFILE]: " << ptimeName << " : " << double(clock() - ptimes[ptimeName]) / (double)CLOCKS_PER_SEC << std::endl;
+    std::cout << "[MCUT PROFILE]: " << ptimeName << " : " << ((double)clock() - (double)ptimes[ptimeName]) / (double)CLOCKS_PER_SEC << std::endl;
 #else
 #define TIME_PROFILE_START(name)
 #define TIME_PROFILE_END()
@@ -308,7 +308,7 @@ int find_connected_components(std::map<face_descriptor_t, int>& fccmap, const me
     std::map<mcut::vertex_descriptor_t, int> vertex_to_set_index;
 
     for (mcut::mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v) {
-        vertex_to_set_index[*v] = (int)std::distance(mesh.vertices_begin(), v);
+        vertex_to_set_index[*v] = (int)mcut::mesh_t::vertex_iterator_t::distance(mesh.vertices_begin(), v); // std::distance(mesh.vertices_begin(), v);
         vertex_sets.push_back({ *v }); // make set of one
     }
 
@@ -2056,7 +2056,7 @@ void dispatch(output_t& output, const input_t& input)
                     const bool pq_is_indicent_on_pqr_and_pqs = (face_pqs != mesh_t::null_face()); // pq is common to faces pqr and pqs
                     std::vector<fd_t> new_vertex_incident_ps_faces; // the list of faces which are incident to our intersection point
                     // NOTE: Two intersection vertices are same if they are incident on the same faces AND their registry halfedges are opposites
-                    bool computed_intersection_point_exists = false;
+                    //bool computed_intersection_point_exists = false;
 
                     if (pq_is_indicent_on_pqr_and_pqs) {
 
@@ -2168,7 +2168,7 @@ void dispatch(output_t& output, const input_t& input)
 
     for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator entry_it = m0_ivtx_to_intersection_registry_entry.cbegin(); entry_it != m0_ivtx_to_intersection_registry_entry.cend(); ++entry_it) {
 
-        const vd_t& ipoint_descr = entry_it->first;
+        //const vd_t& ipoint_descr = entry_it->first;
         const ed_t& ipoint_iedge = entry_it->second.first;
         const vd_t v0 = ps.vertex(ipoint_iedge, 0);
         const bool is_cs_edge = ps_is_cutmesh_vertex(v0, sm_vtx_cnt);
@@ -4919,36 +4919,31 @@ void dispatch(output_t& output, const input_t& input)
                                 }
                             }
                         }
+                    }
 
-                        // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-                        // Here we progressively check if all vertices of the (being built)
-                        // child polygon are all intersection points [from the src- or cut-mesh]
-                        // The point of this is to test for "floating polygons" which are illegal.
+                    // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+                    // Here we progressively check if all vertices of the (being built)
+                    // child polygon are all intersection points [from the src- or cut-mesh]
+                    // The point of this is to test for "floating polygons" which are illegal.
 
-                        bool tgt_is_ivtx = m0_is_intersection_point(current_halfedge_target, ps_vtx_cnt);
+                    bool tgt_is_ivtx = m0_is_intersection_point(current_halfedge_target, ps_vtx_cnt);
 
-                        if (tgt_is_ivtx) {
-                            std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator fiter = m0_ivtx_to_intersection_registry_entry.find(current_halfedge_target);
+                    if (tgt_is_ivtx) {
+                        std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator fiter = m0_ivtx_to_intersection_registry_entry.find(current_halfedge_target);
 
-                            MCUT_ASSERT(fiter != m0_ivtx_to_intersection_registry_entry.cend());
+                        MCUT_ASSERT(fiter != m0_ivtx_to_intersection_registry_entry.cend());
 
-                            const fd_t intersected_face = fiter->second.second;
-                            bool intersected_face_is_from_cut_mesh = ps_is_cutmesh_face(intersected_face, sm_face_count);
-                            bool intersecting_edge_is_from_src_mesh = intersected_face_is_from_cut_mesh;
-                            bool intersecting_edge_is_from_cut_mesh = !intersected_face_is_from_cut_mesh;
+                        const fd_t intersected_face = fiter->second.second;
+                        bool intersected_face_is_from_cut_mesh = ps_is_cutmesh_face(intersected_face, sm_face_count);
+                        bool intersecting_edge_is_from_src_mesh = intersected_face_is_from_cut_mesh;
+                        bool intersecting_edge_is_from_cut_mesh = !intersected_face_is_from_cut_mesh;
 
-                            if (child_poly_has_only_ivtxs_from_srcmesh == true && intersecting_edge_is_from_src_mesh == false) {
-                                child_poly_has_only_ivtxs_from_srcmesh = false;
-                            }
+                        child_poly_has_only_ivtxs_from_srcmesh = child_poly_has_only_ivtxs_from_srcmesh && intersecting_edge_is_from_src_mesh;
+                        child_poly_has_only_ivtxs_from_cutmesh = child_poly_has_only_ivtxs_from_cutmesh && intersecting_edge_is_from_cut_mesh;
 
-                            if (child_poly_has_only_ivtxs_from_cutmesh == true && intersecting_edge_is_from_cut_mesh == false) {
-                                child_poly_has_only_ivtxs_from_cutmesh = false;
-                            }
-
-                        } else {
-                            child_poly_has_only_ivtxs_from_srcmesh = false;
-                            child_poly_has_only_ivtxs_from_cutmesh = false;
-                        }
+                    } else {
+                        child_poly_has_only_ivtxs_from_srcmesh = false;
+                        child_poly_has_only_ivtxs_from_cutmesh = false;
                     }
 
                     // 2. find next halfedge
@@ -5015,20 +5010,20 @@ void dispatch(output_t& output, const input_t& input)
                     // if this is true then we have a floating polygon
                     if (child_poly_has_only_ivtxs_from_srcmesh || child_poly_has_only_ivtxs_from_cutmesh) {
                         output.status = status_t::DETECTED_FLOATING_POLYGON;
-                        floating_polygon_info_t fpi;
+
                         bool ps_face_is_from_cutmesh = ps_is_cutmesh_face(ps_face, sm_face_count);
-                        fpi.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
+                        output.detected_floating_polygon_info.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
                         const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
-                        fpi.origin_face = (ps_face_is_from_cutmesh ? fd_t(ps_face - cm_faces_start_offset) : ps_face);
-                        fpi.floating_polygon_vertex_positions = std::unique_ptr<std::vector<math::vec3>>(new std::vector<math::vec3>);
+                        output.detected_floating_polygon_info.origin_face = (ps_face_is_from_cutmesh ? fd_t(ps_face - cm_faces_start_offset) : ps_face);
+                        output.detected_floating_polygon_info.floating_polygon_vertex_positions = std::unique_ptr<std::vector<math::vec3>>(new std::vector<math::vec3>);
 
                         for (std::vector<hd_t>::const_iterator child_poly_he_iter = child_polygon.cbegin(); child_poly_he_iter != child_polygon.cend(); child_poly_he_iter++) {
                             vd_t tgt_descr = m0.target(*child_poly_he_iter);
-                            fpi.floating_polygon_vertex_positions->emplace_back(m0.vertex(tgt_descr));
+                            output.detected_floating_polygon_info.floating_polygon_vertex_positions->emplace_back(m0.vertex(tgt_descr));
                         }
 
                         MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(ps_face) != ps_tested_face_to_plane_normal_max_comp.end());
-                        fpi.origin_face_normal_largest_comp = ps_tested_face_to_plane_normal_max_comp.at(ps_face); // used for 2d project
+                        output.detected_floating_polygon_info.origin_face_normal_largest_comp = ps_tested_face_to_plane_normal_max_comp.at(ps_face); // used for 2d project
 
                         return; // abort, so that the front-end can partition ps_face to prevent use from getting a floating polygon on ps_face with the current child polygon
                     }
@@ -8378,7 +8373,7 @@ void dispatch(output_t& output, const input_t& input)
             lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;
 
             // get patch polygons
-            const std::vector<int>& cw_patch = patches.at(cw_patch_idx);
+            //const std::vector<int>& cw_patch = patches.at(cw_patch_idx);
             // get the opposite patch
             const int ccw_patch_idx = patch_to_opposite.at(cw_patch_idx); //opposite patch
 
@@ -8426,7 +8421,7 @@ void dispatch(output_t& output, const input_t& input)
             lg << "seed polygon = " << cw_patch_seed_poly_idx << std::endl;
 
             // the patch must contain the polygon
-            MCUT_ASSERT(std::find(cw_patch.cbegin(), cw_patch.cend(), cw_patch_seed_poly_idx) != cw_patch.cend());
+            MCUT_ASSERT(std::find(patches.at(cw_patch_idx).cbegin(), patches.at(cw_patch_idx).cend(), cw_patch_seed_poly_idx) != patches.at(cw_patch_idx).cend());
 
             const traced_polygon_t& cw_patch_seed_poly = m0_polygons.at(cw_patch_seed_poly_idx);
             traced_polygon_t::const_iterator he_find_iter = std::find(cw_patch_seed_poly.cbegin(), cw_patch_seed_poly.cend(), ccw_patch_seed_interior_ihalfedge_opp);
@@ -8646,7 +8641,7 @@ void dispatch(output_t& output, const input_t& input)
             MCUT_ASSERT(patches.find(cur_patch_idx) != patches.cend());
 
             // get list of patch polygons
-            const std::vector<int>& patch = patches.at(cur_patch_idx);
+            //const std::vector<int>& patch = patches.at(cur_patch_idx);
 
             ///////////////////////////////////////////////////////////////////////////
             // stitch patch into a connected component stored in "m1_colored"
@@ -8672,7 +8667,7 @@ void dispatch(output_t& output, const input_t& input)
             const int m0_patch_seed_poly_idx = patch_to_seed_poly_idx.at(cur_patch_idx);
 
             // patch must contain the polygon
-            MCUT_ASSERT(std::find(patch.cbegin(), patch.cend(), m0_patch_seed_poly_idx) != patch.cend());
+            MCUT_ASSERT(std::find(patches.at(cur_patch_idx).cbegin(), patches.at(cur_patch_idx).cend(), m0_patch_seed_poly_idx) != patches.at(cur_patch_idx).cend());
             // the seed polygon must be from the ones that were traced in "m0" (see graph discovery stage above)
             MCUT_ASSERT(m0_patch_seed_poly_idx < (int)m0_polygons.size());
 
@@ -8961,7 +8956,7 @@ void dispatch(output_t& output, const input_t& input)
                             MCUT_ASSERT(m0_is_intersection_point(m0_cs_next_patch_polygon_he_src, ps_vtx_cnt) && m0_is_intersection_point(m0_cs_next_patch_polygon_he_tgt, ps_vtx_cnt)); // .. because the current halfedge is "incoming"
 
                             // get the "m0" polygons which are traced with the "next" halfedge
-                            const std::vector<int>& m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
+                            //const std::vector<int>& m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
                             // get reference to src-mesn polygon which is traced with "next" halfedge
                             //const std::vector<int>::const_iterator find_iter = std::find_if(
                             //    m0_poly_he_coincident_polys.cbegin(),
@@ -8972,12 +8967,12 @@ void dispatch(output_t& output, const input_t& input)
 
                             // "next" is always incident to a source-mesh polygon
                             MCUT_ASSERT(std::find_if(
-                                            m0_poly_he_coincident_polys.cbegin(),
-                                            m0_poly_he_coincident_polys.cend(),
+                                            m0_h_to_ply.at(m0_cs_next_patch_polygon_he).cbegin(),
+                                            m0_h_to_ply.at(m0_cs_next_patch_polygon_he).cend(),
                                             [&](const int& e) {
                                                 return (e < traced_sm_polygon_count); // match with src-mesn polygon
                                             })
-                                != m0_poly_he_coincident_polys.cend());
+                                != m0_h_to_ply.at(m0_cs_next_patch_polygon_he).cend());
 
                             //
                             // At this point, we have found the adjacent connected component which is
@@ -9406,7 +9401,7 @@ void dispatch(output_t& output, const input_t& input)
                 MCUT_ASSERT(patches.find(cur_patch_idx) != patches.cend());
 
                 // polygons of current patch
-                const std::vector<int>& patch_polys = patches.at(cur_patch_idx);
+                //const std::vector<int>& patch_polys = patches.at(cur_patch_idx);
 
                 // stores the queued adjacent polygon to be stitched that have just been discovered
                 // i.e. discovered while finding the next untransformed adjacent polygons of the

@@ -28,18 +28,18 @@
 namespace mcut {
 namespace geom {
 
-#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES) // TODO: implement this probably (placement of code)
     // NOTE: if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS is defined, then mcut::math::real_number_t will implicitely be cast to double here
     // which is a faster alternative to using full exact arithmetic here
-    double orient2d(const double* pa, const double* pb, const double* pc);
-    double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
+    //double orient2d(const double* pa, const double* pb, const double* pc);
+    //double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
 #else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
 
     // basically the Shewchuk's orient2dfast()
-    mcut::math::real_number_t orient2d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc);
+    extern mcut::math::real_number_t orient2d(const mcut::math::vec2& pa, const mcut::math::vec2& pb, const mcut::math::vec2& pc);
 
     // basically the Shewchuk's orient3dfast()
-    mcut::math::real_number_t orient3d(const mcut::math::real_number_t* pa, const mcut::math::real_number_t* pb, const mcut::math::real_number_t* pc, const mcut::math::real_number_t* pd);
+    extern mcut::math::real_number_t orient3d(const mcut::math::vec3& pa, const mcut::math::vec3& pb, const mcut::math::vec3& pc, const mcut::math::vec3& pd);
 
 #endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
 

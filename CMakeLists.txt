@@ -109,7 +109,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" ST
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	list(APPEND compilation_flags w3 -diag-disable:remark)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	list(APPEND compilation_flags /W4)
+	list(APPEND compilation_flags /W4 /wd26812)
 	list(APPEND preprocessor_defs -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
@@ -122,7 +122,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" ST
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	# pass
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	set(kernel_source_file_flags "/wd4100 /wd4189")
+	set(kernel_source_file_flags "/wd4100 /wd26812")
 endif()
 
 set_source_files_properties(
