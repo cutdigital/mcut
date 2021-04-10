@@ -1654,7 +1654,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
     mcut::output_t backendOutput;
+
     mcut::mesh_t cutMeshInternal;
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
+    std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
+
     int perturbationIters = -1;
     int kernelDispatchCallCounter = -1;
     do {
@@ -1665,8 +1669,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::
         backendOutput.status = mcut::status_t::SUCCESS;
 
-        std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
-        std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
         mcut::math::vec3 perturbation;
 
         if (general_position_assumption_was_violated) {
@@ -1789,12 +1791,66 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             // ... store a mapping from newly traced polygons to the original (user provided) input mesh elements
             // --> This will be used to ensure that our mapping refers to correct data elements in the input mesh for the user
 
-            std::queue<std::pair<int, int>> floatingPolyEdgePairQueue;
+            auto getFloatingPolyEdgeVertices = [&](const int fpEdgeIdx, mcut::math::vec2& fpEdgeV0, mcut::math::vec2& fpEdgeV1) {
+                const int fpFirstEdgeV0Idx = (((size_t)fpEdgeIdx) + 0);
+                fpEdgeV0 = floatingPolyVerts2d.at(fpFirstEdgeV0Idx);
+                const int fpFirstEdgeV1Idx = (((size_t)fpEdgeIdx) + 1) % floatingPolyNumEdges;
+                fpEdgeV1 = floatingPolyVerts2d.at(fpFirstEdgeV1Idx);
+            };
+
+            auto maxDistCmp = [&](std::pair<int, int> left, std::pair<int, int> right) {
+                // left
+
+                mcut::math::vec2 leftEdge0V0;
+                mcut::math::vec2 leftEdge0V1;
+
+                getFloatingPolyEdgeVertices(left.first, leftEdge0V0, leftEdge0V1);
+
+                const mcut::math::vec2 leftEdge0MidPoint(
+                    (leftEdge0V0.x() + leftEdge0V0.x()) * .5, //
+                    (leftEdge0V1.y() + leftEdge0V1.y()) * .5);
+
+                mcut::math::vec2 leftEdge1V0;
+                mcut::math::vec2 leftEdge1V1;
+
+                getFloatingPolyEdgeVertices(left.second, leftEdge1V0, leftEdge1V1);
+
+                const mcut::math::vec2 leftEdge1MidPoint(
+                    (leftEdge1V0.x() + leftEdge1V0.x()) * .5, //
+                    (leftEdge1V1.y() + leftEdge1V1.y()) * .5);
+
+                mcut::math::real_number_t leftDist = mcut::math::squared_length(leftEdge1MidPoint - leftEdge0MidPoint);
+
+                // right
+
+                mcut::math::vec2 rightEdge0V0;
+                mcut::math::vec2 rightEdge0V1;
+
+                getFloatingPolyEdgeVertices(right.first, rightEdge0V0, rightEdge0V1);
+
+                const mcut::math::vec2 rightEdge0MidPoint(
+                    (rightEdge0V0.x() + rightEdge0V0.x()) * .5, //
+                    (rightEdge0V1.y() + rightEdge0V1.y()) * .5);
+
+                mcut::math::vec2 rightEdge1V0;
+                mcut::math::vec2 rightEdge1V1;
+
+                getFloatingPolyEdgeVertices(right.second, rightEdge1V0, rightEdge1V1);
+
+                const mcut::math::vec2 rightEdge1MidPoint(
+                    (rightEdge1V0.x() + rightEdge1V0.x()) * .5, //
+                    (rightEdge1V1.y() + rightEdge1V1.y()) * .5);
+
+                mcut::math::real_number_t rightDist = mcut::math::squared_length(rightEdge1MidPoint - rightEdge0MidPoint);
+
+                return leftDist < rightDist;
+            };
+
+            std::priority_queue<std::pair<int, int>, std::vector<std::pair<int, int>>, decltype(maxDistCmp)> floatingPolyEdgePairQueue(maxDistCmp);
 
             // populate queue with [unique] pairs of edges from the floating poly
             for (int i = 0; i < floatingPolyNumEdges; ++i) {
                 for (int j = i + 1; j < floatingPolyNumEdges; ++j) {
-                    // TODO: pick only the pair of edges that are not collinear
                     floatingPolyEdgePairQueue.push(std::make_pair(i, j));
                 }
             }
@@ -1813,18 +1869,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
             while (floatingPolyEdgePairQueue.size() > 0 && successivelyPartitionedOriginFaceWithCurrentEdgePair == false) {
 
-                const std::pair<int, int> floatingPolyCurEdgeIdxPair = floatingPolyEdgePairQueue.front();
+                const std::pair<int, int> floatingPolyCurEdgeIdxPair = floatingPolyEdgePairQueue.top();
                 floatingPolyEdgePairQueue.pop();
 
                 // get vertices of edges
 
                 // e0
-                auto getFloatingPolyEdgeVertices = [&](const int fpEdgeIdx, mcut::math::vec2& fpEdgeV0, mcut::math::vec2& fpEdgeV1) {
-                    const int fpFirstEdgeV0Idx = (((size_t)fpEdgeIdx * 2) + 0);
-                    fpEdgeV0 = floatingPolyVerts2d.at(fpFirstEdgeV0Idx);
-                    const int fpFirstEdgeV1Idx = (((size_t)fpEdgeIdx * 2) + 1) % floatingPolyNumEdges;
-                    fpEdgeV1 = floatingPolyVerts2d.at(fpFirstEdgeV1Idx);
-                };
 
                 const int fpFirstEdgeIdx = floatingPolyCurEdgeIdxPair.first;
                 mcut::math::vec2 fpFirstEdgeV0;
@@ -1910,7 +1960,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 // Now we compute intersection points between every edge in "origin_face" and
                 // our segment (treating "fpSegment" as an infinitely-long line)
 
-                const size_t originFaceNumVerts = fpi.floating_polygon_vertex_positions->size();
+                const size_t originFaceNumVerts = originFaceVertices3d.size();
                 MCUT_ASSERT(originFaceNumVerts >= 3);
                 const size_t originFaceNumEdges = originFaceNumVerts;
 
@@ -2107,30 +2157,17 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 auto replaceOldHalfdgeWithNew2Edges = [](
                                                           const mcut::hd_t oldHalfedge,
                                                           const mcut::mesh_t& origin_input_mesh,
-                                                          const mcut::ed_t origFaceEdgeX, // NOTE: "X" stands for "0" or "1" following the naimng convention I have used
-                                                          const mcut::vd_t origFaceEdgeXHalfedgeSrcDescr,
+                                                          // NOTE: "X" stands for "0" or "1" following the naimng convention I have used
+
                                                           const mcut::hd_t origFaceEdgeXFirstNewHalfedgeDescr,
                                                           const mcut::hd_t origFaceEdgeXSecondNewHalfedgeDescr,
-                                                          const mcut::vd_t origFaceEdgeXIntPoint3dDescr,
                                                           std::vector<mcut::hd_t>& newFaceHalfedges) {
-                    const mcut::vd_t oldHalfedgeSrc = origin_input_mesh.source(oldHalfedge);
-                    mcut::hd_t newHalfedge = mcut::mesh_t::null_halfedge();
-
-                    if (oldHalfedgeSrc == origFaceEdgeXHalfedgeSrcDescr) { // comparing original vertex not an intersection point
-                        newHalfedge = origFaceEdgeXFirstNewHalfedgeDescr;
-                    } else {
-                        //MCUT_ASSERT(oldHalfedgeSrc == origFaceEdgeXHalfedgeTgtDescr);
-                        newHalfedge = origin_input_mesh.opposite(origFaceEdgeXSecondNewHalfedgeDescr);
-                    }
-
-                    // need to add a halfedge from one of the new edges
-                    newFaceHalfedges.push_back(newHalfedge);
-                    // now also need to add the halfedge connecting intersection points
-                    const mcut::vd_t newHalfedgeTgt = origin_input_mesh.target(newHalfedge);
+                    mcut::hd_t newFirstNewHalfedge = origin_input_mesh.opposite(origFaceEdgeXSecondNewHalfedgeDescr);
+                    newFaceHalfedges.push_back(newFirstNewHalfedge);
 
                     // add the other halfedge on the partitioned edge
-                    mcut::hd_t nextNewHalfedge = newHalfedgeTgt == origFaceEdgeXIntPoint3dDescr ? origFaceEdgeXSecondNewHalfedgeDescr : origin_input_mesh.opposite(origFaceEdgeXSecondNewHalfedgeDescr);
-                    newFaceHalfedges.push_back(nextNewHalfedge);
+                    mcut::hd_t secondNewHalfedge = origin_input_mesh.opposite(origFaceEdgeXFirstNewHalfedgeDescr);
+                    newFaceHalfedges.push_back(secondNewHalfedge);
                 };
 
                 // for each neighbouring face (w.r.t. "origin_face") to be replaced
@@ -2156,22 +2193,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             replaceOldHalfdgeWithNew2Edges(
                                 oldHalfedge,
                                 *origin_input_mesh,
-                                origFaceEdge0Descr,
-                                origFaceEdge0HalfedgeSrcDescr,
                                 origFaceEdge0FirstNewHalfedgeDescr,
                                 origFaceEdge0SecondNewHalfedgeDescr,
-                                origFaceEdge0IntPoint3dDescr,
                                 replacedOrigFaceNeighbourToNewHalfedges[face]);
 
                         } else if (oldHalfedgeEdge == origFaceEdge1Descr) {
                             replaceOldHalfdgeWithNew2Edges(
                                 oldHalfedge,
                                 *origin_input_mesh,
-                                origFaceEdge1Descr,
-                                origFaceEdge1HalfedgeSrcDescr,
                                 origFaceEdge1FirstNewHalfedgeDescr,
                                 origFaceEdge1SecondNewHalfedgeDescr,
-                                origFaceEdge1IntPoint3dDescr,
                                 replacedOrigFaceNeighbourToNewHalfedges[face]);
                         } else {
                             replacedOrigFaceNeighbourToNewHalfedges[face].push_back(oldHalfedge); // maintain unpartitioned halfedge

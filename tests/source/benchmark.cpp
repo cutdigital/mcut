@@ -12,7 +12,7 @@
 
 #include "off.h"
 
-#define NUMBER_OF_BENCHMARKS 25 //
+#define NUMBER_OF_BENCHMARKS 30 //
 
 struct Benchmark {
     McContext myContext = MC_NULL_HANDLE;
