@@ -649,7 +649,7 @@ void write_off(const char* fpath, const mcut::mesh_t& mesh)
     //
     // #vertices, #faces, #edges
     //
-    outfile << mesh.number_of_vertices() << " " << mesh.number_of_faces() << " " << mesh.number_of_edges() << "\n";
+    outfile << mesh.number_of_vertices() << " " << mesh.number_of_faces() << " " << 0 /*mesh.number_of_edges()*/ << "\n";
 
     //
     // vertices

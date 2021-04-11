@@ -4822,6 +4822,15 @@ void dispatch(output_t& output, const input_t& input)
 
             std::vector<hd_t> incident_halfedges_to_be_walked(incident_halfedges.cbegin(), incident_halfedges.cend()); // copy
 
+            // input mesh face-partitioning (due to floating polygons) is limited to one floating polygon per ps-face in
+            // a given mcut::dispatch call.
+            // (the difficult of producing a partition that fixes the offending polygons to too much).
+            // Thus, if a given mcut::dispatch call detects a ps-face with more than one floating polygon, only one
+            // (the 1st encountered) floating polygon will be registered and returned to the front-end. The remaining
+            // floating polygon(s) in that ps-face will be handled in the next dispatch call (should they still
+            // arrise after partitioning). This approach is regretably slower than handling everything but it is
+            // practical due to the difficulty of the problem and the rarity of its occurance.
+            int detected_floating_polygons_on_ps_face = 0;
             do { // each iteration traces a child polygon
 
                 traced_polygon_t child_polygon;
@@ -5031,35 +5040,59 @@ void dispatch(output_t& output, const input_t& input)
                     }
 
                     if (is_floating_polygon) {
-                        output.status = status_t::DETECTED_FLOATING_POLYGON;
 
-                        bool ps_face_is_from_cutmesh = ps_is_cutmesh_face(ps_face, sm_face_count);
-                        output.detected_floating_polygon_info.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
-                        const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
-                        output.detected_floating_polygon_info.origin_face = (ps_face_is_from_cutmesh ? fd_t(ps_face - cm_faces_start_offset) : ps_face);
-                        output.detected_floating_polygon_info.floating_polygon_vertex_positions = std::unique_ptr<std::vector<math::vec3>>(new std::vector<math::vec3>);
+                        if (detected_floating_polygons_on_ps_face == 0) {
+                            bool ps_face_is_from_cutmesh = ps_is_cutmesh_face(ps_face, sm_face_count);
 
-                        for (std::vector<hd_t>::const_iterator child_poly_he_iter = child_polygon.cbegin(); child_poly_he_iter != child_polygon.cend(); child_poly_he_iter++) {
-                            vd_t tgt_descr = m0.target(*child_poly_he_iter);
-                            output.detected_floating_polygon_info.floating_polygon_vertex_positions->emplace_back(m0.vertex(tgt_descr));
+                            output.detected_floating_polygons.push_back(floating_polygon_info_t());
+                            floating_polygon_info_t& fpi = output.detected_floating_polygons.back();
+
+                            fpi.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
+                            const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
+                            fpi.origin_face = (ps_face_is_from_cutmesh ? fd_t(ps_face - cm_faces_start_offset) : ps_face);
+                            fpi.floating_polygon_vertex_positions.clear();
+
+                            for (std::vector<hd_t>::const_iterator child_poly_he_iter = child_polygon.cbegin(); child_poly_he_iter != child_polygon.cend(); child_poly_he_iter++) {
+                                vd_t tgt_descr = m0.target(*child_poly_he_iter);
+                                fpi.floating_polygon_vertex_positions.emplace_back(m0.vertex(tgt_descr));
+                            }
+
+                            MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(ps_face) != ps_tested_face_to_plane_normal_max_comp.end());
+                            fpi.origin_face_normal_largest_comp = ps_tested_face_to_plane_normal_max_comp.at(ps_face); // used for 2d project
                         }
 
-                        MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(ps_face) != ps_tested_face_to_plane_normal_max_comp.end());
-                        output.detected_floating_polygon_info.origin_face_normal_largest_comp = ps_tested_face_to_plane_normal_max_comp.at(ps_face); // used for 2d project
+                        detected_floating_polygons_on_ps_face++;
 
-                        return; // abort, so that the front-end can partition ps_face to prevent use from getting a floating polygon on ps_face with the current child polygon
+                        for (std::vector<hd_t>::const_iterator child_poly_he_iter = child_polygon.cbegin(); child_poly_he_iter != child_polygon.cend(); child_poly_he_iter++) {
+
+                            // the polygon-tracing do-while loop above traces floating polygons twice since halfedge
+                            // filtering cannot consistently filter ihalfedges (x-->x). Thus, the moment we detect a
+                            // floating polygon on a ps-face, we remove the opposites of its halfedges to prevent us
+                            // from tracing the opposite (winding) floating polygon. This also helps us avoid effectively
+                            // having duplicate entries in "output.detected_floating_polygons"
+                            const hd_t opp = m0.opposite(*child_poly_he_iter);
+                            std::vector<hd_t>::const_iterator hFiter = std::find(incident_halfedges_to_be_walked.cbegin(), incident_halfedges_to_be_walked.cend(), opp);
+                            MCUT_ASSERT(hFiter != incident_halfedges_to_be_walked.cend());
+                            incident_halfedges_to_be_walked.erase(hFiter);
+                        }
                     }
 
-                    const int poly_idx = (int)(m0_polygons.size() + child_polygons.size());
-                    if (ps_is_cutmesh_face(ps_face, sm_face_count)) {
-                        m0_cm_cutpath_adjacent_polygons.push_back(poly_idx);
-                    } else {
-                        m0_sm_cutpath_adjacent_polygons.push_back(poly_idx);
+                    // NOTE: the moment we find at least one floating polygon, there no further point in
+                    // computing state that will not be used in the current dispatch call. That is,
+                    // we will need to partition offending ps-polygons and restart anyway. Hence, the
+                    // if check.
+                    if (output.detected_floating_polygons.empty()) {
+                        const int poly_idx = (int)(m0_polygons.size() + child_polygons.size());
+                        if (ps_is_cutmesh_face(ps_face, sm_face_count)) {
+                            m0_cm_cutpath_adjacent_polygons.push_back(poly_idx);
+                        } else {
+                            m0_sm_cutpath_adjacent_polygons.push_back(poly_idx);
+                        }
+
+                        m0_to_ps_face[poly_idx] = ps_face;
+
+                        child_polygons.emplace_back(child_polygon);
                     }
-
-                    m0_to_ps_face[poly_idx] = ps_face;
-
-                    child_polygons.emplace_back(child_polygon);
                 }
 
             } while (!incident_halfedges_to_be_walked.empty());
@@ -5067,10 +5100,13 @@ void dispatch(output_t& output, const input_t& input)
 
         lg << "traced polygons on face = " << child_polygons.size() << std::endl;
 
-        m0_polygons.insert(m0_polygons.end(), child_polygons.cbegin(), child_polygons.cend());
+        // See note above
+        if (output.detected_floating_polygons.empty()) {
+            m0_polygons.insert(m0_polygons.end(), child_polygons.cbegin(), child_polygons.cend());
 
-        if (!is_from_cut_mesh /*!ps_is_cutmesh_face(ps_face, sm_face_count)*/) {
-            traced_sm_polygon_count += (int)child_polygons.size();
+            if (!is_from_cut_mesh /*!ps_is_cutmesh_face(ps_face, sm_face_count)*/) {
+                traced_sm_polygon_count += (int)child_polygons.size();
+            }
         }
 
         lg.unindent();
@@ -5078,6 +5114,11 @@ void dispatch(output_t& output, const input_t& input)
     } // for each ps-face to trace
 
     TIME_PROFILE_END(); // &&&&&
+
+    if (!output.detected_floating_polygons.empty()) {
+        output.status = status_t::DETECTED_FLOATING_POLYGON;
+        return; // abort, so that the front-end can partition ps-faces containing floating polygon
+    }
 
     // m0_ivtx_to_ps_faces.clear(); // free
     ps_iface_to_m0_edge_list.clear(); // free

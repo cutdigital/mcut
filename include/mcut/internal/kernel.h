@@ -104,7 +104,7 @@ struct floating_polygon_info_t {
     // largest component of the normal of the origin_face
     int origin_face_normal_largest_comp = -1;
     // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
-    std::unique_ptr<std::vector<math::vec3>> floating_polygon_vertex_positions;
+    std::vector<math::vec3> floating_polygon_vertex_positions;
 };
 
 //
@@ -179,7 +179,7 @@ struct output_t {
     output_mesh_info_t seamed_cut_mesh;
 
     // floating polygon handling
-    floating_polygon_info_t detected_floating_polygon_info;
+    std::vector<floating_polygon_info_t> detected_floating_polygons;
 };
 
 //
