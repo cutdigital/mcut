@@ -98,9 +98,7 @@ enum class cut_surface_patch_winding_order_t : unsigned char {
 struct floating_polygon_info_t {
     // the input mesh (source-mesh or cut-mesh) containing the face on which the floating polygon was discovered.
     // This is a pointer to input_t::src_mesh or input_t::cut_mesh
-    const mesh_t* origin_mesh = nullptr;
-    // the face of the origin-mesh on which the floating polygon was discovered
-    fd_t origin_face = mesh_t::null_face();
+    // const mesh_t* origin_mesh = nullptr;
     // largest component of the normal of the origin_face
     int origin_face_normal_largest_comp = -1;
     // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
@@ -179,7 +177,15 @@ struct output_t {
     output_mesh_info_t seamed_cut_mesh;
 
     // floating polygon handling
-    std::vector<floating_polygon_info_t> detected_floating_polygons;
+    std::map<
+        // the face of the origin-mesh on which the floating polygon was discovered
+        // NOTE: this is a descriptor into the polygon soup. Thus, we'll need to
+        // subtract the number of source-mesh faces if this face belongs to the cut
+        // mesh.
+        fd_t,
+        // info about floating polygon
+        floating_polygon_info_t>
+        detected_floating_polygons;
 };
 
 //

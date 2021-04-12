@@ -1713,17 +1713,21 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             bool floating_polygon_was_on_srcmesh = false;
             bool floating_polygon_was_on_cutmesh = false;
 
-            for (std::vector<mcut::floating_polygon_info_t>::const_iterator detected_floating_polygons_iter = backendOutput.detected_floating_polygons.cbegin();
+            for (std::map<mcut::fd_t, mcut::floating_polygon_info_t>::const_iterator detected_floating_polygons_iter = backendOutput.detected_floating_polygons.cbegin();
                  detected_floating_polygons_iter != backendOutput.detected_floating_polygons.cend(); ++detected_floating_polygons_iter) {
                 MCUT_ASSERT(general_position_assumption_was_violated == false); // cannot occur at same time!
 
-                const mcut::floating_polygon_info_t& fpi = *detected_floating_polygons_iter;
+                // get the [origin] input-mesh face index (Note: this index may be offsetted
+                // to distinguish between source-mesh and cut-mesh faces).
+                const mcut::fd_t ps_face = detected_floating_polygons_iter->first;
+                const mcut::floating_polygon_info_t& fpi = detected_floating_polygons_iter->second;
 
-                bool on_srcmesh = fpi.origin_mesh == backendInput.src_mesh;
+                bool on_srcmesh = (ps_face < numSrcMeshFaces); //fpi.origin_mesh == backendInput.src_mesh;
                 floating_polygon_was_on_srcmesh = floating_polygon_was_on_srcmesh || on_srcmesh;
                 floating_polygon_was_on_cutmesh = floating_polygon_was_on_cutmesh || !on_srcmesh;
 
-                mcut::fd_t origin_face = fpi.origin_face;
+                // Now compute the actual input mesh face index (accounting for offset)
+                mcut::fd_t origin_face = on_srcmesh ? ps_face : mcut::fd_t(ps_face - numSrcMeshFaces); // accounting for offset
                 // pointer to input mesh with face containing floating polygon
                 // Note: this mesh will be modified.
                 mcut::mesh_t* origin_input_mesh = &srcMeshInternal;
