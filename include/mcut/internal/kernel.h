@@ -118,6 +118,8 @@ struct input_t {
     bool populate_vertex_maps = false; // compute data relating vertices in cc to original input mesh
     bool populate_face_maps = false; // compute data relating face in cc to original input mesh
     bool enforce_general_position = false;
+    // counts how many times we have perturbed the cut-mesh to enforce general-position
+    int general_position_enforcement_count = 0;
 
     // NOTE TO SELF: if the user simply wants seams, then kernel should not have to proceed to stitching!!!
     bool keep_srcmesh_seam = false;
@@ -178,13 +180,13 @@ struct output_t {
 
     // floating polygon handling
     std::map<
-        // the face of the origin-mesh on which the floating polygon was discovered
+        // the face of the origin-mesh on which floating polygon(s) are discovered
         // NOTE: this is a descriptor into the polygon soup. Thus, we'll need to
         // subtract the number of source-mesh faces if this face belongs to the cut
         // mesh.
         fd_t,
-        // info about floating polygon
-        floating_polygon_info_t>
+        // info about floating polygons contained on ps-face
+        std::vector<floating_polygon_info_t>>
         detected_floating_polygons;
 };
 

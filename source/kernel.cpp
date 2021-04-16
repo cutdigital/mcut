@@ -2154,7 +2154,21 @@ void dispatch(output_t& output, const input_t& input)
 
     if (m0_ivtx_to_intersection_registry_entry.empty()) {
         lg.set_reason_for_failure("no face intersection found");
-        output.status = status_t::SUCCESS;
+        if (input.enforce_general_position && input.general_position_enforcement_count > 0) {
+            // This is not the first time we have invoked the kernel, which means that
+            // perturbation pushed the cut-mesh into a state/position/configuration that
+            // that does not actually intersect with the src-mesh. Thus, we will need to
+            // perturb again!
+            // By contruction, general position can only have been violated on inputs that
+            // where intersecting (in some way) to begin with i.e. with the input meshes
+            // as provided by the user. Thus, it would be incorrect to perturb the cut-mesh
+            // into an intersection-free configuration and then claim that we have
+            // successfully enforced general position. We want to make sure that after we
+            // perturb we can at least produce *some* cut.
+            output.status = status_t::GENERAL_POSITION_VIOLATION;
+        } else {
+            output.status = status_t::SUCCESS;
+        }
         return;
     }
 
@@ -2400,400 +2414,90 @@ void dispatch(output_t& output, const input_t& input)
 
                 bool cutpath_edge_exists = m0.halfedge(src_vertex, tgt_vertex, true) != mesh_t::null_halfedge();
 
-                if (
-                    cutpath_edge_exists == false
-                    // !interior_edge_exists(m0, src_vertex, tgt_vertex /*, m0_cutpath_edges*/)
-                ) {
+                if (cutpath_edge_exists == false) {
 
-                    lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;
+                    bool edge_lies_on_intersecting_polygons = true;
+                    // Here we also check whether the edge actually lies on the area of the [shared polygons]
+                    // in the registry entries of its vertices. This operation is fundamentally geometric
+                    // and cannot be resolved using topology (we have insufficient information to identify
+                    // intersection edges). See benchmark test 34
+                    // Thus, we will not add the edge if its mid-point does not lie in the area of [any]
+                    // of the shared faces in the resgistry entries of its vertices (intersection points)..
+                    std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator find_iter = m0_ivtx_to_intersection_registry_entry.cend();
 
-                    const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
+                    // get intersection-registry faces of src vertex
+                    find_iter = m0_ivtx_to_intersection_registry_entry.find(src_vertex);
+                    MCUT_ASSERT(find_iter != m0_ivtx_to_intersection_registry_entry.cend());
+                    const std::vector<fd_t> src_vertex_faces = ps_get_ivtx_registry_entry_faces(ps, find_iter->second);
 
-                    MCUT_ASSERT(h != mesh_t::null_halfedge());
-                    m0_cutpath_edges.emplace_back(m0.edge(h));
+                    // get intersection-registry faces of tgt vertex
+                    find_iter = m0_ivtx_to_intersection_registry_entry.find(tgt_vertex);
+                    MCUT_ASSERT(find_iter != m0_ivtx_to_intersection_registry_entry.cend());
+                    const std::vector<fd_t> tgt_vertex_faces = ps_get_ivtx_registry_entry_faces(ps, find_iter->second);
 
-                    // NOTE: here we add all edge without assuming anything about which of the will be used to clip either polygon
-                    ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
-                    ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
+                    std::vector<fd_t> shared_faces;
+                    std::copy_if(src_vertex_faces.begin(), src_vertex_faces.end(), std::back_inserter(shared_faces),
+                        [&](fd_t f) {
+                            return !is_virtual_face(f) && std::find(tgt_vertex_faces.cbegin(), tgt_vertex_faces.cend(), f) != tgt_vertex_faces.cend();
+                        });
 
-                    update_neighouring_ps_iface_m0_edge_list(src_vertex, tgt_vertex, ps,
-                        sm_face,
-                        cm_face,
-                        m0_ivtx_to_intersection_registry_entry,
-                        ps_iface_to_m0_edge_list,
-                        m0_cutpath_edges);
+                    MCUT_ASSERT(shared_faces.size() >= 2); // connectable intersection points must match by 2 or more faces
 
-                    MCUT_ASSERT(m0.target(h) == tgt_vertex);
-                    ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
+                    // compute edge mid-point (could be any point along the edge that is not one of the vertices)
+                    const math::vec3& src_vertex_coords = m0.vertex(src_vertex);
+                    const math::vec3& tgt_vertex_coords = m0.vertex(tgt_vertex);
+                    const math::vec3 midpoint = (tgt_vertex_coords + src_vertex_coords) * math::real_number_t(0.5);
 
-                    MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
-                    ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
+                    // for each shared
+                    for (std::vector<fd_t>::const_iterator sf_iter = shared_faces.cbegin(); sf_iter != shared_faces.cend(); ++sf_iter) {
+
+                        fd_t shared_face = *sf_iter;
+                        MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(shared_face) != ps_tested_face_to_plane_normal_max_comp.cend());
+                        int shared_face_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(shared_face);
+                        MCUT_ASSERT(ps_tested_face_to_vertices.find(shared_face) != ps_tested_face_to_vertices.cend());
+                        const std::vector<math::vec3>& shared_face_vertices = ps_tested_face_to_vertices.at(shared_face);
+
+                        char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
+                            midpoint,
+                            shared_face_vertices.data(),
+                            (int)shared_face_vertices.size(),
+                            shared_face_normal_max_comp);
+
+                        if (in_poly_test_intersection_type != 'i') {
+                            edge_lies_on_intersecting_polygons = false;
+                            break;
+                        }
+                    }
+
+                    if (edge_lies_on_intersecting_polygons) {
+                        lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;
+
+                        const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
+
+                        MCUT_ASSERT(h != mesh_t::null_halfedge());
+                        m0_cutpath_edges.emplace_back(m0.edge(h));
+
+                        // NOTE: here we add all edge without assuming anything about which of the will be used to clip either polygon
+                        ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
+                        ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
+
+                        update_neighouring_ps_iface_m0_edge_list(src_vertex, tgt_vertex, ps,
+                            sm_face,
+                            cm_face,
+                            m0_ivtx_to_intersection_registry_entry,
+                            ps_iface_to_m0_edge_list,
+                            m0_cutpath_edges);
+
+                        MCUT_ASSERT(m0.target(h) == tgt_vertex);
+                        ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
+
+                        MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
+                        ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
+                    }
                 }
             }
         } // else if (new_ivertices_count > 2) {
     }
-    ///////////////////////////////////////////////////////////////////////////
-    // Create new edges partitioning the intersecting ps edges (2-part process)
-    ///////////////////////////////////////////////////////////////////////////
-
-    lg << "create polygon-exterior edges" << std::endl;
-    lg.indent();
-    // Part 1
-    //
-    // Here, we identify ps-edges with more than 3 coincident m0-vertices (ps-
-    // and intersection points)
-    //
-    // Task: 1) find ps-edges with more than 3 coincident m0-vertices, 2)
-    // sort these vertices along the ps-edge 3) connect sorted point by
-    // creating edges in "m0"
-    //
-    // Brief: ps-edges with more than 3 coincident vertices arise during a
-    // partial-cut (3d polyhedron) and/or concave cut-mesh-to-source-mesh
-    // face intersection.
-    // For every such edge, there will be 2 ps-vertices and the rest are
-    // intersection points. (Sorting requires numerical calculation).
-    //
-    // We also create a mapping between each polygon-boundary interior-edge
-    // vertex and its multiple copies which will be used for connected component
-    // separation and sealing (hole filling).
-    // NOTE: a polygon-boundary edge is one which is lies on the boundary of a
-    // ps-polygon. Conversely, an interior edge lies within the polygon (path
-    // along which polygon is clipped - the cut path).
-
-    //std::map<vd_t, std::vector<vd_t>> m0_to_m1_poly_ext_int_edge_vertex;
-
-    std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
-
-    for (std::map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge) {
-        lg.indent();
-
-        // TODO: get_vertices_on_ps_edge() is not needed we can probably infer this information using previously/pre-computed std::maps
-        // vertices that lie on current ps edge
-
-        //get_vertices_on_ps_edge(iter_ps_edge, m0_ivtx_to_intersection_registry_entry, ps, m0_to_ps_vtx);
-
-        if (iter_ps_edge->second.size() > 1) { // intersection points on edge is more than 1 i.e. edge has more than thre edges
-
-            const vd_t ps_v0 = ps.vertex(iter_ps_edge->first, 0);
-            const vd_t ps_v1 = ps.vertex(iter_ps_edge->first, 1);
-
-            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
-            const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
-            const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
-            std::vector<vd_t> vertices_on_ps_edge = { m0_v0, m0_v1 };
-
-            // and rest of points (intersection points)
-            vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), iter_ps_edge->second.cbegin(), iter_ps_edge->second.cend());
-
-            lg << "ps-edge " << estr(ps, iter_ps_edge->first) << " : ";
-
-            MCUT_ASSERT(ps_edge_to_vertices.find(iter_ps_edge->first) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
-
-            ps_edge_to_vertices.insert(std::make_pair(iter_ps_edge->first, std::vector<std::pair<vd_t, math::vec3>>()));
-
-            for (std::vector<vd_t>::const_iterator it = vertices_on_ps_edge.cbegin(); it != vertices_on_ps_edge.cend(); ++it) {
-
-                lg << vstr(*it) << " ";
-
-                const math::vec3& vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
-                ps_edge_to_vertices.at(iter_ps_edge->first).push_back(std::make_pair(*it, vertex_coordinates));
-
-                //if (m0_is_intersection_point(*it, ps_vtx_cnt)) { // is intersection point
-                //m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
-                //}
-            }
-            lg << std::endl;
-        }
-
-        lg.unindent();
-    }
-
-    lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices.size() << std::endl;
-
-    // In the next for-loop, we sort each list of vertices on each ps-edge
-    // which more than 3 coincident vertices
-
-    std::map<ed_t, std::vector<vd_t>> ps_edge_to_sorted_descriptors; // sorted vertex that lie on each edge with > 3 vertices
-
-    for (std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>>::iterator edge_vertices_iter = ps_edge_to_vertices.begin(); edge_vertices_iter != ps_edge_to_vertices.end(); ++edge_vertices_iter) {
-        std::vector<std::pair<vd_t, math::vec3>>& incident_vertices = edge_vertices_iter->second;
-
-        ps_edge_to_sorted_descriptors[edge_vertices_iter->first] = linear_projection_sort(incident_vertices);
-
-#if 0
-        // since all points are on straight line, we sort them by x-coord and by y-coord if x-coord is the same for all vertices
-        std::sort(incident_vertices.begin(), incident_vertices.end(),
-            [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
-                return (a.second.x() < b.second.x());
-            });
-
-        const bool x_coordinate_is_same = have_same_coordinate(incident_vertices, 0);
-
-        if (x_coordinate_is_same) {
-            // ... then  sort on y-coord
-            std::sort(incident_vertices.begin(), incident_vertices.end(),
-                [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
-                    return (a.second.y() < b.second.y());
-                });
-
-            const bool y_coordinate_is_same = have_same_coordinate(incident_vertices, 1);
-
-            if (y_coordinate_is_same) {
-                // ... then  sort on z-coord
-                std::sort(incident_vertices.begin(), incident_vertices.end(),
-                    [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
-                        return (a.second.z() < b.second.z());
-                    });
-            }
-        }
-
-#endif
-    }
-
-    //
-    // Now we, create edges between the sorted vertices that are coincident
-    // on the same ps-edge that has more-than 3 incident vertices.
-    //
-    // This step will create class-1 (o==>x), class-2 (o==>x),
-    // and class-3 (x==>x) which are the so called "polygon-boundary
-    // interior-iedges".
-
-    std::map<
-        ed_t, // polygon-soup edge
-        std::vector<ed_t> // list of m0-edges which lay on polygon-soup edge
-        >
-        ps_to_m0_edges;
-
-    // for each ps-edge with more than 3 coincindent vertices
-    for (std::map<ed_t, std::vector<vd_t>>::const_iterator ps_edge_coincident_vertices_iter = ps_edge_to_sorted_descriptors.begin();
-         ps_edge_coincident_vertices_iter != ps_edge_to_sorted_descriptors.end();
-         ++ps_edge_coincident_vertices_iter) {
-
-        lg.indent();
-
-        // get sorted list of vertices on edge
-        const std::vector<vd_t>& coincident_sorted_vertices = ps_edge_coincident_vertices_iter->second;
-
-        MCUT_ASSERT(coincident_sorted_vertices.size() > 3); // we are only dealing with ps-edges with more than 3 coicindent vertices
-
-        // first vertex must not be an intersection point, because all vertices lie on a
-        // ps-edge to be partitioned into new edges, thus the first vertex must not
-        // be an intersection point: [*]===========[*] --> [*]===*==*======[*]
-        MCUT_ASSERT(!m0_is_intersection_point(coincident_sorted_vertices.front(), ps_vtx_cnt));
-        MCUT_ASSERT(m0_is_intersection_point((*(coincident_sorted_vertices.cbegin() + 1)), ps_vtx_cnt));
-
-        MCUT_ASSERT(m0_is_intersection_point((*(coincident_sorted_vertices.cend() - 2)), ps_vtx_cnt));
-        MCUT_ASSERT(!m0_is_intersection_point(coincident_sorted_vertices.back(), ps_vtx_cnt)); // likewise, last vertex must not be an intersection point
-
-        // for each sorted vertex on ps-edge (starting from the second in the list)
-        for (std::vector<vd_t>::const_iterator iter = coincident_sorted_vertices.cbegin() + 1; iter != coincident_sorted_vertices.cend(); ++iter) {
-
-            const vd_t src_vertex = *(iter - 1);
-            const vd_t tgt_vertex = *(iter);
-            const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // create edge!
-
-            lg << "add edge : " << estr(src_vertex, tgt_vertex) << std::endl;
-
-            MCUT_ASSERT(h != mesh_t::null_halfedge());
-
-            const ed_t new_edge = m0.edge(h);
-            MCUT_ASSERT(new_edge != mesh_t::null_edge());
-
-            // map original ps-edge to list of "child" edges which lie on it
-            ps_to_m0_edges[ps_edge_coincident_vertices_iter->first].push_back(new_edge);
-
-            // Here we save the "incoming" halfedge for each vertex of the created edge,
-            // if the vertex is an intersection point. An incoming halfedge is a one
-            // whose target is the vertex.
-            // We will using this information when splitting the source mesh along the
-            // cut path (when duplicating intersection points to create holes).
-
-            if ((iter - 1) == coincident_sorted_vertices.cbegin()) // first iteration
-            {
-                MCUT_ASSERT(m0.target(h) == tgt_vertex);
-                ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
-            } else if ((std::size_t)std::distance(coincident_sorted_vertices.cbegin(), iter) == coincident_sorted_vertices.size() - 1) // last iterator
-            {
-                MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
-                ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
-            } else {
-                MCUT_ASSERT(m0.target(h) == tgt_vertex);
-                ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
-
-                MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
-                ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
-            }
-
-            // Here, we also associate the new edge with an intersecting ps-face.
-            // Note: since the new edge here will lie on the face boundary, its associated intersecting ps-face(s) will
-            // be those which are incident to the parent ps-edge
-            const ed_t ps_edge = ps_edge_coincident_vertices_iter->first;
-
-            for (int i = 0; i < 2; ++i) { // for each halfedge of edge
-                const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
-
-                if (ps_edge_h != mesh_t::null_halfedge()) {
-                    const fd_t f = ps.face(ps_edge_h);
-                    if (f != mesh_t::null_face()) // ps_edge could be on the border!
-                    {
-                        ps_iface_to_m0_edge_list[f].emplace_back(new_edge);
-                    }
-                }
-            }
-        }
-
-        lg.unindent();
-    }
-
-    // Part 2
-    //
-    // We will now create edges between vertices that lie on the same ps-edge
-    // which has 2 or 3 coincident vertices. Note that in the case of 2 coincident
-    // vertices, the created edge is the same as the original ps-edge.
-    //
-    // Brief: the order of m0-vertices along the ps-edge is deduced since the number
-    // of vertices is small enough (unlike Part 1).
-    // So we have two simple cases:
-    // a) ps-edge is coincident on two m0-vertices which are not intersection points
-    // b) ps-edge is coincident on three m0-vertices such that one is an intersection point
-    //
-
-    lg << "create edges on ps-edges with 2 (oo) or 3 vertices (ox or xo)" << std::endl;
-
-    // a map between edge ids in "ps" and in "m0", which is the data structure we are progressively
-    // defining to hold data for the new mesh containing clipped polygons
-    std::map<ed_t, ed_t> ps_to_m0_non_intersecting_edge;
-
-    // for each ps-edge
-    for (mesh_t::edge_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge) {
-        lg.indent();
-
-        if (ps_edge_to_vertices.find(*iter_ps_edge) != ps_edge_to_vertices.end()) {
-            continue; // the case of more than 3 vertices (handled above)
-        }
-
-        const ed_t ps_edge = *iter_ps_edge; // edge handle
-        const vd_t ps_v0 = ps.vertex(ps_edge, 0);
-        const vd_t ps_v1 = ps.vertex(ps_edge, 1);
-
-        MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
-        const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-        MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
-        const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
-
-        std::vector<vd_t> vertices_on_ps_edge = { ps_v0, ps_v1 }; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
-        std::map<ed_t, std::vector<vd_t>>::const_iterator ps_intersecting_edges_iter = ps_intersecting_edges.find(ps_edge);
-        if (ps_intersecting_edges_iter != ps_intersecting_edges.cend()) {
-            vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), ps_intersecting_edges_iter->second.cbegin(), ps_intersecting_edges_iter->second.cend());
-        }
-
-        if (vertices_on_ps_edge.size() == 2) // simple case (edge did not intersect with any polygon)
-        {
-            lg << "add edge (oo) : (" << vertices_on_ps_edge.back() << ", " << vertices_on_ps_edge.front() << ")" << std::endl;
-
-            const hd_t h = m0.add_edge(vertices_on_ps_edge.back(), vertices_on_ps_edge.front());
-
-            MCUT_ASSERT(h != mesh_t::null_halfedge());
-
-            const ed_t edge = m0.edge(h);
-            ps_to_m0_non_intersecting_edge[ps_edge] = edge; // associate
-
-            // similar to Part 1, we also associate the new edge with an intersecting ps-face.
-            for (int i = 0; i < 2; ++i) {
-                const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
-                if (ps_edge_h != mesh_t::null_halfedge()) { // note: ps_edge could be on the border!
-                    const fd_t f = ps.face(ps_edge_h);
-                    bool is_intersecting_ps_face = f != mesh_t::null_face() && ps_iface_to_m0_edge_list.find(f) != ps_iface_to_m0_edge_list.cend();
-                    if (is_intersecting_ps_face) {
-                        ps_iface_to_m0_edge_list[f].emplace_back(edge);
-                    }
-                }
-            }
-        } else { // this is the more complex case where we add minimal set of non overlapping edges between 3 vertices
-
-            MCUT_ASSERT(vertices_on_ps_edge.size() == 3);
-
-            const vd_t first = vertices_on_ps_edge.front();
-            const vd_t second = *(vertices_on_ps_edge.begin() + 1);
-            const vd_t third = vertices_on_ps_edge.back();
-
-            hd_t h0;
-            hd_t h1;
-
-            if (!m0_is_intersection_point(first, ps.number_of_vertices())) { // o-->...
-                if (m0_is_intersection_point(second, ps.number_of_vertices())) {
-                    //
-                    // o x o
-                    //
-                    lg << "add edge (ox) : " << estr(first, second) << std::endl;
-                    h0 = m0.add_edge(first, second);
-                    MCUT_ASSERT(h0 != mesh_t::null_halfedge());
-
-                    MCUT_ASSERT(m0.target(h0) == second);
-                    ivtx_to_incoming_hlist[second].push_back(h0);
-
-                    lg << "add edge (xo) : " << estr(second, third) << std::endl;
-                    h1 = m0.add_edge(second, third);
-                    MCUT_ASSERT(h1 != mesh_t::null_halfedge());
-
-                    MCUT_ASSERT(m0.target(m0.opposite(h1)) == second);
-                    ivtx_to_incoming_hlist[second].push_back(m0.opposite(h1));
-                } else {
-                    //
-                    //  o o x
-                    //
-                    lg << "add edge (ox) : " << estr(first, third) << std::endl;
-                    h0 = m0.add_edge(first, third);
-                    MCUT_ASSERT(h0 != mesh_t::null_halfedge());
-                    ivtx_to_incoming_hlist[third].push_back(h0);
-
-                    lg << "add edge (xo) : " << estr(third, second) << std::endl;
-                    h1 = m0.add_edge(third, second);
-                    MCUT_ASSERT(h1 != mesh_t::null_halfedge());
-                    ivtx_to_incoming_hlist[third].push_back(m0.opposite(h1));
-                }
-            } else {
-                //
-                // x o o
-                //
-                lg << "add edge (ox) : " << estr(second, first) << std::endl;
-                h0 = m0.add_edge(second, first); // o-->x
-                MCUT_ASSERT(h0 != mesh_t::null_halfedge());
-                ivtx_to_incoming_hlist[first].push_back(h0);
-
-                MCUT_ASSERT(m0.target(m0.opposite(h0)) == second);
-
-                lg << "add edge (xo) : " << estr(first, third) << std::endl;
-                h1 = m0.add_edge(first, third); // x-->o
-                MCUT_ASSERT(h1 != mesh_t::null_halfedge());
-
-                MCUT_ASSERT(m0.target(m0.opposite(h1)) == first);
-                ivtx_to_incoming_hlist[first].push_back(m0.opposite(h1));
-            }
-
-            // // associate the new edge with an intersecting ps-face
-            for (int i = 0; i < 2; ++i) { // for each halfedge of edge
-                const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
-
-                if (ps_edge_h != mesh_t::null_halfedge()) {
-                    const fd_t f = ps.face(ps_edge_h);
-                    if (f != mesh_t::null_face()) // ps_edge could be on the border!
-                    {
-                        ps_iface_to_m0_edge_list[f].emplace_back(m0.edge(h0));
-                        ps_iface_to_m0_edge_list[f].emplace_back(m0.edge(h1));
-                    }
-                }
-            }
-        }
-        lg.unindent();
-    }
-    lg.unindent();
-
-    TIME_PROFILE_END(); // &&&&&
-
-    ps_intersecting_edges.clear();
-    ps_edge_to_vertices.clear(); //free
 
     // NOTE: at this stage we have all vertices and edges which are needed to clip
     // intersecting faces in the polygon-soup ("ps").
@@ -3596,23 +3300,12 @@ void dispatch(output_t& output, const input_t& input)
             }
         }
 
-        // input mesh face-partitioning (due to floating polygons) is limited to one floating polygon per ps-face in
-        // a given mcut::dispatch call. It is too difficult to fixe multiple offending floating polygons at the same
-        // time.
-        // Thus, if a given mcut::dispatch call detects a ps-face with more than one floating polygon, only one
-        // (the 1st encountered) floating polygon will be registered and returned to the front-end. The remaining
-        // floating polygon(s) in that ps-face will be handled in the next dispatch call (should they still
-        // arise after partitioning). This approach is regretably slower than handling everything but it is
-        // practical due to the difficulty of the problem and the rarity of its occurance.
-        //
-        // For reference, one example of when this can happen is if you cut a quad (src-mesh) with a torus (cut-mesh)
-        const bool face_already_registered = output.detected_floating_polygons.find(shared_registry_entry_intersected_face) != output.detected_floating_polygons.cend();
-
-        if (is_floating_polygon && !face_already_registered) {
+        if (is_floating_polygon) {
 
             //bool ps_face_is_from_cutmesh = ps_is_cutmesh_face(shared_registry_entry_intersected_face, sm_face_count);
 
-            floating_polygon_info_t& fpi = output.detected_floating_polygons[shared_registry_entry_intersected_face];
+            output.detected_floating_polygons[shared_registry_entry_intersected_face].emplace_back(floating_polygon_info_t());
+            floating_polygon_info_t& fpi = output.detected_floating_polygons[shared_registry_entry_intersected_face].back();
 
             //fpi.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
             //const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
@@ -3635,88 +3328,6 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     m0_explicit_cutpath_sequence_to_properties.clear();
-#if 0
-    ///////////////////////////////////////////////////////////////////////////
-    // check for further degeneracy before we proceed further
-    ///////////////////////////////////////////////////////////////////////////
-
-    //
-    // Here we look for cut-mesh patches whose boundary/border is not defined by
-    // an intersection point with a src-mesh halfedge in its registry.
-    // (stab cut)
-    //
-
-    bool all_cutpaths_making_holes_are_okay = true;
-    // for each color
-    for (std::vector<int>::const_iterator cpmh_iter = explicit_cutpaths_making_holes.cbegin();
-         cpmh_iter != explicit_cutpaths_making_holes.cend();
-         cpmh_iter++) {
-
-        const int cpmh_index = *cpmh_iter;
-
-        const std::vector<ed_t>& explicit_cutpath_making_hole = m0_explicit_cutpath_sequences.at(cpmh_index);
-
-        vd_t v0_prev = mesh_t::null_vertex(); // prevents duplicate checks
-        vd_t v1_prev = mesh_t::null_vertex();
-
-        bool cutpath_is_good = false;
-        for (std::vector<ed_t>::const_iterator cpe_iter = explicit_cutpath_making_hole.cbegin();
-             cpe_iter != explicit_cutpath_making_hole.cend();
-             ++cpe_iter) {
-
-            const vd_t v0 = m0.vertex(*cpe_iter, 0);
-            if (v0 != v0_prev) {
-                MCUT_ASSERT(m0_is_intersection_point(v0, ps_vtx_cnt));
-
-                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend());
-                const std::pair<ed_t, fd_t>& v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0);
-                const ed_t v0_coincident_ps_edge = v0_ipair.first; // m0_ivtx_to_ps_edge.at(v0);
-                const bool v0_coincident_ps_halfedge_is_sm_halfedge = !ps_is_cutmesh_vertex(ps.vertex(v0_coincident_ps_edge, 0), sm_vtx_cnt);
-
-                if (v0_coincident_ps_halfedge_is_sm_halfedge) {
-                    cutpath_is_good = true;
-                    break;
-                }
-
-                v0_prev = v0;
-            }
-
-            const vd_t v1 = m0.vertex(*cpe_iter, 1);
-
-            if (v1 != v1_prev) {
-
-                MCUT_ASSERT(m0_is_intersection_point(v1, ps_vtx_cnt));
-
-                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend());
-                const std::pair<ed_t, fd_t>& v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1);
-
-                const ed_t v1_ps_e = v1_ipair.first; //  m0_ivtx_to_ps_edge.at(v1);
-                const bool v1_coincident_ps_edge_is_sm_halfedge = !ps_is_cutmesh_vertex(ps.vertex(v1_ps_e, 0), sm_vtx_cnt);
-                if (v1_coincident_ps_edge_is_sm_halfedge) {
-                    cutpath_is_good = true;
-                    break;
-                }
-
-                v1_prev = v1;
-            }
-        }
-
-        if (!cutpath_is_good) {
-            all_cutpaths_making_holes_are_okay = false;
-            break;
-        }
-    }
-
-    if (!all_cutpaths_making_holes_are_okay) {
-
-        lg.set_reason_for_failure("found dangling cut-mesh patch."); // ... which cannot be connected to source-mesh because the cut-mesh is intersecting a source-mesh face without cutting its edges
-        output.status = status_t::INVALID_MESH_INTERSECTION;
-
-        // This can happen when the cut would result in an output with topological holes (i.e. polygons with holes)!
-
-        return; // exit
-    }
-#endif
 
     // The following sections of code are about clipping intersecting polygons,
     // and the information we need in order to do that.
@@ -3728,6 +3339,7 @@ void dispatch(output_t& output, const input_t& input)
 
     lg << "associate intersecting faces to intersection-points" << std::endl;
 
+    // TODO: build this data structure during polygon intersection tests!
     std::map<
         fd_t, // intersectiong face
         std::vector<vd_t> // intersection point which involve the intersecting face
@@ -3792,6 +3404,369 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     ///////////////////////////////////////////////////////////////////////////
+    // Create new edges partitioning the intersecting ps edges (2-part process)
+    ///////////////////////////////////////////////////////////////////////////
+
+    lg << "create polygon-exterior edges" << std::endl;
+    lg.indent();
+    // Part 1
+    //
+    // Here, we identify ps-edges with more than 3 coincident m0-vertices (ps-
+    // and intersection points)
+    //
+    // Task: 1) find ps-edges with more than 3 coincident m0-vertices, 2)
+    // sort these vertices along the ps-edge 3) connect sorted point by
+    // creating edges in "m0"
+    //
+    // Brief: ps-edges with more than 3 coincident vertices arise during a
+    // partial-cut (3d polyhedron) and/or concave cut-mesh-to-source-mesh
+    // face intersection.
+    // For every such edge, there will be 2 ps-vertices and the rest are
+    // intersection points. (Sorting requires numerical calculation).
+    //
+    // We also create a mapping between each polygon-boundary interior-edge
+    // vertex and its multiple copies which will be used for connected component
+    // separation and sealing (hole filling).
+    // NOTE: a polygon-boundary edge is one which is lies on the boundary of a
+    // ps-polygon. Conversely, an interior edge lies within the polygon (path
+    // along which polygon is clipped - the cut path).
+
+    //std::map<vd_t, std::vector<vd_t>> m0_to_m1_poly_ext_int_edge_vertex;
+
+    std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
+
+    for (std::map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge) {
+        lg.indent();
+
+        // TODO: get_vertices_on_ps_edge() is not needed we can probably infer this information using previously/pre-computed std::maps
+        // vertices that lie on current ps edge
+
+        //get_vertices_on_ps_edge(iter_ps_edge, m0_ivtx_to_intersection_registry_entry, ps, m0_to_ps_vtx);
+
+        if (iter_ps_edge->second.size() > 1) { // intersection points on edge is more than 1 i.e. edge has more than thre edges
+
+            const vd_t ps_v0 = ps.vertex(iter_ps_edge->first, 0);
+            const vd_t ps_v1 = ps.vertex(iter_ps_edge->first, 1);
+
+            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+            const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
+            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+            const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
+            std::vector<vd_t> vertices_on_ps_edge = { m0_v0, m0_v1 };
+
+            // and rest of points (intersection points)
+            vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), iter_ps_edge->second.cbegin(), iter_ps_edge->second.cend());
+
+            lg << "ps-edge " << estr(ps, iter_ps_edge->first) << " : ";
+
+            MCUT_ASSERT(ps_edge_to_vertices.find(iter_ps_edge->first) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
+
+            ps_edge_to_vertices.insert(std::make_pair(iter_ps_edge->first, std::vector<std::pair<vd_t, math::vec3>>()));
+
+            for (std::vector<vd_t>::const_iterator it = vertices_on_ps_edge.cbegin(); it != vertices_on_ps_edge.cend(); ++it) {
+
+                lg << vstr(*it) << " ";
+
+                const math::vec3& vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
+                ps_edge_to_vertices.at(iter_ps_edge->first).push_back(std::make_pair(*it, vertex_coordinates));
+
+                //if (m0_is_intersection_point(*it, ps_vtx_cnt)) { // is intersection point
+                //m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
+                //}
+            }
+            lg << std::endl;
+        }
+
+        lg.unindent();
+    }
+
+    lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices.size() << std::endl;
+
+    // In the next for-loop, we sort each list of vertices on each ps-edge
+    // which more than 3 coincident vertices
+
+    std::map<ed_t, std::vector<vd_t>> ps_edge_to_sorted_descriptors; // sorted vertex that lie on each edge with > 3 vertices
+
+    for (std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>>::iterator edge_vertices_iter = ps_edge_to_vertices.begin(); edge_vertices_iter != ps_edge_to_vertices.end(); ++edge_vertices_iter) {
+        std::vector<std::pair<vd_t, math::vec3>>& incident_vertices = edge_vertices_iter->second;
+
+        ps_edge_to_sorted_descriptors[edge_vertices_iter->first] = linear_projection_sort(incident_vertices);
+
+#if 0
+      // since all points are on straight line, we sort them by x-coord and by y-coord if x-coord is the same for all vertices
+      std::sort(incident_vertices.begin(), incident_vertices.end(),
+        [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
+          return (a.second.x() < b.second.x());
+        });
+
+      const bool x_coordinate_is_same = have_same_coordinate(incident_vertices, 0);
+
+      if (x_coordinate_is_same) {
+        // ... then  sort on y-coord
+        std::sort(incident_vertices.begin(), incident_vertices.end(),
+          [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
+            return (a.second.y() < b.second.y());
+          });
+
+        const bool y_coordinate_is_same = have_same_coordinate(incident_vertices, 1);
+
+        if (y_coordinate_is_same) {
+          // ... then  sort on z-coord
+          std::sort(incident_vertices.begin(), incident_vertices.end(),
+            [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
+              return (a.second.z() < b.second.z());
+            });
+        }
+      }
+
+#endif
+    }
+
+    //
+    // Now we, create edges between the sorted vertices that are coincident
+    // on the same ps-edge that has more-than 3 incident vertices.
+    //
+    // This step will create class-1 (o==>x), class-2 (o==>x),
+    // and class-3 (x==>x) which are the so called "polygon-boundary
+    // interior-iedges".
+
+    std::map<
+        ed_t, // polygon-soup edge
+        std::vector<ed_t> // list of m0-edges which lay on polygon-soup edge
+        >
+        ps_to_m0_edges;
+
+    // for each ps-edge with more than 3 coincindent vertices
+    for (std::map<ed_t, std::vector<vd_t>>::const_iterator ps_edge_coincident_vertices_iter = ps_edge_to_sorted_descriptors.begin();
+         ps_edge_coincident_vertices_iter != ps_edge_to_sorted_descriptors.end();
+         ++ps_edge_coincident_vertices_iter) {
+
+        lg.indent();
+
+        // get sorted list of vertices on edge
+        const std::vector<vd_t>& coincident_sorted_vertices = ps_edge_coincident_vertices_iter->second;
+
+        MCUT_ASSERT(coincident_sorted_vertices.size() > 3); // we are only dealing with ps-edges with more than 3 coicindent vertices
+
+        // first vertex must not be an intersection point, because all vertices lie on a
+        // ps-edge to be partitioned into new edges, thus the first vertex must not
+        // be an intersection point: [*]===========[*] --> [*]===*==*======[*]
+        MCUT_ASSERT(!m0_is_intersection_point(coincident_sorted_vertices.front(), ps_vtx_cnt));
+        MCUT_ASSERT(m0_is_intersection_point((*(coincident_sorted_vertices.cbegin() + 1)), ps_vtx_cnt));
+
+        MCUT_ASSERT(m0_is_intersection_point((*(coincident_sorted_vertices.cend() - 2)), ps_vtx_cnt));
+        MCUT_ASSERT(!m0_is_intersection_point(coincident_sorted_vertices.back(), ps_vtx_cnt)); // likewise, last vertex must not be an intersection point
+
+        // for each sorted vertex on ps-edge (starting from the second in the list)
+        for (std::vector<vd_t>::const_iterator iter = coincident_sorted_vertices.cbegin() + 1; iter != coincident_sorted_vertices.cend(); ++iter) {
+
+            const vd_t src_vertex = *(iter - 1);
+            const vd_t tgt_vertex = *(iter);
+            const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // create edge!
+
+            lg << "add edge : " << estr(src_vertex, tgt_vertex) << std::endl;
+
+            MCUT_ASSERT(h != mesh_t::null_halfedge());
+
+            const ed_t new_edge = m0.edge(h);
+            MCUT_ASSERT(new_edge != mesh_t::null_edge());
+
+            // map original ps-edge to list of "child" edges which lie on it
+            ps_to_m0_edges[ps_edge_coincident_vertices_iter->first].push_back(new_edge);
+
+            // Here we save the "incoming" halfedge for each vertex of the created edge,
+            // if the vertex is an intersection point. An incoming halfedge is a one
+            // whose target is the vertex.
+            // We will using this information when splitting the source mesh along the
+            // cut path (when duplicating intersection points to create holes).
+
+            if ((iter - 1) == coincident_sorted_vertices.cbegin()) // first iteration
+            {
+                MCUT_ASSERT(m0.target(h) == tgt_vertex);
+                ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
+            } else if ((std::size_t)std::distance(coincident_sorted_vertices.cbegin(), iter) == coincident_sorted_vertices.size() - 1) // last iterator
+            {
+                MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
+                ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
+            } else {
+                MCUT_ASSERT(m0.target(h) == tgt_vertex);
+                ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
+
+                MCUT_ASSERT(m0.target(m0.opposite(h)) == src_vertex);
+                ivtx_to_incoming_hlist[src_vertex].push_back(m0.opposite(h));
+            }
+
+            // Here, we also associate the new edge with an intersecting ps-face.
+            // Note: since the new edge here will lie on the face boundary, its associated intersecting ps-face(s) will
+            // be those which are incident to the parent ps-edge
+            const ed_t ps_edge = ps_edge_coincident_vertices_iter->first;
+
+            for (int i = 0; i < 2; ++i) { // for each halfedge of edge
+                const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
+
+                if (ps_edge_h != mesh_t::null_halfedge()) {
+                    const fd_t f = ps.face(ps_edge_h);
+                    if (f != mesh_t::null_face()) // ps_edge could be on the border!
+                    {
+                        ps_iface_to_m0_edge_list[f].emplace_back(new_edge);
+                    }
+                }
+            }
+        }
+
+        lg.unindent();
+    }
+
+    // Part 2
+    //
+    // We will now create edges between vertices that lie on the same ps-edge
+    // which has 2 or 3 coincident vertices. Note that in the case of 2 coincident
+    // vertices, the created edge is the same as the original ps-edge.
+    //
+    // Brief: the order of m0-vertices along the ps-edge is deduced since the number
+    // of vertices is small enough (unlike Part 1).
+    // So we have two simple cases:
+    // a) ps-edge is coincident on two m0-vertices which are not intersection points
+    // b) ps-edge is coincident on three m0-vertices such that one is an intersection point
+    //
+
+    lg << "create edges on ps-edges with 2 (oo) or 3 vertices (ox or xo)" << std::endl;
+
+    // a map between edge ids in "ps" and in "m0", which is the data structure we are progressively
+    // defining to hold data for the new mesh containing clipped polygons
+    std::map<ed_t, ed_t> ps_to_m0_non_intersecting_edge;
+
+    // for each ps-edge
+    for (mesh_t::edge_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge) {
+        lg.indent();
+
+        if (ps_edge_to_vertices.find(*iter_ps_edge) != ps_edge_to_vertices.end()) {
+            continue; // the case of more than 3 vertices (handled above)
+        }
+
+        const ed_t ps_edge = *iter_ps_edge; // edge handle
+        const vd_t ps_v0 = ps.vertex(ps_edge, 0);
+        const vd_t ps_v1 = ps.vertex(ps_edge, 1);
+
+        MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+        const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
+        MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+        const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
+
+        std::vector<vd_t> vertices_on_ps_edge = { ps_v0, ps_v1 }; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
+        std::map<ed_t, std::vector<vd_t>>::const_iterator ps_intersecting_edges_iter = ps_intersecting_edges.find(ps_edge);
+        if (ps_intersecting_edges_iter != ps_intersecting_edges.cend()) {
+            vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), ps_intersecting_edges_iter->second.cbegin(), ps_intersecting_edges_iter->second.cend());
+        }
+
+        if (vertices_on_ps_edge.size() == 2) // simple case (edge did not intersect with any polygon)
+        {
+            lg << "add edge (oo) : (" << vertices_on_ps_edge.back() << ", " << vertices_on_ps_edge.front() << ")" << std::endl;
+
+            const hd_t h = m0.add_edge(vertices_on_ps_edge.back(), vertices_on_ps_edge.front());
+
+            MCUT_ASSERT(h != mesh_t::null_halfedge());
+
+            const ed_t edge = m0.edge(h);
+            ps_to_m0_non_intersecting_edge[ps_edge] = edge; // associate
+
+            // similar to Part 1, we also associate the new edge with an intersecting ps-face.
+            for (int i = 0; i < 2; ++i) {
+                const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
+                if (ps_edge_h != mesh_t::null_halfedge()) { // note: ps_edge could be on the border!
+                    const fd_t f = ps.face(ps_edge_h);
+                    bool is_intersecting_ps_face = f != mesh_t::null_face() && ps_iface_to_m0_edge_list.find(f) != ps_iface_to_m0_edge_list.cend();
+                    if (is_intersecting_ps_face) {
+                        ps_iface_to_m0_edge_list[f].emplace_back(edge);
+                    }
+                }
+            }
+        } else { // this is the more complex case where we add minimal set of non overlapping edges between 3 vertices
+
+            MCUT_ASSERT(vertices_on_ps_edge.size() == 3);
+
+            const vd_t first = vertices_on_ps_edge.front();
+            const vd_t second = *(vertices_on_ps_edge.begin() + 1);
+            const vd_t third = vertices_on_ps_edge.back();
+
+            hd_t h0;
+            hd_t h1;
+
+            if (!m0_is_intersection_point(first, ps.number_of_vertices())) { // o-->...
+                if (m0_is_intersection_point(second, ps.number_of_vertices())) {
+                    //
+                    // o x o
+                    //
+                    lg << "add edge (ox) : " << estr(first, second) << std::endl;
+                    h0 = m0.add_edge(first, second);
+                    MCUT_ASSERT(h0 != mesh_t::null_halfedge());
+
+                    MCUT_ASSERT(m0.target(h0) == second);
+                    ivtx_to_incoming_hlist[second].push_back(h0);
+
+                    lg << "add edge (xo) : " << estr(second, third) << std::endl;
+                    h1 = m0.add_edge(second, third);
+                    MCUT_ASSERT(h1 != mesh_t::null_halfedge());
+
+                    MCUT_ASSERT(m0.target(m0.opposite(h1)) == second);
+                    ivtx_to_incoming_hlist[second].push_back(m0.opposite(h1));
+                } else {
+                    //
+                    //  o o x
+                    //
+                    lg << "add edge (ox) : " << estr(first, third) << std::endl;
+                    h0 = m0.add_edge(first, third);
+                    MCUT_ASSERT(h0 != mesh_t::null_halfedge());
+                    ivtx_to_incoming_hlist[third].push_back(h0);
+
+                    lg << "add edge (xo) : " << estr(third, second) << std::endl;
+                    h1 = m0.add_edge(third, second);
+                    MCUT_ASSERT(h1 != mesh_t::null_halfedge());
+                    ivtx_to_incoming_hlist[third].push_back(m0.opposite(h1));
+                }
+            } else {
+                //
+                // x o o
+                //
+                lg << "add edge (ox) : " << estr(second, first) << std::endl;
+                h0 = m0.add_edge(second, first); // o-->x
+                MCUT_ASSERT(h0 != mesh_t::null_halfedge());
+                ivtx_to_incoming_hlist[first].push_back(h0);
+
+                MCUT_ASSERT(m0.target(m0.opposite(h0)) == second);
+
+                lg << "add edge (xo) : " << estr(first, third) << std::endl;
+                h1 = m0.add_edge(first, third); // x-->o
+                MCUT_ASSERT(h1 != mesh_t::null_halfedge());
+
+                MCUT_ASSERT(m0.target(m0.opposite(h1)) == first);
+                ivtx_to_incoming_hlist[first].push_back(m0.opposite(h1));
+            }
+
+            // // associate the new edge with an intersecting ps-face
+            for (int i = 0; i < 2; ++i) { // for each halfedge of edge
+                const hd_t ps_edge_h = ps.halfedge(ps_edge, i);
+
+                if (ps_edge_h != mesh_t::null_halfedge()) {
+                    const fd_t f = ps.face(ps_edge_h);
+                    if (f != mesh_t::null_face()) // ps_edge could be on the border!
+                    {
+                        ps_iface_to_m0_edge_list[f].emplace_back(m0.edge(h0));
+                        ps_iface_to_m0_edge_list[f].emplace_back(m0.edge(h1));
+                    }
+                }
+            }
+        }
+        lg.unindent();
+    }
+    lg.unindent();
+
+    TIME_PROFILE_END(); // &&&&&
+
+    ps_intersecting_edges.clear();
+    ps_edge_to_vertices.clear(); //free
+
+    ///////////////////////////////////////////////////////////////////////////
     // Polygon tracing (clipping of intersecting polygon-soup faces)
     ///////////////////////////////////////////////////////////////////////////
 
@@ -3818,6 +3793,9 @@ void dispatch(output_t& output, const input_t& input)
     int traced_sm_polygon_count = 0;
 
     std::map<int, fd_t> m0_to_ps_face; // (we'll later also include reversed polygon patches)
+
+    // TODO: find a way to loop over only those ps-faces that where found to be actually intersecting!
+    // i.e. those that can be found in a registry entrys
 
     // for each face in the polygon-soup mesh
     for (mesh_t::face_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter) {
@@ -3977,9 +3955,10 @@ void dispatch(output_t& output, const input_t& input)
             // number of boundary edges on the face
             int incident_boundary_edge_count = 0;
 
-            // We will now partition the list of incident edges into boundary/exterior and interior
+            // We will now partition the list of incident edges into boundary/exterior and interior.
             // Boundary edges come first, then interior ones. We do this because it makes it easier for us
             // to filter our interior edges if they are consecutive in the list (i.e. in "incident_edges")
+            // TODO: this might not be necessary since interior edges passing outside incident polygons are no longer created
             std::partition(incident_edges.begin(), incident_edges.end(),
                 [&](const ed_t& e) {
                     // calculate if edge is exterior
@@ -4239,10 +4218,10 @@ void dispatch(output_t& output, const input_t& input)
                 //------------
                 //
                 //the asterisk represents intersection vertices
-
+#if 0
                 bool apply_filtering = iedge_set.size() >= 3;
 
-                if (apply_filtering) {
+                if (apply_filtering) { // TODO: no need for filtering anymore
 
                     // b. apply filtering
 
@@ -4506,6 +4485,7 @@ void dispatch(output_t& output, const input_t& input)
                     lg << std::endl;
 
                 } // end of edge filtering
+#endif
             }
 
             // dump the final set of edges to be used for clipping
@@ -9848,7 +9828,7 @@ void dispatch(output_t& output, const input_t& input)
     ///////////////////////////////////////////////////////////////////////////
 
     std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>>& out = output.connected_components;
-
+    int idx = 0;
     for (std::map<char, std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>>::iterator color_to_separated_CCs_iter = color_to_separated_connected_ccsponents.begin();
          color_to_separated_CCs_iter != color_to_separated_connected_ccsponents.end();
          ++color_to_separated_CCs_iter) {
@@ -9879,10 +9859,10 @@ void dispatch(output_t& output, const input_t& input)
 
                 std::pair<mesh_t, connected_component_info_t>& cc_instance = *cc_instance_iter;
 
-                if (input.verbose) {
-                    const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
-                    dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
-                }
+                //if (input.verbose) {
+                    //const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
+                    dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx++) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
+                //}
 
                 output_mesh_info_t omi;
                 omi.mesh = std::move(cc_instance.first);
