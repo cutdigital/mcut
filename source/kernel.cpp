@@ -5539,6 +5539,7 @@ void dispatch(output_t& output, const input_t& input)
                 if (math::sign(scalar_prod) == math::NEGATIVE) { // the current halfedge passed the sign test
                     MCUT_ASSERT(known_exterior_cm_polygons.find(cs_poly_idx) == known_exterior_cm_polygons.cend());
                     known_exterior_cm_polygons[cs_poly_idx] = (int)std::distance(cs_poly.cbegin(), cs_poly_he_iter);
+                    break; // done, we now know "cs_poly_idx" as an exterior polygon
                 }
             }
         }
