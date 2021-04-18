@@ -215,17 +215,6 @@ bool ps_is_cutmesh_face(const fd_t& ps_fd, const int sm_face_count)
     return ((int)ps_fd) >= sm_face_count;
 }
 
-int wrap_integer(int x, const int lo, const int hi)
-{
-    const int range_size = hi - lo + 1;
-
-    if (x < lo) {
-        x += range_size * ((lo - x) / range_size + 1);
-    }
-
-    return lo + (x - lo) % range_size;
-}
-
 void dump_mesh(const mesh_t& mesh, const char* fbasename)
 {
     const std::string name = std::string(fbasename) + ".off";
@@ -1981,6 +1970,8 @@ void dispatch(output_t& output, const input_t& input)
 
             math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
 
+            // TODO: replace this with shewchuck predicate (nasty failure on test 42)
+            // at least orient3d will be able to give use the corrent result!
             char segment_intersection_type = geom::compute_segment_plane_intersection(
                 intersection_point,
                 tested_face_plane_normal,
@@ -2078,7 +2069,7 @@ void dispatch(output_t& output, const input_t& input)
 
                     lg << "add vertex" << std::endl;
                     lg.indent();
-                    lg << "position = (" << intersection_point << ")" << std::endl;
+                    std::cout << "position = (" << intersection_point << ")" << std::endl;
                     lg << "descriptor = " << vstr(new_vertex_descr) << std::endl;
                     lg << "registry-entry" << std::endl;
                     lg.indent();
@@ -3282,24 +3273,32 @@ void dispatch(output_t& output, const input_t& input)
         // same input mesh
         bool is_floating_polygon = true;
         fd_t shared_registry_entry_intersected_face = mesh_t::null_face();
+        vd_t vertex_prev = mesh_t::null_vertex();
         for (std::vector<ed_t>::const_iterator cp_edge_iter = cutpath_sequence.cbegin(); cp_edge_iter != cutpath_sequence.cend(); cp_edge_iter++) {
-            vd_t v0 = m0.vertex(*cp_edge_iter, 0);
+            vd_t v = m0.vertex(*cp_edge_iter, 0);
+            if (vertex_prev != mesh_t::null_vertex() && v == vertex_prev) {
+                v = m0.vertex(*cp_edge_iter, 1);
+                MCUT_ASSERT(v != vertex_prev);
+            }
 
-            MCUT_ASSERT(m0_is_intersection_point(v0, ps_vtx_cnt));
+            MCUT_ASSERT(m0_is_intersection_point(v, ps_vtx_cnt));
 
-            std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator v0_to_intersection_registry_entry = m0_ivtx_to_intersection_registry_entry.find(v0);
+            std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator v_to_intersection_registry_entry = m0_ivtx_to_intersection_registry_entry.find(v);
             if (shared_registry_entry_intersected_face == mesh_t::null_face()) {
-                shared_registry_entry_intersected_face = v0_to_intersection_registry_entry->second.second; // set to initial value
+                shared_registry_entry_intersected_face = v_to_intersection_registry_entry->second.second; // set to initial value
             } else {
                 // i.e. "is same face" which is being pierced by multiple edges [of the same input mesh]
-                is_floating_polygon = (shared_registry_entry_intersected_face == v0_to_intersection_registry_entry->second.second);
+                is_floating_polygon = (shared_registry_entry_intersected_face == v_to_intersection_registry_entry->second.second);
             }
 
             if (!is_floating_polygon) {
                 break;
             }
+
+            vertex_prev = v;
         }
 
+        vertex_prev = mesh_t::null_vertex();
         if (is_floating_polygon) {
 
             //bool ps_face_is_from_cutmesh = ps_is_cutmesh_face(shared_registry_entry_intersected_face, sm_face_count);
@@ -3312,9 +3311,16 @@ void dispatch(output_t& output, const input_t& input)
             //fpi.origin_face = (ps_face_is_from_cutmesh ? fd_t(shared_registry_entry_intersected_face - cm_faces_start_offset) : shared_registry_entry_intersected_face);
             fpi.floating_polygon_vertex_positions.clear();
 
+            vertex_prev = mesh_t::null_vertex();
             for (std::vector<ed_t>::const_iterator cp_edge_iter = cutpath_sequence.cbegin(); cp_edge_iter != cutpath_sequence.cend(); cp_edge_iter++) {
-                vd_t v0 = m0.vertex(*cp_edge_iter, 0);
-                fpi.floating_polygon_vertex_positions.emplace_back(m0.vertex(v0));
+                vd_t v = m0.vertex(*cp_edge_iter, 0);
+                if (vertex_prev != mesh_t::null_vertex() && v == vertex_prev) {
+                    v = m0.vertex(*cp_edge_iter, 1);
+                    MCUT_ASSERT(v != vertex_prev);
+                }
+
+                fpi.floating_polygon_vertex_positions.emplace_back(m0.vertex(v));
+                vertex_prev = v;
             }
 
             MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(shared_registry_entry_intersected_face) != ps_tested_face_to_plane_normal_max_comp.end());
@@ -9861,8 +9867,8 @@ void dispatch(output_t& output, const input_t& input)
                 std::pair<mesh_t, connected_component_info_t>& cc_instance = *cc_instance_iter;
 
                 //if (input.verbose) {
-                    //const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
-                    dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx++) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
+                //const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
+                dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx++) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
                 //}
 
                 output_mesh_info_t omi;

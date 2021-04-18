@@ -188,6 +188,17 @@ public:
     }
 };
 
+static int wrap_integer(int x, const int lo, const int hi)
+{
+    const int range_size = hi - lo + 1;
+
+    if (x < lo) {
+        x += range_size * ((lo - x) / range_size + 1);
+    }
+
+    return lo + (x - lo) % range_size;
+}
+
 } // namespace mcut
 
 #endif // MCUT_UTILS_H_
