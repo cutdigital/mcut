@@ -25,23 +25,44 @@
 
 #include "mcut/internal/math.h"
 
+/* geometric predicates described by Shewchuk in: shewchuk.c
+  *
+  * Routines for Arbitrary Precision Floating-point Arithmetic and
+  * Fast Robust Geometric Predicates
+  */
+extern "C" {
+double orient2d(const double* pa,
+    const double* pb,
+    const double* pc);
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+double orient3d(const double* pa,
+    const double* pb,
+    const double* pc,
+    const double* pd);
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+double incircle(const double* pa,
+    const double* pb,
+    const double* pc,
+    const double* pd);
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+double insphere(const double* pa,
+    const double* pb,
+    const double* pc,
+    const double* pd,
+    const double* pe);
+}
+
 namespace mcut {
 namespace geom {
 
-#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES) // TODO: implement this probably (placement of code)
-    // NOTE: if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS is defined, then mcut::math::real_number_t will implicitely be cast to double here
-    // which is a faster alternative to using full exact arithmetic here
-    //double orient2d(const double* pa, const double* pb, const double* pc);
-    //double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
-#else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
-
-    // basically the Shewchuk's orient2dfast()
-    extern mcut::math::real_number_t orient2d(const mcut::math::vec2& pa, const mcut::math::vec2& pb, const mcut::math::vec2& pc);
-
-    // basically the Shewchuk's orient3dfast()
-    extern mcut::math::real_number_t orient3d(const mcut::math::vec3& pa, const mcut::math::vec3& pb, const mcut::math::vec3& pc, const mcut::math::vec3& pd);
-
-#endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
+    mcut::math::real_number_t orient2d(const mcut::math::vec2& pa, const mcut::math::vec2& pb, const mcut::math::vec2& pc);
+    mcut::math::real_number_t orient3d(const mcut::math::vec3& pa, const mcut::math::vec3& pb, const mcut::math::vec3& pc, const mcut::math::vec3& pd);
 
     // Compute a polygon's plane coefficients (i.e. normal and d parameters).
     // The computed normal is not normalized. This function returns the largest component of the normal.
@@ -65,6 +86,22 @@ namespace geom {
         const math::real_number_t& d_coeff,
         const math::vec3& q,
         const math::vec3& r);
+
+    // Similar to "compute_segment_plane_intersection" but simply checks the [type] of intersection using
+    // exact arithmetic
+    //
+    // Return values:
+    // 'p': The segment lies wholly within the plane.
+    // 'q': The(first) q endpoint is on the plane (but not 'p').
+    // 'r' : The(second) r endpoint is on the plane (but not 'p').
+    // '0' : The segment lies strictly to one side or the other of the plane.
+    // '1': The segment intersects the plane, and none of {p, q, r} hold.
+    char compute_segment_plane_intersection_type(
+        const math::vec3& q,
+        const math::vec3& r,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_normal_max_comp);
 
     // Test if a point 'q' (in 2D) lies inside or outside a given polygon (count the number ray crossings).
     //

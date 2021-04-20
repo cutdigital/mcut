@@ -27,18 +27,18 @@
 #include <mpfr.h>
 #endif
 
-#include <string>
-#include <cstring>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <string>
 
 namespace mcut {
 namespace math {
 
-    typedef long double fixed_precision_number_t;
+    typedef double fixed_precision_number_t;
 
 #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    
+
     class arbitrary_precision_number_t {
     public:
         static mp_rnd_t get_default_rounding_mode()
@@ -77,8 +77,7 @@ namespace math {
         {
             mpfr_init2(get_mpfr_handle(), arbitrary_precision_number_t::get_default_precision());
             int ret = mpfr_set_str(get_mpfr_handle(), value, 10, arbitrary_precision_number_t::get_default_rounding_mode());
-            if(ret!=0)
-            {
+            if (ret != 0) {
                 std::fprintf(stderr, "mpfr_set_str failed\n");
                 std::abort();
             }
@@ -257,14 +256,14 @@ namespace math {
         {
             // NOTE: number of decimal digits in the significand is dependent on the current precision and rounding mode
             mpfr_exp_t decimalLocation = 0;
-            char *s = mpfr_get_str (NULL, &decimalLocation, 10, 0, get_mpfr_handle(), get_default_rounding_mode());
+            char* s = mpfr_get_str(NULL, &decimalLocation, 10, 0, get_mpfr_handle(), get_default_rounding_mode());
             std::string out = std::string(s);
-            if(out[0] == '-') // first char is minus sign
+            if (out[0] == '-') // first char is minus sign
             {
-                // The generated string is a fraction, with an implicit radix point immediately to the left of the 
+                // The generated string is a fraction, with an implicit radix point immediately to the left of the
                 // first digit. For example, the number −3.1416 would be returned as "−31416" in the string and
                 // 1 written at "&decimalLocation".
-                decimalLocation += 1; // account for minus sign.            
+                decimalLocation += 1; // account for minus sign.
             }
             out.insert(decimalLocation, ".");
             mpfr_free_str(s);
@@ -335,7 +334,7 @@ namespace math {
     extern bool operator!=(const arbitrary_precision_number_t& a, const long double b);
 
     using real_number_t = arbitrary_precision_number_t;
-#else 
+#else
     using real_number_t = fixed_precision_number_t;
 #endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 

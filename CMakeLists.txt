@@ -137,7 +137,8 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/source/math.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/geom.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/number.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/bvh.cpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/source/bvh.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/shewchuk.c)
 
 #
 # Create MCUT target(s)

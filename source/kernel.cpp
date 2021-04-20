@@ -1972,13 +1972,21 @@ void dispatch(output_t& output, const input_t& input)
 
             // TODO: replace this with shewchuck predicate (nasty failure on test 42)
             // at least orient3d will be able to give use the corrent result!
-            char segment_intersection_type = geom::compute_segment_plane_intersection(
+#if 0
+            char segment_intersection_result = geom::compute_segment_plane_intersection(
                 intersection_point,
                 tested_face_plane_normal,
                 tested_face_plane_param_d,
                 tested_edge_h0_source_vertex,
                 tested_edge_h0_target_vertex);
-
+#else
+            char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
+                tested_edge_h0_source_vertex,
+                tested_edge_h0_target_vertex,
+                tested_face_vertices.data(),
+                tested_face_vertices.size(),
+                tested_face_plane_normal_max_comp);
+#endif
             bool have_plane_intersection = (segment_intersection_type != '0');
 
             lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;
@@ -1987,6 +1995,33 @@ void dispatch(output_t& output, const input_t& input)
                 lg.indent();
 
                 lg << "intersection point: " << intersection_point << std::endl;
+
+                if (
+                    // illegal point-on-plane case
+                    (segment_intersection_type != '1')) {
+                    output.status = status_t::GENERAL_POSITION_VIOLATION;
+                    if (!input.enforce_general_position) {
+                        // Our assuption of having inputs in general position has been violated, we need to terminate
+                        // with an error since perturbation (enforment of general positions) is disabled.
+                        // This is because our intersection registry formulation requires that edges completely
+                        // penetrate/intersect through polygon's area.
+                        lg.set_reason_for_failure("invalid compute_segment_plane_intersection_type result ('" + std::to_string(segment_intersection_type) + "')");
+                    }
+                    return;
+                }
+
+                // :::::::::::::::::::::::::::::::::::
+                // compute the actual intersectin point
+
+                // NOTE: if using doubles, then here we just care about getting the intersection point
+                // irrespective of whether "segment_intersection_result" is consistent with "segment_intersection_type".
+                // The inconsistency can happen during edge cases. see e.g. test 42.
+                char segment_intersection_result = geom::compute_segment_plane_intersection(
+                    intersection_point,
+                    tested_face_plane_normal,
+                    tested_face_plane_param_d,
+                    tested_edge_h0_source_vertex,
+                    tested_edge_h0_target_vertex);
 
                 char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                     intersection_point,

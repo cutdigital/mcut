@@ -587,7 +587,26 @@ public:
     void remove_vertex(const vertex_descriptor_t v)
     {
         // TODO: not really needed so far for anything implemented
-        MCUT_ASSERT(false);
+        //MCUT_ASSERT(false);
+    }
+
+    void remove_elements()
+    {
+        for (face_iterator_t i = faces_begin(); i != faces_end(); ++i) {
+            remove_face(*i);
+        }
+
+        for (edge_iterator_t i = edges_begin(); i != edges_end(); ++i) {
+            remove_edge(*i);
+        }
+
+        for (halfedge_iterator_t i = halfedges_begin(); i != halfedges_end(); ++i) {
+            remove_halfedge(*i);
+        }
+
+        for (vertex_iterator_t i = vertices_begin(); i != vertices_end(); ++i) {
+            remove_vertex(*i);
+        }
     }
 
     int number_of_internal_faces() const

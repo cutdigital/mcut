@@ -46,9 +46,8 @@
 #include "mcut/internal/geom.h"
 
 // If the inputs are found to not be in general position, then we perturb the
-// cut-mesh by this constant (scaled by a random variable [0.1-1.0]). Otherwise
-// not used.
-const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-10;
+// cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
+const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-6;
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 McRoundingModeFlags convertRoundingMode(int rm)
@@ -317,6 +316,7 @@ std::map<McContext, std::unique_ptr<McDispatchContextInternal>> gDispatchContext
 McResult indexArrayMeshToHalfedgeMesh(
     std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
     mcut::mesh_t& halfedgeMesh,
+    mcut::math::real_number_t& bboxDiagonal,
     const void* pVertices,
     const uint32_t* pFaceIndices,
     const uint32_t* pFaceSizes,
@@ -410,6 +410,15 @@ McResult indexArrayMeshToHalfedgeMesh(
             return result;
         }
     }
+
+    mcut::math::vec3 bboxMin(1e10);
+    mcut::math::vec3 bboxMax(-1e10);
+    for (mcut::mesh_t::vertex_iterator_t i = halfedgeMesh.vertices_begin(); i != halfedgeMesh.vertices_end(); ++i) {
+        const mcut::math::vec3& coords = halfedgeMesh.vertex(*i);
+        bboxMin = mcut::math::compwise_min(bboxMin, coords);
+        bboxMax = mcut::math::compwise_max(bboxMax, coords);
+    }
+    bboxDiagonal = mcut::math::length(bboxMax - bboxMin);
 
     int faceSizeOffset = 0;
 
@@ -1532,9 +1541,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     mcut::mesh_t srcMeshInternal;
+    mcut::math::real_number_t srcMeshBboxDiagonal(0.0);
     result = indexArrayMeshToHalfedgeMesh(
         ctxtPtr,
         srcMeshInternal,
+        srcMeshBboxDiagonal,
         pSrcMeshVertices,
         pSrcMeshFaceIndices,
         pSrcMeshFaceSizes,
@@ -1662,15 +1673,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     mcut::output_t backendOutput;
 
     mcut::mesh_t cutMeshInternal;
+    mcut::math::real_number_t cutMeshBboxDiagonal(0.0);
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
     std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
 
-    int perturbationIters = -1;
+    int perturbationIters = 0;
     int kernelDispatchCallCounter = -1;
     do {
         kernelDispatchCallCounter++;
 
-        bool general_position_assumption_was_violated = (perturbationIters != -1 && (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION));
+        bool general_position_assumption_was_violated = (/*perturbationIters != -1 &&*/ (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION));
         bool floating_polygon_was_detected = backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON;
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::
         backendOutput.status = mcut::status_t::SUCCESS;
@@ -1685,21 +1697,24 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 // use by the kernel track if the most-recent perturbation causes the cut-mesh and src-mesh to
                 // not intersect at all, which means we need to perturb again.
                 backendInput.general_position_enforcement_count = perturbationIters;
-
+                const mcut::math::real_number_t scalar = cutMeshBboxDiagonal * GENERAL_POSITION_ENFORCMENT_CONSTANT;
                 std::default_random_engine rd(perturbationIters);
                 std::mt19937 mt(rd());
-                std::uniform_real_distribution<double> dist(0.1, 1.0);
+                std::uniform_real_distribution<double> dist(-1.0, 1.0);
                 perturbation = mcut::math::vec3(
-                    dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
-                    dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT,
-                    dist(mt) * GENERAL_POSITION_ENFORCMENT_CONSTANT);
+                    dist(mt) * scalar,
+                    dist(mt) * scalar,
+                    dist(mt) * scalar);
             }
         } // if (general_position_assumption_was_violated) {
 
-        if ((perturbationIters == -1 /*no perturbs required*/ || general_position_assumption_was_violated) && floating_polygon_was_detected == false) {
+        if ((perturbationIters == 0 /*no perturbs required*/ || general_position_assumption_was_violated) && floating_polygon_was_detected == false) {
+            cutMeshInternal.remove_elements();
+
             result = indexArrayMeshToHalfedgeMesh(
                 ctxtPtr,
                 cutMeshInternal,
+                cutMeshBboxDiagonal,
                 pCutMeshVertices,
                 pCutMeshFaceIndices,
                 pCutMeshFaceSizes,

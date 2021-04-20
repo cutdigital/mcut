@@ -94,7 +94,7 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
 
         ASSERT_EQ(mcDispatch(
                       utest_fixture->myContext,
-                      MC_DISPATCH_VERTEX_ARRAY_FLOAT,
+                      MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
                       utest_fixture->pSrcMeshVertices,
                       utest_fixture->pSrcMeshFaceIndices,
                       utest_fixture->pSrcMeshFaceSizes,

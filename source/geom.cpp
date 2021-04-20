@@ -31,38 +31,23 @@
 namespace mcut {
 namespace geom {
 
-#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
-
-#else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
-
-    // basically the Shewchuk's orient2dfast()
     mcut::math::real_number_t orient2d(const mcut::math::vec2& pa, const mcut::math::vec2& pb, const mcut::math::vec2& pc)
     {
-        const mcut::math::real_number_t acx = pa[0] - pc[0];
-        const mcut::math::real_number_t bcx = pb[0] - pc[0];
-        const mcut::math::real_number_t acy = pa[1] - pc[1];
-        const mcut::math::real_number_t bcy = pb[1] - pc[1];
-
-        return (acx * bcy) - (acy * bcx);
+        const double pa_[2] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()) };
+        const double pb_[2] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()) };
+        const double pc_[2] = { static_cast<double>(pc.x()), static_cast<double>(pc.y()) };
+        return ::orient2d(pa_, pb_, pc_);
     }
 
-    // basically the Shewchuk's orient3dfast()
     mcut::math::real_number_t orient3d(const mcut::math::vec3& pa, const mcut::math::vec3& pb, const mcut::math::vec3& pc, const mcut::math::vec3& pd)
     {
-        const mcut::math::real_number_t adx = pa[0] - pd[0];
-        const mcut::math::real_number_t bdx = pb[0] - pd[0];
-        const mcut::math::real_number_t cdx = pc[0] - pd[0];
-        const mcut::math::real_number_t ady = pa[1] - pd[1];
-        const mcut::math::real_number_t bdy = pb[1] - pd[1];
-        const mcut::math::real_number_t cdy = pc[1] - pd[1];
-        const mcut::math::real_number_t adz = pa[2] - pd[2];
-        const mcut::math::real_number_t bdz = pb[2] - pd[2];
-        const mcut::math::real_number_t cdz = pc[2] - pd[2];
+        const double pa_[3] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()), static_cast<double>(pa.z()) };
+        const double pb_[3] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()), static_cast<double>(pb.z()) };
+        const double pc_[3] = { static_cast<double>(pc.x()), static_cast<double>(pc.y()), static_cast<double>(pc.z()) };
+        const double pd_[3] = { static_cast<double>(pd.x()), static_cast<double>(pd.y()), static_cast<double>(pd.z()) };
 
-        return (adx * ((bdy * cdz) - (bdz * cdy))) + (bdx * ((cdy * adz) - (cdz * ady))) + (cdx * ((ady * bdz) - (adz * bdy)));
+        return ::orient3d(pa_, pb_, pc_, pd_);
     }
-
-#endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
 
 #if 0
     void polygon_normal(math::vec3& normal, const math::vec3* vertices, const int num_vertices)
@@ -156,6 +141,52 @@ namespace geom {
             return 'r'; // The (second) r endpoint is on the plane (but not 'p').
         } else {
             return '0'; // The segment lies strictly to one side or the other of the plane
+        }
+    }
+
+    char compute_segment_plane_intersection_type(
+        const math::vec3& q,
+        const math::vec3& r,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_normal_max_comp)
+    {
+        std::vector<math::vec2> x;
+        project2D(x, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+        MCUT_ASSERT(x.size() == polygon_vertex_count);
+
+        // get any three vertices that are not collinear
+        int i = 0;
+        int j = i + 1;
+        int k = j + 1;
+        bool b = false;
+        for (; i < polygon_vertex_count && !b; ++i) {
+            for (; j < polygon_vertex_count && !b; ++j) {
+                for (; k < polygon_vertex_count && !b; ++k) {
+                    if (!collinear(x[i], x[j], x[k])) {
+                        b = true;
+                    }
+                }
+            }
+        }
+
+        if (!b) {
+            return '0'; // all polygon points are collinear
+        }
+
+        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+
+        if (qRes == 0 && rRes == 0) {
+            return 'p';
+        } else if (qRes == 0) {
+            return 'q';
+        } else if (rRes == 0) {
+            return 'r';
+        } else if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) {
+            return '0';
+        } else {
+            return '1';
         }
     }
 
