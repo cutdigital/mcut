@@ -1944,14 +1944,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     // gather vertices of "origin_face" (descriptors and 3d coords)
 
-                    std::vector<mcut::vd_t> originFaceVertexDescriptors = origin_input_mesh->get_vertices_around_face(origin_face);
+                    //std::vector<mcut::vd_t> originFaceVertexDescriptors = origin_input_mesh->get_vertices_around_face(origin_face);
                     std::vector<mcut::math::vec3> originFaceVertices3d;
-                    originFaceVertices3d.resize(originFaceVertexDescriptors.size());
+                    // get information about each edge (used by "origin_face") that needs to be split along the respective intersection point
+                    const std::vector<mcut::hd_t>& origFaceHalfedges = origin_input_mesh->get_halfedges_around_face(origin_face);
 
-                    for (std::vector<mcut::vd_t>::const_iterator it = originFaceVertexDescriptors.cbegin(); it != originFaceVertexDescriptors.cend(); ++it) {
-                        const size_t idx = std::distance(originFaceVertexDescriptors.cbegin(), it);
-                        const mcut::math::vec3& vert = origin_input_mesh->vertex(*it);
-                        originFaceVertices3d[idx] = vert;
+                    for (std::vector<mcut::hd_t>::const_iterator i = origFaceHalfedges.cbegin(); i != origFaceHalfedges.cend(); ++i) {
+                        const mcut::vd_t src = origin_input_mesh->source(*i); // NOTE: we use source so that edge iterators/indices match with internal mesh storage
+                        originFaceVertices3d.push_back(origin_input_mesh->vertex(src));
                     }
 
                     MCUT_ASSERT(fpi.origin_face_normal_largest_comp != -1); // should be defined when we identify the floating polygon in the kernel
@@ -1964,7 +1964,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     //
 
                     std::vector<mcut::math::vec2> originFaceVertexCoords2D;
-                    originFaceVertices3d.resize(originFaceVertices3d.size());
                     mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d.data(), (int)originFaceVertices3d.size(), fpi.origin_face_normal_largest_comp);
 
                     // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
@@ -2189,28 +2188,47 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         [&](std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>>& a, //
                             std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>>& b) {
                             mcut::math::real_number_t aDist(std::numeric_limits<double>::max()); // bias toward points inside polygon
-                            char aOnEdge = mcut::geom::compute_point_in_polygon_test(
-                                a.second.first,
-                                originFaceVertexCoords2D.data(),
-                                (int)originFaceVertexCoords2D.size());
+                            //char aOnEdge = mcut::geom::compute_point_in_polygon_test(
+                            //    a.second.first,
+                            //    originFaceVertexCoords2D.data(),
+                            //    (int)originFaceVertexCoords2D.size());
 
-                            if (aOnEdge == 'e') {
+                            bool aOnEdge = false;
+                            for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
+                                int i0 = i;
+                                int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
+                                if (mcut::geom::collinear(originFaceVertexCoords2D[i0], originFaceVertexCoords2D[i1], a.second.first)) {
+                                    aOnEdge = true;
+                                    break;
+                                }
+                            }
+
+                            if (aOnEdge) {
                                 const mcut::math::vec2 aVec = a.second.first - fpSegmentMidPoint;
                                 aDist = mcut::math::squared_length(aVec);
                             }
 
                             mcut::math::real_number_t bDist(std::numeric_limits<double>::max());
-                            char bOnEdge = mcut::geom::compute_point_in_polygon_test(
-                                b.second.first,
-                                originFaceVertexCoords2D.data(),
-                                (int)originFaceVertexCoords2D.size());
+                            //char bOnEdge = mcut::geom::compute_point_in_polygon_test(
+                            //    b.second.first,
+                            //    originFaceVertexCoords2D.data(),
+                            //    (int)originFaceVertexCoords2D.size());
+                            bool bOnEdge = false;
+                            for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
+                                int i0 = i;
+                                int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
+                                if (mcut::geom::collinear(originFaceVertexCoords2D[i0], originFaceVertexCoords2D[i1], b.second.first)) {
+                                    bOnEdge = true;
+                                    break;
+                                }
+                            }
 
-                            if (bOnEdge == 'e') {
+                            if (bOnEdge) {
                                 const mcut::math::vec2 bVec = b.second.first - fpSegmentMidPoint;
                                 bDist = mcut::math::squared_length(bVec);
                             }
 
-                            return aDist < bDist;
+                            return aDist > bDist;
                         });
 
                     // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -2220,9 +2238,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     // this std::vector stores the faces that use an edge that will be partitioned
                     std::vector<mcut::fd_t> replaced_input_mesh_faces = { origin_face };
-
-                    // get information about each edge (used by "origin_face") that needs to be split along the respective intersection point
-                    const std::vector<mcut::hd_t>& origFaceHalfedges = origin_input_mesh->get_halfedges_around_face(origin_face);
 
                     MCUT_ASSERT(originFaceIntersectedEdgeInfo.size() >= 2); // we partition atleast two edges of origin_face [always!]
 
@@ -2235,7 +2250,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     // NOTE: minus-1 since "get_vertices_around_face(origin_face)" builds a list using halfedge target vertices
                     // See the starred note above
-                    int halfedgeIdx = mcut::wrap_integer(origFaceEdge0Idx - 1, 0, (int)originFaceEdgeCount - 1); //(origFaceEdge0Idx + 1) % originFaceEdgeCount;
+                    int halfedgeIdx = origFaceEdge0Idx; // mcut::wrap_integer(origFaceEdge0Idx - 1, 0, (int)originFaceEdgeCount - 1); //(origFaceEdge0Idx + 1) % originFaceEdgeCount;
                     const mcut::hd_t origFaceEdge0Halfedge = origFaceHalfedges.at(halfedgeIdx);
                     MCUT_ASSERT(origin_face == origin_input_mesh->face(origFaceEdge0Halfedge));
                     const mcut::ed_t origFaceEdge0Descr = origin_input_mesh->edge(origFaceEdge0Halfedge);
@@ -2269,7 +2284,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     const int origFaceEdge1Idx = originFaceIntersectedEdge1Info.first;
                     const mcut::math::real_number_t& origFaceEdge1IntPointEqnParam = originFaceIntersectedEdge1Info.second.second;
 
-                    halfedgeIdx = mcut::wrap_integer(origFaceEdge1Idx - 1, 0, (int)originFaceEdgeCount - 1); // (origFaceEdge1Idx + 1) % originFaceEdgeCount;
+                    halfedgeIdx = origFaceEdge1Idx; /// mcut::wrap_integer(origFaceEdge1Idx - 1, 0, (int)originFaceEdgeCount - 1); // (origFaceEdge1Idx + 1) % originFaceEdgeCount;
                     const mcut::hd_t origFaceEdge1Halfedge = origFaceHalfedges.at(halfedgeIdx);
                     MCUT_ASSERT(origin_face == origin_input_mesh->face(origFaceEdge1Halfedge));
                     const mcut::ed_t origFaceEdge1Descr = origin_input_mesh->edge(origFaceEdge1Halfedge);
