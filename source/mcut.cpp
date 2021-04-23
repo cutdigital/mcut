@@ -1711,6 +1711,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         if ((perturbationIters == 0 /*no perturbs required*/ || general_position_assumption_was_violated) && floating_polygon_was_detected == false) {
             cutMeshInternal.remove_elements();
 
+            // TODO: the number of cut-mesh faces and vertices may increase due to polygon partitioning
+            // Therefore: we need to perturb the updated cut-mesh i.e. the one containing partitioned polygons
+            // "pCutMeshVertices" are simply the user provided coordinates
+            // We must also use the newly added vertices (coords) due to polygon partitioning as "unperturbed" values
+            // This will require some intricate mapping
             result = indexArrayMeshToHalfedgeMesh(
                 ctxtPtr,
                 cutMeshInternal,
@@ -2193,15 +2198,15 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             //    originFaceVertexCoords2D.data(),
                             //    (int)originFaceVertexCoords2D.size());
 
-                            bool aOnEdge = false;
-                            for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
-                                int i0 = i;
-                                int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
-                                if (mcut::geom::collinear(originFaceVertexCoords2D[i0], originFaceVertexCoords2D[i1], a.second.first)) {
-                                    aOnEdge = true;
-                                    break;
-                                }
-                            }
+                            bool aOnEdge = (.0 <= a.second.second && 1. >= a.second.second);
+                            //for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
+                            //    int i0 = i;
+                            //    int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
+                            //    if (mcut::geom::collinear(originFaceVertexCoords2D[i0], originFaceVertexCoords2D[i1], a.second.first)) {
+                            //         aOnEdge = true;
+                            //         break;
+                            //    }
+                            //}
 
                             if (aOnEdge) {
                                 const mcut::math::vec2 aVec = a.second.first - fpSegmentMidPoint;
@@ -2213,22 +2218,23 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             //    b.second.first,
                             //    originFaceVertexCoords2D.data(),
                             //    (int)originFaceVertexCoords2D.size());
-                            bool bOnEdge = false;
-                            for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
-                                int i0 = i;
-                                int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
-                                if (mcut::geom::collinear(originFaceVertexCoords2D[i0], originFaceVertexCoords2D[i1], b.second.first)) {
-                                    bOnEdge = true;
-                                    break;
-                                }
-                            }
+                            bool bOnEdge = (.0 <= b.second.second && 1. >= b.second.second);
+
+                            //for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
+                            //    int i0 = i;
+                            //    int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
+                            //    if (mcut::geom::collinear(originFaceVertexCoords2D[i0], originFaceVertexCoords2D[i1], b.second.first)) {
+                            //        bOnEdge = true;
+                            //        break;
+                            //    }
+                            //}
 
                             if (bOnEdge) {
                                 const mcut::math::vec2 bVec = b.second.first - fpSegmentMidPoint;
                                 bDist = mcut::math::squared_length(bVec);
                             }
 
-                            return aDist > bDist;
+                            return aDist < bDist;
                         });
 
                     // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

@@ -160,13 +160,20 @@ namespace geom {
         int j = i + 1;
         int k = j + 1;
         bool b = false;
-        for (; i < polygon_vertex_count && !b; ++i) {
-            for (; j < polygon_vertex_count && !b; ++j) {
-                for (; k < polygon_vertex_count && !b; ++k) {
+        for (; i < polygon_vertex_count; ++i) {
+            for (; j < polygon_vertex_count; ++j) {
+                for (; k < polygon_vertex_count; ++k) {
                     if (!collinear(x[i], x[j], x[k])) {
                         b = true;
+                        break;
                     }
                 }
+                if (b) {
+                    break;
+                }
+            }
+            if (b) {
+                break;
             }
         }
 
