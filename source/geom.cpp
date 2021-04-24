@@ -22,12 +22,6 @@
 
 #include "mcut/internal/geom.h"
 
-#if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
-#include "mcut/../source/shewchuk_predicates.c"
-#else // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
-
-#endif // #if defined(MCUT_USE_SHEWCHUK_EXACT_PREDICATES)
-
 namespace mcut {
 namespace geom {
 
@@ -36,6 +30,7 @@ namespace geom {
         const double pa_[2] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()) };
         const double pb_[2] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()) };
         const double pc_[2] = { static_cast<double>(pc.x()), static_cast<double>(pc.y()) };
+
         return ::orient2d(pa_, pb_, pc_);
     }
 
@@ -144,6 +139,45 @@ namespace geom {
         }
     }
 
+    bool determine_three_noncollinear_vertices(
+        int& i,
+        int& j,
+        int& k,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_normal_max_comp)
+    {
+        MCUT_ASSERT(polygon_vertex_count >= 3);
+
+        std::vector<math::vec2> x;
+        project2D(x, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+        MCUT_ASSERT(x.size() == polygon_vertex_count);
+
+        // get any three vertices that are not collinear
+        i = 0;
+        j = i + 1;
+        k = j + 1;
+        bool found = false;
+        for (; i < polygon_vertex_count; ++i) {
+            for (; j < polygon_vertex_count; ++j) {
+                for (; k < polygon_vertex_count; ++k) {
+                    if (!collinear(x[i], x[j], x[k])) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            }
+            if (found) {
+                break;
+            }
+        }
+
+        return found;
+    }
+
     char compute_segment_plane_intersection_type(
         const math::vec3& q,
         const math::vec3& r,
@@ -151,34 +185,16 @@ namespace geom {
         const int polygon_vertex_count,
         const int polygon_normal_max_comp)
     {
-        std::vector<math::vec2> x;
-        project2D(x, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
-        MCUT_ASSERT(x.size() == polygon_vertex_count);
-
-        // get any three vertices that are not collinear
+        // ... any three vertices that are not collinear
         int i = 0;
-        int j = i + 1;
-        int k = j + 1;
-        bool b = false;
-        for (; i < polygon_vertex_count; ++i) {
-            for (; j < polygon_vertex_count; ++j) {
-                for (; k < polygon_vertex_count; ++k) {
-                    if (!collinear(x[i], x[j], x[k])) {
-                        b = true;
-                        break;
-                    }
-                }
-                if (b) {
-                    break;
-                }
-            }
-            if (b) {
-                break;
-            }
-        }
+        int j = 1;
+        int k = 2;
+        if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
+            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
 
-        if (!b) {
-            return '0'; // all polygon points are collinear
+            if (!b) {
+                return '0'; // all polygon points are collinear
+            }
         }
 
         double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
@@ -193,6 +209,121 @@ namespace geom {
         } else if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) {
             return '0';
         } else {
+            return '1';
+        }
+    }
+
+    char compute_segment_line_plane_intersection_type(
+        const math::vec3& q,
+        const math::vec3& r,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_normal_max_comp,
+        const math::vec3& polygon_plane_normal,
+        const math::real_number_t& polygon_plane_d_coeff)
+    {
+
+        // ... any three vertices that are not collinear
+        int i = 0;
+        int j = 1;
+        int k = 2;
+        if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
+            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+
+            if (!b) {
+                return '0'; // all polygon points are collinear
+            }
+        }
+
+        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+
+        if (qRes == 0 && rRes == 0) {
+            // both points used to define line lie on plane therefore we have an in-plane intersection
+            // or the polygon is a degenerate triangle
+            return 'p';
+        } else {
+            if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) { // both points used to define line lie on same side of plane
+                // check if line is parallel to plane
+                const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
+                const math::vec3 rq = (r - q);
+                const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
+
+                if (denom == 0.0 /* Segment is parallel to plane.*/) {
+                    MCUT_ASSERT(num != 0.0); // implies 'q' is on plane (see: "compute_segment_plane_intersection(...)") but we have already established that q and r are on same side.
+                    return '0';
+                }
+            }
+        }
+
+        // q and r are on difference sides of the plane, therefore we have an intersection
+        return '1';
+    }
+
+    // Compute the intersection point between a line (not a segment) and a plane defined by a polygon.
+    //
+    // Parameters:
+    //  'p' : output intersection point (computed if line does indeed intersect the plane)
+    //  'q' : first point defining your line
+    //  'r' : second point defining your line
+    //  'polygon_vertices' : the vertices of the polygon defineing the plane (assumed to not be degenerate)
+    //  'polygon_vertex_count' : number of olygon vertices
+    //  'polygon_normal_max_comp' : largest component of polygon normal.
+    //  'polygon_plane_normal' : normal of the given polygon
+    //  'polygon_plane_d_coeff' : the distance coefficient of the plane equation corresponding to the polygon's plane
+    //
+    // Return values:
+    // '0': line is parallel to plane (or polygon is degenerate ... within available precision)
+    // '1': an intersection exists.
+    // 'p': q and r lie in the plane (technically they are parallel to the plane too but we need to report this because it violates GP).
+    char compute_line_plane_intersection(
+        math::vec3& p, //intersection point
+        const math::vec3& q,
+        const math::vec3& r,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_normal_max_comp,
+        const math::vec3& polygon_plane_normal,
+        const math::real_number_t& polygon_plane_d_coeff)
+    {
+        // ... any three vertices that are not collinear
+        int i = 0;
+        int j = 1;
+        int k = 2;
+        if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
+            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+
+            if (!b) {
+                return '0'; // all polygon points are collinear
+            }
+        }
+
+        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+
+        if (qRes == 0 && rRes == 0) {
+            return 'p'; // both points used to define line lie on plane therefore we have an in-plane intersection
+        } else {
+
+            const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
+            const math::vec3 rq = (r - q);
+            const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
+
+            if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) { // both q an r are on same side of plane
+                if (denom == 0.0 /* line is parallel to plane.*/) {
+                    return '0';
+                }
+            }
+
+            // q and r are on difference sides of the plane, therefore we have an intersection
+
+            // compute the intersection point
+            const math::real_number_t t = num / denom;
+
+            for (int it = 0; it < 3; ++it) {
+                p[it] = q[it] + t * (r[it] - q[it]);
+            }
+
             return '1';
         }
     }
@@ -333,6 +464,12 @@ namespace geom {
         else
             return ((a[1] <= c[1]) && (c[1] <= b[1])) || //
                 ((a[1] >= c[1]) && (c[1] >= b[1]));
+    }
+
+    bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c, math::real_number_t& predResult)
+    {
+        predResult = mcut::geom::orient2d(a, b, c);
+        return predResult == 0;
     }
 
     bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c)

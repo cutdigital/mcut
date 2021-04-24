@@ -1703,9 +1703,9 @@ void dispatch(output_t& output, const input_t& input)
 
     cs_to_ps_vtx.clear();
 
-    if (input.verbose) {
-        dump_mesh(ps, "polygon-soup");
-    }
+    //if (input.verbose) {
+    dump_mesh(ps, "polygon-soup");
+    //}
 
     const int ps_vtx_cnt = ps.number_of_vertices();
     const int ps_face_cnt = ps.number_of_faces();
@@ -1973,48 +1973,93 @@ void dispatch(output_t& output, const input_t& input)
             // TODO: replace this with shewchuck predicate (nasty failure on test 42)
             // at least orient3d will be able to give use the corrent result!
 #if 0
-            char segment_intersection_result = geom::compute_segment_plane_intersection(
+            char lp_intersection_result = geom::compute_line_plane_intersection(
                 intersection_point,
-                tested_face_plane_normal,
-                tested_face_plane_param_d,
                 tested_edge_h0_source_vertex,
-                tested_edge_h0_target_vertex);
+                tested_edge_h0_target_vertex,
+                tested_face_vertices.data(),
+                tested_face_vertices.size(),
+                tested_face_plane_normal_max_comp,
+                tested_face_plane_normal,
+                tested_face_plane_param_d);
 #else
             char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
                 tested_edge_h0_source_vertex,
                 tested_edge_h0_target_vertex,
                 tested_face_vertices.data(),
-                tested_face_vertices.size(),
+                (int)tested_face_vertices.size(),
                 tested_face_plane_normal_max_comp);
 #endif
-            bool have_plane_intersection = (segment_intersection_type != '0');
+            bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
 
             lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;
 
-            if (have_plane_intersection) { // does the halfedge segment intersect the plane?
+            if (have_plane_intersection) { // does the segment intersect the plane?
                 lg.indent();
 
                 lg << "intersection point: " << intersection_point << std::endl;
 
-                if (
-                    // illegal point-on-plane case
-                    (segment_intersection_type != '1')) {
-                    output.status = status_t::GENERAL_POSITION_VIOLATION;
-                    if (!input.enforce_general_position) {
-                        // Our assuption of having inputs in general position has been violated, we need to terminate
-                        // with an error since perturbation (enforment of general positions) is disabled.
-                        // This is because our intersection registry formulation requires that edges completely
-                        // penetrate/intersect through polygon's area.
-                        lg.set_reason_for_failure("invalid compute_segment_plane_intersection_type result ('" + std::to_string(segment_intersection_type) + "')");
+                if (segment_intersection_type != '1') { // the segment only touches the the plane (the line reprsented by segment still intersects the plane)
+
+                    // before jumping-the-gun and assuming that we have indeed violated GP,
+                    // we should check whether the point found to be on the plane (touching point) is
+                    // actually [inside] the tested_face. That would imply cutting through a vertex or edge (undefined).
+                    // If this is true then we have indeed violated GP. Otherwise, we just treat this as a non-intersection because
+                    // the what-would-have-been intersection point actually lies outside the tested_face.
+                    bool violatedGP = false;
+                    std::vector<const math::vec3*> points_touching_plane;
+
+                    if (segment_intersection_type == 'q' /*segment start*/ || segment_intersection_type == 'r' /*segment end*/) { // only one segment end is touching plane
+                        points_touching_plane.push_back((segment_intersection_type == 'q') ? &tested_edge_h0_source_vertex : &tested_edge_h0_target_vertex);
+                    } else { // both point are in the plane, so we will need to confirm whether BOTH are outside our tested face.
+                        points_touching_plane.push_back(&tested_edge_h0_source_vertex);
+                        points_touching_plane.push_back(&tested_edge_h0_target_vertex);
                     }
-                    return;
+
+                    // if any point in "points_touching_plane" is inside the tested_face then we have violated GP
+                    for (std::vector<const math::vec3*>::const_iterator i = points_touching_plane.cbegin(); i != points_touching_plane.cend(); ++i) {
+                        const math::vec3& point = (*(*i));
+                        char result = geom::compute_point_in_polygon_test(
+                            point,
+                            tested_face_vertices.data(),
+                            (int)tested_face_vertices.size());
+                        if (
+                            // the touching point is inside, which implies cutting through a vertex (of "tested_edge")
+                            result == 'i' ||
+                            // The following condition means that we will have an edge-edge intersection anyway!
+                            // i.e. 'v' means that two edges (from sm and cm) touch at their tips/points since point is an end point of "tested_edge"
+                            // ... and 'e' means that an end point of "tested_edge" touches an edge of "tested_face"
+                            (result == 'v' || result == 'e')) {
+                            violatedGP = true;
+                            break;
+                        }
+                    }
+
+                    if (violatedGP) {
+                        output.status = status_t::GENERAL_POSITION_VIOLATION;
+                        if (!input.enforce_general_position) {
+                            // Our assumption of having inputs in general position has been violated, we need to terminate
+                            // with an error since perturbation (enforment of general positions) is disabled by the user.
+                            // Note: our intersection registry formulation requires that edges completely penetrate/intersect through polygon's area.
+                            lg.set_reason_for_failure("invalid compute_segment_plane_intersection_type result ('" + std::to_string(segment_intersection_type) + "')");
+                        }
+                        return; // bail and return to the front-end
+                    } else {
+                        // same as the case where "have_plane_intersection" is false.
+                        // so we just move onto the next edge-face test.
+                        continue;
+                    }
                 }
 
-                // :::::::::::::::::::::::::::::::::::
-                // compute the actual intersectin point
+                // at this point, we have established that the segment actually intersects the plane [properly]
 
-                // NOTE: if using doubles, then here we just care about getting the intersection point
-                // irrespective of whether "segment_intersection_result" is consistent with "segment_intersection_type".
+                // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+                // Now we compute the actual intersection point (coordinates)
+                // and check whether it lies inside our polygon, or that GP has been violated,
+                // which happens if e.g. the intersection point lies on an edge/vertex of "tested_face")
+
+                // NOTE: if using fixed precision floats (i.e. double), then here we just care about getting the intersection point
+                // irrespective of whether "segment_intersection_result" is consistent with "segment_intersection_type" from above.
                 // The inconsistency can happen during edge cases. see e.g. test 42.
                 char segment_intersection_result = geom::compute_segment_plane_intersection(
                     intersection_point,
@@ -2023,6 +2068,7 @@ void dispatch(output_t& output, const input_t& input)
                     tested_edge_h0_source_vertex,
                     tested_edge_h0_target_vertex);
 
+                // is our intersection point in the polygon?
                 char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                     intersection_point,
                     tested_face_vertices.data(),
@@ -2036,8 +2082,6 @@ void dispatch(output_t& output, const input_t& input)
                     if (!input.enforce_general_position) {
                         // Our assuption of having inputs in general position has been violated, we need to terminate
                         // with an error since perturbation (enforment of general positions) is disabled.
-                        // This is because our intersection registry formulation requires that edges completely
-                        // penetrate/intersect through polygon's area.
                         lg.set_reason_for_failure("invalid point-in-polygon test result ('" + std::to_string(in_poly_test_intersection_type) + "')");
                     }
                     return;
@@ -2048,7 +2092,7 @@ void dispatch(output_t& output, const input_t& input)
                 lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;
 
                 if (have_point_in_polygon) { // NOTE: point must be [inside] the polygon for us to consider it further
-
+#if 0
                     // Intersection point is now determined to be in side face-B (our polygon), now we must use the information
                     // we computed from the segment-plane intersection test to find out if general position has been violated (i.e.
                     // invalid case of cutting through a vertex)
@@ -2065,20 +2109,23 @@ void dispatch(output_t& output, const input_t& input)
                         }
                         return;
                     }
-
                     vd_t pre_existing_copy = mesh_t::null_vertex(); // set to correct value if intersection has already been computed
+#endif
+                    // The naming convention of these variables is based on Sifakis et al. 2007
+                    //hd_t halfedge_pq = tested_edge_h0; // the halfedge which is intersected with polygon
+                    //hd_t halfedge_pq_opp = tested_edge_h1; // ps.opposite(halfedge_pq);
+                    fd_t face_pqr = tested_edge_face; // the face which is incident to halfedge-pq
+                    fd_t face_xyz = tested_face; // the face which is intersected with halfedge-pq
+                    fd_t face_pqs = tested_edge_face == tested_edge_h0_face ? tested_edge_h1_face : mesh_t::null_face(); //ps.face(halfedge_pq_opp); // the face which is incident to the halfedge opposite to halfedge-pq
+                    //fd_t face_pqX = mesh_t::null_face(); // a virtual face pqX (where X denotes an unspecified auxiliary point)
+
+#if 0
+                    
 
                     // add vertex if it does not exist.
                     // --------------------------------
 
-                    // The naming convention of these variables is based on Sifakis et al. 2007
-                    hd_t halfedge_pq = tested_edge_h0; // the halfedge which is intersected with polygon
-                    hd_t halfedge_pq_opp = tested_edge_h1; // ps.opposite(halfedge_pq);
-                    fd_t face_pqr = tested_edge_face; // the face which is incident to halfedge-pq
-                    fd_t face_xyz = tested_face; // the face which is intersected with halfedge-pq
-                    fd_t face_pqs = tested_edge_face == tested_edge_h0_face ? tested_edge_h1_face : mesh_t::null_face(); //ps.face(halfedge_pq_opp); // the face which is incident to the halfedge opposite to halfedge-pq
-                    fd_t face_pqX = mesh_t::null_face(); // a virtual face pqX (where X denotes an unspecified auxiliary point)
-
+                   
                     const bool pq_is_indicent_on_pqr_and_pqs = (face_pqs != mesh_t::null_face()); // pq is common to faces pqr and pqs
                     std::vector<fd_t> new_vertex_incident_ps_faces; // the list of faces which are incident to our intersection point
                     // NOTE: Two intersection vertices are same if they are incident on the same faces AND their registry halfedges are opposites
@@ -2099,9 +2146,9 @@ void dispatch(output_t& output, const input_t& input)
                         new_vertex_incident_ps_faces.push_back(face_pqX); // virtual face
                         new_vertex_incident_ps_faces.push_back(face_xyz);
                     }
-
+#endif
                     vd_t new_vertex_descr = m0.add_vertex(intersection_point);
-
+#if 0
                     lg << "add vertex" << std::endl;
                     lg.indent();
                     std::cout << "position = (" << intersection_point << ")" << std::endl;
@@ -2112,7 +2159,7 @@ void dispatch(output_t& output, const input_t& input)
                     lg << "halfedge = " << hstr(ps, halfedge_pq) << std::endl;
                     lg.unindent();
                     lg.unindent();
-
+#endif
                     //m0_ivtx_to_ps_faces.insert(std::make_pair(new_vertex_descr, new_vertex_incident_ps_faces));
                     //m0_ivtx_to_ps_edge.insert(std::make_pair(new_vertex_descr, tested_edge));
                     MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(new_vertex_descr) == m0_ivtx_to_intersection_registry_entry.cend());
@@ -2442,12 +2489,11 @@ void dispatch(output_t& output, const input_t& input)
 
                 if (cutpath_edge_exists == false) {
 
-                    bool edge_lies_on_intersecting_polygons = true;
-                    // Here we also check whether the edge actually lies on the area of the [shared polygons]
+                    // Here we also check whether the edge actually lies on the area of two [shared polygons]
                     // in the registry entries of its vertices. This operation is fundamentally geometric
                     // and cannot be resolved using topology (we have insufficient information to identify
                     // intersection edges). See benchmark test 34
-                    // Thus, we will not add the edge if its mid-point does not lie in the area of [any]
+                    // Thus, we will not add the edge if its mid-point does not lie in the area of [two]
                     // of the shared faces in the resgistry entries of its vertices (intersection points)..
                     std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator find_iter = m0_ivtx_to_intersection_registry_entry.cend();
 
@@ -2474,7 +2520,8 @@ void dispatch(output_t& output, const input_t& input)
                     const math::vec3& tgt_vertex_coords = m0.vertex(tgt_vertex);
                     const math::vec3 midpoint = (tgt_vertex_coords + src_vertex_coords) * math::real_number_t(0.5);
 
-                    // for each shared
+                    std::vector<int> shared_faces_containing_edge;
+                    // for each shared face
                     for (std::vector<fd_t>::const_iterator sf_iter = shared_faces.cbegin(); sf_iter != shared_faces.cend(); ++sf_iter) {
 
                         fd_t shared_face = *sf_iter;
@@ -2489,13 +2536,15 @@ void dispatch(output_t& output, const input_t& input)
                             (int)shared_face_vertices.size(),
                             shared_face_normal_max_comp);
 
-                        if (in_poly_test_intersection_type != 'i') {
-                            edge_lies_on_intersecting_polygons = false;
-                            break;
+                        if (in_poly_test_intersection_type == 'i') {
+                            const int idx = (int)std::distance(shared_faces.cbegin(), sf_iter);
+                            shared_faces_containing_edge.push_back(idx);
                         }
                     }
 
-                    if (edge_lies_on_intersecting_polygons) {
+                    MCUT_ASSERT((int)shared_faces_containing_edge.size() <= 2);
+
+                    if ((int)shared_faces_containing_edge.size() == 2) {
                         lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;
 
                         const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
@@ -2504,15 +2553,19 @@ void dispatch(output_t& output, const input_t& input)
                         m0_cutpath_edges.emplace_back(m0.edge(h));
 
                         // NOTE: here we add all edge without assuming anything about which of the will be used to clip either polygon
-                        ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
-                        ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
+                        //ps_iface_to_m0_edge_list[sm_face].emplace_back(m0_cutpath_edges.back());
+                        //ps_iface_to_m0_edge_list[cm_face].emplace_back(m0_cutpath_edges.back());
+                        for (std::vector<int>::const_iterator i = shared_faces_containing_edge.cbegin(); i != shared_faces_containing_edge.cend(); ++i) {
+                            const fd_t shared_face = shared_faces.at(*i);
+                            ps_iface_to_m0_edge_list[shared_face].emplace_back(m0_cutpath_edges.back());
+                        }
 
-                        update_neighouring_ps_iface_m0_edge_list(src_vertex, tgt_vertex, ps,
-                            sm_face,
-                            cm_face,
-                            m0_ivtx_to_intersection_registry_entry,
-                            ps_iface_to_m0_edge_list,
-                            m0_cutpath_edges);
+                        //update_neighouring_ps_iface_m0_edge_list(src_vertex, tgt_vertex, ps,
+                        //    sm_face,
+                        //    cm_face,
+                        //    m0_ivtx_to_intersection_registry_entry,
+                        //    ps_iface_to_m0_edge_list,
+                        //    m0_cutpath_edges);
 
                         MCUT_ASSERT(m0.target(h) == tgt_vertex);
                         ivtx_to_incoming_hlist[tgt_vertex].push_back(h);
@@ -2757,6 +2810,9 @@ void dispatch(output_t& output, const input_t& input)
                         MCUT_ASSERT(m0_ivtx_to_disjoint_implicit_cutpath_sequence.count(next_vertex) == 1);
                     }
                 } // if (current_edge_is_terminal == false) {
+                else {
+                    m0_ivtx_to_disjoint_implicit_cutpath_sequence[next_vertex] = current_disjoint_implicit_cutpath_sequence_index;
+                }
             } // if (!reached_end_of_sequence) {
 
             lg.unindent();
@@ -2783,6 +2839,10 @@ void dispatch(output_t& output, const input_t& input)
     m0_edge_to_disjoint_implicit_cutpath_sequence.clear(); // free
 
     lg << "create explicit cut-path sequences" << std::endl;
+
+#if 1
+    std::vector<std::vector<ed_t>> m0_explicit_cutpath_sequences = m0_implicit_cutpath_sequences;
+#else // NOTE the commented out code is not no longer needed
 
     std::vector<std::vector<ed_t>> m0_explicit_cutpath_sequences;
 
@@ -2979,7 +3039,7 @@ void dispatch(output_t& output, const input_t& input)
         lg.unindent();
         lg.unindent();
     }
-
+#endif
     m0_ivtx_to_cutpath_edges.clear(); // free
     m0_implicit_cutpath_sequences.clear(); // free
 
@@ -3987,7 +4047,7 @@ void dispatch(output_t& output, const input_t& input)
                 lg.unindent();
             }
 
-            // After gathering the vertices above, we will not collect edges on the face
+            // After gathering the vertices above, we will now collect edges on the face
             // -------------------------------------------------------------------------
 
             // edges on face
@@ -4259,10 +4319,10 @@ void dispatch(output_t& output, const input_t& input)
                 //------------
                 //
                 //the asterisk represents intersection vertices
-#if 0
+
                 bool apply_filtering = iedge_set.size() >= 3;
 
-                if (apply_filtering) { // TODO: no need for filtering anymore
+                if (apply_filtering) {
 
                     // b. apply filtering
 
@@ -4290,6 +4350,7 @@ void dispatch(output_t& output, const input_t& input)
                         }
                     }
 
+                    // TODO: we dont need this because of new polygon partitioning code, which implies that we will never encounter the situation described
                     // Here, we check for one condition before we proceed with filtering:
                     // 1) that there is at-least one vertex (i.e. in "iedge_set_vertices") which lies on a halfedge
                     //    (i.e. the boundary) of the currently clipped face (ps_face).
@@ -4430,7 +4491,7 @@ void dispatch(output_t& output, const input_t& input)
                             }
                             return found;
                         });
-
+#if 0
                     if (terminal_vertex_count == 0) {
                         // NOTE: this signifies an that we have encountered `floating patch`.
                         // A `floating patch` is arises when our edges in the set do not have a terminal
@@ -4441,7 +4502,16 @@ void dispatch(output_t& output, const input_t& input)
                         lg << "skip filtering : interior edge sequence forms loop (floating patch)." << std::endl;
                         continue;
                     }
-
+#else
+                    MCUT_ASSERT(terminal_vertex_count != 0); // poly-partitioning prevents this!
+                    MCUT_ASSERT(terminal_vertex_count >= 2);
+                    if (terminal_vertex_count > 2) {
+                        // no need to filter because the edges in the set are disjoint (they do not form a connected sequence).
+                        // This means we have iedges that will not be used to trace any polygon.
+                        // i.e. the tracing will discover an invalid poly and discard it!
+                        continue;
+                    }
+#endif
                     MCUT_ASSERT(terminal_vertex_count == 2); // verify that there are exactly two vertices associated with only one edge each
 
                     // get any terminal vertex
@@ -4526,7 +4596,6 @@ void dispatch(output_t& output, const input_t& input)
                     lg << std::endl;
 
                 } // end of edge filtering
-#endif
             }
 
             // dump the final set of edges to be used for clipping

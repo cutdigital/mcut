@@ -25,37 +25,13 @@
 
 #include "mcut/internal/math.h"
 
-/* geometric predicates described by Shewchuk in: shewchuk.c
-  *
-  * Routines for Arbitrary Precision Floating-point Arithmetic and
-  * Fast Robust Geometric Predicates
-  */
+// Shewchuk predicates : shewchuk.c
 extern "C" {
-double orient2d(const double* pa,
-    const double* pb,
-    const double* pc);
-
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-double orient3d(const double* pa,
-    const double* pb,
-    const double* pc,
-    const double* pd);
-
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-double incircle(const double* pa,
-    const double* pb,
-    const double* pc,
-    const double* pd);
-
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-double insphere(const double* pa,
-    const double* pb,
-    const double* pc,
-    const double* pd,
-    const double* pe);
+void exactinit();
+double orient2d(const double* pa, const double* pb, const double* pc);
+double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
+double incircle(const double* pa, const double* pb, const double* pc, const double* pd);
+double insphere(const double* pa, const double* pb, const double* pc, const double* pd, const double* pe);
 }
 
 namespace mcut {
@@ -71,6 +47,32 @@ namespace geom {
         math::real_number_t& d_coeff,
         const math::vec3* polygon_vertices,
         const int polygon_vertex_count);
+
+    // Compute the intersection point between a line (not a segment) and a plane defined by a polygon.
+    //
+    // Parameters:
+    //  'p' : output intersection point (computed if line does indeed intersect the plane)
+    //  'q' : first point defining your line
+    //  'r' : second point defining your line
+    //  'polygon_vertices' : the vertices of the polygon defineing the plane (assumed to not be degenerate)
+    //  'polygon_vertex_count' : number of olygon vertices
+    //  'polygon_normal_max_comp' : largest component of polygon normal.
+    //  'polygon_plane_normal' : normal of the given polygon
+    //  'polygon_plane_d_coeff' : the distance coefficient of the plane equation corresponding to the polygon's plane
+    //
+    // Return values:
+    // '0': line is parallel to plane or polygon is degenerate (within available precision)
+    // '1': an intersection exists.
+    // 'p': q and r lie in the plane (technically they are parallel to the plane too).
+    char compute_line_plane_intersection(
+        math::vec3& p, //intersection point
+        const math::vec3& q,
+        const math::vec3& r,
+        const math::vec3* polygon_vertices,
+        const int polygon_vertex_count,
+        const int polygon_normal_max_comp,
+        const math::vec3& polygon_plane_normal,
+        const math::real_number_t& polygon_plane_d_coeff);
 
     // Test if a line segment intersects with a plane, and yeild the intersection point if so.
     //
@@ -134,6 +136,8 @@ namespace geom {
         const math::vec3* polygon_vertices,
         const int polygon_vertex_count,
         const int polygon_plane_normal_largest_component);
+
+    bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c, math::real_number_t& predResult);
 
     bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c);
 

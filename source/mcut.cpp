@@ -848,6 +848,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pContext, McFlags flag
     }
     *pContext = ret.first->first;
 
+    ::exactinit();
+
     return result;
 }
 
@@ -2004,8 +2006,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         fpGetEdgeVertexCoords(edgeIdx, edgeV0, edgeV1);
 
                         const mcut::math::vec2 midPoint(
-                            (edgeV0.x() + edgeV1.x()) * .5, //
-                            (edgeV0.y() + edgeV1.y()) * .5);
+                            (edgeV0.x() + edgeV1.x()) / 2, //
+                            (edgeV0.y() + edgeV1.y()) / 2);
 
                         return midPoint;
                     };
@@ -2074,10 +2076,23 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                                                     const mcut::math::vec2& segStart,
                                                     const mcut::math::vec2& segEnd,
                                                     const std::vector<mcut::math::vec2>& polyVerts) -> bool {
+                            mcut::math::real_number_t predResult(0xdeadbeef);
                             for (std::vector<mcut::math::vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it) {
-                                if (mcut::geom::collinear(segStart, segEnd, (*it))) {
+#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+                                bool are_collinear = mcut::geom::collinear(segStart, segEnd, (*it));
+                                if (are_collinear) {
                                     return true;
                                 }
+#else
+                                bool are_collinear = mcut::geom::collinear(segStart, segEnd, (*it), predResult);
+                                // last ditch attempt to prevent the possibility of creating a partitioning
+                                // edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
+                                // see: test41
+                                const double epsilon = 1e-9;
+                                if (are_collinear || (!are_collinear && epsilon > std::fabs(predResult))) {
+                                    return true;
+                                }
+#endif
                             }
                             return false;
                         }; // end lambda
