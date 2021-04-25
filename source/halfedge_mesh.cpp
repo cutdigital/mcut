@@ -754,9 +754,9 @@ void read_off(mcut::mesh_t& mesh, const char* fpath)
         }
         std::istringstream vtx_line_stream(info);
 
-        long double x;
-        long double y;
-        long double z;
+        double x;
+        double y;
+        double z;
         vtx_line_stream >> x >> y >> z;
         vmap[i] = mesh.add_vertex(x, y, z);
     }

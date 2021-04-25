@@ -144,6 +144,7 @@ typedef enum McConnectedComponentType {
     MC_CONNECTED_COMPONENT_TYPE_FRAGMENT = (1 << 0), /**< A connected component which is originates from the source-mesh. */
     MC_CONNECTED_COMPONENT_TYPE_PATCH = (1 << 2), /**< A connected component which is originates from the cut-mesh. */
     MC_CONNECTED_COMPONENT_TYPE_SEAM = (1 << 3), /**< A connected component which is the same as either the source-mesh or the cut-mesh, but with additional edges defining the intersection contour (seam). */
+    MC_CONNECTED_COMPONENT_TYPE_INPUT = (1 << 4), /*  TODO: add documentation*/
     MC_CONNECTED_COMPONENT_TYPE_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McConnectedComponentType;
 
@@ -197,6 +198,19 @@ typedef enum McSeamOrigin {
     MC_SEAM_ORIGIN_CUTMESH = 1 << 1, /**< Seam connected component from the input cut mesh. */
     MC_SEAM_ORIGIN_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McSeamOrigin;
+
+/**
+ * \enum McInputOrigin
+ * @brief The user-provided input mesh from which an input connected component is derived.
+ *
+ * This enum structure defines the possible origins of a input connected component, which can be either the source-mesh or the cut-mesh.
+ * Note: the number of elements (faces and vertices) in an input connected component will be the same [or greater] than the corresponding user-provided input mesh from which the respective connected component came from. The input connect component will contain more elements if MCUT detected an intersection configuration where the cut-mesh will create a hole in a face of the source mesh but without severing the edges of the source mesh face (and vice versa). 
+ */
+typedef enum McInputOrigin {
+    MC_INPUT_ORIGIN_SRCMESH = 1 << 0, /**< Input connected component from the input source mesh.*/
+    MC_INPUT_ORIGIN_CUTMESH = 1 << 1, /**< Input connected component from the input cut mesh. */
+    MC_INPUT_ORIGIN_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
+} McInputOrigin;
 
 /**
  * \enum McConnectedComponentData

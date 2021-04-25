@@ -74,7 +74,7 @@ namespace math {
 
     std::ostream& operator<<(std::ostream& os, const vec3& v)
     {
-        return os << static_cast<long double>(v.x()) << ", " << static_cast<long double>(v.y()) << ", " << static_cast<long double>(v.z());
+        return os << static_cast<double>(v.x()) << ", " << static_cast<double>(v.y()) << ", " << static_cast<double>(v.z());
     }
 
     std::ostream& operator<<(std::ostream& os, const matrix_t& m)

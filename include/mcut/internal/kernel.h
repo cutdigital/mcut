@@ -100,9 +100,9 @@ struct floating_polygon_info_t {
     // This is a pointer to input_t::src_mesh or input_t::cut_mesh
     // const mesh_t* origin_mesh = nullptr;
     // largest component of the normal of the origin_face
-    int origin_face_normal_largest_comp = -1;
+    int projection_component = -1;
     // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
-    std::vector<math::vec3> floating_polygon_vertex_positions;
+    std::vector<math::vec3> polygon_vertices;
 };
 
 //

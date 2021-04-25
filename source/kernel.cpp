@@ -3404,7 +3404,7 @@ void dispatch(output_t& output, const input_t& input)
             //fpi.origin_mesh = ps_face_is_from_cutmesh ? input.cut_mesh : input.src_mesh;
             //const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
             //fpi.origin_face = (ps_face_is_from_cutmesh ? fd_t(shared_registry_entry_intersected_face - cm_faces_start_offset) : shared_registry_entry_intersected_face);
-            fpi.floating_polygon_vertex_positions.clear();
+            fpi.polygon_vertices.clear();
 
             vertex_prev = mesh_t::null_vertex();
             for (std::vector<ed_t>::const_iterator cp_edge_iter = cutpath_sequence.cbegin(); cp_edge_iter != cutpath_sequence.cend(); cp_edge_iter++) {
@@ -3414,12 +3414,12 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(v != vertex_prev);
                 }
 
-                fpi.floating_polygon_vertex_positions.emplace_back(m0.vertex(v));
+                fpi.polygon_vertices.emplace_back(m0.vertex(v));
                 vertex_prev = v;
             }
 
             MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(shared_registry_entry_intersected_face) != ps_tested_face_to_plane_normal_max_comp.end());
-            fpi.origin_face_normal_largest_comp = ps_tested_face_to_plane_normal_max_comp.at(shared_registry_entry_intersected_face); // used for 2d project
+            fpi.projection_component = ps_tested_face_to_plane_normal_max_comp.at(shared_registry_entry_intersected_face); // used for 2d project
         }
     }
 

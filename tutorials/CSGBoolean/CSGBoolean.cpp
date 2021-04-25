@@ -38,7 +38,7 @@ struct InputMesh {
 
 int main(int argc, char* argv[])
 {
-    // 1. load meshes.
+    // load meshes.
     // -----------------
     InputMesh srcMesh;
 
@@ -101,13 +101,13 @@ int main(int argc, char* argv[])
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.size(), (int)cutMesh.F.size());
 
-    // 2. create a context
+    // create a context
     // -------------------
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
     assert(err == MC_NO_ERROR);
 
-    // 3. do the cutting (boolean ops)
+    //  do the cutting (boolean ops)
     // -------------------------------
     printf("\nInputs: \n\tShape A = 'cube.obj'.\n\tShape B = 'torus.obj'\n\n");
 
@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
         err = mcDispatch(
             context,
             MC_DISPATCH_VERTEX_ARRAY_DOUBLE | // vertices are in array of doubles
-                MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessarys
+                MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessary
                 boolOpFlags, // filter flags which specify the type of output we want
             // source mesh
             reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
 
         assert(err == MC_NO_ERROR);
 
-        // 4. query the number of available connected component (all types)
+        // query the number of available connected component (all types)
         // -------------------------------------------------------------
         uint32_t numConnComps;
         err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
@@ -168,13 +168,13 @@ int main(int argc, char* argv[])
 
         assert(err == MC_NO_ERROR);
 
-        // 5. query the data of each connected component from MCUT
+        // query the data of each connected component from MCUT
         // -------------------------------------------------------
 
         McConnectedComponent connComp = connectedComponents[0];
         uint64_t numBytes = 0;
 
-        // 5.1 query the number of vertices
+        // query the number of vertices
         // --------------------------------
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.2 query the vertices
+        // query the vertices
         // ----------------------
 
         numBytes = 0;
@@ -193,7 +193,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.3 query the faces
+        // query the faces
         // -------------------
 
         numBytes = 0;
@@ -203,7 +203,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.4 query the face sizes
+        // query the face sizes
         // ------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.5 query the face map
+        // query the face map
         // ------------------------
         const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
 

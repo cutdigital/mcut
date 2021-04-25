@@ -37,7 +37,7 @@ bool compare(double x, double y)
 
 int main(int argc, char* argv[])
 {
-    // 1. load meshes.
+    //  load meshes.
     // -----------------
     InputMesh srcMesh;
 
@@ -105,14 +105,14 @@ int main(int argc, char* argv[])
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.size(), (int)cutMesh.F.size());
 
-    // 2. create an MCUT context
+    //  create an MCUT context
     // -------------------------
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_DEBUG);
 
     assert(err == MC_NO_ERROR);
 
-    // 3. do the cutting
+    //  do the cutting
     // -----------------
     err = mcDispatch(
         context,
@@ -132,7 +132,47 @@ int main(int argc, char* argv[])
 
     assert(err == MC_NO_ERROR);
 
-    // 4. query the number of available connected component (all types)
+    // Here we query for the "input connected components", from which we will get the number
+    // of source mesh vertices and faces that are used by MCUT _internally_ for the src-mesh.
+    // ------------------------------------------------------------------------------------
+    uint32_t numInputConnComps = 0;
+    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_INPUT, 0, NULL, &numInputConnComps);
+    assert(err == MC_NO_ERROR);
+    assert(numInputConnComps == 2); // always two (sm & cm)
+    std::vector<McConnectedComponent> inputConnComps(numInputConnComps);
+    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_INPUT, numInputConnComps, inputConnComps.data(), NULL);
+    assert(err == MC_NO_ERROR);
+
+    uint32_t internalSrcMeshVertexCount = 0;
+    uint32_t internalSrcMeshFaceCount = 0;
+
+    for (int i = 0; i < (int)numInputConnComps; ++i) {
+        McConnectedComponent inCC = inputConnComps.at(i);
+
+        McInputOrigin origin = McInputOrigin::MC_INPUT_ORIGIN_ALL;
+        err = mcGetConnectedComponentData(context, inCC, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL);
+        assert(origin == McInputOrigin::MC_INPUT_ORIGIN_SRCMESH || origin == McInputOrigin::MC_INPUT_ORIGIN_CUTMESH);
+
+        if (origin == McInputOrigin::MC_INPUT_ORIGIN_CUTMESH) {
+            continue;
+        }
+
+        uint32_t numVertices = 0;
+        err = mcGetConnectedComponentData(context, inCC, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numVertices, NULL);
+        assert((int)numVertices > 0);
+
+        uint32_t numFaces = 0;
+        err = mcGetConnectedComponentData(context, inCC, MC_CONNECTED_COMPONENT_DATA_FACE_COUNT, sizeof(uint32_t), &numFaces, NULL);
+        assert((int)numFaces > 0);
+
+        internalSrcMeshVertexCount = numVertices;
+        internalSrcMeshFaceCount = numFaces;
+    }
+
+    assert((int)internalSrcMeshVertexCount > 0);
+    assert((int)internalSrcMeshFaceCount > 0);
+
+    //  query the number of available connected component (all types)
     // ----------------------------------------------------------------
 
     uint32_t numConnectedComponents;
@@ -151,14 +191,14 @@ int main(int argc, char* argv[])
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
     assert(err == MC_NO_ERROR);
 
-    // 5. query the data of each connected component from MCUT
+    //  query the data of each connected component from MCUT
     // -------------------------------------------------------
 
     for (int i = 0; i < (int)connectedComponents.size(); ++i) {
         McConnectedComponent connComp = connectedComponents[i]; // connected compoenent id
         uint64_t numBytes = 0;
 
-        // 5.1 query the number of vertices
+        //  query the number of vertices
         // --------------------------------
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
         assert(err == MC_NO_ERROR);
@@ -166,7 +206,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.2 query the vertices
+        //  query the vertices
         // ----------------------
 
         numBytes = 0;
@@ -177,7 +217,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.3 query the faces
+        //  query the faces
         // -------------------
 
         numBytes = 0;
@@ -187,7 +227,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.4 query the face sizes
+        //  query the face sizes
         // ------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
@@ -196,7 +236,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.5 query the vertex map
+        //  query the vertex map
         // ------------------------
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes);
@@ -205,7 +245,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, numBytes, ccVertexMap.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 5.5 query the face map
+        //  query the face map
         // -----------------------
         const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
@@ -214,7 +254,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        // 6 resolve fragment name
+        //  resolve fragment name
         // -------------------------
 
         // Here we create a name the connected component based on its properties
@@ -231,6 +271,8 @@ int main(int argc, char* argv[])
 
         if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
             name += "seam";
+        } else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            name += "input";
         } else {
             isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
             name += isFragment ? "frag" : "patch";
@@ -255,14 +297,22 @@ int main(int argc, char* argv[])
         bool ccIsFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
         // connected-components is not a fragment && it is a seam
-        if (!ccIsFromSrcMesh && ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
-            // get origin
-            McSeamOrigin ccOrig = (McSeamOrigin)0;
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
-            assert(err = MC_NO_ERROR);
+        if (!ccIsFromSrcMesh) {
+            if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
+                // get origin
+                McSeamOrigin ccOrig = (McSeamOrigin)0;
+                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
+                assert(err == MC_NO_ERROR);
 
-            ccIsFromSrcMesh = (ccOrig == McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
-            name += ccIsFromSrcMesh ? ".sm" : ".cm";
+                ccIsFromSrcMesh = (ccOrig == McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
+                name += ccIsFromSrcMesh ? ".sm" : ".cm";
+            } else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+                McInputOrigin ccOrig = (McInputOrigin)0;
+                err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &ccOrig, NULL);
+                assert(err == MC_NO_ERROR);
+                ccIsFromSrcMesh = (ccOrig == McInputOrigin::MC_INPUT_ORIGIN_SRCMESH);
+                name += ccIsFromSrcMesh ? ".sm" : ".cm";
+            }
         }
 
         int faceVertexOffsetBase = 0;
@@ -281,13 +331,13 @@ int main(int argc, char* argv[])
             // to distinguish between source-mesh and cut-mesh faces).
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh face index (we don't know yet)
             // ** This is how we infer which mapped indices belong to the source-mesh or the cut-mesh.
-            const bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.size());
+            const bool faceIsFromSrcMesh = (imFaceIdxRaw < internalSrcMeshFaceCount);
             bool flipNormalsOnFace = false;
             // Now compute the actual input mesh face index (accounting for offset)
             uint32_t imFaceIdx = imFaceIdxRaw;
 
             if (!faceIsFromSrcMesh) { // if the current face is from the cut-mesh
-                imFaceIdx = (imFaceIdxRaw - srcMesh.F.size()); // accounting for offset
+                imFaceIdx = (imFaceIdxRaw - internalSrcMeshFaceCount); // accounting for offset
                 // check if we need to flip normals on the face
                 flipNormalsOnFace = (isFragment && fragmentLocation == MC_FRAGMENT_LOCATION_ABOVE);
             }
@@ -299,12 +349,12 @@ int main(int argc, char* argv[])
 
                 const int ccVertexIdx = ccFaceIndices.at((uint64_t)faceVertexOffsetBase + v);
                 const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
-                bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMesh.V.size());
+                bool vertexIsFromSrcMesh = (imVertexIdxRaw < internalSrcMeshVertexCount);
                 const bool isSeamVertex = (imVertexIdxRaw == MC_UNDEFINED_VALUE); // i.e. a vertex along the cut-path (an intersection point)
                 uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                 if (!vertexIsFromSrcMesh) {
-                    imVertexIdx = (imVertexIdxRaw - srcMesh.V.size()); // account for offset
+                    imVertexIdx = (imVertexIdxRaw - internalSrcMeshVertexCount); // account for offset
                 }
 
                 const InputMesh* inputMeshPtr = faceIsFromSrcMesh ? &srcMesh : &cutMesh;
