@@ -22,7 +22,6 @@ struct DebugContextConfig {
     McContext context_;
 };
 
-
 MCAPI_ATTR void mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
@@ -31,15 +30,21 @@ MCAPI_ATTR void mcDebugOutput(McDebugSource source,
     const char* message,
     const void* userParam)
 {
-    // blah... 
+    // blah...
+    source;
+    type;
+    id;
+    severity;
+    length;
+    message;
+    userParam;
 }
-
 
 UTEST_F_SETUP(DebugContextConfig)
 {
-McResult err = mcCreateContext(&utest_fixture->context_, MC_DEBUG);
-        EXPECT_TRUE(utest_fixture->context_ != nullptr);
-        EXPECT_EQ(err, MC_NO_ERROR);
+    McResult err = mcCreateContext(&utest_fixture->context_, MC_DEBUG);
+    EXPECT_TRUE(utest_fixture->context_ != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
 }
 
 UTEST_F_TEARDOWN(DebugContextConfig)
@@ -47,7 +52,6 @@ UTEST_F_TEARDOWN(DebugContextConfig)
     McResult err = mcReleaseContext(utest_fixture->context_);
     EXPECT_EQ(err, MC_NO_ERROR);
 }
-
 
 UTEST_F(DebugContextConfig, queryContextDebugFlag)
 {

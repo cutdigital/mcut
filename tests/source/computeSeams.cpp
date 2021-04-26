@@ -127,8 +127,8 @@ UTEST_F(SeamConnectedComponent, queryVertices)
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
-        McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
+    for (int c = 0; c < (int)utest_fixture->connComps_.size(); ++c) {
+        McConnectedComponent cc = utest_fixture->connComps_[c]; // connected compoenent id
 
         uint32_t numberOfVertices = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);

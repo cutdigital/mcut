@@ -23,7 +23,7 @@ struct DataMapsQueryTest {
     std::vector<uint32_t> pCutMeshFaceIndices;
     std::vector<uint32_t> pCutMeshFaceSizes;
 
-    McFlags dispatchflags;
+    McFlags dispatchflags = 0;
 };
 
 #define NUMBER_OF_TESTS 6
@@ -167,15 +167,17 @@ UTEST_I_SETUP(DataMapsQueryTest)
 
 UTEST_I_TEARDOWN(DataMapsQueryTest)
 {
-    utest_fixture->pSrcMeshVertices.clear();
-    utest_fixture->pSrcMeshFaceIndices.clear();
-    utest_fixture->pSrcMeshFaceSizes.clear();
-    utest_fixture->pCutMeshVertices.clear();
-    utest_fixture->pCutMeshFaceIndices.clear();
-    utest_fixture->pCutMeshFaceSizes.clear();
-    EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->context_, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data()), MC_NO_ERROR);
-    utest_fixture->connComps_.clear();
-    EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
+    if (utest_index < (size_t)NUMBER_OF_TESTS) {
+        utest_fixture->pSrcMeshVertices.clear();
+        utest_fixture->pSrcMeshFaceIndices.clear();
+        utest_fixture->pSrcMeshFaceSizes.clear();
+        utest_fixture->pCutMeshVertices.clear();
+        utest_fixture->pCutMeshFaceIndices.clear();
+        utest_fixture->pCutMeshFaceSizes.clear();
+        EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->context_, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data()), MC_NO_ERROR);
+        utest_fixture->connComps_.clear();
+        EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
+    }
 }
 
 UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
@@ -213,8 +215,8 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
     uint32_t internalCutMeshVertexCount = 0;
     uint32_t internalCutMeshFaceCount = 0;
 
-    for (int i = 0; i < (int)numInputConnComps; ++i) {
-        McConnectedComponent inCC = inputConnComps.at(i);
+    for (int c = 0; c < (int)numInputConnComps; ++c) {
+        McConnectedComponent inCC = inputConnComps.at(c);
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, inCC, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
@@ -338,9 +340,6 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
             uint32_t ccFaceCount = (uint32_t)(numBytes / sizeof(uint32_t));
             ASSERT_GT((int)ccFaceCount, 0);
 
-            McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
-            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-
             numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
             ASSERT_EQ(numBytes / sizeof(uint32_t), ccFaceCount);
@@ -350,8 +349,8 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
 
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, faceMap.size() * sizeof(uint32_t), faceMap.data(), NULL), MC_NO_ERROR);
 
-            for (int i = 0; i < (int)ccFaceCount; i++) {
-                const uint32_t imFaceIdxRaw = faceMap[i];
+            for (int v = 0; v < (int)ccFaceCount; v++) {
+                const uint32_t imFaceIdxRaw = faceMap[v];
                 bool faceIsFromSrcMesh = (imFaceIdxRaw < internalSrcMeshVertexCount);
 
                 ASSERT_TRUE(imFaceIdxRaw != MC_UNDEFINED_VALUE); // all face indices are mapped!

@@ -29,7 +29,7 @@ struct InputMesh {
     std::vector<double> vertexCoordsArray; // vertex coords
 };
 
-int main(int argc, char* argv[])
+int main()
 {
     // 1. load meshes.
     // -----------------
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
-        srcMesh.faceSizesArray.push_back(f.size());
+        srcMesh.faceSizesArray.push_back((uint32_t)f.size());
     }
 
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.size(), (int)srcMesh.F.size());
@@ -78,23 +78,23 @@ int main(int argc, char* argv[])
     }
 
     // copy vertices
-    for (int i = 0; i < cutMesh.V.size(); ++i) {
+    for (int i = 0; i < (int)cutMesh.V.size(); ++i) {
         const std::vector<double>& v = cutMesh.V[i];
-        assert(v.size() == 3);
+        assert((int)v.size() == 3);
         cutMesh.vertexCoordsArray.push_back(v[0]);
         cutMesh.vertexCoordsArray.push_back(v[1]);
         cutMesh.vertexCoordsArray.push_back(v[2]);
     }
 
     // copy faces
-    for (int i = 0; i < cutMesh.F.size(); ++i) {
+    for (int i = 0; i < (int)cutMesh.F.size(); ++i) {
         const std::vector<int>& f = cutMesh.F[i];
         assert(f.size() == 3);
         for (int j = 0; j < f.size(); ++j) {
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
 
-        cutMesh.faceSizesArray.push_back(f.size());
+        cutMesh.faceSizesArray.push_back((uint32_t)f.size());
     }
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.size(), (int)cutMesh.F.size());
@@ -182,8 +182,8 @@ int main(int argc, char* argv[])
     //  query the data of each connected component from MCUT
     // -------------------------------------------------------
 
-    for (int i = 0; i < (int)connComps.size(); ++i) {
-        McConnectedComponent connComp = connComps[i]; // connected component id
+    for (int ci = 0; ci < (int)connComps.size(); ++ci) {
+        McConnectedComponent connComp = connComps[ci]; // connected component id
         uint64_t numBytes = 0;
 
         //  query the number of ccVertices
@@ -202,7 +202,7 @@ int main(int argc, char* argv[])
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         assert(err == MC_NO_ERROR);
-        std::vector<double> ccVertices(ccVertexCount * 3u, 0);
+        std::vector<double> ccVertices((size_t)ccVertexCount * 3u, 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
@@ -280,7 +280,7 @@ int main(int argc, char* argv[])
                 McFragmentSealType sType = (McFragmentSealType)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sType, NULL);
                 assert(err == MC_NO_ERROR);
-                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".partial" : ".none");
+                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : ".none";
             }
         }
 
@@ -316,7 +316,7 @@ int main(int argc, char* argv[])
         std::vector<int> ccReversedFaces;
 
         // for each face in CC
-        for (int f = 0; f < ccFaceCount; ++f) {
+        for (int f = 0; f < (int)ccFaceCount; ++f) {
 
             // input mesh face index (which may be offsetted!)
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
@@ -420,8 +420,8 @@ int main(int argc, char* argv[])
                     if (ccVertexNormals[ccVertexIdx].norm() == 0) {
                         int faceVertexOffset = -1;
                         // for each vertex index in face
-                        for (Eigen::Index i = 0; i < imFace.size(); ++i) {
-                            if (imFace[i] == imVertexIdx) {
+                        for (int i = 0; i < (int)imFace.size(); ++i) {
+                            if ((int)imFace[i] == (int)imVertexIdx) {
                                 faceVertexOffset = i;
                                 break;
                             }
@@ -453,7 +453,7 @@ int main(int argc, char* argv[])
         // -------------------------
 
         char fnameBuf[64];
-        sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), i);
+        sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), ci);
         std::string fpath(DATA_DIR "/" + std::string(fnameBuf));
 
         printf("write file: %s\n", fpath.c_str());
@@ -462,7 +462,7 @@ int main(int argc, char* argv[])
 
         // write vertices and normals
 
-        for (int i = 0; i < ccVertexCount; ++i) {
+        for (int i = 0; i < (int)ccVertexCount; ++i) {
             double x = ccVertices[(uint64_t)i * 3 + 0];
             double y = ccVertices[(uint64_t)i * 3 + 1];
             double z = ccVertices[(uint64_t)i * 3 + 2];
@@ -475,7 +475,7 @@ int main(int argc, char* argv[])
         // write faces (with normal indices)
 
         faceVertexOffsetBase = 0;
-        for (int i = 0; i < ccFaceCount; ++i) {
+        for (int i = 0; i < (int)ccFaceCount; ++i) {
             int faceSize = faceSizes.at(i);
 
             file << "f ";

@@ -39,14 +39,14 @@ bool compare(double x, double y)
     return std::fabs(x - y) < 1e-6;
 }
 
-int main(int argc, char* argv[])
+int main()
 {
     //  load meshes.
     // -----------------
     InputMesh srcMesh;
 
     // read file
-    srcMesh.fpath = DATA_DIR "/a_.obj"; // DATA_DIR "/a.obj";
+    srcMesh.fpath = /*DATA_DIR "/a_.obj";*/ DATA_DIR "/a.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
     if (!srcMeshLoaded) {
@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
         srcMesh.faceIndicesArray.push_back(f.x());
         srcMesh.faceIndicesArray.push_back(f.y());
         srcMesh.faceIndicesArray.push_back(f.z());
-        srcMesh.faceSizesArray.push_back(f.rows());
+        srcMesh.faceSizesArray.push_back((uint32_t)f.rows());
     }
 
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.rows(), (int)srcMesh.F.rows());
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
     InputMesh cutMesh;
 
     // read file
-    cutMesh.fpath = DATA_DIR "/b_.obj"; // DATA_DIR "/b.obj";
+    cutMesh.fpath = /*DATA_DIR "/b_.obj";*/ DATA_DIR "/b.obj";
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.UV_V, cutMesh.corner_normals, cutMesh.F, cutMesh.UV_F, cutMesh.fNormIndices);
 
     if (!cutMeshLoaded) {
@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
         cutMesh.faceIndicesArray.push_back(f.x());
         cutMesh.faceIndicesArray.push_back(f.y());
         cutMesh.faceIndicesArray.push_back(f.z());
-        cutMesh.faceSizesArray.push_back(f.rows());
+        cutMesh.faceSizesArray.push_back((uint32_t)f.rows());
     }
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.rows(), (int)cutMesh.F.rows());
@@ -217,7 +217,7 @@ int main(int argc, char* argv[])
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         assert(err == MC_NO_ERROR);
-        std::vector<double> ccVertices(ccVertexCount * 3u, 0);
+        std::vector<double> ccVertices((size_t)ccVertexCount * 3u, 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
                 McFragmentSealType sType = (McFragmentSealType)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sType, NULL);
                 assert(err == MC_NO_ERROR);
-                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".partial" : ".none");
+                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : ".none";
             }
         }
 
@@ -341,20 +341,20 @@ int main(int argc, char* argv[])
 
         if (mcutModifiedInputMeshesInternally) {
             // write vertices
-            for (int i = 0; i < ccVertexCount; ++i) {
-                double x = ccVertices[(uint64_t)i * 3 + 0];
-                double y = ccVertices[(uint64_t)i * 3 + 1];
-                double z = ccVertices[(uint64_t)i * 3 + 2];
+            for (int k = 0; k < (int)ccVertexCount; ++k) {
+                double x = ccVertices[(uint64_t)k * 3 + 0];
+                double y = ccVertices[(uint64_t)k * 3 + 1];
+                double z = ccVertices[(uint64_t)k * 3 + 2];
                 file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
             }
 
             // write faces
             faceVertexOffsetBase = 0;
-            for (int i = 0; i < ccFaceCount; ++i) {
-                int faceSize = faceSizes.at(i);
+            for (int k = 0; k < (int)ccFaceCount; ++k) {
+                int faceSize = faceSizes.at(k);
 
                 file << "f ";
-                for (int j = 0; j < faceSize; ++j) {
+                for (int j = 0; j < (int)faceSize; ++j) {
                     const int idx = faceVertexOffsetBase + j;
                     const int ccVertexIdx = ccFaceIndices.at(static_cast<size_t>(idx));
                     file << (ccVertexIdx + 1) << " ";
@@ -376,7 +376,7 @@ int main(int argc, char* argv[])
         std::vector<uint32_t> ccFaceVertexTexCoordIndices;
 
         // for each face in CC
-        for (int f = 0; f < ccFaceCount; ++f) {
+        for (int f = 0; f < (int)ccFaceCount; ++f) {
 
             // input mesh face index (which may be offsetted!)
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
@@ -391,7 +391,7 @@ int main(int argc, char* argv[])
             int faceSize = faceSizes.at(f);
 
             // for each vertex in face
-            for (int v = 0; v < faceSize; ++v) {
+            for (int v = 0; v < (int)faceSize; ++v) {
 
                 const int ccVertexIdx = ccFaceIndices.at((uint64_t)faceVertexOffsetBase + v);
                 // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
@@ -466,9 +466,9 @@ int main(int argc, char* argv[])
 
                     int faceVertexOffset = -1;
                     // for each vertex index in face
-                    for (Eigen::Index i = 0; i < imFace.rows(); ++i) {
-                        if (imFace(i) == imVertexIdx) {
-                            faceVertexOffset = i;
+                    for (int p = 0; p < (int)imFace.rows(); ++p) {
+                        if ((int)imFace(p) == (int)imVertexIdx) {
+                            faceVertexOffset = p;
                             break;
                         }
                     }
@@ -486,11 +486,11 @@ int main(int argc, char* argv[])
                     [&](const Eigen::Vector2d& e) { return compare(e.x(), texCoord.x()) && compare(e.y(), texCoord.y()); });
 
                 if (fiter != ccTexCoords.cend()) {
-                    texCoordIndex = std::distance(ccTexCoords.cbegin(), fiter);
+                    texCoordIndex = (int)std::distance(ccTexCoords.cbegin(), fiter);
                 }
 
                 if (texCoordIndex == -1) { // tex coord not yet stored for CC vertex in face
-                    texCoordIndex = ccTexCoords.size();
+                    texCoordIndex = (int)ccTexCoords.size();
                     ccTexCoords.push_back(texCoord);
                 }
 
@@ -504,27 +504,27 @@ int main(int argc, char* argv[])
         // -------------------------
 
         // write vertices
-        for (int i = 0; i < ccVertexCount; ++i) {
-            double x = ccVertices[(uint64_t)i * 3 + 0];
-            double y = ccVertices[(uint64_t)i * 3 + 1];
-            double z = ccVertices[(uint64_t)i * 3 + 2];
+        for (int k = 0; k < (int)ccVertexCount; ++k) {
+            double x = ccVertices[(uint64_t)k * 3 + 0];
+            double y = ccVertices[(uint64_t)k * 3 + 1];
+            double z = ccVertices[(uint64_t)k * 3 + 2];
             file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
         }
 
         // write tex coords (including duplicates i.e. per face texture coords)
 
-        for (int i = 0; i < ccTexCoords.size(); ++i) {
-            Eigen::Vector2d uv = ccTexCoords[i]; //faceTexCoords[j];
+        for (int k = 0; k < (int)ccTexCoords.size(); ++k) {
+            Eigen::Vector2d uv = ccTexCoords[k]; //faceTexCoords[j];
             file << "vt " << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << uv.x() << " " << uv.y() << std::endl; // texcoords have same index as positions
         }
 
         // write faces
         faceVertexOffsetBase = 0;
-        for (int i = 0; i < ccFaceCount; ++i) {
-            int faceSize = faceSizes.at(i);
+        for (int k = 0; k < (int)ccFaceCount; ++k) {
+            int faceSize = faceSizes.at(k);
 
             file << "f ";
-            for (int j = 0; j < faceSize; ++j) {
+            for (int j = 0; j < (int)faceSize; ++j) {
                 const int idx = faceVertexOffsetBase + j;
                 const int ccVertexIdx = ccFaceIndices.at(static_cast<size_t>(idx));
                 file << (ccVertexIdx + 1) << "/" << ccFaceVertexTexCoordIndices[idx] + 1 << " ";

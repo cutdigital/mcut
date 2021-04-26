@@ -23,8 +23,8 @@
 # You can configure MCUT with the following CMake options:
 #
 #	MCUT_BUILD_AS_SHARED_LIB - Build MCUT as a shared/dynamic library (.so/.dll).
-#	MCUT_BUILD_THE_DOCS - Build documentation (explicit dependancy on Doxygen)
-#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS - Build using arbitrary precision numbers (explicit dependancy on MPFR).
+#	MCUT_BUILD_THE_DOCS - Build documentation (explicit dependancy on Doxygen) 
+#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS - Build using arbitrary precision numbers (BETA MODE ).
 #	MCUT_BUILD_TESTS - Build the tests (implicit dependancy on GoogleTest)
 #	MCUT_BUILD_TUTORIALS - Build tutorials
 #

@@ -36,7 +36,7 @@ struct InputMesh {
     std::vector<double> vertexCoordsArray; // vertex coords
 };
 
-int main(int argc, char* argv[])
+int main()
 {
     // load meshes.
     // -----------------

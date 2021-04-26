@@ -55,7 +55,9 @@ UTEST_I_SETUP(Benchmark)
 
 UTEST_I_TEARDOWN(Benchmark)
 {
-    EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
+    if (utest_index < NUMBER_OF_BENCHMARKS) {
+        EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
+    }
 }
 
 UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
@@ -122,8 +124,8 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
         //
         // query connected component data
         //
-        for (int i = 0; i < (int)connComps.size(); ++i) {
-            McConnectedComponent cc = connComps[i]; // connected compoenent id
+        for (int c = 0; c < (int)connComps.size(); ++c) {
+            McConnectedComponent cc = connComps[c]; // connected compoenent id
 
             uint64_t vertexCountBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes), MC_NO_ERROR);
@@ -156,9 +158,9 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             faceIndices.resize(connCompFaceIndicesBytes / sizeof(uint32_t));
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE, connCompFaceIndicesBytes, faceIndices.data(), NULL), MC_NO_ERROR);
 
-            for (int i = 0; i < (int)faceIndices.size(); ++i) {
-                ASSERT_GE((uint32_t)faceIndices[i], (uint32_t)0);
-                ASSERT_LT((uint32_t)faceIndices[i], numberOfVertices); //  "out of bounds vertex index"
+            for (int v = 0; v < (int)faceIndices.size(); ++v) {
+                ASSERT_GE((uint32_t)faceIndices[v], (uint32_t)0);
+                ASSERT_LT((uint32_t)faceIndices[v], numberOfVertices); //  "out of bounds vertex index"
             }
 
             // face sizes
@@ -171,8 +173,8 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, connCompFaceSizesBytes, faceSizes.data(), NULL), MC_NO_ERROR);
             ASSERT_GT(faceSizes.size(), 0); //  "there has to be at least one face in a connected component"
 
-            for (int i = 0; i < (int)faceSizes.size(); ++i) {
-                ASSERT_GE(faceSizes[i], (uint32_t)3); // "3 is the minimum possible number of vertices in a polygon, which is a triangle"
+            for (int v = 0; v < (int)faceSizes.size(); ++v) {
+                ASSERT_GE(faceSizes[v], (uint32_t)3); // "3 is the minimum possible number of vertices in a polygon, which is a triangle"
             }
 
             // edge indices

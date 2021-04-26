@@ -268,7 +268,7 @@ void writeOFF(
         uint32_t faceVertexCount = pFaceSizes[i];
         fprintf(file, "%d", (int)faceVertexCount);
         int j;
-        for (j = 0; j < faceVertexCount; ++j) {
+        for (j = 0; j < (int)faceVertexCount; ++j) {
             uint32_t* fptr = pFaceIndices + faceBaseOffset + j;
             fprintf(file, " %d", *fptr);
         }

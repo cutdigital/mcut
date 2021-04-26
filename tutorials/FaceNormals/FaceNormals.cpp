@@ -35,7 +35,7 @@ bool compare(double x, double y)
     return std::fabs(x - y) < 1e-6;
 }
 
-int main(int argc, char* argv[])
+int main()
 {
     //  load meshes.
     // -----------------
@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
-        srcMesh.faceSizesArray.push_back(f.size());
+        srcMesh.faceSizesArray.push_back((uint32_t)f.size());
     }
 
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.size(), (int)srcMesh.F.size());
@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
 
-        cutMesh.faceSizesArray.push_back(f.size());
+        cutMesh.faceSizesArray.push_back((uint32_t)f.size());
     }
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.size(), (int)cutMesh.F.size());
@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         assert(err == MC_NO_ERROR);
 
-        std::vector<double> ccVertices(ccVertexCount * 3u, 0.0);
+        std::vector<double> ccVertices((size_t)ccVertexCount * 3u, 0.0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         assert(err == MC_NO_ERROR);
 
@@ -290,7 +290,7 @@ int main(int argc, char* argv[])
                 McFragmentSealType sType = (McFragmentSealType)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sType, NULL);
                 assert(err == MC_NO_ERROR);
-                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : (sType == MC_FRAGMENT_SEAL_TYPE_PARTIAL ? ".partial" : ".none");
+                name += sType == MC_FRAGMENT_SEAL_TYPE_COMPLETE ? ".complete" : ".none";
             }
         }
 
@@ -325,7 +325,7 @@ int main(int argc, char* argv[])
         std::vector<int> ccFaceVertexNormalIndices; // normal indices reference by each face
 
         // for each face in cc
-        for (int f = 0; f < ccFaceCount; ++f) {
+        for (int f = 0; f < (int)ccFaceCount; ++f) {
 
             // get the [origin] input-mesh face index (Note: this index may be offsetted
             // to distinguish between source-mesh and cut-mesh faces).
@@ -428,9 +428,9 @@ int main(int argc, char* argv[])
 
                     // the index of the mapped-to index in the input mesh
                     int imFaceVertexOffset = -1;
-                    for (Eigen::Index i = 0; i < imFace.size(); ++i) {
-                        if (imFace[i] == imVertexIdx) {
-                            imFaceVertexOffset = i;
+                    for (int p = 0; p < (int)imFace.size(); ++p) {
+                        if (imFace[p] == (int)imVertexIdx) {
+                            imFaceVertexOffset = p;
                             break;
                         }
                     }
@@ -462,11 +462,11 @@ int main(int argc, char* argv[])
                     [&](const Eigen::Vector3d& e) { return compare(e.x(), normal.x()) && compare(e.y(), normal.y()) && compare(e.z(), normal.z()); });
 
                 if (fiter != ccNormals.cend()) {
-                    normalIndex = std::distance(ccNormals.cbegin(), fiter);
+                    normalIndex = (int)std::distance(ccNormals.cbegin(), fiter);
                 }
 
                 if (normalIndex == -1) { // normal not yet stored for CC vertex in face
-                    normalIndex = ccNormals.size();
+                    normalIndex = (int)ccNormals.size();
                     ccNormals.push_back(normal);
                 }
 
@@ -489,25 +489,25 @@ int main(int argc, char* argv[])
 
         // write vertices
 
-        for (int i = 0; i < ccVertexCount; ++i) {
-            double x = ccVertices[(uint64_t)i * 3 + 0];
-            double y = ccVertices[(uint64_t)i * 3 + 1];
-            double z = ccVertices[(uint64_t)i * 3 + 2];
+        for (int p = 0; p < (int)ccVertexCount; ++p) {
+            double x = ccVertices[(uint64_t)p * 3 + 0];
+            double y = ccVertices[(uint64_t)p * 3 + 1];
+            double z = ccVertices[(uint64_t)p * 3 + 2];
             file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
         }
 
         // write normals
 
-        for (int i = 0; i < ccNormals.size(); ++i) {
-            Eigen::Vector3d n = ccNormals[i];
+        for (int p = 0; p < ccNormals.size(); ++p) {
+            Eigen::Vector3d n = ccNormals[p];
             file << "vn " << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << n.x() << " " << n.y() << " " << n.z() << std::endl;
         }
 
         // write faces (with normal indices)
 
         faceVertexOffsetBase = 0;
-        for (int i = 0; i < ccFaceCount; ++i) {
-            int faceSize = faceSizes.at(i);
+        for (int k = 0; k < (int)ccFaceCount; ++k) {
+            int faceSize = faceSizes.at(k);
 
             file << "f ";
             for (int j = 0; j < faceSize; ++j) {

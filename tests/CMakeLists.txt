@@ -42,6 +42,7 @@ add_executable(
 target_include_directories(mcut_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
 target_link_libraries(mcut_tests PRIVATE mcut)
 target_compile_definitions(mcut_tests PRIVATE -DMESHES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/meshes" )
+target_compile_options(mcut_tests PRIVATE ${compilation_flags})
 
 if(MCUT_BUILD_AS_SHARED_LIB)
 	target_compile_definitions(mcut_tests PRIVATE -DMCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 )

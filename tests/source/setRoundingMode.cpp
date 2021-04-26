@@ -4,11 +4,11 @@
 #define NUM_ROUNDING_MODES 4
 
 McRoundingModeFlags modes[] = {
-        MC_ROUNDING_MODE_TO_NEAREST,
-        MC_ROUNDING_MODE_TOWARD_ZERO,
-        MC_ROUNDING_MODE_TOWARD_POS_INF,
-        MC_ROUNDING_MODE_TOWARD_NEG_INF
-    };
+    MC_ROUNDING_MODE_TO_NEAREST,
+    MC_ROUNDING_MODE_TOWARD_ZERO,
+    MC_ROUNDING_MODE_TOWARD_POS_INF,
+    MC_ROUNDING_MODE_TOWARD_NEG_INF
+};
 
 struct SetRoundingMode {
     McContext context_;
@@ -27,8 +27,10 @@ UTEST_I_SETUP(SetRoundingMode)
 
 UTEST_I_TEARDOWN(SetRoundingMode)
 {
-    McResult err = mcReleaseContext(utest_fixture->context_);
-    EXPECT_EQ(err, MC_NO_ERROR);
+    if (utest_index < NUM_ROUNDING_MODES) {
+        McResult err = mcReleaseContext(utest_fixture->context_);
+        EXPECT_EQ(err, MC_NO_ERROR);
+    }
 }
 
 UTEST_I(SetRoundingMode, setRoundingMode, NUM_ROUNDING_MODES)
@@ -41,4 +43,3 @@ UTEST_I(SetRoundingMode, setRoundingMode, NUM_ROUNDING_MODES)
 
     ASSERT_EQ(roundingModeValSet, roundingMode);
 }
-

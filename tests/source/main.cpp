@@ -57,7 +57,7 @@ ssize_t getline(char** lineptr, size_t* n, FILE* stream)
             *lineptr = new_ptr;
         }
 
-        ((unsigned char*)(*lineptr))[pos++] = c;
+        ((unsigned char*)(*lineptr))[pos++] = (unsigned char)c;
         if (c == '\n') {
             break;
         }
@@ -233,6 +233,8 @@ extern "C" void writeOFF(
     }
 
     fprintf(file, "OFF\n");
+    numEdges;
+    pEdgeIndices;
     fprintf(file, "%d %d %d\n", numVertices, numFaces, 0 /*numEdges*/);
     int i;
     for (i = 0; i < (int)numVertices; ++i) {
