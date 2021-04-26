@@ -115,7 +115,7 @@ UTEST_F(DispatchFilterFlags, noFiltering)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 10); // including sealed, partially, unsealed, above, below, patches & seams
+    ASSERT_EQ(numConnectedComponents, 12); // including sealed, partially, unsealed, above, below, patches & seams
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -127,8 +127,6 @@ UTEST_F(DispatchFilterFlags, noFiltering)
 
 UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
 {
-    //ASSERT_EQ(0, 1); // "TODO: this needs to be fixed (partial cut)"
-
     const std::string srcMeshPath = std::string(MESHES_DIR) + "/bunny.off";
 
     readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
@@ -166,7 +164,7 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the inside) fragment
+    ASSERT_EQ(numConnectedComponents, 4); // one completely filled (from the inside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -176,6 +174,11 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
 
         McConnectedComponentType type = (McConnectedComponentType)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+
+        if (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            continue;
+        }
+
         ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
         McFragmentLocation location = (McFragmentLocation)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
@@ -184,10 +187,11 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
         McFragmentSealType sealType = (McFragmentSealType)0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE", which mean "complete sealed from the inside".
-        ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
-        McPatchLocation patchLocation = (McPatchLocation)0;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
-        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+        if (sealType == McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE) {
+            McPatchLocation patchLocation = (McPatchLocation)0;
+            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+            ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+        }
     }
 }
 
@@ -230,7 +234,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the inside) fragment
+    ASSERT_EQ(numConnectedComponents, 3); // one completely filled (from the inside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -240,6 +244,11 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
 
         McConnectedComponentType type;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+
+        if (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            continue;
+        }
+
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW" and "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE"
         ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
         McFragmentLocation location;
@@ -295,7 +304,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one completely filled (from the outside) fragment
+    ASSERT_EQ(numConnectedComponents, 3); // one completely filled (from the outside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -306,7 +315,9 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
         McConnectedComponentType type;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW" and "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE"
-        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+        if (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            continue;
+        }
         McFragmentLocation location;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW"
@@ -315,70 +326,6 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
         // The dispatch function was called with "MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE", which mean "complete sealed from the inside".
         ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
-        McPatchLocation patchLocation;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
-        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
-    }
-}
-
-UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutsidePartial)
-{
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
-
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
-
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
-
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
-
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
-
-    ASSERT_EQ(mcDispatch(
-                  utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
-        MC_NO_ERROR);
-
-    uint32_t numConnectedComponents = 0;
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_GE(numConnectedComponents, 1); // one completely filled (from the outside) fragment
-    utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
-
-    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
-        McConnectedComponent cc = utest_fixture->connComps_[i];
-        ASSERT_TRUE(cc != MC_NULL_HANDLE);
-
-        McConnectedComponentType type;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
-        McFragmentLocation location;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
-        ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
-        McFragmentSealType sealType;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
-        // When dispatch is called with MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE, it means that MCUT will compute both fully sealed and partially sealed
-        // fragments.
-        ASSERT_TRUE(sealType == McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL || sealType == McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE);
         McPatchLocation patchLocation;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
         ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
@@ -424,7 +371,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one unsealed fragment
+    ASSERT_EQ(numConnectedComponents, 3); // one unsealed fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -433,16 +380,20 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
 
     McConnectedComponentType type;
     ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
-    McFragmentLocation location;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
-    ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
-    McFragmentSealType sealType;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
-    ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE);
-    McPatchLocation patchLocation;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
-    ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_UNDEFINED);
+
+    if (type != McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+        McFragmentLocation location;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &location, NULL), MC_NO_ERROR);
+        ASSERT_EQ(location, McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW);
+        McFragmentSealType sealType;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE, sizeof(McFragmentSealType), &sealType, NULL), MC_NO_ERROR);
+        ASSERT_EQ(sealType, McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE);
+        McPatchLocation patchLocation;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_UNDEFINED);
+    }
 }
 
 // TODO: fragments ABOVE
@@ -486,19 +437,23 @@ UTEST_F(DispatchFilterFlags, patchInside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    McConnectedComponent cc = utest_fixture->connComps_[0];
-    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+        McConnectedComponent cc = utest_fixture->connComps_[0];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
-    McConnectedComponentType type;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH);
-    McPatchLocation patchLocation;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
-    ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        if (type != McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH);
+            McPatchLocation patchLocation;
+            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+            ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_INSIDE);
+        }
+    }
 }
 
 UTEST_F(DispatchFilterFlags, patchOutside)
@@ -540,19 +495,25 @@ UTEST_F(DispatchFilterFlags, patchOutside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    McConnectedComponent cc = utest_fixture->connComps_[0];
-    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+        McConnectedComponent cc = utest_fixture->connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
-    McConnectedComponentType type;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH);
-    McPatchLocation patchLocation;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
-    ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        if (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            continue;
+        }
+
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_PATCH);
+        McPatchLocation patchLocation;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION, sizeof(McPatchLocation), &patchLocation, NULL), MC_NO_ERROR);
+        ASSERT_EQ(patchLocation, McPatchLocation::MC_PATCH_LOCATION_OUTSIDE);
+    }
 }
 
 UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
@@ -594,19 +555,24 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus input
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    McConnectedComponent cc = utest_fixture->connComps_[0];
-    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+        McConnectedComponent cc = utest_fixture->connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
-    McConnectedComponentType type;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
-    McSeamOrigin origin;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
-    ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        if (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            continue;
+        }
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
+        McSeamOrigin origin;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
+        ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
+    }
 }
 
 UTEST_F(DispatchFilterFlags, seamFromCutMesh)
@@ -648,17 +614,23 @@ UTEST_F(DispatchFilterFlags, seamFromCutMesh)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 1); // one interior patch
+    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    McConnectedComponent cc = utest_fixture->connComps_[0];
-    ASSERT_TRUE(cc != MC_NULL_HANDLE);
+    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+        McConnectedComponent cc = utest_fixture->connComps_[i];
+        ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
-    McConnectedComponentType type;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-    ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
-    McSeamOrigin origin;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
-    ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_CUTMESH);
+        McConnectedComponentType type;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
+        if (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            continue;
+        }
+
+        ASSERT_EQ(type, McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_SEAM);
+        McSeamOrigin origin;
+        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &origin, NULL), MC_NO_ERROR);
+        ASSERT_EQ(origin, McSeamOrigin::MC_SEAM_ORIGIN_CUTMESH);
+    }
 }

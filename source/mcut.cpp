@@ -352,56 +352,6 @@ McResult indexArrayMeshToHalfedgeMesh(
                 y + (perturbation != NULL ? (*perturbation).y() : 0.f),
                 z + (perturbation != NULL ? (*perturbation).z() : 0.f));
         }
-    } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_EXACT) {
-#pragma warning("TODO: perturbation code")
-        const char* vptr = reinterpret_cast<const char*>(pVertices);
-        const char* vptr_ = vptr; // shifted
-
-        // storage for digits and decimal point (if any)
-        std::vector<char> x;
-        std::vector<char> y;
-        std::vector<char> z;
-
-        // for each number
-        for (uint32_t i = 0; i < numVertices * 3; ++i) {
-
-            vptr_ = std::strchr(vptr, ' ');
-            std::ptrdiff_t diff = vptr_ - vptr;
-            uint64_t srcStrLen = diff + 1; // extra byte for null-char
-            if (vptr_ == nullptr) {
-                srcStrLen = strlen(vptr) + 1;
-            }
-
-            if ((i % 3) == 0) { // x
-                x.resize(srcStrLen);
-                std::sscanf(vptr, "%s", &x[0]);
-                x.back() = '\0';
-            } else if ((i % 3) - 1 == 0) { // y
-                y.resize(srcStrLen);
-                std::sscanf(vptr, "%s", &y[0]);
-                y.back() = '\0';
-            } else if ((i % 3) - 2 == 0) { // z
-                z.resize(srcStrLen);
-                std::sscanf(vptr, "%s", &z[0]);
-                z.back() = '\0';
-
-                vmap[i / 3u] = halfedgeMesh.add_vertex(x.data(), y.data(), z.data()); // add vertex with exact number from parsed string
-
-                vptr_ = std::strchr(vptr, '\n'); // .. find newline char (start of next vertex)
-
-                if (vptr_ == nullptr && i != (numVertices * 3) - 1) { // its not the last entry
-                    result = McResult::MC_INVALID_VALUE;
-
-                    if (result != McResult::MC_NO_ERROR) {
-                        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid numerical string format");
-
-                        return result;
-                    }
-                }
-            }
-
-            vptr = vptr_ + 1; // offset so that we point to the start of the next number/line
-        }
     } else {
         result = McResult::MC_INVALID_VALUE;
 
@@ -1550,7 +1500,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     std::unique_ptr<McDispatchContextInternal>& ctxtPtr = ctxtIter->second;
 
-    if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_EXACT) == 0) {
+    if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0) {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "dispatch floating-point type unspecified");
         result = McResult::MC_INVALID_VALUE;
         return result;
@@ -1636,8 +1586,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED | //
         MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | //
         MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | //
-        MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE | //
-        MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE | //
         MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE | //
         MC_DISPATCH_FILTER_PATCH_INSIDE | //
         MC_DISPATCH_FILTER_PATCH_OUTSIDE | //
@@ -1653,8 +1601,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         backendInput.keep_fragments_sealed_inside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE);
         backendInput.keep_unsealed_fragments = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE);
         backendInput.keep_fragments_partially_cut = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED);
-        backendInput.keep_fragments_sealed_outside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE);
-        backendInput.keep_fragments_sealed_inside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE);
+        //backendInput.keep_fragments_sealed_outside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE);
+        //backendInput.keep_fragments_sealed_inside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE);
         backendInput.keep_inside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_INSIDE);
         backendInput.keep_outside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_OUTSIDE);
         backendInput.keep_srcmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_SRCMESH);
@@ -1940,9 +1888,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                                     mcut::math::real_number_t _2; // unused
                                     mcut::math::vec2 _3; // unused
 
-                                    const char result = mcut::geom::compute_segment_intersection(faceEdgeV0, faceEdgeV1, fpEdgeV0, fpEdgeV1, _3, _1, _2);
+                                    const char res = mcut::geom::compute_segment_intersection(faceEdgeV0, faceEdgeV1, fpEdgeV0, fpEdgeV1, _3, _1, _2);
 
-                                    if (result == '1') { // implies a propery segment-segment intersection
+                                    if (res == '1') { // implies a propery segment-segment intersection
                                         haveEdgeIntersectingFP = true;
                                         break;
                                     }
@@ -3102,54 +3050,6 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             }
 
             MCUT_ASSERT((byteOffset * sizeof(double)) == allocatedBytes);
-        }
-    } break;
-    case MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT: { // arbitrary prec float string
-
-        uint64_t allocatedBytes = 0;
-        for (uint32_t i = 0; i < ccData->indexArrayMesh.numVertices * 3; ++i) {
-            const mcut::math::real_number_t& val = ccData->indexArrayMesh.pVertices[i];
-
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-            allocatedBytes += (std::to_string(val) + " ").length(); // NOTE: we could cache results of tmp strings
-#else
-            allocatedBytes += (val.to_string() + " ").length();
-#endif
-        }
-
-        MCUT_ASSERT(allocatedBytes > 0);
-
-        if (pMem == nullptr) {
-            *pNumBytes = allocatedBytes;
-        } else {
-
-            if (bytes > allocatedBytes) {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                result = McResult::MC_INVALID_VALUE;
-                return result;
-            }
-
-            uint64_t byteOffset = 0;
-            int8_t* outPtr = reinterpret_cast<int8_t*>(pMem);
-
-            for (uint32_t i = 0; i < ccData->indexArrayMesh.numVertices * 3; ++i) {
-                const mcut::math::real_number_t& val = ccData->indexArrayMesh.pVertices[i];
-
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-                const std::string val_ = std::to_string(val) + " ";
-#else
-                const std::string val_ = val.to_string() + " ";
-#endif
-                if (byteOffset + val_.length() > bytes) {
-                    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                    result = McResult::MC_INVALID_VALUE;
-                    return result;
-                }
-                memcpy(outPtr + byteOffset, reinterpret_cast<const void*>(val_.c_str()), val_.length());
-                byteOffset += val_.length();
-            }
-
-            MCUT_ASSERT(byteOffset == allocatedBytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_COUNT: {

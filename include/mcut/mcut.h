@@ -123,15 +123,10 @@ typedef uint32_t McBool;
  */
 typedef enum McResult {
     MC_NO_ERROR = 0, /**< The function was successfully executed. */
-    //MC_INVALID_SRC_MESH = -(1 << 0), /**< The input source-mesh does not the meet requirements of a valid mesh. */
-    //MC_INVALID_CUT_MESH = -(1 << 1), /**< The input cut-mesh does not the meet requirements of a valid mesh. */
-    //MC_EDGE_EDGE_INTERSECTION = -(1 << 2), /** Found an edge-edge intersection. */
-    //MC_FACE_VERTEX_INTERSECTION = -(1 << 3), /** Found an face-vertex intersection. */
     MC_INVALID_OPERATION = -(1 << 1), /**< An internal operation could not be executed successively. */
     MC_INVALID_VALUE = -(1 << 2), /**< An invalid value has been passed to the API. */
     MC_OUT_OF_MEMORY = -(1 << 3), /** Memory allocation operation cannot allocate memory. */
-    //MC_INVALID_MESH_PLACEMENT = -(1 << 7), /** At least one vertex in the source mesh has the same coordinates as another vertex in the cut-mesh, or vice-versa. */
-    MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
+   MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McResult;
 
 /**
@@ -169,7 +164,6 @@ typedef enum McFragmentLocation {
  */
 typedef enum McFragmentSealType {
     MC_FRAGMENT_SEAL_TYPE_COMPLETE = 1 << 0, /**< Holes are completely sealed (watertight). */
-    MC_FRAGMENT_SEAL_TYPE_PARTIAL = 1 << 1, /**< Holes are partially sealed (non watertight). Fragments with this property may have 1 to N-1 hole-filling polygons added, where N is the total number of cut-mesh polygons to create a watertight seal.*/
     MC_FRAGMENT_SEAL_TYPE_NONE = 1 << 2, /**< Holes are not sealed (gaping hole). */
     MC_FRAGMENT_SEAL_TYPE_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McFragmentSealType;
@@ -222,7 +216,6 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT = (1 << 0), /**< Number of vertices. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
-    MC_CONNECTED_COMPONENT_DATA_VERTEX_EXACT = (1 << 3), /**< List of vertex coordinates as a character string representing arbitrary-precision numbers. Values are exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to using std::to_string. */
     MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
     MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
@@ -285,7 +278,6 @@ typedef enum McDebugSeverity {
  */
 typedef enum McContextCreationFlags {
     MC_DEBUG = (1 << 0), /**< Enable debug mode (message logging etc.).*/
-    MC_PROFILING_ENABLE = (1 << 1) /**< Enable profiling mode.*/
 } McContextCreationFlags;
 
 /**
@@ -311,28 +303,24 @@ typedef enum McRoundingModeFlags {
 typedef enum McDispatchFlags {
     MC_DISPATCH_VERTEX_ARRAY_FLOAT = (1 << 0), /**< Interpret the input mesh vertices as arrays of 32-bit floating-point numbers.*/
     MC_DISPATCH_VERTEX_ARRAY_DOUBLE = (1 << 1), /**< Interpret the input mesh vertices as arrays of 64-bit floating-point numbers.*/
-    MC_DISPATCH_VERTEX_ARRAY_EXACT = (1 << 2), /**< Interpret the input mesh vertices as character strings representing arbitrary-precision numbers. Values are parsed exact only if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the conversion operation is equivalent to std::to_string.*/
-    MC_DISPATCH_REQUIRE_THROUGH_CUTS = (1 << 3), /**< Require that all intersection paths partition/divide the source-mesh into two disjoint parts. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts.*/
-    MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 5), /** Compute connected-component-to-input mesh vertex-id maps. */
-    MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 6), /** Compute connected-component-to-input mesh face-id maps. */
+    MC_DISPATCH_REQUIRE_THROUGH_CUTS = (1 << 2), /**< Require that all intersection paths partition/divide the source-mesh into two disjoint parts. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts.*/
+    MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 3), /** Compute connected-component-to-input mesh vertex-id maps. */
+    MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 4), /** Compute connected-component-to-input mesh face-id maps. */
     //
-    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE = (1 << 7), /** Keep fragments that are above the cut-mesh.*/
-    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW = (1 << 8), /** Keep fragments that are below the cut-mesh.*/
-    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED = (1 << 9), /** Keep fragments that are partially cut i.e. neither above nor below the cut-mesh*/
+    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE = (1 << 5), /** Keep fragments that are above the cut-mesh.*/
+    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW = (1 << 6), /** Keep fragments that are below the cut-mesh.*/
+    MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED = (1 << 7), /** Keep fragments that are partially cut i.e. neither above nor below the cut-mesh*/
     //
-    MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE = (1 << 10), /** Keep fragments that are fully sealed (hole-filled) on the interior.  This flag indicates a subset of fragments that are produced with the option ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE enabled. Thus, this flag and ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE are mutually exclusive. */
-    MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE = (1 << 11), /** Keep fragments that are fully sealed (hole-filled) on the exterior. This flag indicates a subset of fragments that are produced with the option ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE enabled. Thus, this flag and ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE are mutually exclusive. */
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE = (1 << 8), /** Keep fragments that are fully sealed (hole-filled) on the interior.  This flag indicates a subset of fragments that are produced with the option ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE enabled. Thus, this flag and ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE are mutually exclusive. */
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE = (1 << 9), /** Keep fragments that are fully sealed (hole-filled) on the exterior. This flag indicates a subset of fragments that are produced with the option ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE enabled. Thus, this flag and ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE are mutually exclusive. */
     //
-    MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE = (1 << 12), /** Keep fragments that are fully sealed and those that are partially sealed (on the exterior).  This flag indicates a superset of fragments that are produced with the option ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE enabled. Thus, this flag and ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE are mutually exclusive.*/
-    MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE = (1 << 13), /** Keep fragments that are fully sealed and those that are partially sealed (on the interior).  This flag indicates a superset of fragments that are produced with the option ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE enabled. Thus, this flag and ::MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE are mutually exclusive.*/
+    MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE = (1 << 10), /** Keep fragments that are not sealed (holes not filled).*/
     //
-    MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE = (1 << 14), /** Keep fragments that are not sealed (holes not filled).*/
+    MC_DISPATCH_FILTER_PATCH_INSIDE = (1 << 11), /** Keep patches on the inside of the source mesh (those used to fill holes).*/
+    MC_DISPATCH_FILTER_PATCH_OUTSIDE = (1 << 12), /** Keep patches on the outside of the source mesh.*/
     //
-    MC_DISPATCH_FILTER_PATCH_INSIDE = (1 << 15), /** Keep patches on the inside of the source mesh (those used to fill holes).*/
-    MC_DISPATCH_FILTER_PATCH_OUTSIDE = (1 << 16), /** Keep patches on the outside of the source mesh.*/
-    //
-    MC_DISPATCH_FILTER_SEAM_SRCMESH = (1 << 17), /** Keep the seam which is the same as the source-mesh but with new edges placed along the cut path. Note: a seam from the source-mesh will only be computed if the dispatch operation computes a complete (through) cut.*/
-    MC_DISPATCH_FILTER_SEAM_CUTMESH = (1 << 18), /** Keep the seam which is the same as the cut-mesh but with new edges placed along the cut path. Note: a seam from the cut-mesh will only be computed if the dispatch operation computes a complete (through) cut.*/
+    MC_DISPATCH_FILTER_SEAM_SRCMESH = (1 << 13), /** Keep the seam which is the same as the source-mesh but with new edges placed along the cut path. Note: a seam from the source-mesh will only be computed if the dispatch operation computes a complete (through) cut.*/
+    MC_DISPATCH_FILTER_SEAM_CUTMESH = (1 << 14), /** Keep the seam which is the same as the cut-mesh but with new edges placed along the cut path. Note: a seam from the cut-mesh will only be computed if the dispatch operation computes a complete (through) cut.*/
     //
     MC_DISPATCH_FILTER_ALL = ( //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE | //
@@ -340,14 +328,12 @@ typedef enum McDispatchFlags {
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED | //
         MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | //
         MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | //
-        MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE | //
-        MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE | //
         MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE | //
         MC_DISPATCH_FILTER_PATCH_INSIDE | //
         MC_DISPATCH_FILTER_PATCH_OUTSIDE | //
         MC_DISPATCH_FILTER_SEAM_SRCMESH | //
         MC_DISPATCH_FILTER_SEAM_CUTMESH), /** Keep all connected components resulting from the dispatched cut. */
-    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 19) /** Allow MCUT to perturb the cut-mesh if the inputs are not in general position.  */
+    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15) /** Allow MCUT to perturb the cut-mesh if the inputs are not in general position.  */
 } McDispatchFlags;
 
 /**

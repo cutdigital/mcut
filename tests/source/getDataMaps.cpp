@@ -213,7 +213,7 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
     uint32_t internalCutMeshVertexCount = 0;
     uint32_t internalCutMeshFaceCount = 0;
 
-    for (int i = 0; i < numInputConnComps; ++i) {
+    for (int i = 0; i < (int)numInputConnComps; ++i) {
         McConnectedComponent inCC = inputConnComps.at(i);
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;

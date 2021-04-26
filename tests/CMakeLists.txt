@@ -27,10 +27,8 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/source/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/booleanOperation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/degenerateInput.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/arbitraryPrecisionInput.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/benchmark.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/createContext.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/arbitraryPrecisionInput.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/computeSeams.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/debugCallback.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/debugVerboseLog.cpp

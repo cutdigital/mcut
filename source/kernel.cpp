@@ -51,7 +51,7 @@
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
 
-#define DUMP_ELAPSED_TIME_INFO
+//#define DUMP_ELAPSED_TIME_INFO
 
 #if defined(DUMP_ELAPSED_TIME_INFO)
 #include <ctime>
@@ -196,6 +196,17 @@ std::string to_string(const cut_surface_patch_winding_order_t& v)
         break;
     }
     return s;
+}
+
+int wrap_integer(int x, const int lo, const int hi)
+{
+    const int range_size = hi - lo + 1;
+
+    if (x < lo) {
+        x += range_size * ((lo - x) / range_size + 1);
+    }
+
+    return lo + (x - lo) % range_size;
 }
 
 // returns whether a polygon-soup vertex is an intersection vertex/point
@@ -1627,18 +1638,18 @@ void dispatch(output_t& output, const input_t& input)
         return;
     }
 
-    //if (input.verbose) {
-    dump_mesh(sm, "src-mesh");
-    //}
+    if (input.verbose) {
+        dump_mesh(sm, "src-mesh");
+    }
 
     lg << "check cut-mesh." << std::endl;
     if (check_input_mesh(cs) == false) {
         output.status = status_t::INVALID_CUT_MESH;
         return;
     }
-    //if (input.verbose) {
-    dump_mesh(cs, "cut-mesh");
-    //}
+    if (input.verbose) {
+        dump_mesh(cs, "cut-mesh");
+    }
 
     const int sm_vtx_cnt = sm.number_of_vertices();
     const int sm_face_count = sm.number_of_faces();
@@ -2054,14 +2065,14 @@ void dispatch(output_t& output, const input_t& input)
                 // at this point, we have established that the segment actually intersects the plane [properly]
 
                 // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-                // Now we compute the actual intersection point (coordinates)
+                // Now we compute the [actual] intersection point (coordinates)
                 // and check whether it lies inside our polygon, or that GP has been violated,
                 // which happens if e.g. the intersection point lies on an edge/vertex of "tested_face")
 
                 // NOTE: if using fixed precision floats (i.e. double), then here we just care about getting the intersection point
                 // irrespective of whether "segment_intersection_result" is consistent with "segment_intersection_type" from above.
                 // The inconsistency can happen during edge cases. see e.g. test 42.
-                char segment_intersection_result = geom::compute_segment_plane_intersection(
+                geom::compute_segment_plane_intersection(
                     intersection_point,
                     tested_face_plane_normal,
                     tested_face_plane_param_d,
@@ -9970,10 +9981,10 @@ void dispatch(output_t& output, const input_t& input)
 
                 std::pair<mesh_t, connected_component_info_t>& cc_instance = *cc_instance_iter;
 
-                //if (input.verbose) {
-                //const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
-                dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx++) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
-                //}
+                if (input.verbose) {
+                    //const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
+                    dump_mesh(cc_instance.first, (std::string("cc") + std::to_string(idx++) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
+                }
 
                 output_mesh_info_t omi;
                 omi.mesh = std::move(cc_instance.first);
