@@ -249,7 +249,7 @@ namespace geom {
                 const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
 
                 if (denom == 0.0 /* Segment is parallel to plane.*/) {
-                    MCUT_ASSERT(num != 0.0); // implies 'q' is on plane (see: "compute_segment_plane_intersection(...)") but we have already established that q and r are on same side.
+                    //MCUT_ASSERT(num != 0.0); // implies 'q' is on plane (see: "compute_segment_plane_intersection(...)") but we have already established that q and r are on same side.
                     return '0';
                 }
             }
