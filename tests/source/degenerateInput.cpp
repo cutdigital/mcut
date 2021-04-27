@@ -68,6 +68,8 @@ UTEST_F(DegenerateInput, faceVertexIntersection)
     std::vector<uint32_t> cutMeshFaceIndices = { 0, 1, 2 };
     uint32_t cutMeshFaceSizes = 3; // array of one
 
+    // NOTE: this test will fail due to limitations in floating point precisions
+    // It should pass for exact numbers build
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, MC_DISPATCH_VERTEX_ARRAY_FLOAT, //
                   &srcMeshVertices[0], &srcMeshFaceIndices[0], &srcMeshFaceSizes, 3, 1, //
                   &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 3, 1),

@@ -375,5 +375,5 @@ UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_PartialCut)
     uint32_t numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
-    ASSERT_EQ(numConnComps, 0u); // there should be no connected components
+    ASSERT_EQ(numConnComps, 2u); // there should be no connected components besides inputs
 }

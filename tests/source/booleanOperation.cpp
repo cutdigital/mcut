@@ -104,7 +104,7 @@ UTEST_F(BooleanOperation, differenceA_Not_B)
     uint32_t numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, 1);
+    ASSERT_EQ(numConnComps, 3);
 }
 
 UTEST_F(BooleanOperation, differenceB_Not_A)
@@ -130,7 +130,7 @@ UTEST_F(BooleanOperation, differenceB_Not_A)
     uint32_t numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, 1);
+    ASSERT_EQ(numConnComps, 3);
 }
 
 UTEST_F(BooleanOperation, unionOp)
@@ -156,7 +156,7 @@ UTEST_F(BooleanOperation, unionOp)
     uint32_t numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, 1);
+    ASSERT_EQ(numConnComps, 3);
 }
 
 UTEST_F(BooleanOperation, intersectionOp)
@@ -182,5 +182,5 @@ UTEST_F(BooleanOperation, intersectionOp)
     uint32_t numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, 1);
+    ASSERT_EQ(numConnComps, 3);
 }
