@@ -493,8 +493,8 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
     }
 
     if (!reusing_removed_face_descr) {
-        std::pair<typename face_map_t::iterator, bool> tmp = m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
-        MCUT_ASSERT(tmp.second == true);
+        MCUT_ASSERT(m_faces.count(new_face_idx) ==0);
+        m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
     }
 
     // update halfedges (next halfedge)

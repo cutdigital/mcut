@@ -45,7 +45,7 @@ int main()
     }
 
     // copy vertices
-    for (int i = 0; i < srcMesh.V.size(); ++i) {
+    for (int i = 0; i < (int)srcMesh.V.size(); ++i) {
         const std::vector<double>& v = srcMesh.V[i];
         assert(v.size() == 3);
         srcMesh.vertexCoordsArray.push_back(v[0]);
@@ -54,10 +54,10 @@ int main()
     }
 
     // copy faces
-    for (int i = 0; i < srcMesh.F.size(); ++i) {
+    for (int i = 0; i < (int)srcMesh.F.size(); ++i) {
         const std::vector<int>& f = srcMesh.F[i];
         assert(f.size() == 3); // we assume triangle meshes for simplicity
-        for (int j = 0; j < f.size(); ++j) {
+        for (int j = 0; j < (int)f.size(); ++j) {
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
@@ -90,7 +90,7 @@ int main()
     for (int i = 0; i < (int)cutMesh.F.size(); ++i) {
         const std::vector<int>& f = cutMesh.F[i];
         assert(f.size() == 3);
-        for (int j = 0; j < f.size(); ++j) {
+        for (int j = 0; j < (int)f.size(); ++j) {
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
 

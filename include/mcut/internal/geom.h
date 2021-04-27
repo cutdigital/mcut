@@ -71,8 +71,7 @@ namespace geom {
         const math::vec3* polygon_vertices,
         const int polygon_vertex_count,
         const int polygon_normal_max_comp,
-        const math::vec3& polygon_plane_normal,
-        const math::real_number_t& polygon_plane_d_coeff);
+        const math::vec3& polygon_plane_normal );
 
     // Test if a line segment intersects with a plane, and yeild the intersection point if so.
     //

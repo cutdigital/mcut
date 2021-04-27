@@ -1878,7 +1878,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                                 bool haveEdgeIntersectingFP = false;
 
                                 // for each edge of current floating poly
-                                for (int fpEdgeIter = 0; fpEdgeIter < fpEdgeCount; ++fpEdgeIter) {
+                                for (int fpEdgeIter = 0; fpEdgeIter < (int)fpEdgeCount; ++fpEdgeIter) {
 
                                     const mcut::math::vec2& fpEdgeV0 = fpVertexCoords2D.at(((size_t)fpEdgeIter) + 0);
                                     const mcut::math::vec2& fpEdgeV1 = fpVertexCoords2D.at((((size_t)fpEdgeIter) + 1) % fpVertexCount);
@@ -2035,8 +2035,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     // populate queue with [unique] pairs of edges from the floating polygon
                     // priority is given to those pairs with the farthest distance between then
-                    for (int i = 0; i < fpEdgeCount; ++i) {
-                        for (int j = i + 1; j < fpEdgeCount; ++j) {
+                    for (int i = 0; i < (int)fpEdgeCount; ++i) {
+                        for (int j = i + 1; j < (int)fpEdgeCount; ++j) {
                             fpEdgePairQueue.push(std::make_pair(i, j));
                         }
                     }

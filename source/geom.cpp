@@ -219,8 +219,7 @@ namespace geom {
         const math::vec3* polygon_vertices,
         const int polygon_vertex_count,
         const int polygon_normal_max_comp,
-        const math::vec3& polygon_plane_normal,
-        const math::real_number_t& polygon_plane_d_coeff)
+        const math::vec3& polygon_plane_normal)
     {
 
         // ... any three vertices that are not collinear
@@ -245,7 +244,7 @@ namespace geom {
         } else {
             if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) { // both points used to define line lie on same side of plane
                 // check if line is parallel to plane
-                const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
+                //const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
                 const math::vec3 rq = (r - q);
                 const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
 
@@ -353,7 +352,7 @@ namespace geom {
         int Rcross = 0; /* number of right edge/ray crossings */
         int Lcross = 0; /* number ofleft edge/ray crossings */
 
-        /* For each edge e = (i—lj), see if crosses ray. */
+        /* For each edge e = (iï¿½lj), see if crosses ray. */
         for (int i = 0; i < polygon_vertex_count; i++) {
 
             /* First check if q = (0, 0) is a vertex. */

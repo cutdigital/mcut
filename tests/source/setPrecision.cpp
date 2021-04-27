@@ -38,7 +38,7 @@ UTEST_F_TEARDOWN(SetPrecision)
 
 UTEST_F(SetPrecision, minValue)
 {
-    uint64_t precValSet = max((uint64_t)64ul, utest_fixture->minPrec); // bits
+    uint64_t precValSet =  ((uint64_t)64ul >= utest_fixture->minPrec) ? (uint64_t)64ul : utest_fixture->minPrec; // bits
     EXPECT_EQ(mcSetPrecision(utest_fixture->context_, precValSet), MC_NO_ERROR);
 
     uint64_t prec = 0;
