@@ -42,7 +42,7 @@ int main()
     // -----------------
     InputMesh srcMesh;
 
-    srcMesh.fpath = DATA_DIR "/cube.obj";
+    srcMesh.fpath = DATA_DIR "/test8_b.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.TC, srcMesh.N, srcMesh.F, srcMesh.FTC, srcMesh.FN);
 
     if (!srcMeshLoaded) {
@@ -72,7 +72,7 @@ int main()
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.size(), (int)srcMesh.F.size());
 
     InputMesh cutMesh;
-    cutMesh.fpath = DATA_DIR "/torus.obj";
+    cutMesh.fpath = DATA_DIR "/test8_b.obj";
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.TC, cutMesh.N, cutMesh.F, cutMesh.FTC, cutMesh.FN);
 
     if (!cutMeshLoaded) {
@@ -147,10 +147,10 @@ int main()
 
         assert(err == MC_NO_ERROR);
 
-        // query the number of available connected component (all types)
-        // -------------------------------------------------------------
+        // query the number of available connected component
+        // --------------------------------------------------
         uint32_t numConnComps;
-        err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
+        err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_FRAGMENT, 0, NULL, &numConnComps);
         assert(err == MC_NO_ERROR);
 
         printf("connected components: %d\n", (int)numConnComps);
@@ -164,7 +164,7 @@ int main()
 
         std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
         connectedComponents.resize(numConnComps);
-        err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
+        err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_FRAGMENT, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
 
         assert(err == MC_NO_ERROR);
 

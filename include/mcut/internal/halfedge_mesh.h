@@ -593,10 +593,17 @@ public:
         m_edges_removed.push_back(e);
     }
 
-    void remove_vertex(const vertex_descriptor_t)
+    void remove_vertex(const vertex_descriptor_t v)
     {
-        // TODO: not really needed so far for anything implemented
-        //MCUT_ASSERT(false);
+        MCUT_ASSERT(v != null_vertex());
+        MCUT_ASSERT(std::find(m_vertices_removed.cbegin(), m_vertices_removed.cend(), v) == m_vertices_removed.cend());
+
+        vertex_data_t& vd = m_vertices.at(v);
+
+        MCUT_ASSERT(vd.m_faces.empty());
+        MCUT_ASSERT(vd.m_halfedges.empty());
+
+        m_vertices_removed.push_back(v);
     }
 
     void remove_elements()

@@ -273,16 +273,29 @@ vertex_descriptor_t mesh_t::add_vertex(const math::fast_vec3& point)
 
 vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math::real_number_t& y, const math::real_number_t& z)
 {
-    // TODO: upate code to be able to re-use a removed vertex's slot (if feature is needed in the future)
+    vertex_descriptor_t vd = mesh_t::null_vertex();
+    vertex_data_t* data_ptr = nullptr;
+    bool reusing_removed_descr = (!m_vertices_removed.empty());
 
-    vertex_data_t vdata;
-    vdata.p = math::vec3(x, y, z);
-    const vertex_descriptor_t vd(static_cast<vertex_descriptor_t::index_type>(m_vertices.size()));
-    std::pair<typename std::map<vertex_descriptor_t, vertex_data_t>::iterator, bool> tmp = m_vertices.insert(std::make_pair(vd, vdata));
+    if (reusing_removed_descr) // can we re-use a slot?
+    {
+        std::vector<vertex_descriptor_t>::const_iterator it = m_vertices_removed.cbegin() + (m_vertices_removed.size() - 1); // take the most recently removed
+        vd = *it;
+        m_vertices_removed.erase(it);
+        MCUT_ASSERT(m_vertices.find(vd) != m_vertices.cend());
+        data_ptr = &m_vertices.at(vd);
+    } else {
+        vd = static_cast<vertex_descriptor_t>(number_of_vertices());
+        std::pair<typename std::map<vertex_descriptor_t, vertex_data_t>::iterator, bool> ret = m_vertices.insert(std::make_pair(vd, vertex_data_t()));
+        MCUT_ASSERT(ret.second == true);
+        data_ptr = &ret.first->second;
+    }
 
-    MCUT_ASSERT(tmp.second == true);
+    MCUT_ASSERT(vd != mesh_t::null_vertex());
 
-    return tmp.first->first;
+    data_ptr->p = math::vec3(x, y, z);
+
+    return vd;
 }
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -493,7 +506,7 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
     }
 
     if (!reusing_removed_face_descr) {
-        MCUT_ASSERT(m_faces.count(new_face_idx) ==0);
+        MCUT_ASSERT(m_faces.count(new_face_idx) == 0);
         m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
     }
 
