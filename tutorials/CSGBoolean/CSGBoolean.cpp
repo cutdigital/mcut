@@ -42,7 +42,7 @@ int main()
     // -----------------
     InputMesh srcMesh;
 
-    srcMesh.fpath = DATA_DIR "/test8_b.obj";
+    srcMesh.fpath = DATA_DIR "/cube.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.TC, srcMesh.N, srcMesh.F, srcMesh.FTC, srcMesh.FN);
 
     if (!srcMeshLoaded) {
@@ -72,7 +72,7 @@ int main()
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.size(), (int)srcMesh.F.size());
 
     InputMesh cutMesh;
-    cutMesh.fpath = DATA_DIR "/test8_b.obj";
+    cutMesh.fpath = DATA_DIR "/torus.obj";
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.TC, cutMesh.N, cutMesh.F, cutMesh.FTC, cutMesh.FN);
 
     if (!cutMeshLoaded) {

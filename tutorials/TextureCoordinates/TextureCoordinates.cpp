@@ -46,7 +46,8 @@ int main()
     InputMesh srcMesh;
 
     // read file
-    srcMesh.fpath = /*DATA_DIR "/a_.obj";*/ DATA_DIR "/a.obj";
+    srcMesh.fpath = DATA_DIR "/a_.obj"; /* DATA_DIR "/a.obj"*/
+    ;
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
     if (!srcMeshLoaded) {
@@ -77,7 +78,7 @@ int main()
     InputMesh cutMesh;
 
     // read file
-    cutMesh.fpath = /*DATA_DIR "/b_.obj";*/ DATA_DIR "/b.obj";
+    cutMesh.fpath = DATA_DIR "/b_.obj"; /*DATA_DIR "/b.obj";*/
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.UV_V, cutMesh.corner_normals, cutMesh.F, cutMesh.UV_F, cutMesh.fNormIndices);
 
     if (!cutMeshLoaded) {
@@ -130,51 +131,6 @@ int main()
         static_cast<uint32_t>(cutMesh.faceSizesArray.size()));
 
     assert(err == MC_NO_ERROR);
-
-    // Here we query for the "input connected components", from which we will get the number
-    // of source mesh vertices and faces that are used by MCUT _internally_ for the src-mesh.
-    // ------------------------------------------------------------------------------------
-    uint32_t numInputConnComps = 0;
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_INPUT, 0, NULL, &numInputConnComps);
-    assert(err == MC_NO_ERROR);
-    assert(numInputConnComps == 2); // always two (sm & cm)
-    std::vector<McConnectedComponent> inputConnComps(numInputConnComps);
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_INPUT, numInputConnComps, inputConnComps.data(), NULL);
-    assert(err == MC_NO_ERROR);
-
-    uint32_t internalSrcMeshVertexCount = 0;
-    uint32_t internalSrcMeshFaceCount = 0;
-    uint32_t internalCutMeshVertexCount = 0;
-    uint32_t internalCutMeshFaceCount = 0;
-
-    for (int i = 0; i < (int)numInputConnComps; ++i) {
-        McConnectedComponent inCC = inputConnComps.at(i);
-
-        McInputOrigin origin = McInputOrigin::MC_INPUT_ORIGIN_ALL;
-        err = mcGetConnectedComponentData(context, inCC, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL);
-        assert(origin == McInputOrigin::MC_INPUT_ORIGIN_SRCMESH || origin == McInputOrigin::MC_INPUT_ORIGIN_CUTMESH);
-
-        uint32_t numVertices = 0;
-        err = mcGetConnectedComponentData(context, inCC, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numVertices, NULL);
-        assert((int)numVertices > 0);
-
-        uint32_t numFaces = 0;
-        err = mcGetConnectedComponentData(context, inCC, MC_CONNECTED_COMPONENT_DATA_FACE_COUNT, sizeof(uint32_t), &numFaces, NULL);
-        assert((int)numFaces > 0);
-
-        if (origin == McInputOrigin::MC_INPUT_ORIGIN_CUTMESH) {
-            internalCutMeshVertexCount = numVertices;
-            internalCutMeshFaceCount = numFaces;
-        } else {
-            internalSrcMeshVertexCount = numVertices;
-            internalSrcMeshFaceCount = numFaces;
-        }
-    }
-
-    assert((int)internalSrcMeshVertexCount > 0);
-    assert((int)internalSrcMeshFaceCount > 0);
-    assert((int)internalCutMeshVertexCount > 0);
-    assert((int)internalCutMeshFaceCount > 0);
 
     //  query the number of available connected component (all types)
     // -------------------------------------------------------------
@@ -258,8 +214,8 @@ int main()
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
         assert(err == MC_NO_ERROR);
 
-        //  resolve fragment name
-        // -------------------------
+        //  resolve connected component name
+        // ---------------------------------
 
         // Here we create a name the connected component based on its properties
 
@@ -309,14 +265,14 @@ int main()
                 assert(err == MC_NO_ERROR);
 
                 ccIsFromSrcMesh = (ccOrig == McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
-
+                name += ccIsFromSrcMesh ? ".sm" : ".cm";
             } else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
                 McInputOrigin ccOrig = (McInputOrigin)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &ccOrig, NULL);
                 assert(err == MC_NO_ERROR);
                 ccIsFromSrcMesh = (ccOrig == McInputOrigin::MC_INPUT_ORIGIN_SRCMESH);
+                name += ccIsFromSrcMesh ? ".sm" : ".cm";
             }
-            name += ccIsFromSrcMesh ? ".sm" : ".cm";
         }
 
         int faceVertexOffsetBase = 0;
@@ -329,45 +285,6 @@ int main()
         std::ofstream file(fpath);
 
         file << (ccIsFromSrcMesh ? "mtllib a.mtl" : "mtllib b.mtl") << std::endl;
-
-        // TODO: figure out how to propagate vertex attributes (e.g. texture coords) onto the connected components
-        // resulting from a given input mesh (e.g. source-mesh) if MCUT internally modifies that input mesh.
-        // For demonstration purposes, such a case is exemplified when we use "a_.obj" and "b_.obj" as the
-        // tutorial inputs.
-        // NOTE: This is just a matter creating new version of "srcMesh" but using the data from the input connected component
-        // representing MCUT's internal copy of the source mesh. That new version is the one we use for propagating
-        // vertex attributes.
-        bool mcutModifiedInputMeshesInternally = (internalSrcMeshFaceCount != srcMesh.F.rows()) || (internalCutMeshFaceCount != cutMesh.F.rows());
-
-        if (mcutModifiedInputMeshesInternally) {
-            // write vertices
-            for (int k = 0; k < (int)ccVertexCount; ++k) {
-                double x = ccVertices[(uint64_t)k * 3 + 0];
-                double y = ccVertices[(uint64_t)k * 3 + 1];
-                double z = ccVertices[(uint64_t)k * 3 + 2];
-                file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
-            }
-
-            // write faces
-            faceVertexOffsetBase = 0;
-            for (int k = 0; k < (int)ccFaceCount; ++k) {
-                int faceSize = faceSizes.at(k);
-
-                file << "f ";
-                for (int j = 0; j < (int)faceSize; ++j) {
-                    const int idx = faceVertexOffsetBase + j;
-                    const int ccVertexIdx = ccFaceIndices.at(static_cast<size_t>(idx));
-                    file << (ccVertexIdx + 1) << " ";
-                }
-                file << std::endl;
-
-                faceVertexOffsetBase += faceSize;
-            }
-
-            file.close();
-
-            continue; //tmp hack. move onto next connected componenent.
-        }
 
         std::vector<Eigen::Vector2d> ccTexCoords;
         // CC vertex index to texture coordinate index/indices.
@@ -382,10 +299,10 @@ int main()
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
             // input mesh face index (actual index value, accounting for offset)
             uint32_t imFaceIdx = imFaceIdxRaw;
-            bool faceIsFromSrcMesh = (imFaceIdxRaw < internalSrcMeshFaceCount);
+            bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.rows());
 
             if (!faceIsFromSrcMesh) {
-                imFaceIdx = imFaceIdxRaw - internalSrcMeshFaceCount; // accounting for offset
+                imFaceIdx = imFaceIdxRaw - srcMesh.F.rows(); // accounting for offset
             }
 
             int faceSize = faceSizes.at(f);
@@ -396,12 +313,12 @@ int main()
                 const int ccVertexIdx = ccFaceIndices.at((uint64_t)faceVertexOffsetBase + v);
                 // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
                 const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
-                bool vertexIsFromSrcMesh = (imVertexIdxRaw < internalSrcMeshVertexCount);
+                bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMesh.V.rows());
                 const bool vertexIsIntersectionPoint = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
                 uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                 if (!vertexIsFromSrcMesh) {
-                    imVertexIdx = (imVertexIdxRaw - internalSrcMeshVertexCount); // account for offset
+                    imVertexIdx = (imVertexIdxRaw - srcMesh.V.rows()); // account for offset
                 }
 
                 const InputMesh* inputMeshPtr = &srcMesh; // assume origin face is from source mesh
