@@ -47,7 +47,6 @@ int main()
 
     // read file
     srcMesh.fpath = DATA_DIR "/a_.obj"; /* DATA_DIR "/a.obj"*/
-    ;
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
     if (!srcMeshLoaded) {
