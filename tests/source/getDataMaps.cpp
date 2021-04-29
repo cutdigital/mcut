@@ -11,6 +11,7 @@ enum InputType {
 struct TestConfig {
     McFlags dispatchflags;
     InputType inputType;
+    bool swapInputs;
 };
 
 struct DataMapsQueryTest {
@@ -26,17 +27,26 @@ struct DataMapsQueryTest {
     McFlags dispatchflags = 0;
 };
 
-#define NUMBER_OF_TESTS 6
+#define NUM_TEST_CONFIGS 12
 
 TestConfig testConfigs[] = {
     // NO_FACE_PARTITION
-    { MC_DISPATCH_INCLUDE_VERTEX_MAP, InputType::NO_FACE_PARTITION },
-    { MC_DISPATCH_INCLUDE_FACE_MAP, InputType::NO_FACE_PARTITION },
-    { MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, InputType::NO_FACE_PARTITION },
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP, InputType::NO_FACE_PARTITION, false },
+    { MC_DISPATCH_INCLUDE_FACE_MAP, InputType::NO_FACE_PARTITION, false },
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, InputType::NO_FACE_PARTITION, false },
     // REQUIRES_FACE_PARTITION
-    { MC_DISPATCH_INCLUDE_VERTEX_MAP, InputType::REQUIRES_FACE_PARTITION },
-    { MC_DISPATCH_INCLUDE_FACE_MAP, InputType::REQUIRES_FACE_PARTITION },
-    { MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, InputType::REQUIRES_FACE_PARTITION }
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP, InputType::REQUIRES_FACE_PARTITION, false },
+    { MC_DISPATCH_INCLUDE_FACE_MAP, InputType::REQUIRES_FACE_PARTITION, false },
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, InputType::REQUIRES_FACE_PARTITION, false },
+    // ** Swap inputs
+    // NO_FACE_PARTITION
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP, InputType::NO_FACE_PARTITION, true },
+    { MC_DISPATCH_INCLUDE_FACE_MAP, InputType::NO_FACE_PARTITION, true },
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, InputType::NO_FACE_PARTITION, true },
+    // REQUIRES_FACE_PARTITION
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP, InputType::REQUIRES_FACE_PARTITION, true },
+    { MC_DISPATCH_INCLUDE_FACE_MAP, InputType::REQUIRES_FACE_PARTITION, true },
+    { MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, InputType::REQUIRES_FACE_PARTITION, true }
 };
 
 void createCubeSMAndtwoTriCM(
@@ -136,7 +146,7 @@ void CreateInputsRequiringFacePartitioning(std::vector<float>& pSrcMeshVertices,
 
 UTEST_I_SETUP(DataMapsQueryTest)
 {
-    if (utest_index < (size_t)NUMBER_OF_TESTS) {
+    if (utest_index < (size_t)NUM_TEST_CONFIGS) {
         McResult err = mcCreateContext(&utest_fixture->context_, MC_NULL_HANDLE);
         EXPECT_TRUE(utest_fixture->context_ != nullptr);
         EXPECT_EQ(err, MC_NO_ERROR);
@@ -144,22 +154,41 @@ UTEST_I_SETUP(DataMapsQueryTest)
         utest_fixture->dispatchflags = testConfigs[utest_index].dispatchflags;
         switch (testConfigs[utest_index].inputType) {
         case InputType::NO_FACE_PARTITION: {
-
-            createCubeSMAndtwoTriCM(
-                utest_fixture->pSrcMeshVertices,
-                utest_fixture->pSrcMeshFaceIndices,
-                utest_fixture->pSrcMeshFaceSizes,
-                utest_fixture->pCutMeshVertices,
-                utest_fixture->pCutMeshFaceIndices,
-                utest_fixture->pCutMeshFaceSizes);
+            if (testConfigs[utest_index].swapInputs) {
+                createCubeSMAndtwoTriCM(
+                    utest_fixture->pCutMeshVertices,
+                    utest_fixture->pCutMeshFaceIndices,
+                    utest_fixture->pCutMeshFaceSizes,
+                    utest_fixture->pSrcMeshVertices,
+                    utest_fixture->pSrcMeshFaceIndices,
+                    utest_fixture->pSrcMeshFaceSizes);
+            } else {
+                createCubeSMAndtwoTriCM(
+                    utest_fixture->pSrcMeshVertices,
+                    utest_fixture->pSrcMeshFaceIndices,
+                    utest_fixture->pSrcMeshFaceSizes,
+                    utest_fixture->pCutMeshVertices,
+                    utest_fixture->pCutMeshFaceIndices,
+                    utest_fixture->pCutMeshFaceSizes);
+            }
         } break;
         case InputType::REQUIRES_FACE_PARTITION: {
-            CreateInputsRequiringFacePartitioning(utest_fixture->pSrcMeshVertices,
-                utest_fixture->pSrcMeshFaceIndices,
-                utest_fixture->pSrcMeshFaceSizes,
-                utest_fixture->pCutMeshVertices,
-                utest_fixture->pCutMeshFaceIndices,
-                utest_fixture->pCutMeshFaceSizes);
+            if (testConfigs[utest_index].swapInputs) {
+                CreateInputsRequiringFacePartitioning(
+                    utest_fixture->pCutMeshVertices,
+                    utest_fixture->pCutMeshFaceIndices,
+                    utest_fixture->pCutMeshFaceSizes,
+                    utest_fixture->pSrcMeshVertices,
+                    utest_fixture->pSrcMeshFaceIndices,
+                    utest_fixture->pSrcMeshFaceSizes);
+            } else {
+                CreateInputsRequiringFacePartitioning(utest_fixture->pSrcMeshVertices,
+                    utest_fixture->pSrcMeshFaceIndices,
+                    utest_fixture->pSrcMeshFaceSizes,
+                    utest_fixture->pCutMeshVertices,
+                    utest_fixture->pCutMeshFaceIndices,
+                    utest_fixture->pCutMeshFaceSizes);
+            }
         } break;
         }
     }
@@ -167,7 +196,7 @@ UTEST_I_SETUP(DataMapsQueryTest)
 
 UTEST_I_TEARDOWN(DataMapsQueryTest)
 {
-    if (utest_index < (size_t)NUMBER_OF_TESTS) {
+    if (utest_index < (size_t)NUM_TEST_CONFIGS) {
         utest_fixture->pSrcMeshVertices.clear();
         utest_fixture->pSrcMeshFaceIndices.clear();
         utest_fixture->pSrcMeshFaceSizes.clear();
@@ -180,73 +209,27 @@ UTEST_I_TEARDOWN(DataMapsQueryTest)
     }
 }
 
-UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
+UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
 {
+    uint32_t srcMeshVertexCount = (uint32_t)utest_fixture->pSrcMeshVertices.size() / 3;
+    uint32_t srcMeshFaceCount = (uint32_t)utest_fixture->pSrcMeshFaceSizes.size();
+    uint32_t cutMeshVertexCount = (uint32_t)utest_fixture->pCutMeshVertices.size() / 3;
+    uint32_t cutMeshFaceCount = (uint32_t)utest_fixture->pCutMeshFaceSizes.size();
+
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | utest_fixture->dispatchflags,
                   utest_fixture->pSrcMeshVertices.data(),
                   utest_fixture->pSrcMeshFaceIndices.data(),
                   utest_fixture->pSrcMeshFaceSizes.data(),
-                  (uint32_t)utest_fixture->pSrcMeshVertices.size() / 3,
-                  (uint32_t)utest_fixture->pSrcMeshFaceSizes.size(),
+                  srcMeshVertexCount,
+                  srcMeshFaceCount,
                   utest_fixture->pCutMeshVertices.data(),
                   utest_fixture->pCutMeshFaceIndices.data(),
                   utest_fixture->pCutMeshFaceSizes.data(),
-                  (uint32_t)utest_fixture->pCutMeshVertices.size() / 3,
-                  (uint32_t)utest_fixture->pCutMeshFaceSizes.size()),
+                  cutMeshVertexCount,
+                  cutMeshFaceCount),
         MC_NO_ERROR);
-
-    // Here we query for the "input connected components", from which we will get the number
-    // of source mesh vertices and faces that are used by MCUT _internally_. MCUT is free
-    // to modify (copies of) the user-provided input meshes to meet contraints during
-    // certain intersections. One example is when a user wants to cut a hole through a
-    // simple triangle using a cube, where this cube intersects the area spanned by the
-    // trangle but the cube does not sever any of the triangle's edges.
-
-    uint32_t numInputConnComps = 0;
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_INPUT, 0, NULL, &numInputConnComps), MC_NO_ERROR);
-    ASSERT_EQ(numInputConnComps, 2); // always two (sm & cm)
-    std::vector<McConnectedComponent> inputConnComps(numInputConnComps);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_INPUT, numInputConnComps, inputConnComps.data(), NULL), MC_NO_ERROR);
-
-    uint32_t internalSrcMeshVertexCount = 0;
-    uint32_t internalSrcMeshFaceCount = 0;
-    uint32_t internalCutMeshVertexCount = 0;
-    uint32_t internalCutMeshFaceCount = 0;
-
-    for (int c = 0; c < (int)numInputConnComps; ++c) {
-        McConnectedComponent inCC = inputConnComps.at(c);
-
-        McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, inCC, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
-        ASSERT_EQ(type, MC_CONNECTED_COMPONENT_TYPE_INPUT);
-
-        uint32_t numVertices = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, inCC, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numVertices, NULL), MC_NO_ERROR);
-        ASSERT_GT((int)numVertices, 0);
-
-        uint32_t numFaces = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, inCC, MC_CONNECTED_COMPONENT_DATA_FACE_COUNT, sizeof(uint32_t), &numFaces, NULL), MC_NO_ERROR);
-        ASSERT_GT((int)numFaces, 0);
-
-        McInputOrigin origin = McInputOrigin::MC_INPUT_ORIGIN_ALL;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, inCC, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL), MC_NO_ERROR);
-        ASSERT_TRUE(origin == McInputOrigin::MC_INPUT_ORIGIN_SRCMESH || origin == McInputOrigin::MC_INPUT_ORIGIN_CUTMESH);
-
-        if (origin == McInputOrigin::MC_INPUT_ORIGIN_SRCMESH) {
-            internalSrcMeshVertexCount = numVertices;
-            internalSrcMeshFaceCount = numFaces;
-        } else { // origin == McInputOrigin::MC_INPUT_ORIGIN_CUTMESH
-            internalCutMeshVertexCount = numVertices;
-            internalCutMeshFaceCount = numFaces;
-        }
-    }
-
-    ASSERT_GT((int)internalSrcMeshVertexCount, 0);
-    ASSERT_GT((int)internalSrcMeshFaceCount, 0);
-    ASSERT_GT((int)internalCutMeshVertexCount, 0);
-    ASSERT_GT((int)internalCutMeshFaceCount, 0);
 
     // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     // Now we query [all] connected components, including the input CCs
@@ -283,7 +266,7 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
                 for (int i = 0; i < (int)ccVertexCount; i++) {
 
                     const uint32_t imVertexIdxRaw = vertexMap[i];
-                    bool vertexIsFromSrcMesh = (imVertexIdxRaw < internalSrcMeshVertexCount);
+                    bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMeshVertexCount);
                     const bool isIntersectionPoint = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
 
                     if (!isIntersectionPoint) {
@@ -291,10 +274,10 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
                         uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                         if (!vertexIsFromSrcMesh) {
-                            imVertexIdx = (imVertexIdxRaw - internalSrcMeshVertexCount); // account for offset
-                            ASSERT_LT((int)imVertexIdx, internalCutMeshVertexCount);
+                            imVertexIdx = (imVertexIdxRaw - srcMeshVertexCount); // account for offset
+                            ASSERT_LT((int)imVertexIdx, cutMeshVertexCount);
                         } else {
-                            ASSERT_LT((int)imVertexIdx, internalSrcMeshVertexCount);
+                            ASSERT_LT((int)imVertexIdx, srcMeshVertexCount);
                         }
                     }
                 }
@@ -305,9 +288,9 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
                     uint32_t correspondingCutMeshVertex = vertexMap[i];
                     const bool isIntersectionPoint = (correspondingCutMeshVertex == MC_UNDEFINED_VALUE);
                     if (!isIntersectionPoint) {
-                        correspondingCutMeshVertex -= internalSrcMeshVertexCount; // account for offset
+                        correspondingCutMeshVertex -= srcMeshVertexCount; // account for offset
                         ASSERT_GE((int)correspondingCutMeshVertex, 0);
-                        ASSERT_LT((int)correspondingCutMeshVertex, internalCutMeshVertexCount);
+                        ASSERT_LT((int)correspondingCutMeshVertex, cutMeshVertexCount);
                     }
                 }
             };
@@ -331,6 +314,18 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
                     testPatchCC();
                 }
             } break;
+            case McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_INPUT: {
+                // find out where it comes from (source-mesh or cut-mesh)
+                McInputOrigin orig = MC_INPUT_ORIGIN_ALL;
+                ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
+
+                if (orig == MC_INPUT_ORIGIN_SRCMESH) {
+                    testSrcMeshCC();
+                } else {
+                    ASSERT_TRUE(orig == MC_INPUT_ORIGIN_CUTMESH);
+                    testPatchCC();
+                }
+            } break;
             }
         }
 
@@ -351,17 +346,20 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUMBER_OF_TESTS)
 
             for (int v = 0; v < (int)ccFaceCount; v++) {
                 const uint32_t imFaceIdxRaw = faceMap[v];
-                bool faceIsFromSrcMesh = (imFaceIdxRaw < internalSrcMeshVertexCount);
+                bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMeshFaceCount);
 
                 ASSERT_TRUE(imFaceIdxRaw != MC_UNDEFINED_VALUE); // all face indices are mapped!
 
                 uint32_t imFaceIdx = imFaceIdxRaw; // actual index value, accounting for offset
 
                 if (!faceIsFromSrcMesh) {
-                    imFaceIdx = (imFaceIdxRaw - internalSrcMeshVertexCount); // account for offset
-                    ASSERT_LT((int)imFaceIdx, internalCutMeshVertexCount);
+                    imFaceIdx = (imFaceIdxRaw - srcMeshFaceCount); // account for offset
+                    if (imFaceIdx >= cutMeshFaceCount) {
+                        printf("imFaceIdx=%d cutMeshFaceCount=%d\n", imFaceIdx, cutMeshFaceCount);
+                    }
+                    ASSERT_LT((int)imFaceIdx, cutMeshFaceCount);
                 } else {
-                    ASSERT_LT((int)imFaceIdx, internalSrcMeshVertexCount);
+                    ASSERT_LT((int)imFaceIdx, srcMeshFaceCount);
                 }
             }
         }

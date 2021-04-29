@@ -514,8 +514,10 @@ McResult halfedgeMeshToIndexArrayMesh(
     const std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
     IndexArrayMesh& indexArrayMesh,
     const mcut::output_mesh_info_t& halfedgeMeshInfo,
-    const std::map<mcut::vd_t, mcut::math::vec3>& addedFpPartitioningVerticesOnCorrespondingInputMesh,
-    const std::map<mcut::fd_t, mcut::fd_t>& fpPartitionChildFaceToCorrespondingInputMeshFace,
+    const std::map<mcut::vd_t, mcut::math::vec3>& addedFpPartitioningVerticesOnCorrespondingInputSrcMesh,
+    const std::map<mcut::fd_t, mcut::fd_t>& fpPartitionChildFaceToCorrespondingInputSrcMeshFace,
+    const std::map<mcut::vd_t, mcut::math::vec3>& addedFpPartitioningVerticesOnCorrespondingInputCutMesh,
+    const std::map<mcut::fd_t, mcut::fd_t>& fpPartitionChildFaceToCorrespondingInputCutMeshFace,
     const int userSrcMeshVertexCount,
     const int userSrcMeshFaceCount,
     const int internalSrcMeshVertexCount,
@@ -560,36 +562,57 @@ McResult halfedgeMeshToIndexArrayMesh(
 
             // Here we use whatever value was assigned to the current vertex by the kernel.
             // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-            uint32_t value = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter);
-            // set vertices that were added as a result of discovering floating polygons to same value as intersection points i.e. uint_max
-            std::map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputMesh.find(mcut::vd_t(value));
-            bool vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputMesh.cend());
-
-            // NOTE: The kernel will assign a 'proper' index value to vertices that exist due to face partitioning.
-            // 'proper' here means that the kernel assumes that these vertices are original vertices as provided the
-            // user, when in actual fact we added them in order to partition a face. i.e. the kernel is not aware
-            // that a given input mesh it is working with is modified.
-            // So here we have to fix that mapping information to correctly state that "any vertex added due to face
-            // partitioning was not in the user provided input mesh". This means the user can confidently determine
-            // vertices are newly added and which were part of her respective input mesh.
-
+            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter);
             // We use the same default value as that used by the kernel for intersection
             // points (intersection points at mapped to uint_max i.e. null_vertex())
+            uint32_t userInputMeshVertexDescr = UINT32_MAX;
+            // This is true only for polygon intersection points computed by the kernel
+            bool internalInputMeshVertexDescrIsForIntersectionPoint = (internalInputMeshVertexDescr == UINT32_MAX);
 
-            if (vertexExistsDueToFacePartition) {
-                value = UINT32_MAX; // treat like an intersection point
-            } else {
+            if (!internalInputMeshVertexDescrIsForIntersectionPoint) { // user-mesh vertex or vertex that is added due to face-partitioning
+                // NOTE: The kernel will assign/map a 'proper' index value to vertices that exist due to face partitioning.
+                // 'proper' here means that the kernel treats these vertices as 'original vertices' from a user-provided input
+                // mesh. In reality, we added such vertices in order to partition a face. i.e. the kernel is not aware
+                // that a given input mesh it is working with is modified.
+                // So, here we have to fix that mapping information to correctly state that "any vertex added due to face
+                // partitioning was not in the user provided input mesh" and should therefore be treated/labelled as an intersection
+                // point i.e. it should map to UINT32_MAX because it does not map to any vertex in the user provided input mesh.
+                bool vertexExistsDueToFacePartition = false;
+                const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internalSrcMeshVertexCount);
 
-                MCUT_ASSERT(internalSrcMeshVertexCount > 0);
-                if (value != UINT32_MAX /*intsctn pt*/ && (int)value >= internalSrcMeshVertexCount) // cut-mesh vertex ..?
+                if (internalInputMeshVertexDescrIsForSrcMesh) {
+                    std::map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                    vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.cend());
+                } else // internalInputMeshVertexDescrIsForCutMesh
                 {
-                    MCUT_ASSERT(internalSrcMeshVertexCount >= userSrcMeshVertexCount);
-                    const int offset_descrepancy = (internalSrcMeshVertexCount - userSrcMeshVertexCount);
-                    value = (value - offset_descrepancy); // ensure that we offset using number of user mesh vertices
+                    std::map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputCutMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                    vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputCutMesh.cend());
+                }
+
+                if (!vertexExistsDueToFacePartition) { // user-mesh vertex
+
+                    MCUT_ASSERT(internalSrcMeshVertexCount > 0);
+
+                    if (!internalInputMeshVertexDescrIsForSrcMesh) // is it a cut-mesh vertex discriptor ..?
+                    {
+
+                        // vertices added due to face-partitioning will have an unoffsetted index/descr that is >= userSrcMeshVertexCount
+                        const uint32_t internalInputMeshVertexDescrNoOffset = (internalInputMeshVertexDescr - internalSrcMeshVertexCount);
+
+                        //if (internalInputMeshVertexDescrNoOffset < userCutMeshVertexCount) {
+                        //const int offset_descrepancy = (internalSrcMeshVertexCount - userSrcMeshVertexCount);
+                        userInputMeshVertexDescr = (internalInputMeshVertexDescrNoOffset + userSrcMeshVertexCount); // ensure that we offset using number of [user-provided mesh] vertices
+                        //}
+                    } else {
+                        //if (internalInputMeshVertexDescr < userSrcMeshVertexCount) {
+                        //const int offset_descrepancy = (internalSrcMeshVertexCount - userSrcMeshVertexCount);
+                        userInputMeshVertexDescr = internalInputMeshVertexDescr; // src-mesh vertices have no offset unlike cut-mesh vertices
+                        //}
+                    }
                 }
             }
 
-            indexArrayMesh.pVertexMapIndices[i] = value;
+            indexArrayMesh.pVertexMapIndices[i] = userInputMeshVertexDescr;
         }
     }
 
@@ -642,10 +665,52 @@ McResult halfedgeMeshToIndexArrayMesh(
 
         if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
             MCUT_ASSERT(halfedgeMeshInfo.data_maps.face_map.count(*i) == 1);
-            const size_t idx = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+            //const size_t idx = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
-            uint32_t value = static_cast<uint32_t>(halfedgeMeshInfo.data_maps.face_map.at(*i));
+            uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+            uint32_t userInputMeshFaceDescr = INT32_MAX;
 
+            //bool faceExistsDueToFacePartition = false;
+            const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
+
+            if (internalInputMeshFaceDescrIsForSrcMesh) {
+                std::map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputSrcMeshFace.find(mcut::fd_t(internalInputMeshFaceDescr));
+                if (fiter != fpPartitionChildFaceToCorrespondingInputSrcMeshFace.cend()) {
+                    userInputMeshFaceDescr = fiter->second;
+                } else {
+                    userInputMeshFaceDescr = internalInputMeshFaceDescr;
+                }
+                MCUT_ASSERT(userInputMeshFaceDescr < userSrcMeshFaceCount);
+            } else // internalInputMeshVertexDescrIsForCutMesh
+            {
+                std::map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(mcut::fd_t(internalInputMeshFaceDescr));
+                if (fiter != fpPartitionChildFaceToCorrespondingInputCutMeshFace.cend()) {
+                    uint32_t unoffsettedDescr = (fiter->second - internalSrcMeshFaceCount);
+                    //if (unoffsettedDescr < userSrcMeshFaceCount) {
+                    userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                    //}
+                } else {
+                    uint32_t unoffsettedDescr = (internalInputMeshFaceDescr - internalSrcMeshFaceCount);
+                    userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                }
+            }
+
+            MCUT_ASSERT(userInputMeshFaceDescr != INT32_MAX);
+
+#if 0
+            if (!faceExistsDueToFacePartition) { // user-mesh vertex
+
+                MCUT_ASSERT(internalSrcMeshFaceCount > 0);
+
+                if ((int)internalInputMeshFaceDescr >= internalSrcMeshFaceCount) // is it a cut-mesh face discriptor ..?
+                {
+                    MCUT_ASSERT(internalSrcMeshFaceCount >= userSrcMeshFaceCount);
+                    const int offset_descrepancy = (internalSrcMeshFaceCount - userSrcMeshFaceCount);
+                    userInputMeshFaceDescr = (internalInputMeshFaceDescr - offset_descrepancy); // ensure that we offset using number of user mesh vertices
+                }
+            }
+#endif
+#if 0
             std::map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputMeshFace.find(mcut::fd_t(value));
 
             bool faceAddedDueToFacePartitioning = (fiter != fpPartitionChildFaceToCorrespondingInputMeshFace.cend());
@@ -662,8 +727,8 @@ McResult halfedgeMeshToIndexArrayMesh(
                 const int offset_descrepancy = (internalSrcMeshFaceCount - userSrcMeshFaceCount);
                 value = (value - offset_descrepancy); // ensure that we offset using number of user mesh faces
             }
-
-            indexArrayMesh.pFaceMapIndices[idx] = value;
+#endif
+            indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
         }
     }
 
@@ -2668,8 +2733,30 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         return result;
     }
 
+    // NOTE: face descriptors in "fpPartitionChildFaceToInputCutMeshFace", need to be offsetted
+    // by the number of internal source-mesh faces/vertices. This is to ensure consistency with the kernel's data-mapping and make
+    // it easier for us to map vertex and face descriptor in connected components to the correct instance in the user-provided
+    // input meshes.
+    // This offsetting follows a design choice used in the kernel that (ps-faces belonging to cut-mesh start [after] the
+    // source-mesh faces).
+    // Refer to the function "halfedgeMeshToIndexArrayMesh()" on how we use this information.
+    std::map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = fpPartitionChildFaceToInputCutMeshFace;
+    for (std::map<mcut::fd_t, mcut::fd_t>::iterator i = fpPartitionChildFaceToInputCutMeshFace.begin();
+         i != fpPartitionChildFaceToInputCutMeshFace.end(); ++i) {
+        mcut::fd_t offsettedDescr = mcut::fd_t(i->first + srcMeshInternal.number_of_faces());
+        fpPartitionChildFaceToInputCutMeshFaceOFFSETTED[offsettedDescr] = mcut::fd_t(i->second + numSourceMeshFacesInLastDispatchCall); // apply offset
+            // i->second = mcut::fd_t(i->second + numSourceMeshFacesInLastDispatchCall); // apply offset
+    }
+
+    std::map<mcut::vd_t, mcut::math::vec3> addedFpPartitioningVerticesOnCutMeshOFFSETTED;
+    for (std::map<mcut::vd_t, mcut::math::vec3>::const_iterator i = addedFpPartitioningVerticesOnCutMesh.begin();
+         i != addedFpPartitioningVerticesOnCutMesh.end(); ++i) {
+        mcut::vd_t offsettedDescr = mcut::vd_t(i->first + srcMeshInternal.number_of_vertices());
+        addedFpPartitioningVerticesOnCutMeshOFFSETTED[offsettedDescr] = i->second; // apply offset
+    }
+
     //
-    // sealed (partially or completely) fragment connected components
+    // sealed-fragment connected components
     //
 
     for (std::map<mcut::connected_component_location_t, std::map<mcut::cut_surface_patch_location_t, std::vector<mcut::output_mesh_info_t>>>::const_iterator i = backendOutput.connected_components.cbegin();
@@ -2680,17 +2767,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
              j != i->second.cend();
              ++j) {
 
-            //const mcut::cut_surface_patch_location_t& cut_surface_patch_location = j->first;
             const std::string cs_patch_loc_str = mcut::to_string(j->first);
 
-            // The first connected compoenent may or may not have been sealed with atleast one polygon.
-            // One example case is when [completely] cutting a source-mesh like the tetrahedron into two pieces using just one cut-mesh polygon.
-            // In this case, some fragment(s) will have exactly two output instances i.e. "unsealed" and "completely sealed".
-            // This is because there will only be one interior patch polygon, which when stitched leads to a complete seal, thus there are not partial stages of sealing.
-            //
-            bool first_cc_is_completely_sealed = j->second.size() == 1;
-            std::vector<mcut::output_mesh_info_t>::const_iterator start_off = first_cc_is_completely_sealed ? j->second.cbegin() : j->second.cbegin() + 1;
-            for (std::vector<mcut::output_mesh_info_t>::const_iterator k = start_off; k != j->second.cend(); ++k) {
+            for (std::vector<mcut::output_mesh_info_t>::const_iterator k = j->second.cbegin(); k != j->second.cend(); ++k) {
 
                 std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> frag = std::unique_ptr<McFragmentConnComp, void (*)(McConnCompBase*)>(new McFragmentConnComp, ccDeletorFunc<McFragmentConnComp>);
                 McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(frag.get());
@@ -2702,21 +2781,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                 MCUT_ASSERT(asFragPtr->patchLocation != MC_PATCH_LOCATION_UNDEFINED);
                 asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
-                // Note: the last CC is always guarranteed to be fully sealed (see: "include_fragment_sealed_partial" in kernel)!
-                //bool is_last_cc = (size_t)std::distance(j->second.cbegin(), k) == (size_t)(j->second.size() - 1);
 
-                //if (is_last_cc) {
-
-                //} else { // did the user tell us to keep partially sealed fragments??
-                // MCUT_ASSERT(backendInput.keep_fragments_sealed_inside_exhaustive || backendInput.keep_fragments_sealed_outside_exhaustive);
-                // asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_PARTIAL;
-                //}
-
-                // Personal note: Do not be tempted to just deal with unsealed fragments here.
-                // Its not guarranteed that the first element of "j->second" is always completely unsealed! Only sometimes.
-                // Thus, for simplicity we deal with unsealed fragments specifically below (next for-loop)
-
-                halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *k, addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace,
+                halfedgeMeshToIndexArrayMesh(
+                    ctxtPtr, asFragPtr->indexArrayMesh, *k,
+                    addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
             }
         }
@@ -2740,19 +2808,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             asFragPtr->patchLocation = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
             asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
 
-            halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *j, addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace,
+            halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *j,
+                addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
                 numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         }
-    }
-
-    // NOTE: face descriptors in "fpPartitionChildFaceToInputCutMeshFace" i.e. the values of the map, need to be offsetted
-    // by the number of source-mesh faces. This is to ensure that the user can distiguished between source-mesh and cut-mesh
-    // face when querying face maps. This follows a design choice used in the kernel as well (ps-faces belonging to cut-mesh
-    // start after the source-mesh faces).
-    std::map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = fpPartitionChildFaceToInputCutMeshFace;
-    for (std::map<mcut::fd_t, mcut::fd_t>::iterator i = fpPartitionChildFaceToInputCutMeshFaceOFFSETTED.begin();
-         i != fpPartitionChildFaceToInputCutMeshFaceOFFSETTED.end(); ++i) {
-        i->second = mcut::fd_t(i->second + numSourceMeshFacesInLastDispatchCall); // apply offset
     }
 
     // inside patches
@@ -2769,7 +2828,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_INSIDE;
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it, addedFpPartitioningVerticesOnCutMesh, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+        halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
 
@@ -2785,12 +2845,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_OUTSIDE;
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it, addedFpPartitioningVerticesOnCutMesh, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+        halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
 
-    // seams
-    // -----------
+    // seam connected components
+    // -------------------------
 
     // NOTE: seamed meshes are not available if there was no partial cut intersection (due to constraints imposed by halfedge construction rules).
 
@@ -2803,7 +2864,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         McSeamConnComp* asSrcMeshSeamPtr = dynamic_cast<McSeamConnComp*>(ctxtPtr->connComps.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh, addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace,
+        halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
 
@@ -2817,12 +2879,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh, addedFpPartitioningVerticesOnCutMesh, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+        halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
 
     // input connected components
-    // :::::::::::::::::::::::::::
+    // --------------------------
 
     // internal cut-mesh (possibly with new faces and vertices)
     {
@@ -2834,23 +2897,23 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asCutMeshInputPtr->origin = MC_INPUT_ORIGIN_CUTMESH;
 
         mcut::output_mesh_info_t omi;
-        omi.mesh = cutMeshInternal; // naive copy
+        omi.mesh = cutMeshInternal; // naive copy (could use std::move)
         if (backendInput.populate_vertex_maps) {
             for (mcut::mesh_t::vertex_iterator_t i = cutMeshInternal.vertices_begin(); i != cutMeshInternal.vertices_end(); ++i) {
-
-                omi.data_maps.vertex_map[*i] = mcut::vd_t((*i) + srcMeshInternal.number_of_vertices()); // apply offset similarly as kernel
+                omi.data_maps.vertex_map[*i] = mcut::vd_t((*i) + srcMeshInternal.number_of_vertices()); // apply offset like kernel does
             }
         }
 
         if (backendInput.populate_face_maps) {
             for (mcut::mesh_t::face_iterator_t i = cutMeshInternal.faces_begin(); i != cutMeshInternal.faces_end(); ++i) {
-                omi.data_maps.face_map[*i] = mcut::fd_t((*i) + srcMeshInternal.number_of_faces()); // apply offset similarly as kernel
+                omi.data_maps.face_map[*i] = mcut::fd_t((*i) + srcMeshInternal.number_of_faces()); // apply offset like kernel does
             }
         }
 
-        omi.seam_vertices = {}; // empty. an input mesh has not intersection points
+        omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshInputPtr->indexArrayMesh, omi, addedFpPartitioningVerticesOnCutMesh, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+        halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshInputPtr->indexArrayMesh, omi,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
 
@@ -2877,9 +2940,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             }
         }
 
-        omi.seam_vertices = {}; // empty. an input mesh has not intersection points
+        omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshInputPtr->indexArrayMesh, omi, addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace,
+        halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshInputPtr->indexArrayMesh, omi,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
 

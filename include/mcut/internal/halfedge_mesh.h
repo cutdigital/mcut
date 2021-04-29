@@ -597,11 +597,8 @@ public:
     {
         MCUT_ASSERT(v != null_vertex());
         MCUT_ASSERT(std::find(m_vertices_removed.cbegin(), m_vertices_removed.cend(), v) == m_vertices_removed.cend());
-
-        vertex_data_t& vd = m_vertices.at(v);
-
-        MCUT_ASSERT(vd.m_faces.empty());
-        MCUT_ASSERT(vd.m_halfedges.empty());
+        MCUT_ASSERT(m_vertices.at(v).m_faces.empty());
+        MCUT_ASSERT(m_vertices.at(v).m_halfedges.empty());
 
         m_vertices_removed.push_back(v);
     }
