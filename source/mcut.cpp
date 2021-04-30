@@ -1788,11 +1788,15 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         } // if (general_position_assumption_was_violated) {
 
         if ((perturbationIters == 0 /*no perturbs required*/ || general_position_assumption_was_violated) && floating_polygon_was_detected == false) {
+
+            // TODO: assume that re-adding elements (vertices and faces) is going to change the order
+            // from the user-provided order. So we still need to fix the mapping, which may no longer
+            // be one-to-one as in the case when things do not change.
             cutMeshInternal.remove_elements();
 
             // TODO: the number of cut-mesh faces and vertices may increase due to polygon partitioning
-            // Therefore: we need to perturb the updated cut-mesh i.e. the one containing partitioned polygons
-            // "pCutMeshVertices" are simply the user provided coordinates
+            // Therefore: we need to perturb [the updated cut-mesh] i.e. the one containing partitioned polygons
+            // "pCutMeshFaces" are simply the user provided faces
             // We must also use the newly added vertices (coords) due to polygon partitioning as "unperturbed" values
             // This will require some intricate mapping
             result = indexArrayMeshToHalfedgeMesh(
@@ -2898,6 +2902,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         mcut::output_mesh_info_t omi;
         omi.mesh = cutMeshInternal; // naive copy (could use std::move)
+
+        // TODO: assume that re-adding elements (vertices and faces) e.g. prior to perturbation or partitioning is going to change the order
+        // from the user-provided order. So we still need to fix the mapping, which may no longer
+        // be one-to-one (even if with an sm offset ) as in the case when things do not change.
+
         if (backendInput.populate_vertex_maps) {
             for (mcut::mesh_t::vertex_iterator_t i = cutMeshInternal.vertices_begin(); i != cutMeshInternal.vertices_end(); ++i) {
                 omi.data_maps.vertex_map[*i] = mcut::vd_t((*i) + srcMeshInternal.number_of_vertices()); // apply offset like kernel does
