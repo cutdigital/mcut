@@ -47,6 +47,7 @@ int main()
 
     // read file
     srcMesh.fpath = DATA_DIR "/a_.obj"; /* DATA_DIR "/a.obj"*/
+
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.UV_V, srcMesh.corner_normals, srcMesh.F, srcMesh.UV_F, srcMesh.fNormIndices);
 
     if (!srcMeshLoaded) {
@@ -115,7 +116,7 @@ int main()
     // -----------------
     err = mcDispatch(
         context,
-        MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
+        MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP,
         // source mesh
         reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
         reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
@@ -298,10 +299,10 @@ int main()
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
             // input mesh face index (actual index value, accounting for offset)
             uint32_t imFaceIdx = imFaceIdxRaw;
-            bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.rows());
+            bool faceIsFromSrcMesh = (imFaceIdxRaw < (uint32_t)srcMesh.F.rows());
 
             if (!faceIsFromSrcMesh) {
-                imFaceIdx = imFaceIdxRaw - srcMesh.F.rows(); // accounting for offset
+                imFaceIdx = imFaceIdxRaw - (uint32_t)srcMesh.F.rows(); // accounting for offset
             }
 
             int faceSize = faceSizes.at(f);
