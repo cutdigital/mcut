@@ -115,7 +115,7 @@ int main()
     // -----------------
     err = mcDispatch(
         context,
-        MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP,
+        MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
         // source mesh
         reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
         reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
