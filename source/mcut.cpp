@@ -167,12 +167,15 @@ struct IndexArrayMesh {
     std::unique_ptr<uint32_t[]> pFaceMapIndices; // descriptor/index in original mesh (source/cut-mesh), each face has an entry
     std::unique_ptr<uint32_t[]> pFaceSizes;
     std::unique_ptr<uint32_t[]> pEdges;
+    std::unique_ptr<uint32_t[]> pFaceAdjFaces;
+    std::unique_ptr<uint32_t[]> pFaceAdjFacesSizes;
 
     uint32_t numVertices = 0;
     uint32_t numSeamVertexIndices = 0;
     uint32_t numFaces = 0;
     uint32_t numFaceIndices = 0;
     uint32_t numEdgeIndices = 0;
+    uint32_t numFaceAdjFaceIndices = 0;
 };
 
 struct McConnCompBase {
@@ -645,8 +648,13 @@ McResult halfedgeMeshToIndexArrayMesh(
     }
     indexArrayMesh.numFaceIndices = 0;
 
+    indexArrayMesh.pFaceAdjFacesSizes = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
+    indexArrayMesh.numFaceAdjFaceIndices = 0;
+
     std::vector<std::vector<mcut::vd_t>> gatheredFaces;
+    std::vector<std::vector<mcut::fd_t>> gatheredFacesAdjFaces;
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i) {
+        int faceIndex = (int)gatheredFaces.size(); // or "gatheredFacesAdjFaces.size()"
 
         std::vector<mcut::vd_t> face;
         std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
@@ -662,6 +670,12 @@ McResult halfedgeMeshToIndexArrayMesh(
         gatheredFaces.emplace_back(face);
 
         indexArrayMesh.numFaceIndices += (int)face.size();
+
+        std::vector<mcut::fd_t> adjFaces = halfedgeMeshInfo.mesh.get_faces_around_face(*i);
+        gatheredFacesAdjFaces.push_back(adjFaces);
+
+        indexArrayMesh.numFaceAdjFaceIndices += (uint32_t)adjFaces.size();
+        indexArrayMesh.pFaceAdjFacesSizes[faceIndex] = (uint32_t)adjFaces.size();
 
         if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
             MCUT_ASSERT(halfedgeMeshInfo.data_maps.face_map.count(*i) == 1);
@@ -680,7 +694,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                 } else {
                     userInputMeshFaceDescr = internalInputMeshFaceDescr;
                 }
-                MCUT_ASSERT(userInputMeshFaceDescr < userSrcMeshFaceCount);
+                MCUT_ASSERT((int)userInputMeshFaceDescr < (int)userSrcMeshFaceCount);
             } else // internalInputMeshVertexDescrIsForCutMesh
             {
                 std::map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(mcut::fd_t(internalInputMeshFaceDescr));
@@ -729,7 +743,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             }
 #endif
             indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
-        }
+        } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
     }
 
     // sanity check
@@ -737,8 +751,10 @@ McResult halfedgeMeshToIndexArrayMesh(
     MCUT_ASSERT(gatheredFaces.size() == indexArrayMesh.numFaces);
 
     indexArrayMesh.pFaceIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaceIndices]);
+    indexArrayMesh.pFaceAdjFaces = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaceAdjFaceIndices]);
 
-    int faceOffset = 0;
+    int faceVertexIndexOffset = 0;
+    int faceAdjFaceIndexOffset = 0;
 
     for (int i = 0; i < (int)gatheredFaces.size(); ++i) {
         const std::vector<mcut::vd_t>& face = gatheredFaces[i];
@@ -754,9 +770,18 @@ McResult halfedgeMeshToIndexArrayMesh(
         for (int j = 0; j < (int)face.size(); ++j) {
             const mcut::vd_t vd = face[j];
 
-            indexArrayMesh.pFaceIndices[(size_t)faceOffset + j] = vmap[vd];
+            indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = vmap[vd];
         }
-        faceOffset += static_cast<int>(face.size());
+        faceVertexIndexOffset += static_cast<int>(face.size());
+
+        const std::vector<mcut::fd_t>& adjFaces = gatheredFacesAdjFaces[i];
+
+        for (int j = 0; j < (int)adjFaces.size(); ++j) {
+            const mcut::fd_t adjFace = adjFaces[j];
+            indexArrayMesh.pFaceAdjFaces[(size_t)faceAdjFaceIndexOffset + j] = (uint32_t)adjFace;
+        }
+
+        faceAdjFaceIndexOffset += (int)adjFaces.size();
     }
     gatheredFaces.clear();
 
@@ -3206,6 +3231,45 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             }
 
             memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pFaceSizes.get()), bytes);
+        }
+    } break;
+    case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE: {
+        if (pMem == nullptr) {
+            MCUT_ASSERT(ccData->indexArrayMesh.numFaceAdjFaceIndices > 0);
+            *pNumBytes = ccData->indexArrayMesh.numFaceAdjFaceIndices * sizeof(uint32_t);
+        } else {
+            if (bytes > ccData->indexArrayMesh.numFaceAdjFaceIndices * sizeof(uint32_t)) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            if (bytes % sizeof(uint32_t) != 0) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pFaceAdjFaces.get()), bytes);
+        }
+    } break;
+    case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE: {
+        if (pMem == nullptr) {
+            *pNumBytes = ccData->indexArrayMesh.numFaces * sizeof(uint32_t); // each face has a size (num adjacent faces)
+        } else {
+            if (bytes > ccData->indexArrayMesh.numFaces * sizeof(uint32_t)) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            if (bytes % sizeof(uint32_t) != 0) {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            memcpy(pMem, reinterpret_cast<void*>(ccData->indexArrayMesh.pFaceAdjFacesSizes.get()), bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT: {

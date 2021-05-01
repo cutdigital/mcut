@@ -126,7 +126,7 @@ typedef enum McResult {
     MC_INVALID_OPERATION = -(1 << 1), /**< An internal operation could not be executed successively. */
     MC_INVALID_VALUE = -(1 << 2), /**< An invalid value has been passed to the API. */
     MC_OUT_OF_MEMORY = -(1 << 3), /** Memory allocation operation cannot allocate memory. */
-   MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
+    MC_RESULT_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McResult;
 
 /**
@@ -225,10 +225,14 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION = (1 << 10), /**< The location of a fragment connected component with respect to the cut mesh (See also: ::McFragmentLocation). */
     MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION = (1 << 11), /**< The location of a patch with respect to the source mesh (See also: ::McPatchLocation).*/
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE = (1 << 12), /**< The Hole-filling configuration of a fragment connected component (See also: ::McFragmentSealType). */
-    MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX = (1 << 13), /**< List of seam-vertices as an array of indices. */
+    MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX = (1 << 13), /**< List of seam-vertices as an array of indices.*/
     MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 14), /**< The input mesh (source- or cut-mesh) from which a "seam" is derived (See also: ::McSeamedConnectedComponentOrigin). */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP = (1 << 15), /**< List of a subset of vertex indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh vertex or MC_UNDEFINED_VALUE. This index-value corresponds to the connected component vertex at the accessed index. The value at index 0 of the queried array is the index of the vertex in the original input mesh. In order to clearly distinguish indices of the cut mesh from those of the source mesh, this index value corresponds to a cut mesh vertex index if it is great-than-or-equal-to the number of source-mesh vertices. Intersection points are mapped to MC_UNDEFINED_VALUE. The input mesh will be deduced by the user from the type of connected component with which the information is queried.*/
-    MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 16) /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces.*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 16), /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces.*/
+    // incidence and adjacency information
+    MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE = (1 << 17), /* List of face-adjacency indices corresponding to each face.*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18) /* List of adjacent-face-list sizes (number of adjacent faces per face).*/
+
 } McConnectedComponentData;
 
 /**
