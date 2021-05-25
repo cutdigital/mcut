@@ -39,7 +39,6 @@ uint32_t getFaceIndicesBaseOffset(const uint32_t faceIdx, const uint32_t* faceSi
 void mergeAdjacentMeshFacesByProperty(
     std::vector<uint32_t>& meshFaceIndicesOUT,
     std::vector<uint32_t>& meshFaceSizesOUT,
-    const std::vector<double>& meshVertices,
     const std::vector<uint32_t>& meshFaces,
     const std::vector<uint32_t>& meshFaceSizes,
     const std::vector<uint32_t>& meshFaceAdjFace,
@@ -161,7 +160,7 @@ int main()
     // query the data of each connected component from MCUT
     // -------------------------------------------------------
 
-    for (int c = 0; c < numConnComps; ++c) {
+    for (int c = 0; c < (int)numConnComps; ++c) {
         McConnectedComponent connComp = connectedComponents[c];
 
         McConnectedComponentType type;
@@ -262,7 +261,7 @@ int main()
         std::map<int, std::vector<uint32_t>> tagToCcFaces;
         std::map<uint32_t, int> ccFaceToTag;
 
-        for (int ccFaceID = 0; ccFaceID < ccFaceCount; ++ccFaceID) {
+        for (int ccFaceID = 0; ccFaceID < (int)ccFaceCount; ++ccFaceID) {
             int imFaceID = ccFaceMap[ccFaceID];
             std::map<uint32_t, int>::const_iterator srcMeshFaceToTagIter = srcMeshFaceToTag.find(imFaceID);
             bool faceWasTagged = (srcMeshFaceToTagIter != srcMeshFaceToTag.cend());
@@ -284,7 +283,6 @@ int main()
         mergeAdjacentMeshFacesByProperty(
             ccFaceIndicesMerged,
             ccFaceSizesMerged,
-            ccVertices,
             ccFaceIndices,
             ccFaceSizes,
             ccFaceAdjFaces,
@@ -296,7 +294,8 @@ int main()
         {
             char buf[512];
             sprintf(buf, OUTPUT_DIR "/cc%d-merged.obj", c);
-            writeOBJ(buf, &ccVertices[0], ccVertexCount, &ccFaceIndicesMerged[0], &ccFaceSizesMerged[0], ccFaceSizesMerged.size());
+            // NOTE: For the sake of simplicity, we keep unreferenced vertices.
+            writeOBJ(buf, &ccVertices[0], ccVertexCount, &ccFaceIndicesMerged[0], &ccFaceSizesMerged[0], (uint32_t)ccFaceSizesMerged.size());
         }
     }
 
@@ -327,7 +326,7 @@ void writeOBJ(
     std::ofstream file(path);
 
     // write vertices and normals
-    for (uint32_t i = 0; i < ccVertexCount; ++i) {
+    for (uint32_t i = 0; i < (uint32_t)ccVertexCount; ++i) {
         double x = ccVertices[(uint64_t)i * 3 + 0];
         double y = ccVertices[(uint64_t)i * 3 + 1];
         double z = ccVertices[(uint64_t)i * 3 + 2];
@@ -366,9 +365,9 @@ void readOBJ(const std::string& path, std::vector<double>& V, std::vector<uint32
     }
 
     for (int i = 0; i < (int)F_.size(); ++i) {
-        F.push_back(F_[i][0]);
-        F.push_back(F_[i][1]);
-        F.push_back(F_[i][2]);
+        F.push_back((uint32_t)F_[i][0]);
+        F.push_back((uint32_t)F_[i][1]);
+        F.push_back((uint32_t)F_[i][2]);
         Fsizes.push_back(3);
     }
 }
@@ -394,7 +393,6 @@ uint32_t getFaceIndicesBaseOffset(const uint32_t faceIdx, const uint32_t* faceSi
 void mergeAdjacentMeshFacesByProperty(
     std::vector<uint32_t>& meshFaceIndicesOUT,
     std::vector<uint32_t>& meshFaceSizesOUT,
-    const std::vector<double>& meshVertices,
     const std::vector<uint32_t>& meshFaces,
     const std::vector<uint32_t>& meshFaceSizes,
     const std::vector<uint32_t>& meshFaceAdjFace,
@@ -489,8 +487,8 @@ void mergeAdjacentMeshFacesByProperty(
                         halfedgePool.cbegin(),
                         halfedgePool.cend(),
                         [&](const std::pair<int, int>& elem) {
-                            return (elem.first == srcVertexIdx && elem.second == tgtVertexIdx) || //
-                                (elem.second == srcVertexIdx && elem.first == tgtVertexIdx);
+                            return ((uint32_t)elem.first == srcVertexIdx && (uint32_t)elem.second == tgtVertexIdx) || //
+                                ((uint32_t)elem.second == srcVertexIdx && (uint32_t)elem.first == tgtVertexIdx);
                         });
 
                     const bool opposite_halfedge_exists = (fiter != halfedgePool.cend());
@@ -525,7 +523,7 @@ void mergeAdjacentMeshFacesByProperty(
 
                 for (int i = 0; i < 2; ++i) {
                     std::pair<int, int> edge = halfedgePool[halfedges[i]];
-                    if (edge.first == cur->first && std::find(polygon.cbegin(), polygon.cend(), edge.second) == polygon.cend()) {
+                    if (edge.first == cur->first && std::find(polygon.cbegin(), polygon.cend(), (uint32_t)edge.second) == polygon.cend()) {
                         next = vertexToHalfedges.find(edge.second);
                         assert(next != vertexToHalfedges.cend());
                         break;
@@ -554,6 +552,4 @@ void mergeAdjacentMeshFacesByProperty(
             meshFaceSizesOUT.push_back(meshFaceVertexCount);
         }
     }
-
-    // NOTE: For the sake of simplicity, we keep unused vertices.
 }
