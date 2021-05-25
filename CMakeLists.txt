@@ -31,7 +31,7 @@
 # This script will define the following cache variables:
 #
 #	MCUT_INCLUDE_DIR - the MCUT include directory
-# 	MCUT_SHARED_LIB_PATH - path to the MCUT shared library 
+# 	MCUT_LIB_PATH - path to the MCUT shared library 
 
 cmake_minimum_required(VERSION 3.12...3.13 FATAL_ERROR)
 
@@ -97,7 +97,7 @@ endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 #
 # MCUT compilation variables/settings
 #
-set (MCUT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set (MCUT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE STRING "The MCUT include directory")
 
 message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 
@@ -193,7 +193,7 @@ else()
 	endif()
 endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 
-set (MCUT_LIB_PATH $<TARGET_FILE:mcut>)
+set (MCUT_LIB_PATH $<TARGET_FILE:mcut>  CACHE STRING "Path to the compiled MCUT library file")
 message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
 
 #
