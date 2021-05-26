@@ -5,7 +5,7 @@ The tutorial is presented in the context of merging neighouring faces of a
 connected component that share some property (e.g. an ID tag), where 
 this property is _derived_ from origin/birth faces. 
 
-A group of faces that share the property and define a connected a patch will be merged 
+A group of faces that share the property and define a connected patch will be merged 
 into a single face. This is useful in situations where e.g. one has to triangulate the 
 faces of an input mesh before cutting and then recover the untriangulated faces afterwards.
 
