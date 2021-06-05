@@ -1,9 +1,16 @@
+/*
+Simple "hello world" program using MCUT.
+Input meshes are defined in-source but output meshes are saved as .off files
+*/
+
 #include "mcut/mcut.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <vector>
+
+#define my_assert(cond) if(!(cond)){fprintf(stderr, "MCUT error: %s\n", #cond );std::exit(1);}
 
 void writeOFF(
     const char* fpath,

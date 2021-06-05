@@ -26,6 +26,8 @@ We assume that all faces to be merged are coplanar.
 #include <Eigen/Core>
 #include <igl/read_triangle_mesh.h>
 
+#define my_assert(cond) if(!(cond)){fprintf(stderr, "MCUT error: %s\n", #cond );std::exit(1);}
+
 void writeOBJ(
     const std::string& path,
     const double* ccVertices,
@@ -44,8 +46,7 @@ void mergeAdjacentMeshFacesByProperty(
     const std::vector<uint32_t>& meshFaceAdjFace,
     const std::vector<uint32_t>& meshFaceAdjFaceSizes,
     const std::map<int, std::vector<uint32_t>>& tagToMeshFace,
-    const std::map<uint32_t, int>& meshFaceToTag,
-    const std::vector<uint32_t> faceMapToInputMesh);
+    const std::map<uint32_t, int>& meshFaceToTag);
 
 int main()
 {
@@ -55,7 +56,7 @@ int main()
     readOBJ(DATA_DIR "/triangulatedGrid4x4.obj", srcMeshVertices, srcMeshFaceIndices, srcMeshFaceSizes);
 
     // A map denoting the adjacent faces of the source mesh that share some property
-    // (a tag) that we will use to merge faces.
+    // (a tag/number) that we will use to merge adjacent faces.
 
     // Faces in each group are merged into one face/polygon.
     // Groups which are adjacent and share a tag are also merged.
@@ -113,7 +114,7 @@ int main()
     // -------------------
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
-    assert(err == MC_NO_ERROR);
+    my_assert(err == MC_NO_ERROR);
 
     //  do the cutting (boolean ops)
     // -------------------------------
@@ -134,13 +135,13 @@ int main()
         static_cast<uint32_t>(cutMeshVertices.size() / 3),
         static_cast<uint32_t>(cutMeshFaceSizes.size()));
 
-    assert(err == MC_NO_ERROR);
+    my_assert(err == MC_NO_ERROR);
 
     // query the number of available connected component
     // --------------------------------------------------
     uint32_t numConnComps;
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
-    assert(err == MC_NO_ERROR);
+    my_assert(err == MC_NO_ERROR);
 
     printf("connected components: %d\n", (int)numConnComps);
 
@@ -149,13 +150,13 @@ int main()
         exit(0);
     }
 
-    assert(numConnComps > 0);
+    my_assert(numConnComps > 0);
 
     std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
     connectedComponents.resize(numConnComps);
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
 
-    assert(err == MC_NO_ERROR);
+    my_assert(err == MC_NO_ERROR);
 
     // query the data of each connected component from MCUT
     // -------------------------------------------------------
@@ -165,7 +166,7 @@ int main()
 
         McConnectedComponentType type;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         if (!(type == MC_CONNECTED_COMPONENT_TYPE_INPUT || type == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT)) {
             // we only care about the input source mesh, and the "fragment" connected components
@@ -175,7 +176,7 @@ int main()
         if (type == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
             McInputOrigin origin;
             err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL);
-            assert(err == MC_NO_ERROR);
+            my_assert(err == MC_NO_ERROR);
             if (origin == MC_INPUT_ORIGIN_CUTMESH) {
                 continue; // we only care about the source mesh
             }
@@ -186,39 +187,39 @@ int main()
 
         uint64_t numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         uint32_t ccVertexCount = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         // query the vertices
         // ----------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         std::vector<double> ccVertices((uint64_t)ccVertexCount * 3u, 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         // query the faces
         // -------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         std::vector<uint32_t> ccFaceIndices(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         // query the face sizes
         // ------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         std::vector<uint32_t> ccFaceSizes(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, ccFaceSizes.data(), NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         const uint32_t ccFaceCount = static_cast<uint32_t>(ccFaceSizes.size());
 
@@ -232,29 +233,29 @@ int main()
         // ------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         std::vector<uint32_t> ccFaceMap(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         // query the face adjacency
         // ------------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         std::vector<uint32_t> ccFaceAdjFaces(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE, numBytes, ccFaceAdjFaces.data(), NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         // query the face adjacency sizes
         // -------------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, 0, NULL, &numBytes);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
         std::vector<uint32_t> ccFaceAdjFacesSizes(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, numBytes, ccFaceAdjFacesSizes.data(), NULL);
-        assert(err == MC_NO_ERROR);
+        my_assert(err == MC_NO_ERROR);
 
         // resolve mapping between tags and CC faces
         // NOTE: only those CC face whose origin face was tagged will themselves be tagged.
@@ -288,8 +289,7 @@ int main()
             ccFaceAdjFaces,
             ccFaceAdjFacesSizes,
             tagToCcFaces,
-            ccFaceToTag,
-            ccFaceMap);
+            ccFaceToTag);
 
         {
             char buf[512];
@@ -302,13 +302,13 @@ int main()
     // free connected component data
     // --------------------------------
     err = mcReleaseConnectedComponents(context, (uint32_t)connectedComponents.size(), connectedComponents.data());
-    assert(err == MC_NO_ERROR);
+    my_assert(err == MC_NO_ERROR);
 
     // destroy context
     // ------------------
     err = mcReleaseContext(context);
 
-    assert(err == MC_NO_ERROR);
+    my_assert(err == MC_NO_ERROR);
 
     return 0;
 }
@@ -398,8 +398,7 @@ void mergeAdjacentMeshFacesByProperty(
     const std::vector<uint32_t>& meshFaceAdjFace,
     const std::vector<uint32_t>& meshFaceAdjFaceSizes,
     const std::map<int, std::vector<uint32_t>>& tagToMeshFace,
-    const std::map<uint32_t, int>& meshFaceToTag,
-    const std::vector<uint32_t> faceMapToInputMesh)
+    const std::map<uint32_t, int>& meshFaceToTag)
 {
     // for each tag
     for (std::map<int, std::vector<uint32_t>>::const_iterator iter = tagToMeshFace.cbegin(); iter != tagToMeshFace.cend(); ++iter) {
@@ -468,7 +467,7 @@ void mergeAdjacentMeshFacesByProperty(
             // face
             std::vector<std::pair<int, int>> halfedgePool;
 
-            for (int f = 0; f < adjacentFaceListsIter->size(); ++f) {
+            for (int f = 0; f < (int)adjacentFaceListsIter->size(); ++f) {
 
                 const uint32_t meshFaceID = adjacentFaceListsIter->at(f);
                 const uint32_t meshFaceVertexCount = meshFaceSizes[meshFaceID];
@@ -525,7 +524,7 @@ void mergeAdjacentMeshFacesByProperty(
                     std::pair<int, int> edge = halfedgePool[halfedges[i]];
                     if (edge.first == cur->first && std::find(polygon.cbegin(), polygon.cend(), (uint32_t)edge.second) == polygon.cend()) {
                         next = vertexToHalfedges.find(edge.second);
-                        assert(next != vertexToHalfedges.cend());
+                        my_assert(next != vertexToHalfedges.cend());
                         break;
                     }
                 }
