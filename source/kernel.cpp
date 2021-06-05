@@ -1843,9 +1843,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         cs_to_ps_vtx.clear();
 
-        //if (input.verbose) {
-        dump_mesh(ps, "polygon-soup");
-        //}
+        if (input.verbose) {
+          dump_mesh(ps, "polygon-soup");
+        }
 
         const int ps_vtx_cnt = ps.number_of_vertices();
         const int ps_face_cnt = ps.number_of_faces();

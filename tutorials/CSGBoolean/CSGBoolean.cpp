@@ -62,7 +62,7 @@ int main()
     // copy faces
     for (int i = 0; i < (int)srcMesh.F.size(); ++i) {
         const std::vector<int>& f = srcMesh.F[i];
-        for (int j = 0; j < f.size(); ++j) {
+        for (int j = 0; j < (int)f.size(); ++j) {
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
