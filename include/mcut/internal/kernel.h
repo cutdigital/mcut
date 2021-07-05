@@ -200,6 +200,10 @@ std::string to_string(const cut_surface_patch_winding_order_t&);
 
 void dispatch(output_t& out, const input_t& in);
 
+
+int find_connected_components(std::map<face_descriptor_t, int> &fccmap, const mesh_t &mesh);
+
+
 } // namespace mcut
 
 #endif // #ifndef MCUT_KERNEL_H

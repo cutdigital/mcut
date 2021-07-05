@@ -1658,6 +1658,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         const mesh_t &sm = (*input.src_mesh);
         const mesh_t &cs = (*input.cut_mesh);
 
+        if (input.verbose) {
+            dump_mesh(sm, "src-mesh");
+            dump_mesh(cs, "cut-mesh");
+        }
+
         const int sm_vtx_cnt = sm.number_of_vertices();
         const int sm_face_count = sm.number_of_faces();
         const int cs_face_count = cs.number_of_faces();

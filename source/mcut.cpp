@@ -1644,31 +1644,49 @@ void intersectOIBVHs(
     }
 #endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
-    bool check_input_mesh(const mcut::mesh_t &m)
+    McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,const mcut::mesh_t &m)
     {
+        
         bool result = true;
         if (m.number_of_vertices() < 3)
         {
-            (*logger_ptr).set_reason_for_failure("invalid input-mesh vertex count (" + std::to_string(m.number_of_vertices()) + ")");
+            ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_API,
+            McDebugType::MC_DEBUG_TYPE_ERROR,
+            0,
+            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            "Invalid vertex count (V=" + std::to_string(m.number_of_vertices()) + ")");
             result = false;
         }
 
         if (m.number_of_faces() < 1)
         {
-            (*logger_ptr).set_reason_for_failure("invalid input-mesh face count (" + std::to_string(m.number_of_faces()) + ")");
+            ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_API,
+            McDebugType::MC_DEBUG_TYPE_ERROR,
+            0,
+            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            "Invalid face count (F=" + std::to_string(m.number_of_faces()) + ")");
             result = false;
         }
 
-        std::map<face_descriptor_t, int> fccmap;
-        int n = find_connected_components(fccmap, m);
+        std::map<mcut::face_descriptor_t, int> fccmap;
+        int n = mcut::find_connected_components(fccmap, m);
 
         if (n != 1)
         {
-            (*logger_ptr).set_reason_for_failure("invalid number of connected components in input-mesh (" + std::to_string(n) + ")");
+            ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_API,
+            McDebugType::MC_DEBUG_TYPE_ERROR,
+            0,
+            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            "Detected multiple connected components in mesh (N=" + std::to_string(n) + ")");
+            result = false;
+            
             result = false;
         }
 
-        return result;
+        return result ? MC_NO_ERROR : MC_INVALID_VALUE;
     }
 
 MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
@@ -1748,14 +1766,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         return result;
     }
 
-    
-
-    // check here to ensure that vertex coordinates of one mesh are not colocated with any coordinates in the other mesh
-    //result = checkMeshPlacement(ctxtPtr, srcMeshInternal, cutMeshInternal);
-    //if (result != McResult::MC_NO_ERROR) {
-    //    return result;
-    //}
-
     mcut::input_t backendInput;
     backendInput.src_mesh = &srcMeshInternal;
 
@@ -1772,7 +1782,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         // The user states that she does not want a partial cut but yet also states that she
         // wants to keep fragments with partial cuts. These two options are mutually exclusive!
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_KERNEL,
+            McDebugSource::MC_DEBUG_SOURCE_API,
             McDebugType::MC_DEBUG_TYPE_ERROR,
             0,
             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
@@ -2802,6 +2812,25 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         } // if (input.verbose)
 #endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
+        // Check for mesh defects
+        // ::::::::::::::::::::::
+
+        // NOTE: we check for defects here since both input meshes may be modified by the polygon partitioning process above.
+        // Partitiining is involked after atleast one dispatch call.
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Check source-mesh for defects");
+
+        result = check_input_mesh(ctxtPtr, srcMeshInternal);
+        if (result != McResult::MC_NO_ERROR) {
+            return result;
+        }
+
+        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
+
+        result = check_input_mesh(ctxtPtr, srcMeshInternal);
+        if (result != McResult::MC_NO_ERROR) {
+            return result;
+        }
+
         // Evaluate BVHs to find polygon pairs that will be tested for intersection
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -2820,8 +2849,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         backendInput.intersecting_sm_cm_face_pairs = &intersecting_sm_cm_face_pairs;
 
-        // cut!
-        // ----
+        // Invokee the kernel by calling the mcut::internal dispatch function
+        // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
         numSourceMeshFacesInLastDispatchCall = srcMeshInternal.number_of_faces();
 
@@ -2836,7 +2865,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     } while (
         // general position voliation
         (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //
-        // kernel detected a floating polygon and we now need to re-partition the origin polygon (in src mesh or cut-mesh) and then restart the cut
+        // kernel detected a floating polygon and we now need to re-partition the origin polygon (in src mesh or cut-mesh) to then recall mcut::dispatch
         backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON);
 
     result = convert(backendOutput.status);
