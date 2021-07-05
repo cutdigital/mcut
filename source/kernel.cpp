@@ -51,7 +51,7 @@
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
 
-//#define DUMP_ELAPSED_TIME_INFO
+#define DUMP_ELAPSED_TIME_INFO
 
 #if defined(DUMP_ELAPSED_TIME_INFO)
 #include <ctime>
