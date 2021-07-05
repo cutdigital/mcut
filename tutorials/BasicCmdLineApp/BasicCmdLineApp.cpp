@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
     // init dispatch context
     // ---------------------
     McContext context;
-#ifdef NDEBUG
+#if 0// #ifdef  NDEBUG
     McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
 #else
     McResult err = mcCreateContext(&context, MC_DEBUG);

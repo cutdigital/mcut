@@ -32,6 +32,7 @@
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 #include <algorithm>
+#include <queue> 
 #include <fstream>
 #include <memory>
 #include <random> // perturbation
@@ -470,7 +471,7 @@ McResult convert(const mcut::status_t& v)
     //    result = McResult::MC_FACE_VERTEX_INTERSECTION;
     //    break;
     default:
-        std::fprintf(stderr, "[MCUT]: warning - conversion error (McResult)\n");
+        std::fprintf(stderr, "[MCUT]: warning - conversion error (McResult=%d)\n", (int)v);
     }
     return result;
 }
@@ -1265,8 +1266,7 @@ McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
 }
 #endif
 
-#include <algorithm> // std::sort
-#include <queue> // std::queue for traversal
+
 
 void constructOIBVH(
     const mcut::mesh_t& mesh,
@@ -1580,6 +1580,97 @@ void intersectOIBVHs(
     } while (!traversalQueue.empty());
 }
 
+#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
+    std::vector<vd_t> insert_bounding_box_mesh(mesh_t &bvh_mesh, const geom::bounding_box_t<math::fast_vec3> &bbox)
+    {
+        math::fast_vec3 dim2 = ((bbox.maximum() - bbox.minimum()) / 2.0);
+        math::fast_vec3 back_bottom_left(-dim2.x(), -dim2.y(), -dim2.z());
+        math::fast_vec3 shift = (bbox.minimum() - back_bottom_left);
+        math::fast_vec3 front_bl = (math::fast_vec3(-dim2.x(), -dim2.y(), dim2.z()) + shift);
+        math::fast_vec3 front_br = (math::fast_vec3(dim2.x(), -dim2.y(), dim2.z()) + shift);
+        math::fast_vec3 front_tr = (math::fast_vec3(dim2.x(), dim2.y(), dim2.z()) + shift);
+        math::fast_vec3 front_tl = (math::fast_vec3(-dim2.x(), dim2.y(), dim2.z()) + shift);
+        math::fast_vec3 back_bl = (back_bottom_left + shift);
+        math::fast_vec3 back_br = (math::fast_vec3(dim2.x(), -dim2.y(), -dim2.z()) + shift);
+        math::fast_vec3 back_tr = (math::fast_vec3(dim2.x(), dim2.y(), -dim2.z()) + shift);
+        math::fast_vec3 back_tl = (math::fast_vec3(-dim2.x(), dim2.y(), -dim2.z()) + shift);
+
+        std::vector<vd_t> v;
+        v.resize(8);
+
+        // front
+        v[0] = bvh_mesh.add_vertex(front_bl); // bottom left
+        MCUT_ASSERT(v[0] != mesh_t::null_vertex());
+        v[1] = bvh_mesh.add_vertex(front_br); // bottom right
+        MCUT_ASSERT(v[1] != mesh_t::null_vertex());
+        v[2] = bvh_mesh.add_vertex(front_tr); // top right
+        MCUT_ASSERT(v[2] != mesh_t::null_vertex());
+        v[3] = bvh_mesh.add_vertex(front_tl); // top left
+        MCUT_ASSERT(v[3] != mesh_t::null_vertex());
+        // back
+        v[4] = bvh_mesh.add_vertex(back_bl); // bottom left
+        MCUT_ASSERT(v[4] != mesh_t::null_vertex());
+        v[5] = bvh_mesh.add_vertex(back_br); // bottom right
+        MCUT_ASSERT(v[5] != mesh_t::null_vertex());
+        v[6] = bvh_mesh.add_vertex(back_tr); // top right
+        MCUT_ASSERT(v[6] != mesh_t::null_vertex());
+        v[7] = bvh_mesh.add_vertex(back_tl); // top left
+        MCUT_ASSERT(v[7] != mesh_t::null_vertex());
+
+        const std::vector<vd_t> face0 = {v[0], v[1], v[2], v[3]}; // front
+        const fd_t f0 = bvh_mesh.add_face(face0);
+        MCUT_ASSERT(f0 != mesh_t::null_face());
+
+        const std::vector<vd_t> face1 = {v[7], v[6], v[5], v[4]}; //  back
+        const fd_t f1 = bvh_mesh.add_face(face1);
+        MCUT_ASSERT(f1 != mesh_t::null_face());
+
+        const std::vector<vd_t> face2 = {v[1], v[5], v[6], v[2]}; // right
+        const fd_t f2 = bvh_mesh.add_face(face2);
+        MCUT_ASSERT(f2 != mesh_t::null_face());
+
+        const std::vector<vd_t> face3 = {v[0], v[3], v[7], v[4]}; // left
+        const fd_t f3 = bvh_mesh.add_face(face3);
+        MCUT_ASSERT(f3 != mesh_t::null_face());
+
+        const std::vector<vd_t> face4 = {v[3], v[2], v[6], v[7]}; // top
+        const fd_t f4 = bvh_mesh.add_face(face4);
+        MCUT_ASSERT(f4 != mesh_t::null_face());
+
+        const std::vector<vd_t> face5 = {v[4], v[5], v[1], v[0]}; // bottom
+        const fd_t f5 = bvh_mesh.add_face(face5);
+        MCUT_ASSERT(f5 != mesh_t::null_face());
+        return v;
+    }
+#endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
+
+    bool check_input_mesh(const mcut::mesh_t &m)
+    {
+        bool result = true;
+        if (m.number_of_vertices() < 3)
+        {
+            (*logger_ptr).set_reason_for_failure("invalid input-mesh vertex count (" + std::to_string(m.number_of_vertices()) + ")");
+            result = false;
+        }
+
+        if (m.number_of_faces() < 1)
+        {
+            (*logger_ptr).set_reason_for_failure("invalid input-mesh face count (" + std::to_string(m.number_of_faces()) + ")");
+            result = false;
+        }
+
+        std::map<face_descriptor_t, int> fccmap;
+        int n = find_connected_components(fccmap, m);
+
+        if (n != 1)
+        {
+            (*logger_ptr).set_reason_for_failure("invalid number of connected components in input-mesh (" + std::to_string(n) + ")");
+            result = false;
+        }
+
+        return result;
+    }
+
 MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const McContext context,
     McFlags dispatchFlags,
@@ -1656,6 +1747,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     if (result != McResult::MC_NO_ERROR) {
         return result;
     }
+
+    
 
     // check here to ensure that vertex coordinates of one mesh are not colocated with any coordinates in the other mesh
     //result = checkMeshPlacement(ctxtPtr, srcMeshInternal, cutMeshInternal);
