@@ -1878,6 +1878,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         TIME_PROFILE_END();
 
         // compute/extract unique list of faces that are tested for intersection
+        // These are faces of the src-mesh and cut-mesh
         //--------------------------------------------------------
 
         // unique list of faces that are tested for intersection
@@ -1895,7 +1896,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         {
             tested_faces_sm.insert(i->first);
 
-            const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
+            const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps" (see above when we merged cm and sm faces into ps)
             const fd_t cm_face((uint32_t)i->second + cm_faces_start_offset);
             tested_faces_cm.insert(cm_face);
         }
@@ -1935,6 +1936,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // edge-to-face intersection tests (narrow-phase)
         // -----------------------------------------
+
+        std::map<
+            fd_t,             // intersectiong face
+            std::vector<vd_t> // intersection point which involve the intersecting face
+            >
+            ps_iface_to_ivtx_list; // faces which intersect with another
+
         TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
 
         for (std::map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin();
@@ -1963,6 +1971,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const fd_t tested_edge_h1_face = ps.face(tested_edge_h1);
             const fd_t tested_edge_face = tested_edge_h0_face != mesh_t::null_face() ? tested_edge_h0_face : tested_edge_h1_face;
             const bool tested_edge_belongs_to_cm = ps_is_cutmesh_face(tested_edge_face, sm_face_count);
+
+            
 
             // for each face that is to be intersected with the tested-edge
             for (std::vector<fd_t>::const_iterator tested_faces_iter = tested_faces.cbegin();
@@ -2042,7 +2052,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                         // before jumping-the-gun and assuming that we have indeed violated GP,
                         // we should check whether the point found to be on the plane (touching point) is
-                        // actually [inside] the tested_face. That would imply cutting through a vertex or edge (undefined).
+                        // actually [inside] the tested_face. That would imply cutting through a vertex or edge (which is undefined).
                         // If this is true then we have indeed violated GP. Otherwise, we just treat this as a non-intersection because
                         // the what-would-have-been intersection point actually lies outside the tested_face.
                         bool violatedGP = false;
@@ -2085,7 +2095,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             if (!input.enforce_general_position)
                             {
                                 // Our assumption of having inputs in general position has been violated, we need to terminate
-                                // with an error since perturbation (enforment of general positions) is disabled by the user.
+                                // with an error since perturbation (enforcement of general positions) is disabled by the user.
                                 // Note: our intersection registry formulation requires that edges completely penetrate/intersect through polygon's area.
                                 lg.set_reason_for_failure("invalid compute_segment_plane_intersection_type result ('" + std::to_string(segment_intersection_type) + "')");
                             }
@@ -2263,6 +2273,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 lg << "is border" << std::endl;
                                 cm_border_reentrant_ivtx_list.push_back(new_vertex_descr);
                             } //else // is regular
+                        }
+
+                        // map face to intersections points (reverse mapping of the intPoint-to-registryEntry)
+                        ps_iface_to_ivtx_list[tested_face].push_back(new_vertex_descr);
+                        if(tested_edge_h0_face != mesh_t::null_face()){
+                            ps_iface_to_ivtx_list[tested_edge_h0_face].push_back(new_vertex_descr);
+                        }
+                        if(tested_edge_h1_face != mesh_t::null_face()){
+                            ps_iface_to_ivtx_list[tested_edge_h1_face].push_back(new_vertex_descr);
                         }
 
                     } // if (have_point_in_polygon)
@@ -2706,48 +2725,23 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // An "implicit" cut-path sequence is a list of cut-path edges that are sorted (i.e.
         // this means that in memory, edges are placed next to others they connect to).
-        //
-        // The notion is "implicitness" here means that the sequence may include cut-path edges
-        // which are on (but pass outside) a border face of the source-mesh. Thus an implicit
-        // cut-path may contain either one explicit cut-path (itself) or more explicit cut-paths.
-        //
-        // DETAIL
-        // The instance of having an implicit cut-path mapping/containing to one explicit
-        // (actual/real) cut-path is the normal case. This is because most face intersections
-        // tend produce at-most, 2 intersection points. However, when a face intersection test
-        // produced more that 2 intersection points (min=4), an implicit cut-path will map to
-        // at least two explicit cut-paths.
-        //
 
-        // contains implicit cut-path sequences. "disjoint" because some cut-paths (namely, those
-        // which are "linear") may be discovered in two parts due to how we search/build for implicit
-        // cut-paths from "m0_ivtx_to_cutpath_edges".
-        // The truly disjoint sequences will have spliced/joined at a later stage (see below).
-        std::vector<std::vector<ed_t>> m0_implicit_cutpath_sequences;
-        // MapKey=intersection point
-        // MapValue=index of containing disjoint implicit cut-path in "m0_implicit_cutpath_sequences"
-        std::map<vd_t, int> m0_ivtx_to_disjoint_implicit_cutpath_sequence;
-        // MapKey=cut-path edge
-        // MapValue=index of containing disjoint implicit cut-path in "m0_implicit_cutpath_sequences"
-        std::map<ed_t, int> m0_edge_to_disjoint_implicit_cutpath_sequence;
-
-        // Here, we now build all the disjoint implicit cut-path sequences.
-
-        // NOTE: some discovered implicit cut-path sequences will be complete, meaning that
-        // they don't require splicing later
+        std::vector<std::vector<ed_t>> m0_cutpath_sequences;
+        std::map<vd_t, int> m0_ivtx_to_cutpath_sequence;
+        std::map<ed_t, int> m0_edge_to_cutpath_sequence;
 
         do
-        { // an iteration will build a disjoint implicit cut-path sequence
+        { // an iteration will build a cut-path sequence
 
-            const int diff = (int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_disjoint_implicit_cutpath_sequence.size();
+            const int diff = (int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size();
             MCUT_ASSERT(diff >= 2); // need a minimum of 2 intersection points (one edge) to form a sequence
             lg.indent();
-            int current_disjoint_implicit_cutpath_sequence_index = (int)m0_implicit_cutpath_sequences.size();
+            int cur_cutpath_sequence_index = (int)m0_cutpath_sequences.size();
 
-            lg << "current disjoint implicit cut-path sequence = " << current_disjoint_implicit_cutpath_sequence_index << std::endl;
+            lg << "current disjoint implicit cut-path sequence = " << cur_cutpath_sequence_index << std::endl;
             lg.indent();
             // start from an intersection point that is not yet mapped-to/associated-with a
-            // disjoint implicit cut-path sequence in "current_disjoint_implicit_cutpath_sequence"
+            //  sequence in "cur_cutpath_sequence"
             // pick the vertex which is a terminal vertex (to start search from beginning of sequence)
             // or any vertex (if there are not terminal vertices)
 
@@ -2755,18 +2749,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             std::map<vd_t, std::vector<ed_t>>::const_iterator m0_ivtx_to_cutpath_edges_iter = std::find_if(
                 m0_ivtx_to_cutpath_edges.cbegin(), m0_ivtx_to_cutpath_edges.cend(),
                 [&](const std::pair<vd_t, std::vector<ed_t>> &elem) {
-                    bool is_mapped = m0_ivtx_to_disjoint_implicit_cutpath_sequence.find(elem.first) != m0_ivtx_to_disjoint_implicit_cutpath_sequence.cend();
+                    bool is_mapped = m0_ivtx_to_cutpath_sequence.find(elem.first) != m0_ivtx_to_cutpath_sequence.cend();
                     bool is_connected_to_one_edge = elem.second.size() == 1;
                     return (!is_mapped && is_connected_to_one_edge);
                 });
 
             if (m0_ivtx_to_cutpath_edges_iter == m0_ivtx_to_cutpath_edges.cend())
             { // we could not find any intersection point from above
-                // find any intersection point which is not mapped to an implicit cut-path (less strict condition that above)
+                // find any intersection point which is not mapped to a cut-path (less strict condition that above)
                 m0_ivtx_to_cutpath_edges_iter = std::find_if(
                     m0_ivtx_to_cutpath_edges.cbegin(), m0_ivtx_to_cutpath_edges.cend(),
                     [&](const std::pair<vd_t, std::vector<ed_t>> &elem) {
-                        bool is_mapped = m0_ivtx_to_disjoint_implicit_cutpath_sequence.find(elem.first) != m0_ivtx_to_disjoint_implicit_cutpath_sequence.cend();
+                        bool is_mapped = m0_ivtx_to_cutpath_sequence.find(elem.first) != m0_ivtx_to_cutpath_sequence.cend();
                         return !is_mapped;
                     });
             }
@@ -2779,8 +2773,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // start new sequence of edges
             // ---------------------------
 
-            m0_implicit_cutpath_sequences.emplace_back(std::vector<ed_t>());
-            std::vector<ed_t> &current_disjoint_implicit_cutpath_sequence = m0_implicit_cutpath_sequences.back(); // current
+            m0_cutpath_sequences.emplace_back(std::vector<ed_t>());
+            std::vector<ed_t> &cur_cutpath_sequence = m0_cutpath_sequences.back(); 
 
             // vertex at the beginning of the sequence
             const vd_t &first_vertex_of_sequence = m0_ivtx_to_cutpath_edges_iter->first;
@@ -2788,18 +2782,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // the edges connected to our first intersection point
             const std::vector<ed_t> &cutpath_edges_connected_to_first_vertex = m0_ivtx_to_cutpath_edges_iter->second;
 
-            // pick the edge that is not yet mapped-to/associated-with a disjoint implicit cut-path
-            // sequence in "current_disjoint_implicit_cutpath_sequence". Note: if the current sequence
-            // is really a disjoint sequence (i.e. linear), then there is no possibility that one of the edges
+            // pick the edge that is not yet mapped-to/associated-with a  cut-path
+            // sequence in "cur_cutpath_sequence". Note: if the current sequence
+            // is linear, then there is no possibility that one of the edges
             // in "cutpath_edges_connected_to_first_vertex" has already been mapped-to/associated-with
-            // a disjoint implicit cut-path sequence in "current_disjoint_implicit_cutpath_sequence".
+            // a disjoint cut-path sequence in "cur_cutpath_sequence".
             // This is because sequence discovery starts by first searching from terminal vertices/edges
             // (see above conditions).
             std::vector<ed_t>::const_iterator incident_edge_find_iter = std::find_if(
                 cutpath_edges_connected_to_first_vertex.cbegin(),
                 cutpath_edges_connected_to_first_vertex.cend(),
                 [&](const ed_t &incident_edge) {
-                    return m0_edge_to_disjoint_implicit_cutpath_sequence.find(incident_edge) == m0_edge_to_disjoint_implicit_cutpath_sequence.cend();
+                    return m0_edge_to_cutpath_sequence.find(incident_edge) == m0_edge_to_cutpath_sequence.cend();
                 });
 
             MCUT_ASSERT(incident_edge_find_iter != cutpath_edges_connected_to_first_vertex.cend());
@@ -2816,7 +2810,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             ed_t next_edge = first_edge;
 
             do
-            { // an iteration will add an edge to the current disjoint implicit cut-path sequence
+            { // an iteration will add an edge to the current cut-path sequence
                 lg.indent();
 
                 // update state
@@ -2827,21 +2821,17 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 lg << "current edge = " << current_edge << std::endl;
 
                 // add edge
-                current_disjoint_implicit_cutpath_sequence.emplace_back(current_edge);
+                cur_cutpath_sequence.emplace_back(current_edge);
 
                 // map vertex to current disjoint implicit cut-path sequence
-                MCUT_ASSERT(m0_ivtx_to_disjoint_implicit_cutpath_sequence.count(current_vertex) == 0);
-                m0_ivtx_to_disjoint_implicit_cutpath_sequence[current_vertex] = current_disjoint_implicit_cutpath_sequence_index;
-                //std::pair<std::map<vd_t, int>::const_iterator, bool> ret0 = m0_ivtx_to_disjoint_implicit_cutpath_sequence.emplace(current_vertex, current_disjoint_implicit_cutpath_sequence_index);
-                //MCUT_ASSERT(ret0.second == true);
-                MCUT_ASSERT(m0_ivtx_to_disjoint_implicit_cutpath_sequence.count(current_vertex) == 1);
+                MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(current_vertex) == 0);
+                m0_ivtx_to_cutpath_sequence[current_vertex] = cur_cutpath_sequence_index;
+                MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(current_vertex) == 1);
 
                 // map edge to current disjoint implicit cut-path sequence
-                MCUT_ASSERT(m0_edge_to_disjoint_implicit_cutpath_sequence.count(current_edge) == 0);
-                m0_edge_to_disjoint_implicit_cutpath_sequence[current_edge] = current_disjoint_implicit_cutpath_sequence_index;
-                // std::pair<std::map<ed_t, int>::const_iterator, bool> ret1 = m0_edge_to_disjoint_implicit_cutpath_sequence.emplace(current_edge, current_disjoint_implicit_cutpath_sequence_index);
-                // MCUT_ASSERT(ret1.second == true);
-                MCUT_ASSERT(m0_edge_to_disjoint_implicit_cutpath_sequence.count(current_edge) == 1);
+                MCUT_ASSERT(m0_edge_to_cutpath_sequence.count(current_edge) == 0);
+                m0_edge_to_cutpath_sequence[current_edge] = cur_cutpath_sequence_index;
+                MCUT_ASSERT(m0_edge_to_cutpath_sequence.count(current_edge) == 1);
 
                 // reset state
                 next_vertex = mesh_t::null_vertex();
@@ -2853,24 +2843,20 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // "next_vertex" is whichever vertex of the current edge that is not
                 // equal to the "current_vertex"
-                if (current_vertex == current_edge_vertex0)
-                {
+                if (current_vertex == current_edge_vertex0)             {
                     next_vertex = current_edge_vertex1;
                 }
-                else
-                {
+                else                {
                     next_vertex = current_edge_vertex0;
                 }
 
                 // now that we have the next vertex, we can determine the next edge
                 // ----------------------------------------------------------------
 
-                // check if next vertex has already been associated with the disjoint
-                // implicit cut-path sequence.
-                bool reached_end_of_sequence = m0_ivtx_to_disjoint_implicit_cutpath_sequence.find(next_vertex) != m0_ivtx_to_disjoint_implicit_cutpath_sequence.cend();
+                // check if next vertex has already been associated with the cut-path sequence.
+                bool reached_end_of_sequence = m0_ivtx_to_cutpath_sequence.find(next_vertex) != m0_ivtx_to_cutpath_sequence.cend();
 
-                if (!reached_end_of_sequence)
-                {
+                if (!reached_end_of_sequence)                {
                     // get the other edge connected to "next_vertex" i.e. the edge which is not the "current_edge"
                     m0_ivtx_to_cutpath_edges_iter = m0_ivtx_to_cutpath_edges.find(next_vertex);
                     MCUT_ASSERT(m0_ivtx_to_cutpath_edges_iter != m0_ivtx_to_cutpath_edges.cend());
@@ -2887,28 +2873,25 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const ed_t &other_edge = (current_edge == edge0) ? edge1 : edge0;
 
                         // check that "other_edge" has not already been mapped to a disjoint implicit cutpath sequence
-                        std::map<ed_t, int>::const_iterator find_iter = m0_edge_to_disjoint_implicit_cutpath_sequence.find(other_edge);
-                        bool other_edge_is_already_mapped = (find_iter != m0_edge_to_disjoint_implicit_cutpath_sequence.cend());
+                        std::map<ed_t, int>::const_iterator find_iter = m0_edge_to_cutpath_sequence.find(other_edge);
+                        bool other_edge_is_already_mapped = (find_iter != m0_edge_to_cutpath_sequence.cend());
 
-                        if (other_edge_is_already_mapped == false)
-                        {
+                        if (other_edge_is_already_mapped == false)                        {
                             next_edge = other_edge; // set sext edge
                         }
-                        else
-                        {
+                        else                        {
                             // reached end of sequence
-                            MCUT_ASSERT(m0_ivtx_to_disjoint_implicit_cutpath_sequence.count(next_vertex) == 0);
+                            MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(next_vertex) == 0);
                             // need to update this state here because we wont jump back up to the top of the loop as in the normal case.
                             // This is because "next_edge" is null, and the do-while loop continues iff "next_edge != mesh_t::null_edge()"
-                            m0_ivtx_to_disjoint_implicit_cutpath_sequence[next_vertex] = current_disjoint_implicit_cutpath_sequence_index;
-                            //ret0 = m0_ivtx_to_disjoint_implicit_cutpath_sequence.emplace(next_vertex, current_disjoint_implicit_cutpath_sequence_index);
-                            //MCUT_ASSERT(ret0.second == true);
-                            MCUT_ASSERT(m0_ivtx_to_disjoint_implicit_cutpath_sequence.count(next_vertex) == 1);
+                            m0_ivtx_to_cutpath_sequence[next_vertex] = cur_cutpath_sequence_index;
+                            
+                            MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(next_vertex) == 1);
                         }
                     } // if (current_edge_is_terminal == false) {
                     else
                     {
-                        m0_ivtx_to_disjoint_implicit_cutpath_sequence[next_vertex] = current_disjoint_implicit_cutpath_sequence_index;
+                        m0_ivtx_to_cutpath_sequence[next_vertex] = cur_cutpath_sequence_index;
                     }
                 } // if (!reached_end_of_sequence) {
 
@@ -2917,272 +2900,46 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // while there is another edge to added to the current disjoint implicit cutpath sequence
             } while (next_edge != mesh_t::null_edge());
 
-            lg << "disjoint implicit cut-path sequence size = " << current_disjoint_implicit_cutpath_sequence.size() << std::endl;
+            lg << "disjoint implicit cut-path sequence size = " << cur_cutpath_sequence.size() << std::endl;
 
             lg.unindent();
             lg.unindent();
             // while not all intersection-points have been mapped to a disjoint implicit cutpath sequence
-        } while (m0_edge_to_disjoint_implicit_cutpath_sequence.size() != m0_cutpath_edges.size());
+        } while (m0_edge_to_cutpath_sequence.size() != m0_cutpath_edges.size());
 
-        lg << "total disjoint implicit cut-path sequences = " << m0_implicit_cutpath_sequences.size() << std::endl;
+        lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;
 
-        MCUT_ASSERT(m0_implicit_cutpath_sequences.empty() == false);
+        MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
 
         // delink the implicit cut-path sequences to create the final explicit cut-path sequences
         // --------------------------------------------------------------------------------------
 
         m0_cutpath_edges.clear();                              // free
-        m0_ivtx_to_disjoint_implicit_cutpath_sequence.clear(); // free
-        m0_edge_to_disjoint_implicit_cutpath_sequence.clear(); // free
-
-        lg << "create explicit cut-path sequences" << std::endl;
-
-#if 1
-        std::vector<std::vector<ed_t>> m0_explicit_cutpath_sequences = m0_implicit_cutpath_sequences;
-#else // NOTE the commented out code is not no longer needed
-
-        std::vector<std::vector<ed_t>> m0_explicit_cutpath_sequences;
-
-        // for each implicit cut-path sequence (list of edges sorted according to connectivity)
-        for (std::vector<std::vector<ed_t>>::const_iterator iter = m0_implicit_cutpath_sequences.cbegin();
-             iter != m0_implicit_cutpath_sequences.cend();
-             ++iter)
-        {
-            lg.indent();
-            const int implicit_cutpath_sequence_index = (int)std::distance(m0_implicit_cutpath_sequences.cbegin(), iter);
-            lg << "spliced implicit cut-path sequence = " << implicit_cutpath_sequence_index << std::endl;
-
-            lg.indent();
-
-            const std::vector<ed_t> &implicit_cutpath_sequence = *iter;
-            const int implicit_sequence_size = (int)implicit_cutpath_sequence.size();
-
-            lg << "total edges = " << implicit_sequence_size << std::endl;
-
-            // we will now work our way through the vertices of the current sequence,
-            // incrementally building sub-sequences. These sub-sequences contain
-            // connected/sorted edges which [pass through] intersecting source-mesh
-            // faces. Basically, we want to remove any so-called "exterior
-            // interior-edges", which are edges on the cut-path that topologically
-            // (according to intersection registry rules) lie on a border-concave
-            // source-mesh face but do not actually pass inside the area of this face
-            // to cut it (i.e. edges which are not used for clipping).
-            // NOTE: this unique scenario occurs if 1) the source-mesh is not
-            // watertight, and 2) it has concave faces on the border that are involved
-            // in an intersection.
-            //
-            // Each sub-sequence will form an explicit (and final) cut-path that we
-            // will use in later stages (e.g. intersection-point duplication to create
-            // holes).
-
-            // start new sub-sequence (explicit cut-path)
-            m0_explicit_cutpath_sequences.push_back(std::vector<ed_t>());
-            std::vector<ed_t> *m0_explicit_cutpath_subsequence = &m0_explicit_cutpath_sequences.back();
-
-            if (implicit_sequence_size <= 2)
-            { // simple case: linear cut-path
-                lg << "simple linear cut-path" << std::endl;
-                m0_explicit_cutpath_subsequence->insert(
-                    m0_explicit_cutpath_subsequence->cend(),
-                    implicit_cutpath_sequence.cbegin(),
-                    implicit_cutpath_sequence.cend());
-            }
-            else
-            { // more complicated case: either linear or circular implicit cut-path
-                lg << "complex cut-path (linear or circular)" << std::endl;
-
-                // Our iterator, counting how many edges that have been traversed so far.
-                // NOTE: initial value of zero does not imply the beginning of "m0_explicit_cutpath_subsequence".
-                // Rather, it implies the first edge traversed/touched/walked in the sequence (there is no
-                // assumption we are guarranteed to start from beginning of "m0_explicit_cutpath_subsequence" even if
-                // that is the case for linear cut paths)
-                int implicit_sequence_edge_iter = 0;
-
-                // pick the first edge to start from (in the spliced implicit cut-path sequence)
-                // according to the following conditions:
-                // 1) is 1st edge of implicit sequence AND is terminal; OR 2) any edge whose
-                // vertices have registry entries whose faces differ by one real face. The second condition helps
-                // resolve ambiguities that may arise with cut path edges on concave faces
-                for (int edge_iter = 0; edge_iter < implicit_sequence_size; ++edge_iter)
-                { // for each edge in the implicit sequence
-
-                    // check if edge is a terminal edge (i.e. beginning of linear cut-path)
-                    const ed_t &edge = implicit_cutpath_sequence.at(edge_iter);
-                    const vd_t edge_vertex0 = m0.vertex(edge, 0);
-                    const vd_t edge_vertex1 = m0.vertex(edge, 1);
-                    bool edge_vertex0_is_terminal = (m0_ivtx_to_cutpath_edges.at(edge_vertex0).size() == 1);
-                    bool edge_vertex1_is_terminal = (m0_ivtx_to_cutpath_edges.at(edge_vertex1).size() == 1);
-                    bool edge_is_terminal = (edge_vertex0_is_terminal || edge_vertex1_is_terminal);
-
-                    // check first condition
-                    if (edge_iter == 0 && edge_is_terminal)
-                    {
-                        implicit_sequence_edge_iter = edge_iter; // 0
-                        break;                                   // .. found!
-                    }
-                    else
-                    { // check second condition
-                        std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator find_iter = m0_ivtx_to_intersection_registry_entry.cend();
-
-                        // get intersection-registry faces of first vertex
-                        find_iter = m0_ivtx_to_intersection_registry_entry.find(edge_vertex0);
-                        MCUT_ASSERT(find_iter != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::vector<fd_t> entry0_faces = ps_get_ivtx_registry_entry_faces(ps, find_iter->second); // find_iter->second;
-
-                        // get intersection-registry faces of second vertex
-                        find_iter = m0_ivtx_to_intersection_registry_entry.find(edge_vertex1);
-                        MCUT_ASSERT(find_iter != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::vector<fd_t> entry1_faces = ps_get_ivtx_registry_entry_faces(ps, find_iter->second); // find_iter->second;
-
-                        int diff = 0;
-                        // for each face in the registry-entry of first vertex
-                        for (std::vector<fd_t>::const_iterator face_iter = entry0_faces.cbegin();
-                             face_iter != entry0_faces.cend();
-                             ++face_iter)
-                        {
-
-                            if (is_virtual_face(*face_iter))
-                            {
-                                // we compare based on the number of real faces since ambiguities may arise
-                                // in the specific case of border cancave faces, whose cut-path problem
-                                // we are trying to solve right now.
-                                continue;
-                            }
-
-                            // if the face is not contained in the other vertex' registry entry
-                            bool match = std::find(entry1_faces.cbegin(), entry1_faces.cend(), *face_iter) != entry1_faces.cend();
-
-                            if (match == false)
-                            {
-                                ++diff;
-                            }
-                        }
-
-                        MCUT_ASSERT(diff <= 1); // ... based on edge placement rules!
-
-                        if (diff == 1)
-                        {
-                            implicit_sequence_edge_iter = edge_iter;
-                            break; // we have found our starting edge
-                        }
-                    }
-                }
-
-                // each iteration adds an edge to an explicit cut-path sequence, or creates a new explicit cut-path sequence
-                // ---------------------------------------------------------------------------------------------------------
-
-                do
-                {
-
-                    // *--*--*--*--*--*--*--* <-- example sequence
-                    //    |_____| <- example sliding window starting from 2nd vertex/ 2nd edge
-                    int sliding_window_width = 2;
-
-                    int cur_edge_offset = implicit_sequence_edge_iter; // offset of the first edge
-                    MCUT_ASSERT(cur_edge_offset < (int)implicit_cutpath_sequence.size());
-                    // allows us to wrap round to the start of the sequence
-                    int next_edge_offset_tmp = (implicit_sequence_edge_iter + (sliding_window_width - 1)) % implicit_sequence_size;
-                    int next_edge_offset = wrap_integer(next_edge_offset_tmp, 0, implicit_sequence_size - 1);
-                    MCUT_ASSERT(next_edge_offset < (int)implicit_cutpath_sequence.size());
-
-                    const ed_t &current_edge = implicit_cutpath_sequence.at(cur_edge_offset);
-                    const ed_t &next_edge = implicit_cutpath_sequence.at(next_edge_offset);
-
-                    //
-                    // An implicit cut-path which has at least 4 vertices passing through the same source-mesh face
-                    // needs to be trimmed ([at least] one edge has to be removed to partition the sequence). These
-                    // vertices (>=4) which pass through the same source-mesh face have the property that their
-                    // intersection registry-entries match by at-least 2 faces, making them connectable.
-                    //
-                    bool registry_entries_match_by_3_real_faces_cn = false;
-                    bool registry_entries_differ_by_1_real_face_cn = false;
-                    bool all_vertices_are_connectable = cutpath_vertices_are_connectable(
-                        current_edge, next_edge, m0, ps, m0_ivtx_to_intersection_registry_entry, registry_entries_match_by_3_real_faces_cn, registry_entries_differ_by_1_real_face_cn);
-
-                    // if 1) the vertices are connectable, and 2) their intersection registry-entries [do not] match by 3 faces,
-                    // and 3) the current sequence is not empty
-                    // NOTE: condition 2) is used to prevent trimming at the current position if the intersection points are
-                    // not actually on a border of either the src-mesh or cut-mesh (e.g. simple tet-triangle test)
-                    // "registry_entries_differ_by_1_real_face_cn" used specifically for tet-triangle intersection (complete cut)
-                    if (all_vertices_are_connectable && m0_explicit_cutpath_subsequence->size() > 0)
-                    { // ... reached the end of an explicit sequence, start a new one
-
-                        if (registry_entries_match_by_3_real_faces_cn || registry_entries_differ_by_1_real_face_cn)
-                        {
-                            m0_explicit_cutpath_subsequence->push_back(current_edge); // add current edge to sequence
-                        }
-                        else
-                        {
-                            // edge passes through a border concave face, which implies that
-                            // registry entries (for vertices of cur + next edge ) differ by 1 virtual
-                            // face
-
-                            MCUT_ASSERT( // .. this is obvious it but aides understanding
-                                registry_entries_match_by_3_real_faces_cn == false && registry_entries_differ_by_1_real_face_cn == false);
-
-                            // get edge at the front of current explicit sequence i.e. previously added
-                            const ed_t &previous_added_edge = m0_explicit_cutpath_subsequence->back();
-                            // get the vertex from previous edge which is not shared with current edge
-
-                            // check if they are all connectable
-                            bool registry_entries_match_by_3_real_faces_pc = false;
-                            bool registry_entries_differ_by_1_real_face_pc = false; // unused
-                            bool cur_edge_vertices_are_connectable_with_previous = cutpath_vertices_are_connectable(
-                                previous_added_edge, current_edge, m0, ps, m0_ivtx_to_intersection_registry_entry, registry_entries_match_by_3_real_faces_pc, registry_entries_differ_by_1_real_face_pc);
-                            bool current_edge_is_last = (implicit_sequence_edge_iter == (implicit_sequence_size - 1));
-
-                            // NOTE: to understand the logic here, refer to test 7 & 25 (src-mesh = quad & concave-teeth)
-                            //
-                            if (cur_edge_vertices_are_connectable_with_previous && //
-                                (!registry_entries_match_by_3_real_faces_pc) &&    //
-                                !current_edge_is_last)
-                            {
-                                // begin new explicit sequence, but do not add current edge (it has been removed)
-                                m0_explicit_cutpath_sequences.push_back(std::vector<ed_t>());
-                                m0_explicit_cutpath_subsequence = &m0_explicit_cutpath_sequences.back();
-                            }
-                            else
-                            {
-                                m0_explicit_cutpath_subsequence->push_back(current_edge); // add current edge to sequence
-                            }
-                        }
-                    }
-                    else
-                    { // .. then we can add the current edge as part of the current explicit sequence
-                        m0_explicit_cutpath_subsequence->push_back(current_edge);
-                    }
-
-                } while (++implicit_sequence_edge_iter != implicit_sequence_size);
-            }
-
-            lg.unindent();
-            lg.unindent();
-        }
-#endif
+        
+        m0_edge_to_cutpath_sequence.clear(); // free
         m0_ivtx_to_cutpath_edges.clear();      // free
-        m0_implicit_cutpath_sequences.clear(); // free
+        //m0_cutpath_sequences.clear(); // free
 
-        lg << "total explicit cut-path sequences = " << m0_explicit_cutpath_sequences.size() << std::endl;
+        lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;
 
-        MCUT_ASSERT(m0_explicit_cutpath_sequences.empty() == false);
+        MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
 
-        const int num_explicit_cutpath_sequences = (int)m0_explicit_cutpath_sequences.size();
+        const int num_explicit_cutpath_sequences = (int)m0_cutpath_sequences.size();
 
-        // save explicit cut-path sequence properties (linear/circular;is_hole)
+        // save cut-path sequence properties (linear/circular;is_hole)
         // -----------------------------------------------------------------------
 
         // first we need to find all intersection points which have a border source-mesh
-        // halfedge in their intersection registry
+        // halfedge in their intersection registry. We need this data structure to allow 
+        // us to determine the properties of the cut-paths
         //
 
         lg << "find border intersection points" << std::endl;
 
-        // NOTE: we need this data structure to allow us to determine the
-        // properties of the explicit cut-paths
         //
         // MapKey=intersection point on a border halfedge of either the source-mesh or cut-mesh
         // MapValue=pointer entry in "m0_ivtx_to_ps_edge"
-        std::map<vd_t, std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator> m0_explicit_cutpath_terminal_vertices;
+        std::map<vd_t, std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator> m0_cutpath_terminal_vertices;
 
         for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator iter = m0_ivtx_to_intersection_registry_entry.cbegin();
              iter != m0_ivtx_to_intersection_registry_entry.cend();
@@ -3190,31 +2947,26 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         {
             lg.indent();
             const vd_t &ivtx = iter->first;
-            //const hd_t& ivtx_ps_he = iter->second;
-
-            //MCUT_ASSERT(ivtx_ps_he != mesh_t::null_halfedge());
 
             const ed_t edge_of_ivtx_ps_he = iter->second.first; // ps.edge(ivtx_ps_he);
             // check that "ivtx_ps_he" is a border halfedge
             if (ps.is_border(edge_of_ivtx_ps_he))
             {
                 // we have found a terminal vertex
-                MCUT_ASSERT(m0_explicit_cutpath_terminal_vertices.count(ivtx) == 0);
-                m0_explicit_cutpath_terminal_vertices[ivtx] = iter;
-                //std::pair<std::map<vd_t, std::map<vd_t, hd_t>::const_iterator>::const_iterator, bool> ret = m0_explicit_cutpath_terminal_vertices.insert(std::make_pair(ivtx, iter));
-                //MCUT_ASSERT(ret.second == true);
-                MCUT_ASSERT(m0_explicit_cutpath_terminal_vertices.count(ivtx) == 1);
+                MCUT_ASSERT(m0_cutpath_terminal_vertices.count(ivtx) == 0);
+                m0_cutpath_terminal_vertices[ivtx] = iter;
+                MCUT_ASSERT(m0_cutpath_terminal_vertices.count(ivtx) == 1);
                 lg << vstr(ivtx) << std::endl;
             }
 
             lg.unindent();
         }
 
-        lg << "total border intersection points = " << m0_explicit_cutpath_terminal_vertices.size() << std::endl;
+        lg << "total border intersection points = " << m0_cutpath_terminal_vertices.size() << std::endl;
 
         lg << "infer cut-path properties" << std::endl;
 
-        // MapKey=index of an explicit cutpath in  m0_explicit_cutpath_sequences
+        // MapKey=index of an explicit cutpath in  m0_cutpath_sequences
         // MapValue=a tuple of boolean properties (is_linear, is_hole, is_srcmesh_severing).
         //
         // if is_linear is false, then the cut path is "circular" and "is_hole" will
@@ -3222,27 +2974,26 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // if is_linear is true, then the cutpath may or may not be a source-mesh severing cutpath (depends on
         // whether we have a partial cut or not)
         // if is_circular is true, then the cutpath is always severing.
-        std::map<int, std::tuple<bool, bool, bool>> m0_explicit_cutpath_sequence_to_properties;
+        std::map<int, std::tuple<bool, bool, bool>> m0_cutpath_sequence_to_properties;
 
-        for (std::vector<std::vector<ed_t>>::const_iterator iter = m0_explicit_cutpath_sequences.cbegin();
-             iter != m0_explicit_cutpath_sequences.cend();
+        for (std::vector<std::vector<ed_t>>::const_iterator iter = m0_cutpath_sequences.cbegin();
+             iter != m0_cutpath_sequences.cend();
              ++iter)
         {
             lg.indent();
-            const int cutpath_index = (int)std::distance(m0_explicit_cutpath_sequences.cbegin(), iter);
+            const int cutpath_index = (int)std::distance(m0_cutpath_sequences.cbegin(), iter);
 
             lg << "explicit cut-path = " << cutpath_index << std::endl;
 
             lg.indent();
             const std::vector<ed_t> &cutpath = *iter;
 
-            MCUT_ASSERT(m0_explicit_cutpath_sequence_to_properties.count(cutpath_index) == 0);
-            m0_explicit_cutpath_sequence_to_properties[cutpath_index] = std::tuple<bool, bool, bool>();
-            //std::pair<std::map<int, std::tuple<bool, bool, bool>>::iterator, bool> inserted = m0_explicit_cutpath_sequence_to_properties.insert(std::make_pair(cutpath_index, std::tuple<bool, bool, bool>()));
-            //MCUT_ASSERT(inserted.second == true);
-            MCUT_ASSERT(m0_explicit_cutpath_sequence_to_properties.count(cutpath_index) == 1);
+            MCUT_ASSERT(m0_cutpath_sequence_to_properties.count(cutpath_index) == 0);
+            m0_cutpath_sequence_to_properties[cutpath_index] = std::tuple<bool, bool, bool>();
+            
+            MCUT_ASSERT(m0_cutpath_sequence_to_properties.count(cutpath_index) == 1);
 
-            std::tuple<bool, bool, bool> &properties = m0_explicit_cutpath_sequence_to_properties[cutpath_index];
+            std::tuple<bool, bool, bool> &properties = m0_cutpath_sequence_to_properties[cutpath_index];
             bool &cutpath_is_linear = std::get<0>(properties);
             bool &cutpath_is_hole = std::get<1>(properties);
             bool &cutpath_is_srcmesh_severing = std::get<2>(properties); // i.e. the cutpath severs/partitions the src-mesh into two parts
@@ -3256,14 +3007,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const ed_t &first_edge = cutpath.front();
             const vd_t first_edge_vertex0 = m0.vertex(first_edge, 0);
             const vd_t first_edge_vertex1 = m0.vertex(first_edge, 1);
-            bool first_edge_vertex0_is_terminal = m0_explicit_cutpath_terminal_vertices.find(first_edge_vertex0) != m0_explicit_cutpath_terminal_vertices.cend();
+            bool first_edge_vertex0_is_terminal = m0_cutpath_terminal_vertices.find(first_edge_vertex0) != m0_cutpath_terminal_vertices.cend();
 
             bool first_edge_is_terminal = first_edge_vertex0_is_terminal;
 
             if (first_edge_vertex0_is_terminal == false)
             {
                 // check if vertex1 is terminal
-                bool first_edge_vertex1_is_terminal = m0_explicit_cutpath_terminal_vertices.find(first_edge_vertex1) != m0_explicit_cutpath_terminal_vertices.cend();
+                bool first_edge_vertex1_is_terminal = m0_cutpath_terminal_vertices.find(first_edge_vertex1) != m0_cutpath_terminal_vertices.cend();
                 first_edge_is_terminal = first_edge_vertex1_is_terminal;
             }
 
@@ -3287,10 +3038,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // get the halfedge and check where is comes from (cut-mesh/source-mesh)
 
-                std::map<vd_t, std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator>::const_iterator find_iter = m0_explicit_cutpath_terminal_vertices.cend();
-                find_iter = m0_explicit_cutpath_terminal_vertices.find(first_edge_terminal_vertex);
+                std::map<vd_t, std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator>::const_iterator find_iter = m0_cutpath_terminal_vertices.cend();
+                find_iter = m0_cutpath_terminal_vertices.find(first_edge_terminal_vertex);
 
-                MCUT_ASSERT(find_iter != m0_explicit_cutpath_terminal_vertices.cend());
+                MCUT_ASSERT(find_iter != m0_cutpath_terminal_vertices.cend());
 
                 // TODO: These variable names are outdated
                 const ed_t &first_edge_terminal_vertex_edge = find_iter->second->second.first;
@@ -3321,14 +3072,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const ed_t &last_edge = cutpath.back();
                 const vd_t last_edge_vertex0 = m0.vertex(last_edge, 0);
                 const vd_t last_edge_vertex1 = m0.vertex(last_edge, 1);
-                bool last_edge_vertex0_is_terminal = m0_explicit_cutpath_terminal_vertices.find(last_edge_vertex0) != m0_explicit_cutpath_terminal_vertices.cend();
+                bool last_edge_vertex0_is_terminal = m0_cutpath_terminal_vertices.find(last_edge_vertex0) != m0_cutpath_terminal_vertices.cend();
 
                 bool last_edge_is_terminal = last_edge_vertex0_is_terminal;
 
                 if (last_edge_vertex0_is_terminal == false)
                 {
                     // check if vertex1 is terminal
-                    bool last_edge_vertex1_is_terminal = m0_explicit_cutpath_terminal_vertices.find(last_edge_vertex1) != m0_explicit_cutpath_terminal_vertices.cend();
+                    bool last_edge_vertex1_is_terminal = m0_cutpath_terminal_vertices.find(last_edge_vertex1) != m0_cutpath_terminal_vertices.cend();
                     last_edge_is_terminal = last_edge_vertex1_is_terminal;
                 }
 
@@ -3348,9 +3099,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // get the halfedge and check where is comes from (cut-mesh/src-mesh)
 
-                //std::map<vd_t, std::map<vd_t, hd_t>::const_iterator>::const_iterator find_iter = m0_explicit_cutpath_terminal_vertices.cend();
-                find_iter = m0_explicit_cutpath_terminal_vertices.find(last_edge_terminal_vertex);
-                MCUT_ASSERT(find_iter != m0_explicit_cutpath_terminal_vertices.cend());
+                //std::map<vd_t, std::map<vd_t, hd_t>::const_iterator>::const_iterator find_iter = m0_cutpath_terminal_vertices.cend();
+                find_iter = m0_cutpath_terminal_vertices.find(last_edge_terminal_vertex);
+                MCUT_ASSERT(find_iter != m0_cutpath_terminal_vertices.cend());
                 const ed_t &last_edge_terminal_vertex_e = find_iter->second->second.first;
                 const hd_t last_edge_terminal_vertex_e_h0 = ps.halfedge(last_edge_terminal_vertex_e, 0);
                 fd_t ps_face_of_last_edge_terminal_vertex_he = ps.face(last_edge_terminal_vertex_e_h0);
@@ -3386,15 +3137,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             lg.unindent();
         }
 
-        m0_explicit_cutpath_terminal_vertices.clear(); // free
+        m0_cutpath_terminal_vertices.clear(); // free
 
         int num_explicit_linear_cutpaths = 0;
         int num_explicit_circular_cutpaths = 0;
         std::vector<int> explicit_cutpaths_making_holes;
         std::vector<int> explicit_cutpaths_severing_srcmesh;
 
-        for (std::map<int, std::tuple<bool, bool, bool>>::const_iterator iter = m0_explicit_cutpath_sequence_to_properties.cbegin();
-             iter != m0_explicit_cutpath_sequence_to_properties.cend(); ++iter)
+        for (std::map<int, std::tuple<bool, bool, bool>>::const_iterator iter = m0_cutpath_sequence_to_properties.cbegin();
+             iter != m0_cutpath_sequence_to_properties.cend(); ++iter)
         {
             const int &explicit_cutpath_index = iter->first;
             const std::tuple<bool, bool, bool> &properties = iter->second;
@@ -3434,14 +3185,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //          edge sequences identifying the cutpaths
         // =====================================================================
 
-        // associate/map intersection points to their explicit cut-path sequences
-        std::map<vd_t, int> m0_ivtx_to_explicit_cutpath_sequence;
-        for (std::vector<std::vector<ed_t>>::const_iterator iter = m0_explicit_cutpath_sequences.cbegin();
-             iter != m0_explicit_cutpath_sequences.cend();
+#if 0
+        // associate/map intersection points to their cut-path sequences
+        std::map<vd_t, int> m0_ivtx_to_cutpath_sequence;
+        for (std::vector<std::vector<ed_t>>::const_iterator iter = m0_cutpath_sequences.cbegin();
+             iter != m0_cutpath_sequences.cend();
              ++iter)
         {
 
-            const int cutpath_index = (int)std::distance(m0_explicit_cutpath_sequences.cbegin(), iter);
+            const int cutpath_index = (int)std::distance(m0_cutpath_sequences.cbegin(), iter);
 
             for (std::vector<ed_t>::const_iterator it = iter->cbegin(); it != iter->cend(); ++it)
             {
@@ -3450,38 +3202,38 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const vd_t vertex1 = m0.vertex(edge, 1);
 
                 // insert vertex0
-                if (m0_ivtx_to_explicit_cutpath_sequence.count(vertex0) == 0)
+                if (m0_ivtx_to_cutpath_sequence.count(vertex0) == 0)
                 {
-                    m0_ivtx_to_explicit_cutpath_sequence.insert(std::make_pair(vertex0, cutpath_index));
-                    MCUT_ASSERT(m0_ivtx_to_explicit_cutpath_sequence.count(vertex0) == 1);
+                    m0_ivtx_to_cutpath_sequence.insert(std::make_pair(vertex0, cutpath_index));
+                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(vertex0) == 1);
                 }
                 else
                 {
-                    MCUT_ASSERT(m0_ivtx_to_explicit_cutpath_sequence[vertex0] == cutpath_index);
+                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence[vertex0] == cutpath_index);
                 }
 
                 // insert vertex1
-                if (m0_ivtx_to_explicit_cutpath_sequence.count(vertex1) == 0)
+                if (m0_ivtx_to_cutpath_sequence.count(vertex1) == 0)
                 {
-                    m0_ivtx_to_explicit_cutpath_sequence.insert(std::make_pair(vertex1, cutpath_index));
-                    MCUT_ASSERT(m0_ivtx_to_explicit_cutpath_sequence.count(vertex1) == 1);
+                    m0_ivtx_to_cutpath_sequence.insert(std::make_pair(vertex1, cutpath_index));
+                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(vertex1) == 1);
                 }
                 else
                 {
-                    MCUT_ASSERT(m0_ivtx_to_explicit_cutpath_sequence[vertex1] == cutpath_index);
+                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence[vertex1] == cutpath_index);
                 }
             }
         }
-
+#endif
         // Detect degeneracy (see note "limitations")
         //--------------------------------------------
 
-        bool have_more_than_one_explicit_cutpath = (m0_explicit_cutpath_sequences.size() > 0);
-        if (have_more_than_one_explicit_cutpath)
+        bool have_more_than_one_cutpath = (m0_cutpath_sequences.size() > 0);
+        if (have_more_than_one_cutpath)
         {
-            bool atleast_one_explicit_cutpath_makes_a_hole = !explicit_cutpaths_making_holes.empty();
+            bool atleast_one_cutpath_makes_a_hole = !explicit_cutpaths_making_holes.empty();
             //bool atleast_one_explicit_cutpath_is_linear = num_explicit_linear_cutpaths;
-            if (atleast_one_explicit_cutpath_makes_a_hole)
+            if (atleast_one_cutpath_makes_a_hole)
             {
                 // TODO
             }
@@ -3489,13 +3241,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // Detect floating polygons
         // ::::::::::::::::::::::::
+        // NOTE: The following code is what we used to determine when to do polygon partitioning in the front end
 
         // for each circular cut-path (i.e. those making a hole)
-        for (std::vector<int>::const_iterator it = explicit_cutpaths_making_holes.cbegin(); it != explicit_cutpaths_making_holes.cend(); ++it)
-        {
+        for (std::vector<int>::const_iterator it = explicit_cutpaths_making_holes.cbegin(); it != explicit_cutpaths_making_holes.cend(); ++it) {
             const int cutpath_idx = *it;
-            MCUT_ASSERT(m0_explicit_cutpath_sequence_to_properties.find(cutpath_idx) != m0_explicit_cutpath_sequence_to_properties.cend());
-            const std::tuple<bool, bool, bool> &properties = m0_explicit_cutpath_sequence_to_properties.at(cutpath_idx);
+            MCUT_ASSERT(m0_cutpath_sequence_to_properties.find(cutpath_idx) != m0_cutpath_sequence_to_properties.cend());
+            const std::tuple<bool, bool, bool> &properties = m0_cutpath_sequence_to_properties.at(cutpath_idx);
             const bool &is_linear = std::get<0>(properties);
             bool is_circular = !is_linear;
 
@@ -3504,17 +3256,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 continue;
             }
 
-            MCUT_ASSERT(cutpath_idx < m0_explicit_cutpath_sequences.size());
-            const std::vector<ed_t> &cutpath_sequence = m0_explicit_cutpath_sequences.at(cutpath_idx);
+            MCUT_ASSERT(cutpath_idx < m0_cutpath_sequences.size());
+            const std::vector<ed_t> &cutpath_sequence = m0_cutpath_sequences.at(cutpath_idx);
 
             MCUT_ASSERT(cutpath_sequence.size() >= 3); // triangle
 
             // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-            // Detect a floating polygon: one which is not connectable to other
-            // traced polygons by an edge.
-            // These are represented by cutpaths whose vertex are intersection points
-            // that have a tested/intersected face in their registry entry from the
-            // same input mesh
+            // Detect a floating polygon as "one which is not connectable to other
+            // [traced] polygons by an edge". In practice, these polygons are represented 
+            // by circular cutpaths whose vertices are intersection points that have a 
+            // tested/intersected face in their registry entry from the same input mesh
             bool is_floating_polygon = true;
             fd_t shared_registry_entry_intersected_face = mesh_t::null_face();
             vd_t vertex_prev = mesh_t::null_vertex();
@@ -3587,12 +3338,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             return; // abort, so that the front-end can partition ps-faces containing floating polygon
         }
 
-        m0_explicit_cutpath_sequence_to_properties.clear();
+        m0_cutpath_sequence_to_properties.clear();
 
         // The following sections of code are about clipping intersecting polygons,
         // and the information we need in order to do that.
         // -----------------------------------------------------------------------
 
+#if 0
         ///////////////////////////////////////////////////////////////////////////
         // Gather/map intersection points on each intersecting faces
         ///////////////////////////////////////////////////////////////////////////
@@ -3671,6 +3423,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             lg.unindent();
         }
+#endif
 
         ///////////////////////////////////////////////////////////////////////////
         // Create new edges partitioning the intersecting ps edges (2-part process)
@@ -5848,7 +5601,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     }
 
                     // check that the target vertex is along a cut-path making a hole
-                    const int tgt_explicit_cutpath_sequence_idx = m0_ivtx_to_explicit_cutpath_sequence.at(cs_poly_he_tgt);
+                    const int tgt_explicit_cutpath_sequence_idx = m0_ivtx_to_cutpath_sequence.at(cs_poly_he_tgt);
                     bool cutpath_makes_a_hole = std::find(explicit_cutpaths_making_holes.cbegin(),
                                                           explicit_cutpaths_making_holes.cend(),
                                                           tgt_explicit_cutpath_sequence_idx) != explicit_cutpaths_making_holes.cend();
@@ -5981,7 +5734,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
 
         //cm_nonborder_reentrant_ivtx_list.clear(); // free
-        m0_ivtx_to_explicit_cutpath_sequence.clear(); // free
+        m0_ivtx_to_cutpath_sequence.clear(); // free
 
         ///////////////////////////////////////////////////////////////////////////
         // Find the source-mesh polygons (next to cutpath) which are above and below
@@ -7135,7 +6888,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // So long as there is a partial cut and the input mesh is not water tight, we wont patch.
         // This is because patching becomes complex as we then need to account for skipping the task of stitching patches which are incident to hole-bounding-sequences which are not loops.
         // Maybe future work..?
-        const bool proceed_to_fill_holes = explicit_cutpaths_making_holes.size() == m0_explicit_cutpath_sequences.size();
+        const bool proceed_to_fill_holes = explicit_cutpaths_making_holes.size() == m0_cutpath_sequences.size();
 
         //
         // The pipeline stops here if there are no holes to fill.
@@ -7202,8 +6955,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         {
 
             const int ecpmh_idx = *ecpmh_iter; // index of cutpath
-            MCUT_ASSERT(ecpmh_idx < (int)m0_explicit_cutpath_sequences.size());
-            const std::vector<ed_t> &m0_explicit_cutpath_sequence = m0_explicit_cutpath_sequences.at(ecpmh_idx);
+            MCUT_ASSERT(ecpmh_idx < (int)m0_cutpath_sequences.size());
+            const std::vector<ed_t> &m0_explicit_cutpath_sequence = m0_cutpath_sequences.at(ecpmh_idx);
 
             // pick any edge (we choose the first one)
             const ed_t &edge = m0_explicit_cutpath_sequence.front();
@@ -7295,7 +7048,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
 #endif
 
-        m0_explicit_cutpath_sequences.clear(); // free, no longer needed.
+        m0_cutpath_sequences.clear(); // free, no longer needed.
 
         ///////////////////////////////////////////////////////////////////////////
         ///////////////////////////////////////////////////////////////////////////
