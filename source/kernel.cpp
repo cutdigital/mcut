@@ -62,7 +62,7 @@ std::string ptimeName;
     ptimeName = name;
 
 #define TIME_PROFILE_END() \
-    std::cout << "[MCUT PROFILE]: " << ptimeName << " : " << ((double)clock() - (double)ptimes[ptimeName]) / (double)CLOCKS_PER_SEC << std::endl;
+    std::cout << "[MCUT PROFILE]: " << ptimeName << " : " << ((double)clock() - (double)ptimes[ptimeName]) / (double)1000 << "ms"<< std::endl;
 #else
 #define TIME_PROFILE_START(name)
 #define TIME_PROFILE_END()
@@ -1650,6 +1650,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
     //
     void dispatch(output_t &output, const input_t &input)
     {
+        clock_t kernel_time_start = clock();
+
         logger_t &lg = output.logger;
         logger_ptr = &output.logger;
         lg.reset();
@@ -10324,6 +10326,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         color_to_separated_connected_ccsponents.clear();
 
         lg << "end" << std::endl;
+
+        
+        std::cout << "[MCUT PROFILE]: dispatch() : " << ((double)clock() - (double)kernel_time_start) / (double)1000 << "ms"<< std::endl;
 
         return;
     } // dispatch
