@@ -496,6 +496,7 @@ namespace mcut
             //
 
             std::vector<vd_t> polygon_vertices;
+            polygon_vertices.reserve(mX_traced_polygon.size());
 
             // for each halfedge in polygon
             for (std::vector<hd_t>::const_iterator mX_traced_polygon_halfedge_iter = mX_traced_polygon.cbegin();
@@ -537,6 +538,7 @@ namespace mcut
         // here we create a map to tag each polygon in "mesh" with the connected component it belongs to.
         std::map<face_descriptor_t, int> fccmap;
 
+        
         const std::size_t num = find_connected_components(fccmap, mesh);
 
         DEBUG_CODE_MASK((*logger_ptr) <<  "connected components = " << num << std::endl;);
@@ -933,7 +935,7 @@ namespace mcut
         }
         DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
-        #define TIME_PROFILE_END()
+        TIME_PROFILE_END()
         return mesh;
     }
 
