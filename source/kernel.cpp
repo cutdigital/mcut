@@ -468,6 +468,7 @@ namespace mcut
         bool keep_fragments_above_cutmesh,
         bool keep_fragments_partially_cut)
     {
+        TIME_PROFILE_START("Extract connected components");
         DEBUG_CODE_MASK((*logger_ptr) <<  "extract connected components" << std::endl;);
         DEBUG_CODE_MASK((*logger_ptr).indent();)
 
@@ -932,6 +933,7 @@ namespace mcut
         }
         DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
+        #define TIME_PROFILE_END()
         return mesh;
     }
 
