@@ -65,11 +65,13 @@
         }                                \
     } while (0)
 
+# define DEBUG_CODE_MASK(code) code
 #else // #if defined(MCUT_DEBUG_BUILD)
 //
 // MCUT_ASSERT
 //
 #define MCUT_ASSERT(a) // do nothing
+# define DEBUG_CODE_MASK(code) // do nothing
 #endif // #if defined(MCUT_DEBUG_BUILD)
 
 #include <fstream>

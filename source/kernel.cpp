@@ -236,72 +236,72 @@ namespace mcut
     {
         const std::string name = std::string(fbasename) + ".off";
 
-        (*logger_ptr) << "save " << name << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) << "save " << name << std::endl;);
 
 #if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
         bool verb = logger_ptr->verbose();
         logger_ptr->set_verbose(false);
 #endif
 
-        (*logger_ptr) << "vertices = " << mesh.number_of_vertices() << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) << "vertices = " << mesh.number_of_vertices() << std::endl;);
 
         for (mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
         {
-            (*logger_ptr).indent();
-            (*logger_ptr) << vstr(*v) << " (" << mesh.vertex(*v).x() << ", " << mesh.vertex(*v).y() << ", " << mesh.vertex(*v).z() << ")" << std::endl;
-            (*logger_ptr).unindent();
+            DEBUG_CODE_MASK((*logger_ptr).indent(););
+            DEBUG_CODE_MASK((*logger_ptr) << vstr(*v) << " (" << mesh.vertex(*v).x() << ", " << mesh.vertex(*v).y() << ", " << mesh.vertex(*v).z() << ")" << std::endl;);
+            DEBUG_CODE_MASK((*logger_ptr).unindent(););
         }
 
-        (*logger_ptr) << "edges = " << mesh.number_of_edges() << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) << "edges = " << mesh.number_of_edges() << std::endl;);
 
         for (mesh_t::edge_iterator_t e = mesh.edges_begin(); e != mesh.edges_end(); ++e)
         {
-            (*logger_ptr).indent();
-            (*logger_ptr) << estr(mesh, *e) << std::endl;
-            (*logger_ptr).unindent();
+            DEBUG_CODE_MASK((*logger_ptr).indent(););
+            DEBUG_CODE_MASK((*logger_ptr) << estr(mesh, *e) << std::endl;);
+            DEBUG_CODE_MASK((*logger_ptr).unindent(););
         }
 
-        (*logger_ptr) << "halfedges = " << mesh.number_of_halfedges() << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << mesh.number_of_halfedges() << std::endl;);
 
         for (mesh_t::halfedge_iterator_t h = mesh.halfedges_begin(); h != mesh.halfedges_end(); ++h)
         {
-            (*logger_ptr).indent();
-            (*logger_ptr) << hstr(mesh, *h) << std::endl;
-            (*logger_ptr).unindent();
+            DEBUG_CODE_MASK((*logger_ptr).indent(););
+            DEBUG_CODE_MASK((*logger_ptr) << hstr(mesh, *h) << std::endl;);
+            DEBUG_CODE_MASK((*logger_ptr).unindent(););
         }
 
-        (*logger_ptr) << "faces = " << mesh.number_of_faces() << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) << "faces = " << mesh.number_of_faces() << std::endl;);
 
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
-            (*logger_ptr).indent();
-            (*logger_ptr) << "face " << *face_iter << std::endl;
+            DEBUG_CODE_MASK((*logger_ptr).indent(););
+            DEBUG_CODE_MASK((*logger_ptr) << "face " << *face_iter << std::endl;);
 
             const std::vector<halfedge_descriptor_t> &halfedges_around_face = mesh.get_halfedges_around_face(*face_iter);
 
-            (*logger_ptr).indent();
+            DEBUG_CODE_MASK((*logger_ptr).indent(););
 
             int num_halfedges = (int)halfedges_around_face.size();
             MCUT_ASSERT(num_halfedges >= 3);
 
-            (*logger_ptr).indent();
-            (*logger_ptr) << "halfedges = " << num_halfedges << std::endl;
+            DEBUG_CODE_MASK((*logger_ptr).indent(););
+            DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << num_halfedges << std::endl;);
             for (std::vector<halfedge_descriptor_t>::const_iterator h = halfedges_around_face.cbegin();
                  h != halfedges_around_face.cend();
                  ++h)
             {
-                (*logger_ptr).indent();
-                (*logger_ptr) << hstr(mesh, *h) << std::endl;
-                (*logger_ptr).unindent();
+                DEBUG_CODE_MASK((*logger_ptr).indent(););
+                DEBUG_CODE_MASK((*logger_ptr) << hstr(mesh, *h) << std::endl;);
+                DEBUG_CODE_MASK((*logger_ptr).unindent(););
             }
-            (*logger_ptr).unindent();
+            DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
-            (*logger_ptr).unindent();
-            (*logger_ptr).unindent();
+            DEBUG_CODE_MASK((*logger_ptr).unindent(););
+            DEBUG_CODE_MASK((*logger_ptr).unindent(););
         }
 
 #if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-        (*logger_ptr).set_verbose(verb);
+        DEBUG_CODE_MASK((*logger_ptr).set_verbose(verb););
 #endif
 
         write_off(name.c_str(), mesh);
@@ -468,8 +468,8 @@ namespace mcut
         bool keep_fragments_above_cutmesh,
         bool keep_fragments_partially_cut)
     {
-        (*logger_ptr) << "extract connected components" << std::endl;
-        (*logger_ptr).indent();
+        DEBUG_CODE_MASK((*logger_ptr) <<  "extract connected components" << std::endl;);
+        DEBUG_CODE_MASK((*logger_ptr).indent();)
 
         // the auxilliary halfedge mesh containing the vertices and edges
         // referenced by the traced polygons
@@ -479,7 +479,7 @@ namespace mcut
         // Insert traced polygons into the auxilliary mesh
         ///////////////////////////////////////////////////////////////////////////
 
-        (*logger_ptr) << "total polygons = " << mX_traced_polygons.size() << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) <<  "total polygons = " << mX_traced_polygons.size() << std::endl;);
 
         // for each traced polygon
         for (std::vector<std::vector<hd_t>>::const_iterator mX_traced_polygons_iter = mX_traced_polygons.cbegin();
@@ -516,7 +516,7 @@ namespace mcut
         ///////////////////////////////////////////////////////////////////////////
         // find connected components in "mesh"
         ///////////////////////////////////////////////////////////////////////////
-        (*logger_ptr) << "search connected components" << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) <<  "search connected components" << std::endl;);
 
         // connected components
         std::map<std::size_t, mesh_t> ccID_to_mesh;
@@ -538,7 +538,7 @@ namespace mcut
 
         const std::size_t num = find_connected_components(fccmap, mesh);
 
-        (*logger_ptr) << "connected components = " << num << std::endl;
+        DEBUG_CODE_MASK((*logger_ptr) <<  "connected components = " << num << std::endl;);
 
         ///////////////////////////////////////////////////////////////////////////
         // Map vertex descriptors to each connected component
@@ -769,9 +769,9 @@ namespace mcut
 
             if (proceed_to_save_mesh)
             {
-                (*logger_ptr) << "connected component id = " << cc_id << std::endl;
+                DEBUG_CODE_MASK((*logger_ptr) <<  "connected component id = " << cc_id << std::endl;);
 
-                (*logger_ptr).indent();
+                DEBUG_CODE_MASK((*logger_ptr).indent(););
                 connected_component_location_t location = connected_component_location_t::UNDEFINED;
 
                 if (!sm_polygons_below_cs.empty() && !sm_polygons_above_cs.empty())
@@ -921,16 +921,16 @@ namespace mcut
 
                 connected_components[cc_id].emplace_back(cc, std::move(ccinfo));
 
-                (*logger_ptr) << "location = " << to_string(location) << std::endl;
-                (*logger_ptr) << "vertices = " << cc.number_of_vertices() << std::endl;
-                (*logger_ptr) << "edges = " << cc.number_of_edges() << std::endl;
-                (*logger_ptr) << "halfedges = " << cc.number_of_halfedges() << std::endl;
-                (*logger_ptr) << "faces = " << cc.number_of_faces() << std::endl;
+                DEBUG_CODE_MASK((*logger_ptr) <<  "location = " << to_string(location) << std::endl;);
+                DEBUG_CODE_MASK((*logger_ptr) <<  "vertices = " << cc.number_of_vertices() << std::endl;);
+                DEBUG_CODE_MASK((*logger_ptr) <<  "edges = " << cc.number_of_edges() << std::endl;);
+                DEBUG_CODE_MASK((*logger_ptr) <<  "halfedges = " << cc.number_of_halfedges() << std::endl;);
+                DEBUG_CODE_MASK((*logger_ptr) <<  "faces = " << cc.number_of_faces() << std::endl;);
 
-                (*logger_ptr).unindent();
+                DEBUG_CODE_MASK((*logger_ptr).unindent(););
             }
         }
-        (*logger_ptr).unindent();
+        DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
         return mesh;
     }
@@ -948,7 +948,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
 
     MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
     const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-    MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+    MCUT_ASSERT(ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend());
     const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
     // TODO: use ps_to_m0_vtx to avoid linear search
     //std::map<vd_t, vd_t>::const_iterator fiter = std::find_if(
@@ -1173,7 +1173,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
             vd_t h_tgt = m1.target(h_proc);
             const vd_t tgt_copy = m1.add_vertex(m1.vertex(h_tgt)); // make a copy
 
-            (*logger_ptr) << "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;
+            DEBUG_CODE_MASK((*logger_ptr) <<  "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;);
             resolved_inst = tgt_copy;
         }
         else
@@ -1236,7 +1236,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
             vd_t h_tgt = m1.target(h_proc);
             const vd_t tgt_copy = m1.add_vertex(m1.vertex(h_tgt)); // make a copy
 
-            (*logger_ptr) << "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;
+            DEBUG_CODE_MASK((*logger_ptr) <<  "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;);
             resolved_inst = tgt_copy;
         }
 
@@ -1670,16 +1670,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         const int cs_face_count = cs.number_of_faces();
 
         const bool sm_is_watertight = mesh_is_closed(sm);
-        lg << "src-mesh is watertight = " << sm_is_watertight << std::endl;
+        DEBUG_CODE_MASK(lg << "src-mesh is watertight = " << sm_is_watertight << std::endl;);
 
         const bool cm_is_watertight = mesh_is_closed(cs);
-        lg << "cut-mesh is watertight = " << cm_is_watertight << std::endl;
+        DEBUG_CODE_MASK(lg << "cut-mesh is watertight = " << cm_is_watertight << std::endl;);
 
         ///////////////////////////////////////////////////////////////////////////
         // create polygon soup
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "create polygon soup (ps)" << std::endl;
+        DEBUG_CODE_MASK(lg << "create polygon soup (ps)" << std::endl;);
 
         mesh_t ps = sm; // copy
 
@@ -1740,14 +1740,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         const int ps_vtx_cnt = ps.number_of_vertices();
         const int ps_face_cnt = ps.number_of_faces();
 
-        lg << "polygon-soup vertices = " << ps_vtx_cnt << std::endl;
-        lg << "polygon-soup faces = " << ps_face_cnt << std::endl;
+        DEBUG_CODE_MASK(lg << "polygon-soup vertices = " << ps_vtx_cnt << std::endl;);
+        DEBUG_CODE_MASK(lg << "polygon-soup faces = " << ps_face_cnt << std::endl;);
 
         ///////////////////////////////////////////////////////////////////////////
         // create the first auxilliary halfedge data structure ("m0")
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "create auxiliary mesh (`m0`)" << std::endl;
+        DEBUG_CODE_MASK(lg << "create auxiliary mesh (`m0`)" << std::endl;);
 
         // The auxilliary data structure stores:
         // 1) vertices of the polygon-soup, including new intersection points
@@ -1774,7 +1774,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Calculate polygon intersection points
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "calculate intersection-points" << std::endl;
+        DEBUG_CODE_MASK(lg << "calculate intersection-points" << std::endl;);
 
         // ivertex to faces that meet at the this ivertex
         //std::map<
@@ -1840,8 +1840,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
             const fd_t cm_face((uint32_t)intersection_pair.second + cm_faces_start_offset);
 
-            lg << "src-mesh polygon = " << fstr(sm_face) << std::endl;
-            lg << "cut-mesh polygon = " << fstr(cm_face) << std::endl;
+            DEBUG_CODE_MASK(lg << "src-mesh polygon = " << fstr(sm_face) << std::endl;);
+            DEBUG_CODE_MASK(lg << "cut-mesh polygon = " << fstr(cm_face) << std::endl;);
 
             // Create the intersection test permutations. We need these in order to test the
             // halfedges of one face against the other and vice versa.
@@ -1991,11 +1991,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 MCUT_ASSERT(ps_tested_face_to_vertices.find(tested_face) != ps_tested_face_to_vertices.end());
                 const std::vector<math::vec3> &tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
 
-                //lg << "face " << fstr(tested_face) << " vertices = " << tested_face_descriptors.size() << std::endl;
+                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " vertices = " << tested_face_descriptors.size() << std::endl;);
 
                 //for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
                 //    const math::vec3& vertex = ps.vertex(*it);
-                //    lg << "v: " << vertex << std::endl;
+                //    DEBUG_CODE_MASK(lg << "v: " << vertex << std::endl;);
                 //    tested_face_vertices.push_back(vertex);
                 //}
 
@@ -2013,9 +2013,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // tested_face_vertices.data(),
                 //  (int)tested_face_vertices.size());
 
-                //lg << "face " << fstr(tested_face) << " normal = " << tested_face_plane_normal << std::endl;
-                //lg << "face " << fstr(tested_face) << " largest normal component = " << tested_face_plane_normal_max_comp << std::endl;
-                //lg << "face " << fstr(tested_face) << " plane d-coeff = " << tested_face_plane_param_d << std::endl;
+                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " normal = " << tested_face_plane_normal << std::endl;);
+                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " largest normal component = " << tested_face_plane_normal_max_comp << std::endl;);
+                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " plane d-coeff = " << tested_face_plane_param_d << std::endl;);
 
                 math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
 
@@ -2041,13 +2041,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 #endif
                 bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
 
-                lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;
+                DEBUG_CODE_MASK(lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;);
 
                 if (have_plane_intersection)
                 { // does the segment intersect the plane?
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
-                    lg << "intersection point: " << intersection_point << std::endl;
+                    DEBUG_CODE_MASK(lg << "intersection point: " << intersection_point << std::endl;);
 
                     if (segment_intersection_type != '1')
                     { // the segment only touches the the plane (the line reprsented by segment still intersects the plane)
@@ -2151,7 +2151,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     bool have_point_in_polygon = in_poly_test_intersection_type == 'i';
 
-                    lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;
+                    DEBUG_CODE_MASK(lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;);
 
                     if (have_point_in_polygon)
                     { // NOTE: point must be [inside] the polygon for us to consider it further
@@ -2212,16 +2212,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 #endif
                         vd_t new_vertex_descr = m0.add_vertex(intersection_point);
 #if 0
-                    lg << "add vertex" << std::endl;
-                    lg.indent();
-                    std::cout << "position = (" << intersection_point << ")" << std::endl;
-                    lg << "descriptor = " << vstr(new_vertex_descr) << std::endl;
-                    lg << "registry-entry" << std::endl;
-                    lg.indent();
-                    lg << "faces = [" << fstr(new_vertex_incident_ps_faces.at(0)) << ", " << fstr(new_vertex_incident_ps_faces.at(1)) << ", " << fstr(new_vertex_incident_ps_faces.at(2)) << "]" << std::endl;
-                    lg << "halfedge = " << hstr(ps, halfedge_pq) << std::endl;
-                    lg.unindent();
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg << "add vertex" << std::endl;);
+                    DEBUG_CODE_MASK(lg.indent(););
+                    std::cout << "position = (" << intersection_point << ")" << std::endl;);
+                    DEBUG_CODE_MASK(lg << "descriptor = " << vstr(new_vertex_descr) << std::endl;);
+                    DEBUG_CODE_MASK(lg << "registry-entry" << std::endl;);
+                    DEBUG_CODE_MASK(lg.indent(););
+                    DEBUG_CODE_MASK(lg << "faces = [" << fstr(new_vertex_incident_ps_faces.at(0)) << ", " << fstr(new_vertex_incident_ps_faces.at(1)) << ", " << fstr(new_vertex_incident_ps_faces.at(2)) << "]" << std::endl;);
+                    DEBUG_CODE_MASK(lg << "halfedge = " << hstr(ps, halfedge_pq) << std::endl;);
+                    DEBUG_CODE_MASK(lg.unindent(););
+                    DEBUG_CODE_MASK(lg.unindent(););
 #endif
                         //m0_ivtx_to_ps_faces.insert(std::make_pair(new_vertex_descr, new_vertex_incident_ps_faces));
                         //m0_ivtx_to_ps_edge.insert(std::make_pair(new_vertex_descr, tested_edge));
@@ -2272,7 +2272,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             if (is_border_reentrant_ivertex)
                             {
-                                lg << "is border" << std::endl;
+                                DEBUG_CODE_MASK(lg << "is border" << std::endl;);
                                 cm_border_reentrant_ivtx_list.push_back(new_vertex_descr);
                             } //else // is regular
                         }
@@ -2288,7 +2288,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     } // if (have_point_in_polygon)
 
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg.unindent(););
                 } // if (have_plane_intersection) {
             }     // for (std::vector<fd_t>::const_iterator intersected_faces_iter = intersected_faces.cbegin(); intersected_faces_iter != intersected_faces.cend(); ++intersected_faces_iter) {
 
@@ -2331,7 +2331,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         TIME_PROFILE_END();
 
-        lg << "total intersection-points = " << m0_ivtx_to_intersection_registry_entry.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "total intersection-points = " << m0_ivtx_to_intersection_registry_entry.size() << std::endl;);
 
         // A partial cut intersection exists when there exists at-least one intersection point
         // whose registry has a halfedge from the cut-surface, where this halfedge is a border halfedge.
@@ -2359,12 +2359,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             //}
         }
 
-        lg << "partial cut = " << std::boolalpha << partial_cut_detected << std::endl;
+        DEBUG_CODE_MASK(lg << "partial cut = " << std::boolalpha << partial_cut_detected << std::endl;);
 
         if (partial_cut_detected && cm_border_reentrant_ivtx_list.size() == 0)
         {
             // can happen with case when both the input mesh and cut surface are not watertight
-            lg << "note: did not find cut-surface tip re-entrant vertices." << std::endl;
+            DEBUG_CODE_MASK(lg << "note: did not find cut-surface tip re-entrant vertices." << std::endl;);
         }
 
         if (input.verbose)
@@ -2390,7 +2390,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Check for degenerate mesh intersections
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "detect degeneracies" << std::endl;
+        DEBUG_CODE_MASK(lg << "detect degeneracies" << std::endl;);
 
         // TODO: this is redundnat (remove)
         mesh_t::vertex_iterator_t m0_ivtx_iter_begin = m0.vertices_begin();
@@ -2510,7 +2510,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const std::vector<vd_t> &intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
             const uint32_t new_ivertices_count = (uint32_t)intersection_test_ivtx_list.size();
 
-            lg << "create edge(s) from " << new_ivertices_count << " intersection points" << std::endl;
+            DEBUG_CODE_MASK(lg << "create edge(s) from " << new_ivertices_count << " intersection points" << std::endl;);
 
             if (new_ivertices_count == 2)
             { // one edge
@@ -2526,7 +2526,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     //!interior_edge_exists(m0, first_new_ivertex, second_new_ivertex /*, m0_cutpath_edges*/)
                 )
                 {
-                    lg << "add edge (xx) : " << estr(first_new_ivertex, second_new_ivertex) << std::endl;
+                    DEBUG_CODE_MASK(lg << "add edge (xx) : " << estr(first_new_ivertex, second_new_ivertex) << std::endl;);
 
                     hd_t h = m0.add_edge(first_new_ivertex, second_new_ivertex);
                     MCUT_ASSERT(h != mesh_t::null_halfedge());
@@ -2647,7 +2647,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                         if ((int)shared_faces_containing_edge.size() == 2)
                         {
-                            lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;
+                            DEBUG_CODE_MASK(lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;);
 
                             const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
 
@@ -2693,9 +2693,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Find cut-paths (the boundaries of the openings/holes in the source mesh)
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "find cut-paths" << std::endl;
+        DEBUG_CODE_MASK(lg << "find cut-paths" << std::endl;);
 
-        lg.indent();
+        DEBUG_CODE_MASK(lg.indent(););
 
         // We are now going to search for all the cut-paths created from the intersection
         // between source- and cut-mesh faces. Some of these cut-paths identify holes to be
@@ -2723,7 +2723,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // build implicit cut-path sequences (a sorted set of connected edges)
         // -----------------------------------------------------------------------
 
-        lg << "build implicit cut-path sequences" << std::endl;
+        DEBUG_CODE_MASK(lg << "build implicit cut-path sequences" << std::endl;);
 
         // An "implicit" cut-path sequence is a list of cut-path edges that are sorted (i.e.
         // this means that in memory, edges are placed next to others they connect to).
@@ -2737,11 +2737,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             const int diff = (int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size();
             MCUT_ASSERT(diff >= 2); // need a minimum of 2 intersection points (one edge) to form a sequence
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
             int cur_cutpath_sequence_index = (int)m0_cutpath_sequences.size();
 
-            lg << "current disjoint implicit cut-path sequence = " << cur_cutpath_sequence_index << std::endl;
-            lg.indent();
+            DEBUG_CODE_MASK(lg << "current disjoint implicit cut-path sequence = " << cur_cutpath_sequence_index << std::endl;);
+            DEBUG_CODE_MASK(lg.indent(););
             // start from an intersection point that is not yet mapped-to/associated-with a
             //  sequence in "cur_cutpath_sequence"
             // pick the vertex which is a terminal vertex (to start search from beginning of sequence)
@@ -2813,14 +2813,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             do
             { // an iteration will add an edge to the current cut-path sequence
-                lg.indent();
+                DEBUG_CODE_MASK(lg.indent(););
 
                 // update state
                 current_vertex = next_vertex;
                 current_edge = next_edge;
 
-                lg << "current vertex = " << current_vertex << std::endl;
-                lg << "current edge = " << current_edge << std::endl;
+                DEBUG_CODE_MASK(lg << "current vertex = " << current_vertex << std::endl;);
+                DEBUG_CODE_MASK(lg << "current edge = " << current_edge << std::endl;);
 
                 // add edge
                 cur_cutpath_sequence.emplace_back(current_edge);
@@ -2897,19 +2897,19 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     }
                 } // if (!reached_end_of_sequence) {
 
-                lg.unindent();
+                DEBUG_CODE_MASK(lg.unindent(););
 
                 // while there is another edge to added to the current disjoint implicit cutpath sequence
             } while (next_edge != mesh_t::null_edge());
 
-            lg << "disjoint implicit cut-path sequence size = " << cur_cutpath_sequence.size() << std::endl;
+            DEBUG_CODE_MASK(lg << "disjoint implicit cut-path sequence size = " << cur_cutpath_sequence.size() << std::endl;);
 
-            lg.unindent();
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
+            DEBUG_CODE_MASK(lg.unindent(););
             // while not all intersection-points have been mapped to a disjoint implicit cutpath sequence
         } while (m0_edge_to_cutpath_sequence.size() != m0_cutpath_edges.size());
 
-        lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;);
 
         MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
 
@@ -2922,7 +2922,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         m0_ivtx_to_cutpath_edges.clear();      // free
         //m0_cutpath_sequences.clear(); // free
 
-        lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;);
 
         MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
 
@@ -2936,7 +2936,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // us to determine the properties of the cut-paths
         //
 
-        lg << "find border intersection points" << std::endl;
+        DEBUG_CODE_MASK(lg << "find border intersection points" << std::endl;);
 
         //
         // MapKey=intersection point on a border halfedge of either the source-mesh or cut-mesh
@@ -2947,7 +2947,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
              iter != m0_ivtx_to_intersection_registry_entry.cend();
              ++iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
             const vd_t &ivtx = iter->first;
 
             const ed_t edge_of_ivtx_ps_he = iter->second.first; // ps.edge(ivtx_ps_he);
@@ -2958,15 +2958,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 MCUT_ASSERT(m0_cutpath_terminal_vertices.count(ivtx) == 0);
                 m0_cutpath_terminal_vertices[ivtx] = iter;
                 MCUT_ASSERT(m0_cutpath_terminal_vertices.count(ivtx) == 1);
-                lg << vstr(ivtx) << std::endl;
+                DEBUG_CODE_MASK(lg << vstr(ivtx) << std::endl;);
             }
 
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        lg << "total border intersection points = " << m0_cutpath_terminal_vertices.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "total border intersection points = " << m0_cutpath_terminal_vertices.size() << std::endl;);
 
-        lg << "infer cut-path properties" << std::endl;
+        DEBUG_CODE_MASK(lg << "infer cut-path properties" << std::endl;);
 
         // MapKey=index of an explicit cutpath in  m0_cutpath_sequences
         // MapValue=a tuple of boolean properties (is_linear, is_hole, is_srcmesh_severing).
@@ -2982,12 +2982,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
              iter != m0_cutpath_sequences.cend();
              ++iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
             const int cutpath_index = (int)std::distance(m0_cutpath_sequences.cbegin(), iter);
 
-            lg << "explicit cut-path = " << cutpath_index << std::endl;
+            DEBUG_CODE_MASK(lg << "explicit cut-path = " << cutpath_index << std::endl;);
 
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
             const std::vector<ed_t> &cutpath = *iter;
 
             MCUT_ASSERT(m0_cutpath_sequence_to_properties.count(cutpath_index) == 0);
@@ -3132,11 +3132,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //}
             }
 
-            lg << "type = `" << (cutpath_is_linear ? "linear" : "circular") << "`" << std::endl;
-            lg << "hole = " << std::boolalpha << cutpath_is_hole << std::endl;
+            DEBUG_CODE_MASK(lg << "type = `" << (cutpath_is_linear ? "linear" : "circular") << "`" << std::endl;);
+            DEBUG_CODE_MASK(lg << "hole = " << std::boolalpha << cutpath_is_hole << std::endl;);
 
-            lg.unindent();
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
         m0_cutpath_terminal_vertices.clear(); // free
@@ -3176,12 +3176,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             }
         }
 
-        lg << "total explicit linear cutpaths = " << num_explicit_linear_cutpaths << std::endl;
-        lg << "total explicit circular cutpaths = " << num_explicit_circular_cutpaths << std::endl;
-        lg << "total explicit cutpaths making holes = " << explicit_cutpaths_making_holes.size() << std::endl;
-        lg << "total explict cutpaths severing the srcmesh = " << explicit_cutpaths_severing_srcmesh.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "total explicit linear cutpaths = " << num_explicit_linear_cutpaths << std::endl;);
+        DEBUG_CODE_MASK(lg << "total explicit circular cutpaths = " << num_explicit_circular_cutpaths << std::endl;);
+        DEBUG_CODE_MASK(lg << "total explicit cutpaths making holes = " << explicit_cutpaths_making_holes.size() << std::endl;);
+        DEBUG_CODE_MASK(lg << "total explict cutpaths severing the srcmesh = " << explicit_cutpaths_severing_srcmesh.size() << std::endl;);
 
-        lg.unindent(); // end of cutpath sequence detection code
+        DEBUG_CODE_MASK(lg.unindent();); // end of cutpath sequence detection code
 
         // NOTE:    at this point we have all vertices, edges, and the lists of
         //          edge sequences identifying the cutpaths
@@ -3227,6 +3227,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             }
         }
 #endif
+
+#if 0
         // Detect degeneracy (see note "limitations")
         //--------------------------------------------
 
@@ -3240,7 +3242,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // TODO
             }
         }
-
+#endif
         // Detect floating polygons
         // ::::::::::::::::::::::::
         // NOTE: The following code is what we used to determine when to do polygon partitioning in the front end
@@ -3351,7 +3353,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Gather/map intersection points on each intersecting faces
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "associate intersecting faces to intersection-points" << std::endl;
+        DEBUG_CODE_MASK(lg << "associate intersecting faces to intersection-points" << std::endl;);
 
         // TODO: build this data structure during polygon intersection tests!
         std::map<
@@ -3411,19 +3413,19 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         for (std::map<fd_t, std::vector<vd_t>>::const_iterator i = ps_iface_to_ivtx_list.cbegin(); i != ps_iface_to_ivtx_list.cend(); ++i)
         {
-            lg.indent();
-            lg << "face " << i->first << std::endl;
+            DEBUG_CODE_MASK(lg.indent(););
+            DEBUG_CODE_MASK(lg << "face " << i->first << std::endl;);
 
             // log
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
             for (std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
             {
-                lg << vstr(*j) << " ";
+                DEBUG_CODE_MASK(lg << vstr(*j) << " ";
             }
-            lg << std::endl;
-            lg.unindent();
+            DEBUG_CODE_MASK(lg << std::endl;);
+            DEBUG_CODE_MASK(lg.unindent(););
 
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 #endif
 
@@ -3431,8 +3433,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Create new edges partitioning the intersecting ps edges (2-part process)
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "create polygon-exterior edges" << std::endl;
-        lg.indent();
+        DEBUG_CODE_MASK(lg << "create polygon-exterior edges" << std::endl;);
+        DEBUG_CODE_MASK(lg.indent(););
         // Part 1
         //
         // Here, we identify ps-edges with more than 3 coincident m0-vertices (ps-
@@ -3461,7 +3463,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         for (std::map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             // TODO: get_vertices_on_ps_edge() is not needed we can probably infer this information using previously/pre-computed std::maps
             // vertices that lie on current ps edge
@@ -3469,21 +3471,21 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             //get_vertices_on_ps_edge(iter_ps_edge, m0_ivtx_to_intersection_registry_entry, ps, m0_to_ps_vtx);
 
             if (iter_ps_edge->second.size() > 1)
-            { // intersection points on edge is more than 1 i.e. edge has more than thre edges
+            { // intersection points on edge is more than 1 i.e. edge has more than three vertices
 
                 const vd_t ps_v0 = ps.vertex(iter_ps_edge->first, 0);
                 const vd_t ps_v1 = ps.vertex(iter_ps_edge->first, 1);
 
                 MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
                 const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-                MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+                MCUT_ASSERT(ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend());
                 const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
                 std::vector<vd_t> vertices_on_ps_edge = {m0_v0, m0_v1};
 
                 // and rest of points (intersection points)
                 vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), iter_ps_edge->second.cbegin(), iter_ps_edge->second.cend());
 
-                lg << "ps-edge " << estr(ps, iter_ps_edge->first) << " : ";
+                DEBUG_CODE_MASK(lg << "ps-edge " << estr(ps, iter_ps_edge->first) << " : ";);
 
                 MCUT_ASSERT(ps_edge_to_vertices.find(iter_ps_edge->first) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
 
@@ -3492,7 +3494,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 for (std::vector<vd_t>::const_iterator it = vertices_on_ps_edge.cbegin(); it != vertices_on_ps_edge.cend(); ++it)
                 {
 
-                    lg << vstr(*it) << " ";
+                    DEBUG_CODE_MASK(lg << vstr(*it) << " ";);
 
                     const math::vec3 &vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
                     ps_edge_to_vertices.at(iter_ps_edge->first).push_back(std::make_pair(*it, vertex_coordinates));
@@ -3501,13 +3503,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     //m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
                     //}
                 }
-                lg << std::endl;
+                DEBUG_CODE_MASK(lg << std::endl;);
             }
 
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices.size() << std::endl;);
 
         // In the next for-loop, we sort each list of vertices on each ps-edge
         // which more than 3 coincident vertices
@@ -3570,7 +3572,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
              ++ps_edge_coincident_vertices_iter)
         {
 
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             // get sorted list of vertices on edge
             const std::vector<vd_t> &coincident_sorted_vertices = ps_edge_coincident_vertices_iter->second;
@@ -3594,7 +3596,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const vd_t tgt_vertex = *(iter);
                 const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // create edge!
 
-                lg << "add edge : " << estr(src_vertex, tgt_vertex) << std::endl;
+                DEBUG_CODE_MASK(lg << "add edge : " << estr(src_vertex, tgt_vertex) << std::endl;);
 
                 MCUT_ASSERT(h != mesh_t::null_halfedge());
 
@@ -3649,7 +3651,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 }
             }
 
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
         // Part 2
@@ -3665,7 +3667,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // b) ps-edge is coincident on three m0-vertices such that one is an intersection point
         //
 
-        lg << "create edges on ps-edges with 2 (oo) or 3 vertices (ox or xo)" << std::endl;
+        DEBUG_CODE_MASK(lg << "create edges on ps-edges with 2 (oo) or 3 vertices (ox or xo)" << std::endl;);
 
         // a map between edge ids in "ps" and in "m0", which is the data structure we are progressively
         // defining to hold data for the new mesh containing clipped polygons
@@ -3674,7 +3676,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // for each ps-edge
         for (mesh_t::edge_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             if (ps_edge_to_vertices.find(*iter_ps_edge) != ps_edge_to_vertices.end())
             {
@@ -3687,7 +3689,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
             const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend());
             const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
 
             std::vector<vd_t> vertices_on_ps_edge = {ps_v0, ps_v1}; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
@@ -3699,7 +3701,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             if (vertices_on_ps_edge.size() == 2) // simple case (edge did not intersect with any polygon)
             {
-                lg << "add edge (oo) : (" << vertices_on_ps_edge.back() << ", " << vertices_on_ps_edge.front() << ")" << std::endl;
+                DEBUG_CODE_MASK(lg << "add edge (oo) : (" << vertices_on_ps_edge.back() << ", " << vertices_on_ps_edge.front() << ")" << std::endl;);
 
                 const hd_t h = m0.add_edge(vertices_on_ps_edge.back(), vertices_on_ps_edge.front());
 
@@ -3742,14 +3744,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //
                         // o x o
                         //
-                        lg << "add edge (ox) : " << estr(first, second) << std::endl;
+                        DEBUG_CODE_MASK(lg << "add edge (ox) : " << estr(first, second) << std::endl;);
                         h0 = m0.add_edge(first, second);
                         MCUT_ASSERT(h0 != mesh_t::null_halfedge());
 
                         MCUT_ASSERT(m0.target(h0) == second);
                         ivtx_to_incoming_hlist[second].push_back(h0);
 
-                        lg << "add edge (xo) : " << estr(second, third) << std::endl;
+                        DEBUG_CODE_MASK(lg << "add edge (xo) : " << estr(second, third) << std::endl;);
                         h1 = m0.add_edge(second, third);
                         MCUT_ASSERT(h1 != mesh_t::null_halfedge());
 
@@ -3761,12 +3763,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //
                         //  o o x
                         //
-                        lg << "add edge (ox) : " << estr(first, third) << std::endl;
+                        DEBUG_CODE_MASK(lg << "add edge (ox) : " << estr(first, third) << std::endl;);
                         h0 = m0.add_edge(first, third);
                         MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                         ivtx_to_incoming_hlist[third].push_back(h0);
 
-                        lg << "add edge (xo) : " << estr(third, second) << std::endl;
+                        DEBUG_CODE_MASK(lg << "add edge (xo) : " << estr(third, second) << std::endl;);
                         h1 = m0.add_edge(third, second);
                         MCUT_ASSERT(h1 != mesh_t::null_halfedge());
                         ivtx_to_incoming_hlist[third].push_back(m0.opposite(h1));
@@ -3777,14 +3779,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     //
                     // x o o
                     //
-                    lg << "add edge (ox) : " << estr(second, first) << std::endl;
+                    DEBUG_CODE_MASK(lg << "add edge (ox) : " << estr(second, first) << std::endl;);
                     h0 = m0.add_edge(second, first); // o-->x
                     MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                     ivtx_to_incoming_hlist[first].push_back(h0);
 
                     MCUT_ASSERT(m0.target(m0.opposite(h0)) == second);
 
-                    lg << "add edge (xo) : " << estr(first, third) << std::endl;
+                    DEBUG_CODE_MASK(lg << "add edge (xo) : " << estr(first, third) << std::endl;);
                     h1 = m0.add_edge(first, third); // x-->o
                     MCUT_ASSERT(h1 != mesh_t::null_halfedge());
 
@@ -3808,9 +3810,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     }
                 }
             }
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
-        lg.unindent();
+        DEBUG_CODE_MASK(lg.unindent(););
 
         TIME_PROFILE_END(); // &&&&&
 
@@ -3825,7 +3827,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // -----------------------------------------------
 
         TIME_PROFILE_START("Clip polygons"); // &&&&&
-        lg << "clip intersecting faces" << std::endl;
+        DEBUG_CODE_MASK(lg << "clip intersecting faces" << std::endl;);
 
         // Stores the all polygons, including new polygons that are produced after clipping
         // and the faces that remained unchanged because they were not intersecting. Note
@@ -3851,7 +3853,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // for each face in the polygon-soup mesh
         for (mesh_t::face_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             const fd_t &ps_face = *ps_face_iter;
 
@@ -3862,14 +3864,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             bool is_intersecting_ps_face = ps_iface_to_m0_edge_list_fiter != ps_iface_to_m0_edge_list.end();
             bool is_from_cut_mesh = ps_is_cutmesh_face(ps_face, sm_face_count);
 
-            lg << "face " << ps_face << std::endl;
+            DEBUG_CODE_MASK(lg << "face " << ps_face << std::endl;);
 
             std::vector<traced_polygon_t> child_polygons; // new polygons traced on current face
 
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
-            lg << "origin-mesh = " << (is_from_cut_mesh ? "cut-mesh" : "source-mesh") << std::endl;
-            lg << "is intersecting face = " << std::boolalpha << is_intersecting_ps_face << std::endl;
+            DEBUG_CODE_MASK(lg << "origin-mesh = " << (is_from_cut_mesh ? "cut-mesh" : "source-mesh") << std::endl;);
+            DEBUG_CODE_MASK(lg << "is intersecting face = " << std::boolalpha << is_intersecting_ps_face << std::endl;);
 
             if (is_intersecting_ps_face == false)
             { // non-intersecting face
@@ -3892,27 +3894,33 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // for each halfedge in the current polygon
                 for (std::vector<hd_t>::const_iterator hbegin = halfedges_around_face.cbegin(); hbegin != halfedges_around_face.cend(); ++hbegin)
                 {
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
                     // get the source and target vertex descriptors in the polygon soup
                     const vd_t ps_h_src = ps.source(*hbegin);
                     const vd_t ps_h_tgt = ps.target(*hbegin);
 
-                    // get the "m0" version of "ps_h_src"
-                    std::map<vd_t, vd_t>::const_iterator ps_h_src_fiter = std::find_if(m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
-                                                                                       [&](const std::pair<vd_t, vd_t> &e) -> bool { return e.second == ps_h_src; });
+                    MCUT_ASSERT(ps_to_m0_vtx.find(ps_h_src) != ps_to_m0_vtx.cend());
+                    const vd_t m0_h_src = ps_to_m0_vtx.at(ps_h_src);
+                    MCUT_ASSERT(ps_to_m0_vtx.find(ps_h_tgt) != ps_to_m0_vtx.cend());
+                    const vd_t m0_h_tgt = ps_to_m0_vtx.at(ps_h_tgt);
+                    //std::vector<vd_t> vertices_on_ps_edge = {m0_v0, m0_v1};
 
-                    MCUT_ASSERT(ps_h_src_fiter != m0_to_ps_vtx.cend()); // must exist because all "ps" vertices exist in "m0"
+                    // get the "m0" version of "ps_h_src"
+                   // std::map<vd_t, vd_t>::const_iterator ps_h_src_fiter = std::find_if(m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
+                    //                                                                   [&](const std::pair<vd_t, vd_t> &e) -> bool { return e.second == ps_h_src; });
+
+                    ///MCUT_ASSERT(ps_h_src_fiter != m0_to_ps_vtx.cend()); // must exist because all "ps" vertices exist in "m0"
 
                     // get the "m0" version of "ps_h_tgt"
-                    std::map<vd_t, vd_t>::const_iterator ps_h_tgt_fiter = std::find_if(m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
-                                                                                       [&](const std::pair<vd_t, vd_t> &e) -> bool { return e.second == ps_h_tgt; });
+                    //std::map<vd_t, vd_t>::const_iterator ps_h_tgt_fiter = std::find_if(m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
+                    //                                                                   [&](const std::pair<vd_t, vd_t> &e) -> bool { return e.second == ps_h_tgt; });
 
-                    MCUT_ASSERT(ps_h_tgt_fiter != m0_to_ps_vtx.cend());
+                   // MCUT_ASSERT(ps_h_tgt_fiter != m0_to_ps_vtx.cend());
 
                     // the "m0" versions of "ps_h_src" and  "ps_h_tgt"
-                    const vd_t m0_h_src = ps_h_src_fiter->first;
-                    const vd_t m0_h_tgt = ps_h_tgt_fiter->first;
+                    //const vd_t m0_h_src = ps_h_src_fiter->first;
+                    //const vd_t m0_h_tgt = ps_h_tgt_fiter->first;
 
                     // Now we find the actual "m0" halfedge equivalent to "*hbegin" using
                     // our "m0" source and target descriptors
@@ -3926,16 +3934,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // resolve the correct halfedge by match the source and target vertex descriptors
                     if (m0.source(m0_edge_h0) == m0_h_src && m0.target(m0_edge_h0) == m0_h_tgt)
                     {
-                        lg << hstr(m0, m0_edge_h0) << std::endl;
+                        DEBUG_CODE_MASK(lg << hstr(m0, m0_edge_h0) << std::endl;);
                         retraced_poly.emplace_back(m0_edge_h0);
                     }
                     else
                     {
-                        lg << hstr(m0, m0_edge_h1) << std::endl;
+                        DEBUG_CODE_MASK(lg << hstr(m0, m0_edge_h1) << std::endl;);
                         retraced_poly.emplace_back(m0_edge_h1);
                     }
 
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg.unindent(););
                 }
 
                 MCUT_ASSERT(retraced_poly.size() == halfedges_around_face.size());
@@ -3968,15 +3976,19 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 for (int i = 0; i < (int)ps_coincident_vertices.size(); ++i)
                 {
 
-                    std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = std::find_if(
-                        m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
-                        [&](const std::pair<vd_t, vd_t> &e) -> bool {
-                            return e.second == ps_coincident_vertices.at(i);
-                        });
+                    //std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = std::find_if(
+                   //     m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
+                   //     [&](const std::pair<vd_t, vd_t> &e) -> bool {
+                    //        return e.second == ps_coincident_vertices.at(i);
+                    //    });
+                    const vd_t ps_v = ps_coincident_vertices.at(i);
+                    
+                    MCUT_ASSERT(ps_to_m0_vtx.find(ps_v) != ps_to_m0_vtx.cend());
+                    const vd_t m0_v = ps_to_m0_vtx.at(ps_v);
 
-                    MCUT_ASSERT(m0_to_ps_vtx_fiter != m0_to_ps_vtx.end());
+                    //MCUT_ASSERT(m0_to_ps_vtx_fiter != m0_to_ps_vtx.end());
 
-                    coincident_vertices.emplace_back(m0_to_ps_vtx_fiter->first);
+                    coincident_vertices.emplace_back(m0_v);
                 }
 
                 MCUT_ASSERT(coincident_vertices.size() == ps_coincident_vertices.size());
@@ -3990,21 +4002,21 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const std::vector<vd_t> &intersection_points_on_face = ireg_entry_iter->second;
                 coincident_vertices.insert(coincident_vertices.end(), intersection_points_on_face.cbegin(), intersection_points_on_face.cend());
 
-                lg << "intersection points on face = " << intersection_points_on_face.size() << std::endl;
+                DEBUG_CODE_MASK(lg << "intersection points on face = " << intersection_points_on_face.size() << std::endl;);
 
                 MCUT_ASSERT(intersection_points_on_face.size() >= 2); // minimum
 
                 // dump to log
                 if (input.verbose)
                 {
-                    lg << "coincident vertices = " << coincident_vertices.size() << std::endl;
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg << "coincident vertices = " << coincident_vertices.size() << std::endl;);
+                    DEBUG_CODE_MASK(lg.indent(););
                     for (std::vector<vd_t>::const_iterator j = coincident_vertices.cbegin(); j != coincident_vertices.cend(); ++j)
                     {
-                        lg << vstr(*j) << " ";
+                        DEBUG_CODE_MASK(lg << vstr(*j) << " ";);
                     }
-                    lg << std::endl;
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg << std::endl;);
+                    DEBUG_CODE_MASK(lg.unindent(););
                 }
 
                 // After gathering the vertices above, we will now collect edges on the face
@@ -4074,32 +4086,37 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // dump info to log
 
-                lg << "boundary edges = " << incident_boundary_edge_count << std::endl;
+                DEBUG_CODE_MASK(lg << "boundary edges = " << incident_boundary_edge_count << std::endl;);
 
-                for (std::vector<ed_t>::const_iterator exterior_edge_iter = incident_edges.cbegin();
-                     exterior_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count;
-                     ++exterior_edge_iter)
-                {
-                    lg.indent();
-                    lg << estr(m0, *exterior_edge_iter) << std::endl; // " ext-edge=" << *exterior_edge_iter << " : " << m0.vertex(*exterior_edge_iter, 0) << " " << m0.vertex(*exterior_edge_iter, 1) << std::endl;
-                    lg.unindent();
+                if(lg.verbose()){
+                    for (std::vector<ed_t>::const_iterator exterior_edge_iter = incident_edges.cbegin();
+                        exterior_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count;
+                        ++exterior_edge_iter)
+                    {
+                        DEBUG_CODE_MASK(lg.indent(););
+                        DEBUG_CODE_MASK(lg << estr(m0, *exterior_edge_iter) << std::endl;); // " ext-edge=" << *exterior_edge_iter << " : " << m0.vertex(*exterior_edge_iter, 0) << " " << m0.vertex(*exterior_edge_iter, 1) << std::endl;);
+                        DEBUG_CODE_MASK(lg.unindent(););
+                    }
                 }
 
                 MCUT_ASSERT(incident_boundary_edge_count >= 3); // minimum is 3 edge which is for a triangle
 
                 const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
-
-                lg << "unfiltered interior edges = " << interior_edges_on_face << std::endl;
+#if 0
+                DEBUG_CODE_MASK(lg << "unfiltered interior edges = " << interior_edges_on_face << std::endl;);
 
                 // dump info to log
 
-                for (std::vector<ed_t>::const_iterator interior_edge_iter = incident_edges.cbegin() + incident_boundary_edge_count;
-                     interior_edge_iter != incident_edges.cend();
-                     ++interior_edge_iter)
-                {
-                    lg.indent();
-                    lg << estr(m0, *interior_edge_iter) << std::endl;
-                    lg.unindent();
+                if(lg.verbose()){
+                    for (std::vector<ed_t>::const_iterator interior_edge_iter = incident_edges.cbegin() + incident_boundary_edge_count;
+                        interior_edge_iter != incident_edges.cend();
+                        ++interior_edge_iter)
+                    {
+                        DEBUG_CODE_MASK(lg.indent(););
+                        DEBUG_CODE_MASK(lg << estr(m0, *interior_edge_iter) << std::endl;);
+                        DEBUG_CODE_MASK(lg.unindent(););
+                    }
+
                 }
 
                 MCUT_ASSERT(interior_edges_on_face >= 1); // minimum possible number (i.e. situation of two intersection points)
@@ -4116,7 +4133,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // and these ambiguities come from the fact that we will be using only halfedges to do the tracing.
                 // (See tracing steps below for more context!)
 
-                lg << "filter exterior interior-edges" << std::endl;
+                DEBUG_CODE_MASK(lg << "filter exterior interior-edges" << std::endl;);
 
                 /*
                 Algorithm to remove redundant "exterior interior-edges" from the list of incident edges.
@@ -4270,7 +4287,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // if (!iedge_sets.empty()) {
                 // normally we just get one set
-                lg << "interior edge sets = " << iedge_sets.size() << std::endl;
+                DEBUG_CODE_MASK(lg << "interior edge sets = " << iedge_sets.size() << std::endl;);
                 //}
 
                 MCUT_ASSERT(!iedge_sets.empty()); // can never be empty (one set with one edge at least!)
@@ -4299,7 +4316,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     if (apply_filtering)
                     {
-
                         // b. apply filtering
 
                         // first, we gather all vertices used by iedges in the current set
@@ -4486,7 +4502,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // triangle intersects a tetrahedron source-mesh to cut it in half. When a floating patch
                         // arises, we need to keep all of the edges of the sorted sequence.
                         // (see also below: when we seal connected components)
-                        lg << "skip filtering : interior edge sequence forms loop (floating patch)." << std::endl;
+                        DEBUG_CODE_MASK(lg << "skip filtering : interior edge sequence forms loop (floating patch)." << std::endl;);
                         continue;
                     }
 #else
@@ -4555,13 +4571,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         } while (!iedge_set_vertex_to_iedge_set_edges.empty());
 
                         // dump the sequence to log
-                        lg << "re-ordered edge sequence : ";
+                        DEBUG_CODE_MASK(lg << "re-ordered edge sequence : ";);
 
                         for (std::vector<ed_t>::const_iterator i = iedge_set_sequence.begin(); i != iedge_set_sequence.end(); ++i)
                         {
-                            lg << " <" << *i << ">";
+                            DEBUG_CODE_MASK(lg << " <" << *i << ">";);
                         }
-                        lg << std::endl;
+                        DEBUG_CODE_MASK(lg << std::endl;);
 
                         // Now that we have sorted the sequence, we can then systemically filter out
                         // the exterior interior-edges (which has been our objective so far before clipping).
@@ -4569,7 +4585,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // interior-edge :)
                         // ---------------------------------------------------------------------------------
 
-                        lg << "filtered exterior interior-iedges : ";
+                        DEBUG_CODE_MASK(lg << "filtered exterior interior-iedges : ";);
 
                         // for each edge in the sorted sequence (starting from the second)
                         for (int i = 1; i < (int)iedge_set_sequence.size(); i += 2)
@@ -4580,24 +4596,24 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             MCUT_ASSERT(find_iter != incident_edges.cend()); // the exterior interior-edge should exist because it has not yet been filtered until now
 
-                            lg << " <" << *find_iter << ">";
+                            DEBUG_CODE_MASK(lg << " <" << *find_iter << ">";);
 
                             incident_edges.erase(find_iter); // remove exterior interior-iedge
                         }
-                        lg << std::endl;
+                        DEBUG_CODE_MASK(lg << std::endl;);
 
                     } // end of edge filtering
                 }
 
                 // dump the final set of edges to be used for clipping
 
-                lg << "final edges on face = " << incident_edges.size() << std::endl;
+                DEBUG_CODE_MASK(lg << "final edges on face = " << incident_edges.size() << std::endl;);
 
                 for (std::vector<ed_t>::const_iterator j = incident_edges.cbegin(); j != incident_edges.cend(); ++j)
                 {
-                    lg << estr(m0, *j) << std::endl;
+                    DEBUG_CODE_MASK(lg << estr(m0, *j) << std::endl;);
                 }
-
+#endif
                 //
                 // Now that we have the essential set of edges which describe the clipping, the next step
                 // is to gather the halfedges on the clipped face from these edges.
@@ -4610,7 +4626,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // Thus, we need one more filtering step which will remove these redundant halfedges from
                 // the gather set.
 
-                lg << "gather exterior halfedges on face" << std::endl;
+                DEBUG_CODE_MASK(lg << "gather exterior halfedges on face" << std::endl;);
 
                 std::vector<hd_t> incident_halfedges;
 
@@ -4862,15 +4878,17 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 hd_t current_exterior_halfedge = mesh_t::null_halfedge();
                 hd_t next_exterior_halfedge = first_boundary_halfedge;
-
+                std::vector<ed_t> walked_edges;
+                walked_edges.reserve(incident_edges.size());
                 do
                 {
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
                     current_exterior_halfedge = next_exterior_halfedge;
                     incident_halfedges.push_back(current_exterior_halfedge);
+                    walked_edges.push_back(m0.edge(current_exterior_halfedge));
 
-                    lg << hstr(m0, current_exterior_halfedge) << std::endl;
+                    DEBUG_CODE_MASK(lg << hstr(m0, current_exterior_halfedge) << std::endl;);
 
                     const vd_t current_tgt = m0.target(current_exterior_halfedge);
                     next_exterior_halfedge = mesh_t::null_halfedge(); // reset
@@ -4886,6 +4904,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //}
 
                         const ed_t &edge = *incident_edge_iter;
+#if 0
                         bool edge_walked = std::find_if(
                                                incident_halfedges.cbegin(),
                                                incident_halfedges.cend(),
@@ -4894,7 +4913,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                                    const hd_t h1 = m0.halfedge(edge, 1);
                                                    return (e == h0 || e == h1);
                                                }) != incident_halfedges.cend();
-
+#else
+                        bool edge_walked = std::find(walked_edges.cbegin(), walked_edges.cend(), edge) !=walked_edges.cend(); 
+#endif
                         if (edge_walked)
                         {
                             continue; // skip edge is walked already
@@ -4938,13 +4959,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                     next_exterior_halfedge = h1;
                                 }
 
-                                //lg << "h=" << next_exterior_halfedge << " " << m0.source(next_exterior_halfedge) << ", " << m0.target(next_exterior_halfedge) << std::endl;
+                                //DEBUG_CODE_MASK(lg << "h=" << next_exterior_halfedge << " " << m0.source(next_exterior_halfedge) << ", " << m0.target(next_exterior_halfedge) << std::endl;);
 
                                 break; // found
                             }
                         }
                     }
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg.unindent(););
                 } while (next_exterior_halfedge != mesh_t::null_halfedge() /*first_boundary_halfedge*/);
 
                 MCUT_ASSERT(incident_halfedges.size() >= 3); // minimum i.e. for a triangles!
@@ -4953,17 +4974,20 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 const int exterior_halfedge_count = (int)incident_halfedges.size();
 
-                lg << "exterior halfedges on face = " << exterior_halfedge_count << std::endl;
+                DEBUG_CODE_MASK(lg << "exterior halfedges on face = " << exterior_halfedge_count << std::endl;);
 
                 MCUT_ASSERT(exterior_halfedge_count == incident_boundary_edge_count);
 
                 // Now we are going to also gather interior halfedges (those passing inside the area of "ps_face", and defined only by intersection points
                 // where the src and tgt vertex do not share the same incident ihalfedge in their registry entry.
 
-                for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin(); incident_edge_iter != incident_edges.cend(); ++incident_edge_iter)
+                for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin() + incident_boundary_edge_count; // start from polygon interior edges offset 
+                incident_edge_iter != incident_edges.cend(); 
+                ++incident_edge_iter)
                 {
 
                     const ed_t &edge = (*incident_edge_iter);
+                    #if 0
                     const vd_t v0 = m0.vertex(edge, 0);
                     const vd_t v1 = m0.vertex(edge, 1);
 
@@ -4998,17 +5022,23 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             incident_halfedges.push_back(h1);
                         }
                     }
+                    #else
+                    const hd_t h0 = m0.halfedge(edge, 0);
+                    const hd_t h1 = m0.halfedge(edge, 1);
+                        incident_halfedges.push_back(h0);
+                            incident_halfedges.push_back(h1);
+                    #endif
                 }
 
                 // dump
                 if (input.verbose)
                 {
-                    lg << "halfedges on face : ";
+                    DEBUG_CODE_MASK(lg << "halfedges on face : ";);
                     for (std::vector<hd_t>::const_iterator j = incident_halfedges.cbegin(); j != incident_halfedges.cend(); ++j)
                     {
-                        lg << " <" << *j << ">";
+                        DEBUG_CODE_MASK(lg << " <" << *j << ">";);
                     }
-                    lg << std::endl;
+                    DEBUG_CODE_MASK(lg << std::endl;);
                 }
 
                 // Note: at this stage, we have all the halfedges that we need to trace child polygons.
@@ -5032,17 +5062,17 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     MCUT_ASSERT(incident_halfedges_to_be_walked.size() >= 2);
 
-                    lg << "polygon " << m0_polygons.size() + child_polygons.size() << std::endl;
+                    DEBUG_CODE_MASK(lg << "polygon " << m0_polygons.size() + child_polygons.size() << std::endl;);
 
                     bool is_valid_polygon = false;
                     do
                     { // each iteration walks a halfedge to incremetally trace a child polygon
-                        lg.indent();
+                        DEBUG_CODE_MASK(lg.indent(););
 
                         // 1. update state
                         current_halfedge = next_halfedge;
 
-                        lg << hstr(m0, current_halfedge) << std::endl;
+                        DEBUG_CODE_MASK(lg << hstr(m0, current_halfedge) << std::endl;);
 
                         child_polygon.push_back(current_halfedge);
                         const vd_t current_halfedge_target = m0.target(current_halfedge);
@@ -5069,7 +5099,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 if (current_halfedge != m0.opposite(child_polygon.front()))
                                 {
                                     is_valid_polygon = true;
-                                    lg.unindent();
+                                    DEBUG_CODE_MASK(lg.unindent(););
                                     break;
                                 }
                                 else
@@ -5127,7 +5157,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                     if (std::find(child_polygon.cbegin(), child_polygon.cend(), premptive_next) != child_polygon.cend())
                                     {
                                         is_valid_polygon = true;
-                                        lg.unindent();
+                                        DEBUG_CODE_MASK(lg.unindent(););
                                         break;
                                     }
                                 }
@@ -5193,12 +5223,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         }
 
                         next_halfedge = prime_candidate;
-                        lg.unindent();
+                        DEBUG_CODE_MASK(lg.unindent(););
                     } while (next_halfedge != mesh_t::null_halfedge());
 
                     if (is_valid_polygon)
                     {
-                        lg << "valid" << std::endl;
+                        DEBUG_CODE_MASK(lg << "valid" << std::endl;);
 
                         const int poly_idx = (int)(m0_polygons.size() + child_polygons.size());
                         if (ps_is_cutmesh_face(ps_face, sm_face_count))
@@ -5218,7 +5248,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 } while (!incident_halfedges_to_be_walked.empty());
             } // if (!is_intersecting_ps_face) {
 
-            lg << "traced polygons on face = " << child_polygons.size() << std::endl;
+            DEBUG_CODE_MASK(lg << "traced polygons on face = " << child_polygons.size() << std::endl;);
 
             m0_polygons.insert(m0_polygons.end(), child_polygons.cbegin(), child_polygons.cend());
 
@@ -5227,8 +5257,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 traced_sm_polygon_count += (int)child_polygons.size();
             }
 
-            lg.unindent();
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
+            DEBUG_CODE_MASK(lg.unindent(););
         } // for each ps-face to trace
 
         TIME_PROFILE_END(); // &&&&&
@@ -5255,7 +5285,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // cutting algorithm i.e when duplicating intersection points, creating cut-mesh patches, stitching (hole
         // filling), and more.
 
-        lg << "traced polygons = " << m0_polygons.size() << " (source-mesh = " << traced_sm_polygon_count << ")" << std::endl;
+        DEBUG_CODE_MASK(lg << "traced polygons = " << m0_polygons.size() << " (source-mesh = " << traced_sm_polygon_count << ")" << std::endl;);
 
         MCUT_ASSERT((int)m0_polygons.size() >= ps.number_of_faces());
 
@@ -5285,7 +5315,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // mesh rules (to avoid potentially crashing the program due to logic error).
         //
 
-        lg << "dump traced-polygons if possible" << std::endl;
+        DEBUG_CODE_MASK(lg << "dump traced-polygons if possible" << std::endl;);
 
         bool all_cutpaths_are_circular = (num_explicit_circular_cutpaths == num_explicit_cutpath_sequences);
 
@@ -5471,7 +5501,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Map each halfedge to the traced polygons that uses it
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "map halfedges to polygons" << std::endl;
+        DEBUG_CODE_MASK(lg << "map halfedges to polygons" << std::endl;);
 
         // We now need to manually maintain halfedge incidence (i.e. "used-by") information since
         // the traced-polygon connectivity is not stored inside our halfedge mesh data structure.
@@ -5499,7 +5529,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const traced_polygon_t &traced_polygon = *traced_polygon_iter;
             const int traced_polygon_index = (int)std::distance(m0_polygons.cbegin(), traced_polygon_iter);
 
-            lg << "polygon = " << traced_polygon_index << " :";
+            DEBUG_CODE_MASK(lg << "polygon = " << traced_polygon_index << " :";);
 
             // for each halfedge in polygon
             for (traced_polygon_t::const_iterator traced_polygon_halfedge_iter = traced_polygon.cbegin();
@@ -5509,7 +5539,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 const hd_t &traced_polygon_halfedge = *traced_polygon_halfedge_iter;
 
-                lg << " " << hstr(m0, traced_polygon_halfedge);
+                DEBUG_CODE_MASK(lg << " " << hstr(m0, traced_polygon_halfedge););
 
                 std::pair<std::map<hd_t, std::vector<int>>::iterator, bool> pair = m0_h_to_ply.insert(std::make_pair(traced_polygon_halfedge, std::vector<int>()));
 
@@ -5522,19 +5552,19 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 pair.first->second.push_back(traced_polygon_index);
                 MCUT_ASSERT(pair.first->second.size() <= 2);
             }
-            lg << std::endl;
+            DEBUG_CODE_MASK(lg << std::endl;);
         }
 
 #if 0
     // dump
     for (std::map<hd_t, std::vector<int>>::const_iterator i = m0_h_to_ply.cbegin(); i != m0_h_to_ply.cend(); ++i) {
-        lg << "halfedge " << i->first << ": ";
+        DEBUG_CODE_MASK(lg << "halfedge " << i->first << ": ";);
         for (std::vector<int>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
-            lg.indent();
-            lg << " <" << *j << ">";
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.indent(););
+            DEBUG_CODE_MASK(lg << " <" << *j << ">";);
+            DEBUG_CODE_MASK(lg.unindent(););
         }
-        lg << std::endl;
+        DEBUG_CODE_MASK(lg << std::endl;);
     }
 #endif
 
@@ -5559,7 +5589,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         if (explicit_cutpaths_making_holes.size() > 0)
         { // atleast one cut-path makes a hole to be sealed later
-            lg << "find known exterior cut-mesh polygons" << std::endl;
+            DEBUG_CODE_MASK(lg << "find known exterior cut-mesh polygons" << std::endl;);
 
             // for each traced cut-mesh polygon
 
@@ -6229,7 +6259,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
       x - intersection-vertex/point
     */
 
-        lg << "transform intersection-halfedges" << std::endl;
+        DEBUG_CODE_MASK(lg << "transform intersection-halfedges" << std::endl;);
 
         // This data structure will map the descriptors of intersection-halfedges in "m0"
         // to their descriptor in "m1". Thus, some halfedges (in "m0") will be mapped to
@@ -6353,7 +6383,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         do
         {
-            lg << "SCBS iteration: " << ++strongly_connected_sm_boundary_seq_iter_id << std::endl;
+            DEBUG_CODE_MASK(lg << "SCBS iteration: " << ++strongly_connected_sm_boundary_seq_iter_id << std::endl;);
 
             MCUT_ASSERT((m0_1st_sm_ihe_fiter != m0_sm_ihe_to_flag.end())); // their must be at least one halfedge from which we can start walking!
 
@@ -6364,14 +6394,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             do
             {
 
-                lg.indent();
+                DEBUG_CODE_MASK(lg.indent(););
 
                 hd_t m0_cur_h = mesh_t::null_halfedge();
                 // get first intersection halfedge which determine's the first polygon of the current SCBS.
                 // Note that the current SCBS is determined implicitely from this initial intersection halfedge.
                 const hd_t seq_init_ihe = m0_ox_hlist.back();
 
-                lg << "first SCBS halfedge  = " << seq_init_ihe << std::endl;
+                DEBUG_CODE_MASK(lg << "first SCBS halfedge  = " << seq_init_ihe << std::endl;);
 
                 m0_ox_hlist.pop_back(); // remove "seq_init_ihe" from queue
                 hd_t m0_nxt_h = seq_init_ihe;
@@ -6382,10 +6412,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 do
                 { // process ih sequence starting from "seq_init_ihe"
 
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
                     m0_cur_h = m0_nxt_h; // current
-                    lg << "curr(m0)  = " << hstr(m0, m0_cur_h) << std::endl;
+                    DEBUG_CODE_MASK(lg << "curr(m0)  = " << hstr(m0, m0_cur_h) << std::endl;);
                     m0_nxt_h = m0.next(m0_cur_h); // next
 
                     const vd_t m0_cur_h_src = m0.source(m0_cur_h);
@@ -6498,7 +6528,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     if (!m0_cur_h_is_exterior || (m0_cur_h_is_exterior && m0_to_m1_ihe.find(m0_cur_h) == m0_to_m1_ihe.cend()))
                     {
 
-                        lg << "create edge = " << estr(m1_cur_h_src, m1_cur_h_tgt) << std::endl;
+                        DEBUG_CODE_MASK(lg << "create edge = " << estr(m1_cur_h_src, m1_cur_h_tgt) << std::endl;);
 
                         // create processed version (i.e. "m1" version) of "m0_cur_h"
                         hd_t m1_cur_h = m1.add_edge(m1_cur_h_src, m1_cur_h_tgt);
@@ -6577,7 +6607,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         MCUT_ASSERT(m0_to_m1_ihe.find(m0_cur_h) != m0_to_m1_ihe.cend());
                         const hd_t m1_cur_h = m0_to_m1_ihe.at(m0_cur_h);
 
-                        lg << "recycled halfedge = " << hstr(m1, m1_cur_h) << std::endl;
+                        DEBUG_CODE_MASK(lg << "recycled halfedge = " << hstr(m1, m1_cur_h) << std::endl;);
                     }
 
                     //
@@ -6609,14 +6639,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     m0_sm_ihe_to_flag.at(m0_cur_h) = true; // mark as "processed"
 
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg.unindent(););
                 } while (
                     // "next" is ihalfedge
                     (m0_is_intersection_point(m0.source(m0_nxt_h), ps_vtx_cnt) || m0_is_intersection_point(m0.target(m0_nxt_h), ps_vtx_cnt)) &&
                     // "next" is not transformed. For case when ihalfedge-sequence forms a loop.
                     m0_sm_ihe_to_flag.at(m0_nxt_h) == false); // TODO: I think this last condition is the same as "m0_nxt_h" == "seq_init_ihe" (try it bcz using m0_sm_ihe_to_flag will be slower)
 
-                lg.unindent();
+                DEBUG_CODE_MASK(lg.unindent(););
             } while (!m0_ox_hlist.empty());
 
             //
@@ -6702,10 +6732,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
 #if 0
     // dump
-    lg << "m0 to m1 ihalfedge" << std::endl;
+    DEBUG_CODE_MASK(lg << "m0 to m1 ihalfedge" << std::endl;);
 
     for (std::map<hd_t, hd_t>::const_iterator i = m0_to_m1_ihe.cbegin(); i != m0_to_m1_ihe.cend(); ++i) {
-        lg << "<" << i->first << ", " << i->second << ">" << std::endl;
+        DEBUG_CODE_MASK(lg << "<" << i->first << ", " << i->second << ">" << std::endl;);
     }
 #endif
 
@@ -6901,9 +6931,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         if (proceed_to_fill_holes == false)
         {
-            lg << "no holes to fill" << std::endl;
+            DEBUG_CODE_MASK(lg << "no holes to fill" << std::endl;);
 
-            lg << "end" << std::endl;
+            DEBUG_CODE_MASK(lg << "end" << std::endl;);
             return; // exit
         }
 
@@ -7543,13 +7573,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 }
             }
 
-            lg << "patch-graph adjacency matrix:\n"
-               << scs_adj_matrix << std::endl;
+            DEBUG_CODE_MASK(lg << "patch-graph adjacency matrix:\n"
+               << scs_adj_matrix << std::endl;);
 
             const math::matrix_t scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
 
-            lg << "squared:\n"
-               << scs_adj_matrix_sqrd << std::endl;
+            DEBUG_CODE_MASK(lg << "squared:\n"
+               << scs_adj_matrix_sqrd << std::endl;);
 
             const bool is_1st_colored_scs = (cur_scs_1st_patch_idx == 0); // the first scs whose patches/nodes are to be colored
 
@@ -7762,7 +7792,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         if (partial_cut_detected)
         {
-            lg << "save non-duplicate intersection points" << std::endl;
+            DEBUG_CODE_MASK(lg << "save non-duplicate intersection points" << std::endl;);
             //
             // Here we save the cut-mesh border vertices (non-intersection points) which
             // are on the interior (inside) of the src-mesh.
@@ -8009,7 +8039,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             {
 
                                 const int &poly_idx = m0_h_to_ply.at(opp_of_next_of_opp_of_cur_he).front(); // NOTE: class-2 or class-1 ihalfedges are incident to only one polygon
-                                // lg << "poly_idx=" << poly_idx << std::endl;
+                                // DEBUG_CODE_MASK(lg << "poly_idx=" << poly_idx << std::endl;);
                                 next_he_poly_iter = m0_polygons.cbegin() + (poly_idx);
                                 MCUT_ASSERT(next_he_poly_iter != m0_polygons.cend());
                                 const traced_polygon_t &poly = *next_he_poly_iter;
@@ -8041,7 +8071,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Infer patch location (inside/outside) based on graph coloring
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "infer patch locations" << std::endl;
+        DEBUG_CODE_MASK(lg << "infer patch locations" << std::endl;);
 
         //
         // Here we will now explicitly association location information to the graph
@@ -8188,22 +8218,22 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //m0_cm_poly_to_patch_idx.clear();
 
         // dump
-        lg << "color label values (dye)" << std::endl;
-        lg.indent();
+        DEBUG_CODE_MASK(lg << "color label values (dye)" << std::endl;);
+        DEBUG_CODE_MASK(lg.indent(););
         for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin(); color_to_ccw_patches_iter != color_to_patch.cend(); ++color_to_ccw_patches_iter)
         {
             const char color_label = color_to_ccw_patches_iter->first;
             const cut_surface_patch_location_t color_label_dye = patch_color_label_to_location.at(color_label);
 
-            lg << (char)color_label << "=" << (color_label_dye == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << std::endl;
+            DEBUG_CODE_MASK(lg << (char)color_label << "=" << (color_label_dye == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << std::endl;);
         }
-        lg.unindent();
+        DEBUG_CODE_MASK(lg.unindent(););
 
         ///////////////////////////////////////////////////////////////////////////
         // Create reverse patches
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "create reversed patches" << std::endl;
+        DEBUG_CODE_MASK(lg << "create reversed patches" << std::endl;);
 
         const int traced_polygon_count = (int)m0_polygons.size(); // does not include the reversed cut-mesh polygons
 
@@ -8221,18 +8251,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             >
             patch_to_opposite;
 
-        lg << "color tags = " << color_to_patch.size() << std::endl;
+        DEBUG_CODE_MASK(lg << "color tags = " << color_to_patch.size() << std::endl;);
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin();
              color_to_ccw_patches_iter != color_to_patch.cend();
              ++color_to_ccw_patches_iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             const char color_id = color_to_ccw_patches_iter->first;
 
-            lg << "color = " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
+            DEBUG_CODE_MASK(lg << "color = " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
 
             // add entry
             MCUT_ASSERT(color_to_cw_patch.count(color_to_ccw_patches_iter->first) == 0);
@@ -8244,18 +8274,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // list of reversed patches with current color
             std::vector<int> &cw_patch_color = color_to_cw_patch.at(color_to_ccw_patches_iter->first);
 
-            lg << "patch count = " << color_to_ccw_patches_iter->second.size() << std::endl;
+            DEBUG_CODE_MASK(lg << "patch count = " << color_to_ccw_patches_iter->second.size() << std::endl;);
 
             // for each patch with current color
             for (std::vector<int>::const_iterator patch_iter = color_to_ccw_patches_iter->second.cbegin();
                  patch_iter != color_to_ccw_patches_iter->second.cend();
                  ++patch_iter)
             {
-                lg.indent();
+                DEBUG_CODE_MASK(lg.indent(););
 
                 const int patch_idx = *patch_iter;
 
-                lg << "patch = " << patch_idx << " (normal)" << std::endl;
+                DEBUG_CODE_MASK(lg << "patch = " << patch_idx << " (normal)" << std::endl;);
 
                 const std::vector<int> &patch = patches.at(patch_idx);
 
@@ -8269,7 +8299,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 patch_to_opposite[patch_idx] = cw_patch_idx;
                 patch_to_opposite[cw_patch_idx] = patch_idx;
 
-                lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;
+                DEBUG_CODE_MASK(lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;);
 
                 MCUT_ASSERT(patches.count(cw_patch_idx) == 0);
                 patches[cw_patch_idx] = std::vector<int>();
@@ -8298,12 +8328,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 for (int ccw_patch_iter = 0; ccw_patch_iter < initial_patch_size; ++ccw_patch_iter)
                 {
 
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
                     // get the polygon index
                     const int ccw_patch_poly_idx = patch.at(ccw_patch_iter);
 
-                    lg << "polygon = " << ccw_patch_poly_idx << " (normal)" << std::endl;
+                    DEBUG_CODE_MASK(lg << "polygon = " << ccw_patch_poly_idx << " (normal)" << std::endl;);
 
                     // all polygon are stored in the same array so we can use that to deduce
                     // index of new reversed polygon
@@ -8391,16 +8421,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             cw_poly.push_back(tmp.at(index));
                         }
 
-                        lg << "polygon = " << cw_poly_idx << " (reversed)" << std::endl;
+                        DEBUG_CODE_MASK(lg << "polygon = " << cw_poly_idx << " (reversed)" << std::endl;);
 
-                        lg.indent();
+                        DEBUG_CODE_MASK(lg.indent(););
                         {
                             for (traced_polygon_t::const_iterator cw_poly_he_iter = cw_poly.cbegin(); cw_poly_he_iter != cw_poly.cend(); ++cw_poly_he_iter)
                             {
-                                lg << *cw_poly_he_iter << " <" << m0.source(*cw_poly_he_iter) << ", " << m0.target(*cw_poly_he_iter) << ">" << std::endl;
+                                DEBUG_CODE_MASK(lg << *cw_poly_he_iter << " <" << m0.source(*cw_poly_he_iter) << ", " << m0.target(*cw_poly_he_iter) << ">" << std::endl;);
                             }
                         }
-                        lg.unindent();
+                        DEBUG_CODE_MASK(lg.unindent(););
 
                         MCUT_ASSERT(m0.source(cw_poly.front()) == m0.target(cw_poly.back())); // must form loop
 
@@ -8424,21 +8454,21 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         m0_to_ps_face[cw_poly_idx] = m0_to_ps_face.at(ccw_patch_poly_idx);
                     }
 
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg.unindent(););
                 }
-                lg.unindent();
+                DEBUG_CODE_MASK(lg.unindent(););
             }
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
         // number of reversed cut-mesh polygons
         const int cw_cs_poly_count = ((int)m0_polygons.size() - traced_polygon_count);
 
-        lg << "reversed cut-mesh polygons = " << cw_cs_poly_count << std::endl;
+        DEBUG_CODE_MASK(lg << "reversed cut-mesh polygons = " << cw_cs_poly_count << std::endl;);
 
         // NOTE: at this stage, all patch polygons (ccw/normal) also have an opposite (cw/reversed)
 
-        lg << "merge normal and reversed patches" << std::endl;
+        DEBUG_CODE_MASK(lg << "merge normal and reversed patches" << std::endl;);
 
         // merge the opposite color_to_patch data structure
 
@@ -8447,11 +8477,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
              color_to_cw_patch_iter != color_to_cw_patch.cend();
              ++color_to_cw_patch_iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             const char color_value = color_to_cw_patch_iter->first;
 
-            lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
+            DEBUG_CODE_MASK(lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
 
             // get reversed patches
             const std::vector<int> &colored_cw_patches = color_to_cw_patch_iter->second;
@@ -8463,59 +8493,57 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // dump
             if (input.verbose)
             {
-                lg << "total patches = " << colored_patches.size() << std::endl;
+                DEBUG_CODE_MASK(lg << "total patches = " << colored_patches.size() << std::endl;);
 
                 for (std::vector<int>::const_iterator colored_patch_iter = colored_patches.cbegin();
                      colored_patch_iter != colored_patches.cend();
                      ++colored_patch_iter)
                 {
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
                     const int patch_idx = *colored_patch_iter;
                     const std::vector<int> &patch = patches.at(patch_idx);
                     const int is_ccw = (int)(std::distance(colored_patches.cbegin(), colored_patch_iter) < (int)(patch.size() / 2));
 
-                    lg << "patch = " << patch_idx << " (" << (is_ccw ? "normal" : "reversed") << ")" << std::endl;
+                    DEBUG_CODE_MASK(lg << "patch = " << patch_idx << " (" << (is_ccw ? "normal" : "reversed") << ")" << std::endl;);
 
-                    lg.indent();
-                    lg << "polygons=" << patch.size() << " :";
+                    DEBUG_CODE_MASK(lg.indent(););
+                    DEBUG_CODE_MASK(lg << "polygons=" << patch.size() << " :";);
                     for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter)
                     {
-
-                        lg << " " << *patch_poly_iter;
+                        DEBUG_CODE_MASK(lg << " " << *patch_poly_iter;);
                     }
-                    lg << std::endl;
-                    lg.unindent();
-
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg << std::endl;);
+                    DEBUG_CODE_MASK(lg.unindent(););
+                    DEBUG_CODE_MASK(lg.unindent(););
                 }
             }
 
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
         ///////////////////////////////////////////////////////////////////////////
         // save the patches into the output
         ///////////////////////////////////////////////////////////////////////////
 
-        lg << "save patch meshes" << std::endl;
+        DEBUG_CODE_MASK(lg << "save patch meshes" << std::endl;);
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_patches_iter = color_to_patch.cbegin();
              color_to_patches_iter != color_to_patch.cend();
              ++color_to_patches_iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             const char color_id = color_to_patches_iter->first;
-            lg << "color=" << (char)color_id << std::endl;
+            DEBUG_CODE_MASK(lg << "color=" << (char)color_id << std::endl;);
 
             // for each patch with current color
             for (std::vector<int>::const_iterator patch_iter = color_to_patches_iter->second.cbegin();
                  patch_iter != color_to_patches_iter->second.cend();
                  ++patch_iter)
             {
-                lg.indent();
+                DEBUG_CODE_MASK(lg.indent(););
                 const int cur_patch_idx = *patch_iter;
 
                 const cut_surface_patch_location_t &patch_location = patch_color_label_to_location.at(color_id);
@@ -8536,7 +8564,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     >
                     m0_to_patch_mesh_vertex;
 
-                lg << "patch -  " << cur_patch_idx << std::endl;
+                DEBUG_CODE_MASK(lg << "patch -  " << cur_patch_idx << std::endl;);
 
                 // NOTE: ccw/normal patches are created before their reversed counterparts (hence the modulo Operator trick)
 
@@ -8545,7 +8573,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const cut_surface_patch_winding_order_t patch_descriptor = is_ccw_patch ? cut_surface_patch_winding_order_t::DEFAULT : cut_surface_patch_winding_order_t::REVERSE;
                 const std::string cs_patch_descriptor_str = to_string(patch_descriptor);
 
-                lg << "is " << cs_patch_descriptor_str << " patch" << std::endl;
+                DEBUG_CODE_MASK(lg << "is " << cs_patch_descriptor_str << " patch" << std::endl;);
 
                 // get the patch's polygons
                 const std::vector<int> &patch = patches.at(cur_patch_idx);
@@ -8695,9 +8723,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 {
                     output.outside_patches[patch_descriptor].emplace_back(std::move(omi));
                 }
-                lg.unindent();
+                DEBUG_CODE_MASK(lg.unindent(););
             }
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
         if (false == (input.keep_fragments_below_cutmesh ||                                                   //
@@ -8721,34 +8749,34 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // whether each reversed patch is a floating patch or not. We will use this
         // information during stitching
         //
-        lg << "calculate reversed-patch seed variables" << std::endl;
+        DEBUG_CODE_MASK(lg << "calculate reversed-patch seed variables" << std::endl;);
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_cw_patch_iter = color_to_cw_patch.cbegin();
              color_to_cw_patch_iter != color_to_cw_patch.cend();
              ++color_to_cw_patch_iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             const char color_value = color_to_cw_patch_iter->first;
 
-            lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
+            DEBUG_CODE_MASK(lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
 
             // get the reversed patch of the current color
             const std::vector<int> &colored_cw_patches = color_to_cw_patch_iter->second;
 
-            lg << "patches = " << colored_cw_patches.size() << std::endl;
+            DEBUG_CODE_MASK(lg << "patches = " << colored_cw_patches.size() << std::endl;);
 
             // for each patch
             for (std::vector<int>::const_iterator colored_cw_patch_iter = colored_cw_patches.cbegin();
                  colored_cw_patch_iter != colored_cw_patches.cend();
                  ++colored_cw_patch_iter)
             {
-                lg.indent();
+                DEBUG_CODE_MASK(lg.indent(););
 
                 const int cw_patch_idx = *colored_cw_patch_iter;
 
-                lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;
+                DEBUG_CODE_MASK(lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;);
 
                 // get patch polygons
                 //const std::vector<int>& cw_patch = patches.at(cw_patch_idx);
@@ -8776,7 +8804,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // opposite halfedge of the seed interior intersection halfedge of the opposite ccw/normal patch
                 const hd_t ccw_patch_seed_interior_ihalfedge_opp = m0.opposite(ccw_patch_seed_interior_ihalfedge);
 
-                lg << "seed interior intersection-halfedge = " << ccw_patch_seed_interior_ihalfedge_opp << std::endl;
+                DEBUG_CODE_MASK(lg << "seed interior intersection-halfedge = " << ccw_patch_seed_interior_ihalfedge_opp << std::endl;);
 
                 // find the reversed polygon which uses "ccw_patch_seed_interior_ihalfedge_opp"
                 // this will be the seed polygon of the current reversed patch
@@ -8799,7 +8827,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // the index of the seed polygon of the current reversed patch
                 const int cw_patch_seed_poly_idx = *find_iter;
 
-                lg << "seed polygon = " << cw_patch_seed_poly_idx << std::endl;
+                DEBUG_CODE_MASK(lg << "seed polygon = " << cw_patch_seed_poly_idx << std::endl;);
 
                 // the patch must contain the polygon
                 MCUT_ASSERT(std::find(patches.at(cw_patch_idx).cbegin(), patches.at(cw_patch_idx).cend(), cw_patch_seed_poly_idx) != patches.at(cw_patch_idx).cend());
@@ -8824,9 +8852,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //MCUT_ASSERT(seed_poly_idx_insertion.second == true);
                 MCUT_ASSERT(patch_to_seed_poly_idx.count(cw_patch_idx) == 1);
 
-                lg.unindent();
+                DEBUG_CODE_MASK(lg.unindent(););
             }
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         }
 
         patch_to_floating_flag.clear(); // free
@@ -8848,7 +8876,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // if the cut-mesh is water-tight)
         //
 
-        lg << "stitch patches" << std::endl;
+        DEBUG_CODE_MASK(lg << "stitch patches" << std::endl;);
 
         TIME_PROFILE_START("Stitching"); // &&&&&
 
@@ -8911,11 +8939,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
              color_to_patches_iter != color_to_patch.cend();
              ++color_to_patches_iter)
         {
-            lg.indent();
+            DEBUG_CODE_MASK(lg.indent(););
 
             const char color_id = color_to_patches_iter->first;
 
-            lg << "color : " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;
+            DEBUG_CODE_MASK(lg << "color : " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
 
             const cut_surface_patch_location_t &location = patch_color_label_to_location.at(color_id);
 
@@ -8998,7 +9026,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                      vd_t  // "m0" cut-mesh ovtx instance
                      > &m1_to_m0_cm_ovtx_colored = colour_to_m1_to_m0_cm_ovtx[color_id];
 
-            lg << "patches : " << color_to_patches_iter->second.size() << std::endl;
+            DEBUG_CODE_MASK(lg << "patches : " << color_to_patches_iter->second.size() << std::endl;);
 
             // keeps track of the total number of cut-mesh polygons for the current color tag (interior/ext)
             int stitched_poly_counter = 0;
@@ -9008,18 +9036,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                  patch_iter != color_to_patches_iter->second.cend();
                  ++patch_iter)
             {
-                lg.indent();
+                DEBUG_CODE_MASK(lg.indent(););
 
                 // get patch index
                 const int cur_patch_idx = *patch_iter;
 
-                lg << "patch = " << cur_patch_idx << std::endl;
+                DEBUG_CODE_MASK(lg << "patch = " << cur_patch_idx << std::endl;);
 
                 // is it a ccw/normal patch i.e. not the cw/reversed version
                 // NOTE: ccw/normal patches are created/traced before reversed counterparts (hence the modulo trick)
                 const bool is_ccw_patch = ((cur_patch_idx % total_ccw_patch_count) == cur_patch_idx);
 
-                lg << "is " << (is_ccw_patch ? "ccw" : "cw") << " patch" << std::endl;
+                DEBUG_CODE_MASK(lg << "is " << (is_ccw_patch ? "ccw" : "cw") << " patch" << std::endl;);
 
                 MCUT_ASSERT(patches.find(cur_patch_idx) != patches.cend());
 
@@ -9094,7 +9122,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // PERSONAL NOTE: this probably requires a visual example to properly understand
                 const hd_t m1_seed_interior_ihe_opp_opp = m1_colored.opposite(m1_seed_interior_ihe_opp); // i.e. m1 instance of m0_patch_seed_poly_he_opp
 
-                lg << "stitch polygon-halfedges of patch" << std::endl;
+                DEBUG_CODE_MASK(lg << "stitch polygon-halfedges of patch" << std::endl;);
 
                 // this queue contains information identifying the patch polygons next-in-queue
                 // to be stitched into the inferred connected component
@@ -9111,7 +9139,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 do
                 {
 
-                    lg.indent();
+                    DEBUG_CODE_MASK(lg.indent(););
 
                     // the first processed/stitched of halfedge the current polygon (our starting point)
                     hd_t m1_cur_patch_cur_poly_1st_he = mesh_t::null_halfedge();
@@ -9121,7 +9149,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // pop element from queue (the next polygon to stitch)
                     std::tie(m1_cur_patch_cur_poly_1st_he, m0_cur_patch_cur_poly_idx, m0_cur_patch_cur_poly_1st_he_idx) = patch_poly_stitching_queue.front();
 
-                    lg << "polygon = " << m0_cur_patch_cur_poly_idx << std::endl;
+                    DEBUG_CODE_MASK(lg << "polygon = " << m0_cur_patch_cur_poly_idx << std::endl;);
 
                     // must be within the range of the traced polygons (include the reversed ones)
                     MCUT_ASSERT(m0_cur_patch_cur_poly_idx < (int)m0_polygons.size());
@@ -9164,14 +9192,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     do
                     { // for each remaining halfedge of current polygon being stitched
 
-                        lg.indent();
+                        DEBUG_CODE_MASK(lg.indent(););
 
                         if (transformed_he_counter == 1)
                         { // are we processing the second halfedge?
                             // log
                             // TODO: proper printing functions
-                            lg << "transform: <" << m0.source(m0_cur_patch_cur_poly_1st_he) << ", " << m0.target(m0_cur_patch_cur_poly_1st_he) << "> - <"
-                               << m1_colored.source(m1_cur_patch_cur_poly_1st_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_1st_he) << ">" << std::endl;
+                            DEBUG_CODE_MASK(lg << "transform: <" << m0.source(m0_cur_patch_cur_poly_1st_he) << ", " << m0.target(m0_cur_patch_cur_poly_1st_he) << "> - <"
+                               << m1_colored.source(m1_cur_patch_cur_poly_1st_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_1st_he) << ">" << std::endl;);
                         }
 
                         // index of current halfedge index to be processed
@@ -9223,7 +9251,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         if (cur_is_last_to_be_transformed)
                         {
 
-                            lg << "last halfedge" << std::endl;
+                            DEBUG_CODE_MASK(lg << "last halfedge" << std::endl;);
 
                             // we can infer the updated version of the target vertex from the halfedge
                             // which is already updated. Update tgt will be the source of the first
@@ -9298,7 +9326,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 use halfedge defined by computed transformed_src and transformed_tgt
                         */
 
-                            lg << "o-->x" << std::endl;
+                            DEBUG_CODE_MASK(lg << "o-->x" << std::endl;);
 
                             // check if opposite halfedge of current is updated. (NOTE: searching only through
                             // the polygons of the current patch)
@@ -9391,7 +9419,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             // the current halfedge will either be interior or exterior.
 
-                            lg << "x-->x" << std::endl;
+                            DEBUG_CODE_MASK(lg << "x-->x" << std::endl;);
 
                             //MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0.source(m0_cur_patch_cur_poly_cur_he)) != m0_ivtx_to_ps_edge.cend());
 
@@ -9418,7 +9446,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             if (is_valid_ambiguious_interior_edge)
                             {
 
-                                lg << "interior" << std::endl;
+                                DEBUG_CODE_MASK(lg << "interior" << std::endl;);
 
                                 MCUT_ASSERT(m0_to_m1_ihe.find(m0_cur_patch_cur_poly_cur_he_opp) != m0_to_m1_ihe.cend());
                                 const hd_t m1_cur_patch_cur_poly_cur_he_opp = m0_to_m1_ihe.at(m0_cur_patch_cur_poly_cur_he_opp);
@@ -9431,7 +9459,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             else
                             { // its an exterior x-->x halfedge
 
-                                lg << "exterior" << std::endl;
+                                DEBUG_CODE_MASK(lg << "exterior" << std::endl;);
 
                                 // look up the transformed "next" by looking finding the
                                 // coincident source-mesh polygon and then getting the transformed instance of "next".
@@ -9472,7 +9500,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         }
                         else
                         { // class 0 or 2 i.e. o-->o or x-->o
-                            lg << "o-->o or x-->o" << std::endl;
+                            DEBUG_CODE_MASK(lg << "o-->o or x-->o" << std::endl;);
                             /*
                             In the following steps, our ability to deduce the correct target vertex instance 
                             by simply checking whether "opp" or "next" is updated before 
@@ -9721,7 +9749,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                                                     const vd_t m0_poly_he_tgt_dupl = m1_colored.add_vertex(m0.vertex(m0_cur_patch_cur_poly_cur_he_tgt));
 
-                                                    lg << "add vertex = " << m0_poly_he_tgt_dupl << std::endl;
+                                                    DEBUG_CODE_MASK(lg << "add vertex = " << m0_poly_he_tgt_dupl << std::endl;);
 
                                                     MCUT_ASSERT(m0_poly_he_tgt_dupl != mesh_t::null_halfedge());
 
@@ -9743,7 +9771,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             //ed_t e = get_computed_edge(/*m1_colored, */ m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
                             //hd_t h = m1_colored.halfedge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
                             ed_t e = m1_colored.edge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt, true);
-                            lg << "edge = " << e << std::endl;
+                            DEBUG_CODE_MASK(lg << "edge = " << e << std::endl;);
 
                             if (e != mesh_t::null_edge())
                             { // if edge already exists
@@ -9763,7 +9791,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             else
                             {
 
-                                lg << "create new edge" << std::endl;
+                                DEBUG_CODE_MASK(lg << "create new edge" << std::endl;);
 
                                 m1_cur_patch_cur_poly_cur_he = m1_colored.add_edge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
                                 // TODO:replace with map (for O(Log N) searches)
@@ -9776,8 +9804,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             }
                         } // if (m1_cur_patch_cur_poly_cur_he == mesh_t::null_halfedge()) {
 
-                        lg << "transform: <" << m0.source(m0_cur_patch_cur_poly_cur_he) << ", " << m0.target(m0_cur_patch_cur_poly_cur_he) << "> - <"
-                           << m1_colored.source(m1_cur_patch_cur_poly_cur_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_cur_he) << ">" << std::endl;
+                        DEBUG_CODE_MASK(lg << "transform: <" << m0.source(m0_cur_patch_cur_poly_cur_he) << ", " << m0.target(m0_cur_patch_cur_poly_cur_he) << "> - <"
+                           << m1_colored.source(m1_cur_patch_cur_poly_cur_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_cur_he) << ">" << std::endl;);
 
                         // halfedge must have been found (created or inferred)
                         MCUT_ASSERT(m1_cur_patch_cur_poly_cur_he != mesh_t::null_halfedge());
@@ -9817,7 +9845,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         patch_to_m1_he.insert(std::make_pair(cur_patch_idx, m1_cur_patch_cur_poly_cur_he));
                         transformed_he_counter += 1; // next halfedge in m0_cur_patch_cur_poly
 
-                        lg.unindent();
+                        DEBUG_CODE_MASK(lg.unindent(););
                     } while (transformed_he_counter != (int)m0_cur_patch_cur_poly.size()); // while not all halfedges of the current polygon have been transformed.
 
                     //
@@ -10166,7 +10194,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     ++global_cm_poly_stitch_counter;
                     stitched_poly_counter++;
 
-                    lg.unindent();
+                    DEBUG_CODE_MASK(lg.unindent(););
                 } while (!patch_poly_stitching_queue.empty()); // for each polygon of patch
 
                 //
@@ -10174,9 +10202,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // So, the current patch has been stitch to a src-mesh fragment
                 //
 
-                lg.unindent();
+                DEBUG_CODE_MASK(lg.unindent(););
             } // for each patch
-            lg.unindent();
+            DEBUG_CODE_MASK(lg.unindent(););
         } // for each color
 
         TIME_PROFILE_END(); // &&&&&
@@ -10199,7 +10227,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // NOTE: At this stage, all patches of the current have been stitched
         //
 
-        lg << "total cut-mesh polygons stitched = " << global_cm_poly_stitch_counter << std::endl;
+        DEBUG_CODE_MASK(lg << "total cut-mesh polygons stitched = " << global_cm_poly_stitch_counter << std::endl;);
 
         bool userWantsFullySealedFragmentsANY = (input.keep_fragments_sealed_inside || input.keep_fragments_sealed_outside);
         bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
@@ -10212,7 +10240,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // create the [fully] sealed meshes defined by the final set of traced polygons
             ///////////////////////////////////////////////////////////////////////////////
 
-            lg << "create final sealed connected components" << std::endl;
+            DEBUG_CODE_MASK(lg << "create final sealed connected components" << std::endl;);
 
             for (std::map<char, std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>>::iterator color_to_separated_CCs_iter = color_to_separated_connected_ccsponents.begin();
                  color_to_separated_CCs_iter != color_to_separated_connected_ccsponents.end();
@@ -10325,9 +10353,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         patch_color_label_to_location.clear(); // free
         color_to_separated_connected_ccsponents.clear();
 
-        lg << "end" << std::endl;
+        DEBUG_CODE_MASK(lg << "end" << std::endl;);
 
-        
         std::cout << "[MCUT PROFILE]: dispatch() : " << ((double)clock() - (double)kernel_time_start) / (double)1000 << "ms"<< std::endl;
 
         return;
