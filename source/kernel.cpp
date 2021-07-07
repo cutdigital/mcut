@@ -306,6 +306,22 @@ namespace mcut
 
         write_off(name.c_str(), mesh);
     }
+    /*
+        dfs(node u)
+            for each node v connected to u :
+                if v is not visited :
+                    visited[v] = true
+                    dfs(v)
+    */
+    void dfs_cc(vd_t u, const mesh_t &mesh, std::map<vd_t, int> &visited, int connected_component_id) {
+        std::vector<vd_t> verts = mesh.get_vertices_around_vertex(u);
+        for(std::vector<vd_t>::const_iterator v = verts.cbegin(); v != verts.cend(); ++v) {
+            if(visited.find(*v) == visited.cend()) {
+                visited[*v] = connected_component_id;
+                dfs_cc(*v, mesh, visited, connected_component_id);
+            }
+        }   
+    }
 
     int find_connected_components(std::map<face_descriptor_t, int> &fccmap, const mesh_t &mesh)
     {
@@ -314,7 +330,8 @@ namespace mcut
         MCUT_ASSERT(mesh.number_of_faces() >= 1);
 
         fccmap.clear();
-
+        
+#if 0
         std::vector<std::vector<mcut::vertex_descriptor_t>> vertex_sets;
         std::map<mcut::vertex_descriptor_t, int> vertex_to_set_index;
 
@@ -412,6 +429,33 @@ namespace mcut
         }
 
         return (int)final_set_index_to_linear_index.size();
+#else
+        /*
+            for each node u:
+                if u is not visited :
+                    visited[u] = true
+                    connected_component += 1
+                    dfs(u)
+        */
+        std::map<vd_t, int> visited; // if vertex does not exist, then its not visited
+        int connected_component_id= -1;
+        for(mesh_t::vertex_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u) {
+            if(visited.empty() || visited.find(*u) == visited.cend()) {
+                connected_component_id += 1;
+                visited[*u] = connected_component_id;
+                dfs_cc(*u, mesh, visited, connected_component_id);
+            }
+        }  
+
+        // map each face to a connected component
+        for (mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f){
+            const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f);                                                        // !NDEBUG
+            // all vertices belong to the same conn comp
+            fccmap[*f] = visited.at(vertices.front());
+        }
+        return connected_component_id+1; // number of CCs
+#endif
+        
     }
 
     struct connected_component_info_t
@@ -9218,8 +9262,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const hd_t m0_cur_patch_cur_poly_cur_he_opp = m0.opposite(m0_cur_patch_cur_poly_cur_he);
                         // target of the current halfedge
                         vd_t m0_cur_patch_cur_poly_cur_he_tgt = m0.target(m0_cur_patch_cur_poly_cur_he);
-                        const bool src_is_ivertex = m0_is_intersection_point(m0.source(m0_cur_patch_cur_poly_cur_he), ps_vtx_cnt);
-                        const bool tgt_is_ivertex = m0_is_intersection_point(m0.target(m0_cur_patch_cur_poly_cur_he), ps_vtx_cnt);
+                        vd_t m0_cur_patch_cur_poly_cur_he_src = m0.source(m0_cur_patch_cur_poly_cur_he);
+                        const bool src_is_ivertex = m0_is_intersection_point(m0_cur_patch_cur_poly_cur_he_src, ps_vtx_cnt);
+                        const bool tgt_is_ivertex = m0_is_intersection_point(m0_cur_patch_cur_poly_cur_he_tgt, ps_vtx_cnt);
 
                         // is the current halfedge the last to be processed in the current polygon?
                         const bool cur_is_last_to_be_transformed = ((transformed_he_counter + 1) == (int)m0_cur_patch_cur_poly.size()); // i.e. current he is last one to be transform
