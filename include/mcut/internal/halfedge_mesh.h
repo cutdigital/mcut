@@ -416,17 +416,18 @@ public:
             bool old_elem_is_removed = false;
 
             do {
-                typename V::const_iterator old_elem = V::const_iterator::operator++(0); // (i++)
-                old_elem_is_removed = mesh_ptr->is_removed(std::distance(V::cbegin(), old_elem));
+                array_iterator_t<V> old_elem = this->operator++(0); // (i++)
+                element_descriptor_type raw_descriptor = (element_descriptor_type)std::distance(cbegin<>(), old_elem);
+                old_elem_is_removed = mesh_ptr->is_removed(raw_descriptor);
                 if (!old_elem_is_removed) {
                     return old_elem;
                 }
 
                 // keep iterating until the value returned by the (i++) operator returns a valid element
                 // i.e. one that is not marked removed!
-            } while ((*this) != cend<std::remove_reference<decltype(*this)>::type>() && old_elem_is_removed);
+            } while ((*this) != cend<>() && old_elem_is_removed);
 
-            return cend<std::remove_reference<decltype(*this)>::type>();
+            return cend<>();
         }
 
         // prefix increment (++i)
@@ -437,11 +438,11 @@ public:
             bool reached_end = false;
             do {
                 V::const_iterator::operator++(); // (++i)
-                reached_end = (*this) == cend<typename std::remove_reference<decltype(*this)>::type>();
+                reached_end = (*this) == cend<>();
                 cur_elem_is_removed = false;
 
                 if (!reached_end) {
-                    size_t raw_descriptor = std::distance(cbegin(), (*this)); // O(1) ??
+                    size_t raw_descriptor = std::distance(cbegin<>(), (*this)); // O(1) ??
                     cur_elem_is_removed = mesh_ptr->is_removed((vertex_descriptor_t)raw_descriptor );
                     if (!cur_elem_is_removed) {
                         break;
@@ -467,27 +468,39 @@ public:
             typedef T type;
         };
 
-        template <typename I>
+        template <typename I = array_iterator_t<V>>
         I cend()
         {
             return cend(identity<I>()); // https://stackoverflow.com/questions/3052579/explicit-specialization-in-non-namespace-scope
         }
 
-#if 1
+        template <typename I = array_iterator_t<V>>
+        I cbegin()
+        {
+            return cbegin(identity<I>()); 
+        }
+
+#if 0
         static std::ptrdiff_t distance(const array_iterator_t<V>& beg, const array_iterator_t<V>& end)
         {
             array_iterator_t<V> it = beg;
             //typename std::ptrdiff_t dist = (&end) - (&beg);
-            while (it != end) {
-                dist++;
-                ++it;
+            //while (it != end) {
+            //    dist++;
+            //    ++it;
             }
             return dist;
         }
 #endif
     private:
-        template <typename I>
+        template <typename I = array_iterator_t<V>>
         I cend(identity<I>)
+        {
+            return I(); // unused
+        }
+
+        template <typename I = array_iterator_t<V>>
+        I cbegin(identity<I>)
         {
             return I(); // unused
         }
