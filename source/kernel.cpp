@@ -498,12 +498,17 @@ namespace mcut
         const std::map<vd_t /*"m1" ovtx in sm*/, vd_t /*"m0" ovtx in sm*/> &m1_to_m0_sm_ovtx_colored,
         const std::map<vd_t /*"m1" ovtx*/, vd_t /*"m0" ovtx in cm*/> &m1_to_m0_cm_ovtx_colored,
         const std::map<int /*"m0" face idx*/, int /*"m1" face idx*/> &m1_to_m0_face_colored,
-        const std::map<vd_t /*"m0" ovtx*/, vd_t /*"ps" ovtx*/> &m0_to_ps_vtx,
+        //const std::map<vd_t /*"m0" ovtx*/, vd_t /*"ps" ovtx*/> &m0_to_ps_vtx,
+        const std::vector<vd_t> &m0_to_ps_vtx,
         const std::map<int /*"m0" face idx*/, fd_t /*"ps" face*/> &m0_to_ps_face,
-        const std::map<vd_t /*"sm" vtx*/, vd_t /*"ps" vtx*/> &ps_to_sm_vtx,
-        const std::map<fd_t /*"sm" face*/, fd_t /*"ps" face*/> &ps_to_sm_face,
-        const std::map<vd_t /*"cm" vtx*/, vd_t /*"ps" vtx*/> &ps_to_cm_vtx,
-        const std::map<fd_t /*"cs" face*/, fd_t /*"ps" face*/> &ps_to_cm_face,
+        //const std::map<vd_t /*"sm" vtx*/, vd_t /*"ps" vtx*/> &ps_to_sm_vtx,
+        const std::vector<vd_t> &ps_to_sm_vtx,
+        //const std::map<fd_t /*"sm" face*/, fd_t /*"ps" face*/> &ps_to_sm_face,
+        const std::vector<fd_t> &ps_to_sm_face,
+        //const std::map<vd_t /*"cm" vtx*/, vd_t /*"ps" vtx*/> &ps_to_cm_vtx,
+        const std::vector<vd_t> &ps_to_cm_vtx,
+        //const std::map<fd_t /*"cs" face*/, fd_t /*"ps" face*/> &ps_to_cm_face,
+        const std::vector<fd_t> &ps_to_cm_face,
         const int sm_vtx_cnt,
         const int sm_face_count,
         bool popuplate_vertex_maps,
@@ -884,14 +889,14 @@ namespace mcut
 
                         if (vertex_is_in_input_mesh_or_is_intersection_point)
                         {
-                            std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
-                            bool vertex_is_in_input_mesh = m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
+                            //std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
+                            bool vertex_is_in_input_mesh = (int)m0_descr < (int)m0_to_ps_vtx.size();  //m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
                             vd_t input_mesh_descr = mesh_t::null_vertex(); // i.e. source-mesh or cut-mesh
 
                             if (vertex_is_in_input_mesh)
                             {
                                 //MCUT_ASSERT(m0_to_ps_vtx.count(m0_descr) == 1);
-                                const vd_t ps_descr = m0_to_ps_vtx_fiter->second; // m0_to_ps_vtx.at(m0_descr);
+                                const vd_t ps_descr = m0_to_ps_vtx.at(m0_descr); //m0_to_ps_vtx_fiter->second; // m0_to_ps_vtx.at(m0_descr);
                                 // we don't know whether it belongs to cut-mesh patch or source-mesh, so check
                                 const bool is_cutmesh_vtx = ps_is_cutmesh_vertex(ps_descr, sm_vtx_cnt);
                                 if (is_cutmesh_vtx)
@@ -949,14 +954,14 @@ namespace mcut
                         const bool from_cutmesh_face = ps_is_cutmesh_face(ps_descr, sm_face_count);
                         if (from_cutmesh_face)
                         {
-                            MCUT_ASSERT(ps_to_cm_face.count(ps_descr) == 1);
+                            MCUT_ASSERT((int)ps_descr < (int)ps_to_cm_face.size());
                             input_mesh_descr = ps_to_cm_face.at(ps_descr);
                             // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
                             input_mesh_descr = static_cast<fd_t>(input_mesh_descr + sm_face_count);
                         }
                         else
                         {
-                            MCUT_ASSERT(ps_to_sm_face.count(ps_descr) == 1);
+                            MCUT_ASSERT((int)ps_descr < (int)ps_to_sm_face.size());
                             input_mesh_descr = ps_to_sm_face.at(ps_descr);
                         }
 
@@ -1087,7 +1092,8 @@ std::vector<vd_t> get_vertices_on_ps_edge(
         const std::map<hd_t, bool> &m0_sm_ihe_to_flag,
         const std::map<vd_t, std::pair<ed_t, fd_t>> &m0_ivtx_to_intersection_registry_entry,
         const std::map<hd_t, hd_t> &m0_to_m1_ihe,
-        const std::map<vd_t, vd_t> &m0_to_ps_vtx,
+        //const std::map<vd_t, vd_t> &m0_to_ps_vtx,
+        const std::vector<vd_t> &m0_to_ps_vtx,
         const int ps_vtx_cnt,
         const int sm_vtx_cnt,
         const int sm_face_count)
@@ -1731,20 +1737,24 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         mesh_t ps = sm; // copy
 
-        std::map<vd_t, vd_t> ps_to_sm_vtx;
+        //std::map<vd_t, vd_t> ps_to_sm_vtx;
+        std::vector<vd_t> ps_to_sm_vtx(sm_vtx_cnt + cs.number_of_vertices());
         for (mesh_t::vertex_iterator_t v = sm.vertices_begin(); v != sm.vertices_end(); ++v)
         {
             ps_to_sm_vtx[*v] = *v; // one to one mapping since ps is initially a copy of sm!
         }
 
-        std::map<fd_t, fd_t> ps_to_sm_face;
+        //std::map<fd_t, fd_t> ps_to_sm_face;
+        std::vector<fd_t> ps_to_sm_face(sm.number_of_faces() + cs.number_of_faces());
         for (mesh_t::face_iterator_t f = sm.faces_begin(); f != sm.faces_end(); ++f)
         {
             ps_to_sm_face[*f] = *f; // one to one mapping since ps is initially a copy of sm!
         }
 
-        std::map<vd_t, vd_t> cs_to_ps_vtx;
-        std::map<vd_t, vd_t> ps_to_cm_vtx;
+        //std::map<vd_t, vd_t> cs_to_ps_vtx;
+        //std::map<vd_t, vd_t> ps_to_cm_vtx;
+        std::vector<vd_t> cs_to_ps_vtx(cs.number_of_vertices());
+        std::vector<vd_t> ps_to_cm_vtx(sm_vtx_cnt + cs.number_of_vertices());
 
         // merge cm vertices
         for (auto i = cs.vertices_begin(); i != cs.vertices_end(); ++i)
@@ -1753,11 +1763,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             MCUT_ASSERT(v != mesh_t::null_vertex());
 
-            cs_to_ps_vtx.insert(std::make_pair(*i, v));
+            //cs_to_ps_vtx.insert(std::make_pair(*i, v));
+            cs_to_ps_vtx[*i] = v;
             ps_to_cm_vtx[v] = *i;
         }
 
-        std::map<fd_t, fd_t> ps_to_cm_face;
+        //std::map<fd_t, fd_t> ps_to_cm_face;
+        std::vector<fd_t> ps_to_cm_face(sm_face_count + cs_face_count);
 
         // merge cm faces
         for (mesh_t::face_iterator_t i = cs.faces_begin(); i != cs.faces_end(); ++i)
@@ -1804,16 +1816,20 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         mesh_t m0;
 
         // copy ps vertices into the auxilliary mesh (map is used to maintain original vertex order)
-        std::map<vd_t, vd_t> m0_to_ps_vtx;
-        std::map<vd_t, vd_t> ps_to_m0_vtx;
+        //std::map<vd_t, vd_t> m0_to_ps_vtx;
+        std::vector<vd_t> m0_to_ps_vtx; // NOTE: only ps vertices are stored here
+        //std::map<vd_t, vd_t> ps_to_m0_vtx;
+        std::vector<vd_t> ps_to_m0_vtx(sm_vtx_cnt + cs.number_of_vertices());
         for (auto i = ps.vertices_begin(); i != ps.vertices_end(); ++i)
         {
             const vd_t v = m0.add_vertex(ps.vertex(*i));
 
             MCUT_ASSERT(v != mesh_t::null_vertex());
 
-            m0_to_ps_vtx.emplace(v, *i);
-            ps_to_m0_vtx.emplace(*i, v);
+            //m0_to_ps_vtx.emplace(v, *i);
+            m0_to_ps_vtx.emplace_back(*i);
+            //ps_to_m0_vtx.emplace(*i, v);
+            ps_to_m0_vtx[*i] = v;
         }
 
         MCUT_ASSERT(m0.number_of_vertices() == ps.number_of_vertices()); // ... because we have only copied vertices
@@ -1927,6 +1943,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         TIME_PROFILE_END();
 
+        TIME_PROFILE_START("Extract intersecting face list");
         // compute/extract unique list of faces that are tested for intersection
         // These are faces of the src-mesh and cut-mesh
         //--------------------------------------------------------
@@ -1952,10 +1969,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
 
         ps_tested_faces.insert(tested_faces_cm.cbegin(), tested_faces_cm.cend()); // add unique list of cut-mesh faces
-        tested_faces_cm.clear();                                                  // clear (no longer needed)
+        tested_faces_cm.clear();   
+        
+         TIME_PROFILE_END();                                               // clear (no longer needed)
 
+        TIME_PROFILE_START("Compute intersecting face properties");
         // compute/extract geometry properties of each tested face
         //--------------------------------------------------------
+
         std::map<fd_t, math::vec3> ps_tested_face_to_plane_normal;
         std::map<fd_t, math::real_number_t> ps_tested_face_to_plane_normal_d_param;
         std::map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
@@ -1984,6 +2005,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 (int)tested_face_vertices.size());
         }
 
+        TIME_PROFILE_END();
+
         // edge-to-face intersection tests (narrow-phase)
         // -----------------------------------------
 
@@ -1992,6 +2015,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             std::vector<vd_t> // intersection point which involve the intersecting face
             >
             ps_iface_to_ivtx_list; // faces which intersect with another
+
+        // A partial cut intersection exists when there exists at-least one intersection point
+        // whose registry has a halfedge from the cut-surface, where this halfedge is a border halfedge.
+        bool partial_cut_detected = false;
 
         TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
 
@@ -2334,6 +2361,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             ps_iface_to_ivtx_list[tested_edge_h1_face].push_back(new_vertex_descr);
                         }
 
+                        if(partial_cut_detected == false){ // keep checking until true
+                            //const vd_t v0 = ps.vertex(tested_edge, 0);
+                            const bool is_cs_edge = ps_is_cutmesh_vertex(tested_edge_h0_source_descr, sm_vtx_cnt);
+                            // partial_cut_detected = (is_cs_edge && ps.is_border(tested_edge));
+                            bool is_border = (tested_edge_h0_face == mesh_t::null_face() || tested_edge_h1_face == mesh_t::null_face());
+                            partial_cut_detected = (is_cs_edge && is_border);
+                        }
+
                     } // if (have_point_in_polygon)
 
                     DEBUG_CODE_MASK(lg.unindent(););
@@ -2349,6 +2384,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             MCUT_ASSERT((int)iter->second.size() >= 2); // edge-case scenario: an edge intersects with another edge exactly
         }
 #endif
+
+        DEBUG_CODE_MASK(lg << "partial cut = " << std::boolalpha << partial_cut_detected << std::endl;);
 
         // Create edges from the new intersection points
         // ---------------------------------------------
@@ -2380,14 +2417,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         TIME_PROFILE_END();
 
         DEBUG_CODE_MASK(lg << "total intersection-points = " << m0_ivtx_to_intersection_registry_entry.size() << std::endl;);
-
-        // A partial cut intersection exists when there exists at-least one intersection point
-        // whose registry has a halfedge from the cut-surface, where this halfedge is a border halfedge.
-        bool partial_cut_detected = false;
-
+#if 0
         for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator entry_it = m0_ivtx_to_intersection_registry_entry.cbegin(); entry_it != m0_ivtx_to_intersection_registry_entry.cend(); ++entry_it)
         {
-
             //const vd_t& ipoint_descr = entry_it->first;
             const ed_t &ipoint_iedge = entry_it->second.first;
             const vd_t v0 = ps.vertex(ipoint_iedge, 0);
@@ -2406,9 +2438,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // }
             //}
         }
-
-        DEBUG_CODE_MASK(lg << "partial cut = " << std::boolalpha << partial_cut_detected << std::endl;);
-
+#endif
+        
         if (partial_cut_detected && cm_border_reentrant_ivtx_list.size() == 0)
         {
             // can happen with case when both the input mesh and cut surface are not watertight
@@ -3308,7 +3339,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 continue;
             }
 
-            MCUT_ASSERT(cutpath_idx < m0_cutpath_sequences.size());
+            MCUT_ASSERT(cutpath_idx < (int)m0_cutpath_sequences.size());
             const std::vector<ed_t> &cutpath_sequence = m0_cutpath_sequences.at(cutpath_idx);
 
             MCUT_ASSERT(cutpath_sequence.size() >= 3); // triangle
@@ -3524,9 +3555,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const vd_t ps_v0 = ps.vertex(iter_ps_edge->first, 0);
                 const vd_t ps_v1 = ps.vertex(iter_ps_edge->first, 1);
 
-                MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+                MCUT_ASSERT((int)(ps_v0) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend())*/);
                 const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-                MCUT_ASSERT(ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend());
+                MCUT_ASSERT((int)(ps_v1) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend()*/);
                 const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
                 std::vector<vd_t> vertices_on_ps_edge = {m0_v0, m0_v1};
 
@@ -3735,9 +3766,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const vd_t ps_v0 = ps.vertex(ps_edge, 0);
             const vd_t ps_v1 = ps.vertex(ps_edge, 1);
 
-            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend());
+            MCUT_ASSERT((int)(ps_v0) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend())*/);
             const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
-            MCUT_ASSERT(ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend());
+            MCUT_ASSERT((int)(ps_v1) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend()*/);
             const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
 
             std::vector<vd_t> vertices_on_ps_edge = {ps_v0, ps_v1}; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
@@ -3948,9 +3979,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     const vd_t ps_h_src = ps.source(*hbegin);
                     const vd_t ps_h_tgt = ps.target(*hbegin);
 
-                    MCUT_ASSERT(ps_to_m0_vtx.find(ps_h_src) != ps_to_m0_vtx.cend());
+                    MCUT_ASSERT((int)(ps_h_src) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_h_src) != ps_to_m0_vtx.cend()*/);
                     const vd_t m0_h_src = ps_to_m0_vtx.at(ps_h_src);
-                    MCUT_ASSERT(ps_to_m0_vtx.find(ps_h_tgt) != ps_to_m0_vtx.cend());
+                    MCUT_ASSERT((int)(ps_h_tgt) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_h_tgt) != ps_to_m0_vtx.cend()*/);
                     const vd_t m0_h_tgt = ps_to_m0_vtx.at(ps_h_tgt);
                     //std::vector<vd_t> vertices_on_ps_edge = {m0_v0, m0_v1};
 
@@ -4031,7 +4062,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     //    });
                     const vd_t ps_v = ps_coincident_vertices.at(i);
                     
-                    MCUT_ASSERT(ps_to_m0_vtx.find(ps_v) != ps_to_m0_vtx.cend());
+                    MCUT_ASSERT((int)(ps_v) < (int)ps_to_m0_vtx.size()/*ps_to_m0_vtx.find(ps_v) != ps_to_m0_vtx.cend()*/);
                     const vd_t m0_v = ps_to_m0_vtx.at(ps_v);
 
                     //MCUT_ASSERT(m0_to_ps_vtx_fiter != m0_to_ps_vtx.end());
@@ -5490,13 +5521,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 }
 
                                 const vd_t m0_descr = *v; // ... because the vertex list in "merged" is the same as "m0"
-                                std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
-                                bool is_ps_vertex = m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
+                                //std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
+                                bool is_ps_vertex = (int)m0_descr < (int)m0_to_ps_vtx.size(); //m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
                                 vd_t cm_descr = mesh_t::null_vertex();
                                 if (is_ps_vertex)
                                 {
-                                    vd_t ps_descr = m0_to_ps_vtx_fiter->second;
-                                    MCUT_ASSERT(ps_to_cm_vtx.count(ps_descr) == 1);
+                                    vd_t ps_descr = m0_to_ps_vtx.at(m0_descr);//m0_to_ps_vtx_fiter->second;
+                                    MCUT_ASSERT((int)ps_descr < (int)ps_to_cm_vtx.size()/*ps_to_cm_vtx.count(ps_descr) == 1*/);
                                     cm_descr = ps_to_cm_vtx.at(ps_descr);
 
                                     // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
@@ -6072,13 +6103,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 { // x-->o
 
                     // get the polygon-soup version of tgt descriptor
-                    std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_find_v1_iter = std::find_if(
-                        m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
-                        [&](const std::pair<vd_t, vd_t> &e) { return e.first == v1; });
+                    //std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_find_v1_iter = std::find_if(
+                    //    m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
+                    //    [&](const std::pair<vd_t, vd_t> &e) { return e.first == v1; });
 
-                    MCUT_ASSERT(m0_to_ps_vtx_find_v1_iter != m0_to_ps_vtx.cend());
+                    MCUT_ASSERT((int)v1 < (int)m0_to_ps_vtx.size()/*m0_to_ps_vtx_find_v1_iter != m0_to_ps_vtx.cend()*/);
 
-                    const vd_t &ps_v1 = m0_to_ps_vtx_find_v1_iter->second;
+                    const vd_t &ps_v1 = m0_to_ps_vtx.at(v1);//m0_to_ps_vtx_find_v1_iter->second;
 
                     if (ps_is_cutmesh_vertex(ps_v1, sm_vtx_cnt))
                     { // is it a cut-mesh vertex..?
@@ -6089,13 +6120,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 if (!v0_is_ivtx && v1_is_ivtx)
                 { // o-->x
-                    std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_find_v0_iter = std::find_if(
-                        m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
-                        [&](const std::pair<vd_t, vd_t> &e) { return e.first == v0; });
+                    //std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_find_v0_iter = std::find_if(
+                    //    m0_to_ps_vtx.cbegin(), m0_to_ps_vtx.cend(),
+                    //    [&](const std::pair<vd_t, vd_t> &e) { return e.first == v0; });
 
-                    MCUT_ASSERT(m0_to_ps_vtx_find_v0_iter != m0_to_ps_vtx.cend());
+                    MCUT_ASSERT((size_t)v0 < m0_to_ps_vtx.size());// m0_to_ps_vtx_find_v0_iter != m0_to_ps_vtx.cend());
 
-                    const vd_t &ps_v0 = m0_to_ps_vtx_find_v0_iter->second;
+                    const vd_t &ps_v0 = m0_to_ps_vtx.at(v0);//m0_to_ps_vtx_find_v0_iter->second;
 
                     if (ps_is_cutmesh_vertex(ps_v0, sm_vtx_cnt))
                     {
@@ -8721,13 +8752,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     {
                         MCUT_ASSERT(patch_to_m0_vertex.count(*v) == 1);
                         const vd_t as_m0_descr = patch_to_m0_vertex.at(*v);
-
                         vd_t as_cm_descr = mesh_t::null_vertex();
-                        if (m0_to_ps_vtx.count(as_m0_descr) == 1)
+
+                        if ((int)as_m0_descr < (int)m0_to_ps_vtx.size() /*m0_to_ps_vtx.count(as_m0_descr) == 1*/)
                         {
                             vd_t as_ps_descr = patch_to_m0_vertex.at(*v);
 
-                            MCUT_ASSERT(ps_to_cm_vtx.count(as_ps_descr) == 1);
+                            MCUT_ASSERT((int)as_ps_descr < (int)ps_to_cm_vtx.size() /*ps_to_cm_vtx.count(as_ps_descr) == 1*/);
                             as_cm_descr = ps_to_cm_vtx.at(as_ps_descr);
 
                             // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
@@ -8752,7 +8783,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         MCUT_ASSERT(m0_to_ps_face.count(as_m0_descr) == 1);
                         const fd_t as_ps_descr = m0_to_ps_face.at(as_m0_descr);
 
-                        MCUT_ASSERT(ps_to_cm_face.count(as_ps_descr) == 1);
+                        MCUT_ASSERT((int)as_ps_descr < (int)ps_to_cm_face.size()/*ps_to_cm_face.count(as_ps_descr) == 1*/);
                         fd_t as_cm_descr = ps_to_cm_face.at(as_ps_descr);
 
                         // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.

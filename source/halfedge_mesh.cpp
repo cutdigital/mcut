@@ -214,10 +214,10 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
 
 halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
 {
-    MCUT_ASSERT(m_vertices.count(s) == 1);
+    MCUT_ASSERT((size_t)s < m_vertices.size()); // MCUT_ASSERT(m_vertices.count(s) == 1);
     const vertex_data_t& svd = m_vertices.at(s);
     const std::vector<halfedge_descriptor_t>& s_halfedges = svd.m_halfedges;
-    MCUT_ASSERT(m_vertices.count(t) == 1);
+    MCUT_ASSERT((size_t)t < m_vertices.size()); // MCUT_ASSERT(m_vertices.count(t) == 1);
     const vertex_data_t& tvd = m_vertices.at(t);
     const std::vector<halfedge_descriptor_t>& t_halfedges = tvd.m_halfedges;
     std::vector<edge_descriptor_t> t_edges;
@@ -282,13 +282,14 @@ vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math:
         std::vector<vertex_descriptor_t>::const_iterator it = m_vertices_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
         vd = *it;
         m_vertices_removed.erase(it);
-        MCUT_ASSERT(m_vertices.find(vd) != m_vertices.cend());
+        MCUT_ASSERT((size_t)vd < m_vertices.size()); // MCUT_ASSERT(m_vertices.find(vd) != m_vertices.cend());
         data_ptr = &m_vertices.at(vd);
     } else {
         vd = static_cast<vertex_descriptor_t>(number_of_vertices());
-        std::pair<typename std::map<vertex_descriptor_t, vertex_data_t>::iterator, bool> ret = m_vertices.insert(std::make_pair(vd, vertex_data_t()));
-        MCUT_ASSERT(ret.second == true);
-        data_ptr = &ret.first->second;
+        //std::pair<typename std::map<vertex_descriptor_t, vertex_data_t>::iterator, bool> ret = m_vertices.insert(std::make_pair(vd, vertex_data_t()));
+        //MCUT_ASSERT(ret.second == true);
+        m_vertices.push_back(vertex_data_t());
+        data_ptr = &m_vertices.back(); // &ret.first->second;
     }
 
     MCUT_ASSERT(vd != mesh_t::null_vertex());
@@ -402,14 +403,14 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
     // update vertex incidence
 
     // v0
-    MCUT_ASSERT(m_vertices.count(v0) == 1);
+    MCUT_ASSERT((size_t)v0 < m_vertices.size());//MCUT_ASSERT(m_vertices.count(v0) == 1);
     vertex_data_t& v0_data = m_vertices.at(v0);
     //MCUT_ASSERT();
     if (std::find(v0_data.m_halfedges.cbegin(), v0_data.m_halfedges.cend(), h1_idx) == v0_data.m_halfedges.cend()) {
         v0_data.m_halfedges.push_back(h1_idx); // halfedge whose target is v0
     }
     // v1
-    MCUT_ASSERT(m_vertices.count(v1) == 1);
+    MCUT_ASSERT((size_t)v1 < m_vertices.size());//MCUT_ASSERT(m_vertices.count(v1) == 1);
     vertex_data_t& v1_data = m_vertices.at(v1);
     //MCUT_ASSERT();
     if (std::find(v1_data.m_halfedges.cbegin(), v1_data.m_halfedges.cend(), h0_idx) == v1_data.m_halfedges.cend()) {
@@ -526,7 +527,7 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 const math::vec3& mesh_t::vertex(const vertex_descriptor_t& vd) const
 {
     MCUT_ASSERT(vd != null_vertex());
-    MCUT_ASSERT(m_vertices.count(vd) == 1);
+    MCUT_ASSERT((size_t)vd < m_vertices.size());
     const vertex_data_t& vdata = m_vertices.at(vd);
     return vdata.p;
 }
@@ -594,7 +595,7 @@ const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_de
 const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(const vertex_descriptor_t v) const
 {
     MCUT_ASSERT(v != mesh_t::null_vertex());
-    MCUT_ASSERT(m_vertices.count(v) == 1);
+    MCUT_ASSERT((size_t)v < m_vertices.size());
     const vertex_data_t& vd = m_vertices.at(v);
     const std::vector<halfedge_descriptor_t>& incoming_halfedges = vd.m_halfedges;
     return incoming_halfedges;
@@ -602,8 +603,9 @@ const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(co
 
 mesh_t::vertex_iterator_t mesh_t::vertices_begin() const
 {
-    vertex_map_t::const_iterator it = m_vertices.cbegin();
-    while (it != m_vertices.cend() && is_removed(it->first)) {
+    uint32_t index = 0;
+    vertex_array_t::const_iterator it = m_vertices.cbegin();
+    while (it != m_vertices.cend() && is_removed(vertex_descriptor_t(index++))/*is_removed(it)*/) {
         ++it; // shift the pointer to the first valid mesh element
     }
     return vertex_iterator_t(it, this);
@@ -679,7 +681,6 @@ void write_off(const char* fpath, const mcut::mesh_t& mesh)
     //
     // vertices
     //
-
     for (mcut::mesh_t::vertex_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter) {
         //const vertex_data_t& vdata = iter.second;
         const math::vec3& point = mesh.vertex(*iter);

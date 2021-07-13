@@ -1438,6 +1438,8 @@ void constructOIBVH(
 
 void intersectOIBVHs(
     std::vector<std::pair<mcut::fd_t, mcut::fd_t>>& intersecting_sm_cm_face_pairs,
+    std::vector<mcut::fd_t>& intersecting_sm_faces,
+    std::vector<mcut::fd_t>& intersecting_cm_faces,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhAABBs,
     const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhAABBs,
@@ -2837,8 +2839,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
         std::vector<std::pair<mcut::fd_t, mcut::fd_t>> intersecting_sm_cm_face_pairs;
-
-        intersectOIBVHs(intersecting_sm_cm_face_pairs, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+        std::vector<mcut::fd_t> intersecting_sm_faces;
+        std::vector<mcut::fd_t> intersecting_cm_faces;
+        intersectOIBVHs(intersecting_sm_cm_face_pairs, intersecting_sm_faces, intersecting_cm_faces,srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
 
@@ -2856,6 +2859,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         try {
             ctxtPtr->applyPrecisionAndRoundingModeSettings();
+            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch");
             mcut::dispatch(backendOutput, backendInput);
             ctxtPtr->revertPrecisionAndRoundingModeSettings();
         } catch (const std::exception* e) {

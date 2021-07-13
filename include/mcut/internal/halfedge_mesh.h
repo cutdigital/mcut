@@ -237,13 +237,19 @@ public:
         std::vector<halfedge_descriptor_t> m_halfedges;
     };
 
-    struct vertex_data_t {
+    template<typename T>
+    struct mesh_data_t
+    {
+        typedef T descriptor_type;
+    };
+
+    struct vertex_data_t : mesh_data_t<vertex_descriptor_t> {
         mcut::math::vec3 p; // geometry coordinates
         std::vector<face_descriptor_t> m_faces; // ... incident to vertex
         std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
     };
 
-    typedef std::map<vertex_descriptor_t, vertex_data_t> vertex_map_t;
+    typedef std::vector<vertex_data_t> vertex_array_t;
     typedef std::map<edge_descriptor_t, edge_data_t> edge_map_t;
     typedef std::map<halfedge_descriptor_t, halfedge_data_t> halfedge_map_t;
     typedef std::map<face_descriptor_t, face_data_t> face_map_t;
@@ -369,17 +375,145 @@ public:
         {
             return mesh_ptr->halfedges_end();
         }
+#if 0
+        key_iterator_t<vertex_array_t> cend(identity<key_iterator_t<vertex_array_t>>)
+        {
+            return mesh_ptr->vertices_end();
+        }
+#endif
+    };
 
-        key_iterator_t<vertex_map_t> cend(identity<key_iterator_t<vertex_map_t>>)
+    
+    typedef key_iterator_t<edge_map_t> edge_iterator_t;
+    typedef key_iterator_t<halfedge_map_t> halfedge_iterator_t;
+    typedef key_iterator_t<face_map_t> face_iterator_t;
+
+    template <typename V>
+    class array_iterator_t : public V::const_iterator {
+        const mesh_t* const mesh_ptr;
+        typedef typename V::value_type::descriptor_type element_descriptor_type;
+        typename V::value_type* operator->() = delete;
+    public:
+        array_iterator_t()
+            : V::const_iterator()
+            , mesh_ptr(nullptr) {};
+        explicit array_iterator_t(typename V::const_iterator it_, const mesh_t* const mesh)
+            : V::const_iterator(it_)
+            , mesh_ptr(mesh)
+        {
+        }
+
+        typename V::value_type::descriptor_type operator*()
+        {
+            element_descriptor_type d = static_cast<element_descriptor_type>(std::distance(mesh_ptr->vertices_begin(), (*this)));
+            return d;
+        }
+
+        // postfix increment (i++)
+        // increment pointer to the next valid element (i.e. we skip removed elements).
+        array_iterator_t<V> operator++(int)
+        {
+            bool old_elem_is_removed = false;
+
+            do {
+                typename V::const_iterator old_elem = V::const_iterator::operator++(0); // (i++)
+                old_elem_is_removed = mesh_ptr->is_removed(std::distance(V::cbegin(), old_elem));
+                if (!old_elem_is_removed) {
+                    return old_elem;
+                }
+
+                // keep iterating until the value returned by the (i++) operator returns a valid element
+                // i.e. one that is not marked removed!
+            } while ((*this) != cend<std::remove_reference<decltype(*this)>::type>() && old_elem_is_removed);
+
+            return cend<std::remove_reference<decltype(*this)>::type>();
+        }
+
+        // prefix increment (++i)
+        // increment pointer to the next valid element (i.e. we skip removed elements).
+        array_iterator_t<V>& operator++()
+        {
+            bool cur_elem_is_removed = false;
+            bool reached_end = false;
+            do {
+                V::const_iterator::operator++(); // (++i)
+                reached_end = (*this) == cend<typename std::remove_reference<decltype(*this)>::type>();
+                cur_elem_is_removed = false;
+
+                if (!reached_end) {
+                    size_t raw_descriptor = std::distance(mesh_ptr->vertices_begin(), (*this)); // O(1) ??
+                    cur_elem_is_removed = mesh_ptr->is_removed((vertex_descriptor_t)raw_descriptor );
+                    if (!cur_elem_is_removed) {
+                        break;
+                    }
+                }
+
+                // keep iterating until the value pointed to after the (++i) operator is a valid element
+                // i.e. one that is not marked removed!
+
+            } while (cur_elem_is_removed && !reached_end);
+
+            return (*this);
+        }
+
+        // The following are helper functions which are specialised (via type-deduction)
+        // for the type of mesh elements that *this* iterator walks over in "mesh_ptr"
+        // e.g. faces. These functions are used to determine when *this* iterator has
+        // reached the end of the respective std::map data structure over which we are
+        // iterating.
+
+        template <typename T>
+        struct identity {
+            typedef T type;
+        };
+
+        template <typename I>
+        I cend()
+        {
+            return cend(identity<I>()); // https://stackoverflow.com/questions/3052579/explicit-specialization-in-non-namespace-scope
+        }
+
+#if 0
+        static std::ptrdiff_t distance(const array_iterator_t<M>& beg, const array_iterator_t<M>& end)
+        {
+            array_iterator_t<M> it = beg;
+            typename std::ptrdiff_t dist = 0;
+            while (it != end) {
+                dist++;
+                ++it;
+            }
+            return dist;
+        }
+#endif
+    private:
+        template <typename I>
+        I cend(identity<I>)
+        {
+            return I(); // unused
+        }
+#if 0
+        array_iterator_t<face_map_t> cend(identity<array_iterator_t<face_map_t>>)
+        {
+            return mesh_ptr->faces_end();
+        }
+
+        array_iterator_t<edge_map_t> cend(identity<array_iterator_t<edge_map_t>>)
+        {
+            return mesh_ptr->edges_end();
+        }
+
+        array_iterator_t<halfedge_map_t> cend(identity<array_iterator_t<halfedge_map_t>>)
+        {
+            return mesh_ptr->halfedges_end();
+        }
+#endif
+        array_iterator_t<vertex_array_t> cend(identity<array_iterator_t<vertex_array_t>>)
         {
             return mesh_ptr->vertices_end();
         }
     };
 
-    typedef key_iterator_t<vertex_map_t> vertex_iterator_t;
-    typedef key_iterator_t<edge_map_t> edge_iterator_t;
-    typedef key_iterator_t<halfedge_map_t> halfedge_iterator_t;
-    typedef key_iterator_t<face_map_t> face_iterator_t;
+    typedef array_iterator_t<vertex_array_t> vertex_iterator_t;
 
     mesh_t();
     ~mesh_t();
@@ -596,6 +730,7 @@ public:
     void remove_vertex(const vertex_descriptor_t v)
     {
         MCUT_ASSERT(v != null_vertex());
+        MCUT_ASSERT((size_t)v < m_vertices.size());
         MCUT_ASSERT(std::find(m_vertices_removed.cbegin(), m_vertices_removed.cend(), v) == m_vertices_removed.cend());
         MCUT_ASSERT(m_vertices.at(v).m_faces.empty());
         MCUT_ASSERT(m_vertices.at(v).m_halfedges.empty());
@@ -618,7 +753,7 @@ public:
         }
 
         for (vertex_iterator_t i = vertices_begin(); i != vertices_end(); ++i) {
-            remove_vertex(*i);
+            remove_vertex((vertex_descriptor_t)std::distance(vertices_begin(), i));
         }
     }
 
@@ -718,7 +853,7 @@ private:
     // member variables
     // ----------------
 
-    std::map<vertex_descriptor_t, vertex_data_t> m_vertices;
+    std::vector<vertex_data_t> m_vertices;
     std::map<edge_descriptor_t, edge_data_t> m_edges;
     std::map<halfedge_descriptor_t, halfedge_data_t> m_halfedges;
     std::map<face_descriptor_t, face_data_t> m_faces;
