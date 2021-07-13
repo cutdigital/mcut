@@ -441,7 +441,7 @@ public:
                 cur_elem_is_removed = false;
 
                 if (!reached_end) {
-                    size_t raw_descriptor = std::distance(mesh_ptr->vertices_begin(), (*this)); // O(1) ??
+                    size_t raw_descriptor = std::distance(cbegin(), (*this)); // O(1) ??
                     cur_elem_is_removed = mesh_ptr->is_removed((vertex_descriptor_t)raw_descriptor );
                     if (!cur_elem_is_removed) {
                         break;
@@ -473,11 +473,11 @@ public:
             return cend(identity<I>()); // https://stackoverflow.com/questions/3052579/explicit-specialization-in-non-namespace-scope
         }
 
-#if 0
-        static std::ptrdiff_t distance(const array_iterator_t<M>& beg, const array_iterator_t<M>& end)
+#if 1
+        static std::ptrdiff_t distance(const array_iterator_t<V>& beg, const array_iterator_t<V>& end)
         {
-            array_iterator_t<M> it = beg;
-            typename std::ptrdiff_t dist = 0;
+            array_iterator_t<V> it = beg;
+            //typename std::ptrdiff_t dist = (&end) - (&beg);
             while (it != end) {
                 dist++;
                 ++it;
@@ -507,10 +507,18 @@ public:
             return mesh_ptr->halfedges_end();
         }
 #endif
+
+        array_iterator_t<vertex_array_t> cbegin(identity<array_iterator_t<vertex_array_t>>)
+        {
+            return mesh_ptr->vertices_begin();
+        }
+
         array_iterator_t<vertex_array_t> cend(identity<array_iterator_t<vertex_array_t>>)
         {
             return mesh_ptr->vertices_end();
         }
+
+
     };
 
     typedef array_iterator_t<vertex_array_t> vertex_iterator_t;
