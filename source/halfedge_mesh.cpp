@@ -156,7 +156,7 @@ vertex_descriptor_t mesh_t::vertex(const edge_descriptor_t e, const int v) const
 {
     MCUT_ASSERT(e != null_edge());
     MCUT_ASSERT(v == 0 || v == 1);
-    MCUT_ASSERT(m_edges.count(e) == 1);
+    MCUT_ASSERT((size_t)e < m_edges.size() /*m_edges.count(e) == 1*/);
     const edge_data_t& ed = m_edges.at(e);
     const halfedge_descriptor_t h = ed.h;
     MCUT_ASSERT(m_halfedges.count(h) == 1);
@@ -194,7 +194,7 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
 {
     MCUT_ASSERT(i == 0 || i == 1);
     MCUT_ASSERT(e != null_edge());
-    MCUT_ASSERT(m_edges.count(e) == 1);
+    MCUT_ASSERT((size_t)e < m_edges.size() /*m_edges.count(e) == 1*/);
     const edge_data_t& ed = m_edges.at(e);
     halfedge_descriptor_t h = ed.h; // assuming i ==0
 
@@ -370,16 +370,18 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
         std::vector<edge_descriptor_t>::const_iterator eIter = m_edges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
         e_idx = *eIter;
         m_edges_removed.erase(eIter);
-        MCUT_ASSERT(m_edges.find(e_idx) != m_edges.cend());
+        MCUT_ASSERT((size_t)e_idx < m_edges.size()/*m_edges.find(e_idx) != m_edges.cend()*/);
     }
 
     edge_data_t* edge_data_ptr = nullptr;
     if (reusing_removed_edge_descr) {
         edge_data_ptr = &m_edges.at(e_idx);
     } else {
-        std::pair<typename std::map<edge_descriptor_t, edge_data_t>::iterator, bool> eret = m_edges.insert(std::make_pair(e_idx, edge_data_t())); // create a new edge
-        MCUT_ASSERT(eret.second == true);
-        edge_data_ptr = &eret.first->second;
+        //std::pair<typename std::map<edge_descriptor_t, edge_data_t>::iterator, bool> eret = m_edges.insert(std::make_pair(e_idx, edge_data_t())); // create a new edge
+        //MCUT_ASSERT(eret.second == true);
+        //edge_data_ptr = &eret.first->second;
+        m_edges.emplace_back(edge_data_t());
+        edge_data_ptr = &m_edges.back();
     }
 
     // update incidence information
@@ -601,12 +603,14 @@ const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_vertex(co
     return incoming_halfedges;
 }
 
-mesh_t::vertex_iterator_t mesh_t::vertices_begin() const
+mesh_t::vertex_iterator_t mesh_t::vertices_begin(bool account_for_removed_elems) const
 {
-    uint32_t index = 0;
     vertex_array_t::const_iterator it = m_vertices.cbegin();
-    while (it != m_vertices.cend() && is_removed(vertex_descriptor_t(index++))/*is_removed(it)*/) {
-        ++it; // shift the pointer to the first valid mesh element
+    if(account_for_removed_elems){
+        uint32_t index = 0;
+        while (it != m_vertices.cend() && is_removed(vertex_descriptor_t(index++))/*is_removed(it)*/) {
+            ++it; // shift the pointer to the first valid mesh element
+        }
     }
     return vertex_iterator_t(it, this);
 }
@@ -616,11 +620,14 @@ mesh_t::vertex_iterator_t mesh_t::vertices_end() const
     return vertex_iterator_t(m_vertices.cend(), this);
 }
 
-mesh_t::edge_iterator_t mesh_t::edges_begin() const
+mesh_t::edge_iterator_t mesh_t::edges_begin(bool account_for_removed_elems) const
 {
-    edge_map_t::const_iterator it = m_edges.cbegin();
-    while (it != m_edges.cend() && is_removed(it->first)) {
-        ++it; // shift the pointer to the first valid mesh element
+    edge_array_t::const_iterator it = m_edges.cbegin();
+    if(account_for_removed_elems){
+        uint32_t index = 0;
+        while (it != m_edges.cend() && is_removed(edge_descriptor_t(index++)/*it->first*/)) {
+            ++it; // shift the pointer to the first valid mesh element
+        }
     }
     return edge_iterator_t(it, this);
 }

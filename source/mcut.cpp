@@ -1328,7 +1328,7 @@ void constructOIBVH(
             static_cast<float>(offset.y() / dims.y()),
             static_cast<float>(offset.z() / dims.z()));
 
-        const uint32_t idx = (uint32_t)std::distance(mesh.faces_begin(), f);
+        const uint32_t idx = (uint32_t)std::distance(mesh.faces_begin(), f); // NOTE: mesh.faces_begin() may not be the actual beginning internally
         bvhLeafNodeDescriptors[idx].first = *f;
         bvhLeafNodeDescriptors[idx].second = mortion_code;
     }
