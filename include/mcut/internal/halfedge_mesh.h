@@ -235,7 +235,7 @@ public:
         halfedge_descriptor_t h; // primary halfedge (even idx)
     };
 
-    struct face_data_t {
+    struct face_data_t  : mesh_data_t<face_descriptor_t>{
         std::vector<halfedge_descriptor_t> m_halfedges;
     };
 
@@ -248,8 +248,8 @@ public:
     typedef std::vector<vertex_data_t> vertex_array_t;
     typedef std::vector<edge_data_t> edge_array_t;
     typedef std::vector<halfedge_data_t> halfedge_array_t;
-    typedef std::map<face_descriptor_t, face_data_t> face_map_t;
-
+    typedef std::vector<face_data_t> face_array_t;
+#if 0
     // iterator over the keys of a map (base class)
     template <typename M>
     class key_iterator_t : public M::const_iterator {
@@ -382,7 +382,7 @@ public:
     };
 
     
-    typedef key_iterator_t<face_map_t> face_iterator_t;
+#endif
 
     template <typename V>
     class array_iterator_t : public V::const_iterator {
@@ -603,11 +603,22 @@ public:
         {
             return mesh_ptr->halfedges_end();
         }
+
+        array_iterator_t<face_array_t> cbegin(bool account_for_removed_elems, identity<array_iterator_t<face_array_t>> = {})
+        {
+            return mesh_ptr->faces_begin(account_for_removed_elems);
+        }
+
+        array_iterator_t<face_array_t> cend(identity<array_iterator_t<face_array_t>>)
+        {
+            return mesh_ptr->faces_end();
+        }
     };
 
     typedef array_iterator_t<vertex_array_t> vertex_iterator_t;
     typedef array_iterator_t<edge_array_t> edge_iterator_t;
     typedef array_iterator_t<halfedge_array_t> halfedge_iterator_t;
+    typedef array_iterator_t<face_array_t> face_iterator_t;
 
     mesh_t();
     ~mesh_t();
@@ -939,7 +950,7 @@ public:
 
     halfedge_iterator_t halfedges_end() const;
 
-    face_iterator_t faces_begin() const;
+    face_iterator_t faces_begin(bool account_for_removed_elems = true) const;
 
     face_iterator_t faces_end() const;
 
@@ -950,7 +961,7 @@ private:
     std::vector<vertex_data_t> m_vertices;
     std::vector<edge_data_t> m_edges;
     std::vector<halfedge_data_t> m_halfedges;
-    std::map<face_descriptor_t, face_data_t> m_faces;
+    std::vector<face_data_t> m_faces;
 
     // NOTE: I use std::vector because we'll have very few (typically zero)
     // elements removed at a given time. In fact removal only happens during

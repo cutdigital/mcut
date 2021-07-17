@@ -445,7 +445,7 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         new_face_idx = *fIter;
         m_faces_removed.erase(fIter); // slot is going to be used again
 
-        MCUT_ASSERT(m_faces.find(new_face_idx) != m_faces.cend());
+        MCUT_ASSERT((size_t)new_face_idx < m_faces.size() /*m_faces.find(new_face_idx) != m_faces.cend()*/);
     }
 
     face_data_t* face_data_ptr = reusing_removed_face_descr ? &m_faces.at(new_face_idx) : &new_face_data;
@@ -516,8 +516,9 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
     }
 
     if (!reusing_removed_face_descr) {
-        MCUT_ASSERT(m_faces.count(new_face_idx) == 0);
-        m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
+        MCUT_ASSERT((size_t)new_face_idx < m_faces.size() /*m_faces.count(new_face_idx) == 0*/);
+        //m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
+        m_faces.emplace_back(*face_data_ptr);
     }
 
     // update halfedges (next halfedge)
@@ -572,7 +573,7 @@ std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_vertex(const vertex
 const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_face(const face_descriptor_t f) const
 {
     MCUT_ASSERT(f != null_face());
-    MCUT_ASSERT(m_faces.count(f) == 1);
+    MCUT_ASSERT((size_t)f < m_faces.size() /*m_faces.count(f) == 1*/);
     return m_faces.at(f).m_halfedges;
 }
 
@@ -661,11 +662,14 @@ mesh_t::halfedge_iterator_t mesh_t::halfedges_end() const
     return halfedge_iterator_t(m_halfedges.cend(), this);
 }
 
-mesh_t::face_iterator_t mesh_t::faces_begin() const
+mesh_t::face_iterator_t mesh_t::faces_begin(bool account_for_removed_elems) const
 {
-    face_map_t::const_iterator it = m_faces.cbegin();
-    while (it != m_faces.cend() && is_removed(it->first)) {
-        ++it; // shift the pointer to the first valid mesh element
+    face_array_t::const_iterator it = m_faces.cbegin();
+    if(account_for_removed_elems){
+        uint32_t index = 0;
+        while (it != m_faces.cend() && is_removed(face_descriptor_t(index++)/*it->first*/)) {
+            ++it; // shift the pointer to the first valid mesh element
+        }
     }
     return face_iterator_t(it, this);
 }
