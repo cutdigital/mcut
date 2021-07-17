@@ -1087,7 +1087,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
         const vd_t &m0_h_tgt,
         const vd_t &m1_h_tgt,
         const bool m0_h_is_ox,
-        const std::map<hd_t, std::vector<int>> &m0_h_to_ply,
+        const std::vector<std::vector<int>> &m0_h_to_ply,
         const std::map<vd_t, std::vector<hd_t>> &ivtx_to_incoming_hlist,
         const std::map<hd_t, bool> &m0_sm_ihe_to_flag,
         const std::map<vd_t, std::pair<ed_t, fd_t>> &m0_ivtx_to_intersection_registry_entry,
@@ -1169,7 +1169,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
             // 2) halfedge is not used for tracing, OR
             // 3) halfedge has not been processed
             if (is_strictly_cs_h ||                                                      //
-                m0_h_to_ply.find(*halfedge_across_cut_path_iter) == m0_h_to_ply.end() || //
+                m0_h_to_ply.at(*halfedge_across_cut_path_iter).size() == 0/*m0_h_to_ply.find(*halfedge_across_cut_path_iter) == m0_h_to_ply.end()*/ || //
                 m0_sm_ihe_to_flag.at(*halfedge_across_cut_path_iter) == false)
             { // is halfedge incident to a traced polygon and is it processed..?
                 halfedge_across_cut_path_iter = halfedges_across_cut_path.erase(halfedge_across_cut_path_iter);
@@ -1206,7 +1206,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
             // get opposite halfedge of the current halfedge (m0_h)
             const hd_t opp = m0.opposite(m0_h);
 
-            if (m0_h_to_ply.find(opp) != m0_h_to_ply.end())
+            if (m0_h_to_ply.at(opp).size() >0/*m0_h_to_ply.find(opp) != m0_h_to_ply.end()*/)
             { // was the opposite halfedge used to trace a polygon
                 // get the previous of the opposite halfedge (because it is one of the "incoming" halfedges)
                 const hd_t prv_opp = m0.prev(opp);
@@ -1219,7 +1219,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
                 }
             }
         }
-        else if (m0_h_to_ply.find(m0_h) == m0_h_to_ply.end()) // edge-case when src-mesh is not watertight (e.g. test 21)
+        else if (m0_h_to_ply.at(m0_h).size() ==0/*m0_h_to_ply.find(m0_h) == m0_h_to_ply.end()*/) // edge-case when src-mesh is not watertight (e.g. test 21)
         {
             MCUT_ASSERT(halfedges_across_cut_path.size() == 1);
             const hd_t &h = halfedges_across_cut_path.front();
@@ -1239,7 +1239,7 @@ std::vector<vd_t> get_vertices_on_ps_edge(
             //MCUT_ASSERT(opp_nxt != mesh_t::null_halfedge());
 
             // if halfedge incident to traced polygon and is it processed
-            if (m0_h_to_ply.find(opp_nxt) != m0_h_to_ply.end() && m0_sm_ihe_to_flag.at(opp_nxt))
+            if (m0_h_to_ply.at(opp_nxt).size() >0/*m0_h_to_ply.find(opp_nxt) != m0_h_to_ply.end()*/ && m0_sm_ihe_to_flag.at(opp_nxt))
             {
 
                 const vd_t nxt_src = m0_h_tgt; // i.e. m0.source(nxt);
@@ -5589,15 +5589,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //
         // So the first incidence information that we need to keep around is the mapping from every
         // halfedge (in "m0") which is used to trace a polygon, to the traced polygon(s) that uses
-        // that halfedge. Thus, halfedges which are not used for tracing [at all] do not have an entry
-        // in this map. We will use this information later, like to stitch cut-mesh patches to src-mesh
-        // fragments.
+        // that halfedge. Thus, halfedges which are not used for tracing [at all] have an entry in this
+        // vector but the value (std::vector) is empty. We will use this information later, like to 
+        // stitch cut-mesh patches to src-mesh fragments.
 
-        std::map<
-            hd_t,            // a halfedge that is used to trace a polygon
-            std::vector<int> // list of indices of  traced polygons that are traced with the halfedge
-            >
-            m0_h_to_ply;
+        //std::map<
+        //    hd_t,            // a halfedge that is used to trace a polygon
+         //   std::vector<int> // list of indices of  traced polygons that are traced with the halfedge
+         //   >
+         //   m0_h_to_ply;
+         std::vector<std::vector<int> > m0_h_to_ply(m0.number_of_halfedges());
 
         // for each traced polygon
         for (std::vector<traced_polygon_t>::const_iterator traced_polygon_iter = m0_polygons.cbegin();
@@ -5617,7 +5618,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             {
 
                 const hd_t &traced_polygon_halfedge = *traced_polygon_halfedge_iter;
-
+#if 0
                 DEBUG_CODE_MASK(lg << " " << hstr(m0, traced_polygon_halfedge););
 
                 std::pair<std::map<hd_t, std::vector<int>>::iterator, bool> pair = m0_h_to_ply.insert(std::make_pair(traced_polygon_halfedge, std::vector<int>()));
@@ -5630,6 +5631,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 pair.first->second.push_back(traced_polygon_index);
                 MCUT_ASSERT(pair.first->second.size() <= 2);
+#else
+                m0_h_to_ply.at(traced_polygon_halfedge).push_back(traced_polygon_index);
+                MCUT_ASSERT(m0_h_to_ply.at(traced_polygon_halfedge).size() <= 2);
+#endif
             }
             DEBUG_CODE_MASK(lg << std::endl;);
         }
@@ -6165,7 +6170,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 const hd_t h0 = m0.halfedge(edge, 0);
 
-                if (m0_h_to_ply.find(h0) != m0_h_to_ply.end() && m0_sm_ihe_to_flag.find(h0) == m0_sm_ihe_to_flag.cend())
+                if (m0_h_to_ply.at(h0).size() > 0/*m0_h_to_ply.find(h0) != m0_h_to_ply.end()*/ && m0_sm_ihe_to_flag.find(h0) == m0_sm_ihe_to_flag.cend())
                 { // check if used to trace polygon
                     MCUT_ASSERT(m0_sm_ihe_to_flag.count(h0) == 0);
                     m0_sm_ihe_to_flag[h0] = false;
@@ -6176,7 +6181,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 const hd_t h1 = m0.halfedge(edge, 1);
 
-                if (m0_h_to_ply.find(h1) != m0_h_to_ply.end() && m0_sm_ihe_to_flag.find(h1) == m0_sm_ihe_to_flag.cend())
+                if (m0_h_to_ply.at(h1).size() > 0/*m0_h_to_ply.find(h1) != m0_h_to_ply.end()*/ && m0_sm_ihe_to_flag.find(h1) == m0_sm_ihe_to_flag.cend())
                 { // check id used to trace polygon
                     MCUT_ASSERT(m0_sm_ihe_to_flag.count(h1) == 0);
                     m0_sm_ihe_to_flag[h1] = false;
@@ -6374,7 +6379,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             { // tgt is an intersection point
 
                 // is the current halfedge used to traced a polygon (i.e. those we stored in "m0")
-                const bool is_incident_to_traced_polygon = m0_h_to_ply.find(m0_ihe) != m0_h_to_ply.end();
+                const bool is_incident_to_traced_polygon = m0_h_to_ply.at(m0_ihe).size() > 0/*m0_h_to_ply.find(m0_ihe) != m0_h_to_ply.end()*/;
 
                 if (is_incident_to_traced_polygon)
                 {
@@ -6600,7 +6605,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // get the opposite of the current halfedge ("m0")
                     const hd_t opp = m0.opposite(m0_cur_h);
                     // check if this opposite halfedge was used to traced a polygon
-                    const bool opp_used_for_tracing = m0_h_to_ply.find(opp) != m0_h_to_ply.end();
+                    const bool opp_used_for_tracing = m0_h_to_ply.at(opp).size() > 0 /*m0_h_to_ply.find(opp) != m0_h_to_ply.end()*/;
 
                     // if 1) the current halfedge is an interior halfedge (x-->x), OR
                     // 2) the  current halfedge is an exterior halfedge AND it has not been processed
@@ -6789,12 +6794,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         { // we want only polygon-exterior interior ihalfedges
 
                             // get the traced polygon which uses the current halfedge
-                            const std::map<hd_t, std::vector<int>>::const_iterator coincident_poly_find_iter = m0_h_to_ply.find(m0_ihe);
+                            const std::vector<std::vector<int>>::const_iterator coincident_poly_find_iter = m0_h_to_ply.cbegin() + m0_ihe; /* m0_h_to_ply.find(m0_ihe);*/
 
                             MCUT_ASSERT(coincident_poly_find_iter != m0_h_to_ply.end());
-                            MCUT_ASSERT(coincident_poly_find_iter->second.size() == 1); // polygon-exterior interior-ihalfedges are incident to exactly one polygon
+                            MCUT_ASSERT(coincident_poly_find_iter->size() == 1); // polygon-exterior interior-ihalfedges are incident to exactly one polygon
 
-                            const bool is_used_to_trace_src_mesh_polygon = (coincident_poly_find_iter->second.front() < traced_sm_polygon_count);
+                            const bool is_used_to_trace_src_mesh_polygon = (coincident_poly_find_iter->front() < traced_sm_polygon_count);
 
                             return (is_used_to_trace_src_mesh_polygon);
                         }
@@ -7083,7 +7088,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
              2. save polygon and halfedge index
             */
 
-                MCUT_ASSERT(m0_h_to_ply.find(h) != m0_h_to_ply.cend());
+                MCUT_ASSERT(m0_h_to_ply.at(h).size() > 0/*m0_h_to_ply.find(h) != m0_h_to_ply.cend()*/);
                 const std::vector<int> &h_polygons = m0_h_to_ply.at(h);
 
                 // get the cut-mesh polygon using h0
@@ -7543,16 +7548,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             // get the opposite halfedge which is used to trace the adjacent polygon
                             const hd_t poly_he_opp = m0.opposite(*poly_he_iter);
                             // get the coincident polygons (if any)
-                            std::map<hd_t, std::vector<int>>::const_iterator find_iter = m0_h_to_ply.find(poly_he_opp);
+                            std::vector< std::vector<int>>::const_iterator find_iter = m0_h_to_ply.cbegin() + poly_he_opp;//m0_h_to_ply.find(poly_he_opp);
 
                             // check if "poly_he_opp" is used to trace a polygon i.e its not a border halfedge
-                            if (find_iter != m0_h_to_ply.cend())
+                            if (find_iter->size() >0 /*find_iter != m0_h_to_ply.cend()*/)
                             {
 
-                                MCUT_ASSERT(find_iter->second.size() == 1); // only used to trace a CCW cut-mesh polygon
+                                MCUT_ASSERT(find_iter->size() == 1); // only used to trace a CCW cut-mesh polygon
 
                                 // get the polygon which is traced with "poly_he_opp" i.e. the adjacent polygon we are looking for!
-                                const int incident_poly = find_iter->second.front();
+                                const int incident_poly = find_iter->front();
 
                                 // mustbe  cut-mesh polygon since we are only dealing with such polygons when building patches
                                 MCUT_ASSERT(incident_poly >= traced_sm_polygon_count);
@@ -7931,7 +7936,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             // is the halfedge on the border of the cut-mesh i.e. its opposite halfedge is not
                             // used to trace a polygon
-                            const bool is_on_cs_border = m0_h_to_ply.find(m0.opposite(*cs_poly_he_iter)) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
+                            const bool is_on_cs_border = m0_h_to_ply.at(m0.opposite(*cs_poly_he_iter)).size()==0;// m0_h_to_ply.find(m0.opposite(*cs_poly_he_iter)) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
 
                             if (is_on_cs_border)
                             {
@@ -8058,7 +8063,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // polygon which has a border halfedge
                         const hd_t opp_of_cur_he = m0.opposite(cur_he);
 
-                        bool opp_of_cur_he_is_border = m0_h_to_ply.find(opp_of_cur_he) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
+                        bool opp_of_cur_he_is_border = m0_h_to_ply.at(opp_of_cur_he).size() ==0; // m0_h_to_ply.find(opp_of_cur_he) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
 
                         if (opp_of_cur_he_is_border)
                         { // found!
@@ -8070,7 +8075,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         {
 
                             // get index of this neighouring polygon
-                            MCUT_ASSERT(m0_h_to_ply.find(opp_of_cur_he) != m0_h_to_ply.cend());
+                            MCUT_ASSERT(m0_h_to_ply.at(opp_of_cur_he).size()>0 /*m0_h_to_ply.find(opp_of_cur_he) != m0_h_to_ply.cend()*/);
                             const int &opp_of_cur_he_poly_idx = m0_h_to_ply.at(opp_of_cur_he).front(); // NOTE: class-2 or class-1 ihalfedges are incident to only one polygon
                             // reference to the neighbour/adjacent polygon
                             std::vector<traced_polygon_t>::const_iterator opp_of_cur_he_poly_iter = m0_polygons.cbegin() + (opp_of_cur_he_poly_idx);
@@ -8093,7 +8098,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             MCUT_ASSERT(next_of_opp_of_cur_he_idx < (int)opp_of_cur_he_poly.size());
                             const hd_t &next_of_opp_of_cur_he = opp_of_cur_he_poly.at(next_of_opp_of_cur_he_idx); // in the polygon of opp_of_next_he_poly
                             const hd_t opp_of_next_of_opp_of_cur_he = m0.opposite(next_of_opp_of_cur_he);
-                            bool opp_of_next_of_opp_of_cur_he_is_border = m0_h_to_ply.find(opp_of_next_of_opp_of_cur_he) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
+                            bool opp_of_next_of_opp_of_cur_he_is_border = m0_h_to_ply.at(opp_of_next_of_opp_of_cur_he).size()==0;//m0_h_to_ply.find(opp_of_next_of_opp_of_cur_he) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
 
                             //bool opp_of_next_of_opp_of_cur_he_is_border = m0_h_to_ply.find(opp_of_next_of_opp_of_cur_he) == m0_h_to_ply.cend(); // opposite is used to traced a polygon
 
@@ -8471,8 +8476,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             // add into list defining reversed polygon
                             tmp.push_back(patch_poly_he_opp);
                             // check if another cut-mesh polygon is traced with this opposite halfedge.
-                            std::map<hd_t, std::vector<int>>::iterator find_iter = m0_h_to_ply.find(patch_poly_he_opp);
-
+                            std::vector<std::vector<int>>::iterator find_iter = m0_h_to_ply.begin() + patch_poly_he_opp;// m0_h_to_ply.find(patch_poly_he_opp);
+#if 0
                             if (find_iter == m0_h_to_ply.end())
                             { // "patch_poly_he_opp" not used to trace any polygon
                                 //
@@ -8486,9 +8491,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                                 find_iter = m0_he_to_poly_idx_insertion.first;
                             }
-
+#endif
                             // associate "patch_poly_he_opp" with the new reversed polygon
-                            find_iter->second.push_back(cw_poly_idx);
+                            find_iter->push_back(cw_poly_idx);
                         }
 
                         MCUT_ASSERT(tmp.size() == patch_poly.size());
@@ -9552,7 +9557,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 const vd_t m0_cs_next_patch_polygon_he_tgt = m0.target(m0_cs_next_patch_polygon_he);
 
                                 MCUT_ASSERT(m0_is_intersection_point(m0_cs_next_patch_polygon_he_src, ps_vtx_cnt) && m0_is_intersection_point(m0_cs_next_patch_polygon_he_tgt, ps_vtx_cnt));
-                                MCUT_ASSERT(m0_h_to_ply.find(m0_cs_next_patch_polygon_he) != m0_h_to_ply.cend());
+                                MCUT_ASSERT(m0_h_to_ply.at(m0_cs_next_patch_polygon_he).size() > 0 /*m0_h_to_ply.find(m0_cs_next_patch_polygon_he) != m0_h_to_ply.cend()*/);
 
                                 const std::vector<int> &m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
                                 const std::vector<int>::const_iterator find_iter = std::find_if( // points to src-mesh polygon
@@ -9570,7 +9575,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 // Note: this is always true, even in the case of scoop cuts. This is because
                                 // halfedges along the cut-path are updated before stitching (during source-mesh partitioning)
                                 // so we can infer the tgt easily
-                                MCUT_ASSERT(m0_h_to_ply.find(m0_cs_next_patch_polygon_he_opp) != m0_h_to_ply.cend());
+                                MCUT_ASSERT(m0_h_to_ply.at(m0_cs_next_patch_polygon_he_opp).size() > 0 /*m0_h_to_ply.find(m0_cs_next_patch_polygon_he_opp) != m0_h_to_ply.cend()*/);
 
                                 const hd_t m1_cs_next_patch_polygon_he_opp = m0_to_m1_ihe.at(m0_cs_next_patch_polygon_he_opp);
                                 const hd_t m1_cs_next_patch_polygon_he_opp_opp = m1_colored.opposite(m1_cs_next_patch_polygon_he_opp);
@@ -10062,7 +10067,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const hd_t m1_next_poly_seed_he = m1_colored.opposite(m1_cur_polygon_he);
 
                         // infer the index of the next stitched polygon which is traced with m0_cur_patch_cur_poly_cur_he_opp
-                        MCUT_ASSERT(m0_h_to_ply.find(m0_cur_patch_cur_poly_cur_he_opp) != m0_h_to_ply.cend());
+                        MCUT_ASSERT(m0_h_to_ply.at(m0_cur_patch_cur_poly_cur_he_opp).size() > 0 /*m0_h_to_ply.find(m0_cur_patch_cur_poly_cur_he_opp) != m0_h_to_ply.cend()*/);
 
                         //
                         // find the adjacent polygon in the current patch using the opposite of the
