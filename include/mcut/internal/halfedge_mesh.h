@@ -212,7 +212,7 @@ public:
         typedef T descriptor_type;
     };
 
-    struct halfedge_data_t {
+    struct halfedge_data_t : mesh_data_t<halfedge_descriptor_t>{
         halfedge_descriptor_t o; // opposite halfedge
         halfedge_descriptor_t n; // next halfedge
         halfedge_descriptor_t p; // previous halfedge
@@ -247,7 +247,7 @@ public:
 
     typedef std::vector<vertex_data_t> vertex_array_t;
     typedef std::vector<edge_data_t> edge_array_t;
-    typedef std::map<halfedge_descriptor_t, halfedge_data_t> halfedge_map_t;
+    typedef std::vector<halfedge_data_t> halfedge_array_t;
     typedef std::map<face_descriptor_t, face_data_t> face_map_t;
 
     // iterator over the keys of a map (base class)
@@ -363,12 +363,12 @@ public:
         }
 
         
-
+#if 0
         key_iterator_t<halfedge_map_t> cend(identity<key_iterator_t<halfedge_map_t>>)
         {
             return mesh_ptr->halfedges_end();
         }
-#if 0
+
         key_iterator_t<edge_map_t> cend(identity<key_iterator_t<edge_map_t>>)
         {
             return mesh_ptr->edges_end();
@@ -382,8 +382,6 @@ public:
     };
 
     
-   
-    typedef key_iterator_t<halfedge_map_t> halfedge_iterator_t;
     typedef key_iterator_t<face_map_t> face_iterator_t;
 
     template <typename V>
@@ -595,10 +593,21 @@ public:
         {
             return mesh_ptr->edges_end();
         }
+
+        array_iterator_t<halfedge_array_t> cbegin(bool account_for_removed_elems, identity<array_iterator_t<halfedge_array_t>> = {})
+        {
+            return mesh_ptr->halfedges_begin(account_for_removed_elems);
+        }
+
+        array_iterator_t<halfedge_array_t> cend(identity<array_iterator_t<halfedge_array_t>>)
+        {
+            return mesh_ptr->halfedges_end();
+        }
     };
 
     typedef array_iterator_t<vertex_array_t> vertex_iterator_t;
     typedef array_iterator_t<edge_array_t> edge_iterator_t;
+    typedef array_iterator_t<halfedge_array_t> halfedge_iterator_t;
 
     mesh_t();
     ~mesh_t();
@@ -926,7 +935,7 @@ public:
 
     edge_iterator_t edges_end() const;
 
-    halfedge_iterator_t halfedges_begin() const;
+    halfedge_iterator_t halfedges_begin(bool account_for_removed_elems = true) const;
 
     halfedge_iterator_t halfedges_end() const;
 
@@ -940,7 +949,7 @@ private:
 
     std::vector<vertex_data_t> m_vertices;
     std::vector<edge_data_t> m_edges;
-    std::map<halfedge_descriptor_t, halfedge_data_t> m_halfedges;
+    std::vector<halfedge_data_t> m_halfedges;
     std::map<face_descriptor_t, face_data_t> m_faces;
 
     // NOTE: I use std::vector because we'll have very few (typically zero)
