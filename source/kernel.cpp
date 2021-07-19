@@ -33,7 +33,7 @@
 #include <set>
 #include <string>
 #include <tuple>
-
+#include <unordered_map>
 //#define MCUT_MULTI_THREADED_IMPL
 
 #if defined(MCUT_MULTI_THREADED_IMPL)
@@ -313,7 +313,7 @@ namespace mcut
                     visited[v] = true
                     dfs(v)
     */
-    void dfs_cc(vd_t u, const mesh_t &mesh, std::map<vd_t, int> &visited, int connected_component_id) {
+    void dfs_cc(vd_t u, const mesh_t &mesh, std::unordered_map<vd_t, int> &visited, int connected_component_id) {
         std::vector<vd_t> verts = mesh.get_vertices_around_vertex(u);
         for(std::vector<vd_t>::const_iterator v = verts.cbegin(); v != verts.cend(); ++v) {
             if(visited.find(*v) == visited.cend()) {
@@ -323,7 +323,7 @@ namespace mcut
         }   
     }
 
-    int find_connected_components(std::map<face_descriptor_t, int> &fccmap, const mesh_t &mesh)
+    int find_connected_components(std::unordered_map<face_descriptor_t, int> &fccmap, const mesh_t &mesh)
     {
         MCUT_ASSERT(mesh.number_of_vertices() >= 3);
         MCUT_ASSERT(mesh.number_of_edges() >= 3);
@@ -437,7 +437,7 @@ namespace mcut
                     connected_component += 1
                     dfs(u)
         */
-        std::map<vd_t, int> visited; // if vertex does not exist, then its not visited
+        std::unordered_map<vd_t, int> visited; // if vertex does not exist, then its not visited
         int connected_component_id= -1;
         for(mesh_t::vertex_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u) {
             if(visited.empty() || visited.find(*u) == visited.cend()) {
@@ -470,11 +470,12 @@ namespace mcut
     // a seam vertex is simply an intersection point, including a duplicated instance if it exists as determined by the
     // parameters "ps_num_vertices" and "m1_num_vertices_after_srcmesh_partitioning"
     void mark_seam_vertices(
-        std::map<vd_t, bool> &mesh_seam_vertices,
+        std::vector<bool> &mesh_seam_vertices,
         mesh_t &mesh,
         const int ps_num_vertices,
         const int m1_num_vertices_after_srcmesh_partitioning = std::numeric_limits<int>::max())
     {
+        mesh_seam_vertices.resize(mesh.number_of_vertices());
         for (mesh_t::vertex_iterator_t i = mesh.vertices_begin();
              i != mesh.vertices_end();
              ++i)
@@ -493,14 +494,15 @@ namespace mcut
         const std::vector<std::vector<hd_t>> &mX_traced_polygons, // "m0" or "m1" (dependent on function-call location)
         const std::vector<int> &sm_polygons_below_cs,
         const std::vector<int> &sm_polygons_above_cs,
-        const std::map<vd_t, bool> &mesh_vertex_to_seam_flag,
+        const std::vector<bool> &mesh_vertex_to_seam_flag,
         // vertex & face data mapping parameters
-        const std::map<vd_t /*"m1" ovtx in sm*/, vd_t /*"m0" ovtx in sm*/> &m1_to_m0_sm_ovtx_colored,
-        const std::map<vd_t /*"m1" ovtx*/, vd_t /*"m0" ovtx in cm*/> &m1_to_m0_cm_ovtx_colored,
-        const std::map<int /*"m0" face idx*/, int /*"m1" face idx*/> &m1_to_m0_face_colored,
+        //const std::map<vd_t /*"m1" ovtx in sm*/, vd_t /*"m0" ovtx in sm*/> &m1_to_m0_sm_ovtx_colored,
+        const std::vector<vd_t /*"m1" ovtx in sm*/> &m1_to_m0_sm_ovtx_colored,
+        const std::unordered_map<vd_t /*"m1" ovtx*/, vd_t /*"m0" ovtx in cm*/> &m1_to_m0_cm_ovtx_colored,
+        const std::unordered_map<int /*"m0" face idx*/, int /*"m1" face idx*/> &m1_to_m0_face_colored,
         //const std::map<vd_t /*"m0" ovtx*/, vd_t /*"ps" ovtx*/> &m0_to_ps_vtx,
         const std::vector<vd_t> &m0_to_ps_vtx,
-        const std::map<int /*"m0" face idx*/, fd_t /*"ps" face*/> &m0_to_ps_face,
+        const std::unordered_map<int /*"m0" face idx*/, fd_t /*"ps" face*/> &m0_to_ps_face,
         //const std::map<vd_t /*"sm" vtx*/, vd_t /*"ps" vtx*/> &ps_to_sm_vtx,
         const std::vector<vd_t> &ps_to_sm_vtx,
         //const std::map<fd_t /*"sm" face*/, fd_t /*"ps" face*/> &ps_to_sm_face,
@@ -580,12 +582,12 @@ namespace mcut
         // the "X" in "...mX_..." stands for "0" or "1" depending on where the current function is called from!
         // Before "m1" is created in "dispatch", X = "0". Afterwards, X == "1" to signify the fact that the
         // input paramater called "in" (in this function) represents "m0" or "m1"
-        std::map<std::size_t, std::map<vd_t, vd_t>> ccID_to_mX_to_cc_vertex;
-        std::map<std::size_t, std::map<vd_t, vd_t>> ccID_to_cc_to_mX_vertex;
+        std::map<std::size_t, std::unordered_map<vd_t, vd_t>> ccID_to_mX_to_cc_vertex;
+        std::map<std::size_t, std::unordered_map<vd_t, vd_t>> ccID_to_cc_to_mX_vertex;
         // the vertex descriptors [in the cc] which are seam vertices!
         std::map<std::size_t, std::vector<vd_t>> cc_to_seam_vertices;
         // here we create a map to tag each polygon in "mesh" with the connected component it belongs to.
-        std::map<face_descriptor_t, int> fccmap;
+        std::unordered_map<face_descriptor_t, int> fccmap;
 
         
         const std::size_t num = find_connected_components(fccmap, mesh);
@@ -615,8 +617,8 @@ namespace mcut
             if (ccID_to_mX_to_cc_vertex.find(face_cc_id) == ccID_to_mX_to_cc_vertex.end())
             {
                 // create new component descriptor map
-                ccID_to_mX_to_cc_vertex.insert(std::make_pair(face_cc_id, std::map<vd_t, vd_t>()));
-                ccID_to_cc_to_mX_vertex[face_cc_id] = std::map<vd_t, vd_t>();
+                ccID_to_mX_to_cc_vertex.insert(std::make_pair(face_cc_id, std::unordered_map<vd_t, vd_t>()));
+                ccID_to_cc_to_mX_vertex[face_cc_id] = std::unordered_map<vd_t, vd_t>();
             }
 
             //
@@ -689,8 +691,8 @@ namespace mcut
                         ccID_to_cc_to_mX_vertex.at(face_cc_id).insert(std::make_pair(cc_descriptor, *face_vertex_iter));
                     }
                     // check if we need to save vertex as being a seam vertex
-                    std::map<vd_t, bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
-                    bool is_seam_vertex = fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
+                    //std::vector<bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
+                    bool is_seam_vertex = (size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
                     if (is_seam_vertex)
                     {
                         cc_to_seam_vertices[face_cc_id].push_back(cc_descriptor);
@@ -722,7 +724,7 @@ namespace mcut
         // Insert faces into connected components using mapped vertex descriptors
         ///////////////////////////////////////////////////////////////////////////
 
-        std::map<size_t, std::map<fd_t, fd_t>> ccID_to_cc_to_mX_face;
+        std::map<size_t, std::unordered_map<fd_t, fd_t>> ccID_to_cc_to_mX_face;
 
         // for each face in the auxilliary data structure "mesh" (traced polygon)
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
@@ -738,16 +740,16 @@ namespace mcut
             }
 
             std::vector<vd_t> remapped_face; // using remapped cc descriptors
-            std::map<size_t, std::map<fd_t, fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
+            std::map<size_t, std::unordered_map<fd_t, fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
 
             if (ccID_to_cc_to_mX_face_fiter == ccID_to_cc_to_mX_face.cend())
             {
-                std::pair<std::map<size_t, std::map<fd_t, fd_t>>::iterator, bool> r = ccID_to_cc_to_mX_face.insert(std::make_pair(cc_id, std::map<fd_t, fd_t>()));
+                std::pair<std::map<size_t, std::unordered_map<fd_t, fd_t>>::iterator, bool> r = ccID_to_cc_to_mX_face.insert(std::make_pair(cc_id, std::unordered_map<fd_t, fd_t>()));
                 ccID_to_cc_to_mX_face_fiter = r.first;
             }
 
             MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
-            std::map<fd_t, fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
+            std::unordered_map<fd_t, fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
             // for each vertex around face
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
@@ -758,7 +760,7 @@ namespace mcut
             {
                 MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.cend());
 
-                const std::map<vd_t, vd_t> &vertex_map = ccID_to_mX_to_cc_vertex.at(cc_id);
+                const std::unordered_map<vd_t, vd_t> &vertex_map = ccID_to_mX_to_cc_vertex.at(cc_id);
                 const vd_t m1_sm_descr = *face_vertex_iter;
 
                 MCUT_ASSERT(vertex_map.find(m1_sm_descr) != vertex_map.cend());
@@ -842,7 +844,7 @@ namespace mcut
                 // the mapped-to value is undefined (mesh_t::null_vertex())
                 //
 
-                const std::map<vd_t, vd_t> &cc_to_mX_vertex = ccID_to_cc_to_mX_vertex.at(cc_id);
+                const std::unordered_map<vd_t, vd_t> &cc_to_mX_vertex = ccID_to_cc_to_mX_vertex.at(cc_id);
 
                 if (popuplate_vertex_maps)
                 {
@@ -856,21 +858,21 @@ namespace mcut
                         const vd_t mX_descr = cc_to_mX_vertex.at(cc_descr);
 
                         // NOTE: "m1_to_m0_sm_ovtx_colored" contains only non-intersection points from the source mesh
-                        std::map<vd_t, vd_t>::const_iterator m1_to_m0_sm_ovtx_colored_fiter = m1_to_m0_sm_ovtx_colored.find(mX_descr);
+                        //std::vector<vd_t>::const_iterator m1_to_m0_sm_ovtx_colored_fiter = m1_to_m0_sm_ovtx_colored.find(mX_descr);
 
-                        bool is_m1_sm_overtex = m1_to_m0_sm_ovtx_colored_fiter != m1_to_m0_sm_ovtx_colored.cend();
+                        bool is_m1_sm_overtex = (size_t)mX_descr < m1_to_m0_sm_ovtx_colored.size(); //m1_to_m0_sm_ovtx_colored_fiter != m1_to_m0_sm_ovtx_colored.cend();
                         vd_t m0_descr = mesh_t::null_vertex(); // NOTE: two cut-mesh "m1" original vertices may map to one "m0" vertex (due to winding order duplication)
 
                         if (is_m1_sm_overtex)
                         {
-                            m0_descr = m1_to_m0_sm_ovtx_colored_fiter->second;
+                            m0_descr = m1_to_m0_sm_ovtx_colored.at(mX_descr);// m1_to_m0_sm_ovtx_colored_fiter->second;
                         }
                         else if (!m1_to_m0_cm_ovtx_colored.empty())
                         { // are we in the stitching stage..? (calling with "m1")
                             // Lets search through the map "m1_to_m0_cm_ovtx_colored"
 
                             // NOTE: "m1_to_m0_cm_ovtx_colored" contains only non-intersection points from the cut mesh
-                            std::map<vd_t, vd_t>::const_iterator m1_to_m0_cm_ovtx_colored_fiter = m1_to_m0_cm_ovtx_colored.find(mX_descr);
+                            std::unordered_map<vd_t, vd_t>::const_iterator m1_to_m0_cm_ovtx_colored_fiter = m1_to_m0_cm_ovtx_colored.find(mX_descr);
 
                             bool is_m1_cm_overtex = m1_to_m0_cm_ovtx_colored_fiter != m1_to_m0_cm_ovtx_colored.cend();
 
@@ -923,7 +925,7 @@ namespace mcut
                     // -----------------------------------
                     MCUT_ASSERT(ccID_to_cc_to_mX_face.count(cc_id) == 1);
 
-                    std::map<fd_t, fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
+                    std::unordered_map<fd_t, fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
 
                     for (mesh_t::face_iterator_t f = cc.faces_begin(); f != cc.faces_end(); ++f)
                     {
@@ -1088,10 +1090,10 @@ std::vector<vd_t> get_vertices_on_ps_edge(
         const vd_t &m1_h_tgt,
         const bool m0_h_is_ox,
         const std::vector<std::vector<int>> &m0_h_to_ply,
-        const std::map<vd_t, std::vector<hd_t>> &ivtx_to_incoming_hlist,
-        const std::map<hd_t, bool> &m0_sm_ihe_to_flag,
-        const std::map<vd_t, std::pair<ed_t, fd_t>> &m0_ivtx_to_intersection_registry_entry,
-        const std::map<hd_t, hd_t> &m0_to_m1_ihe,
+        const std::unordered_map<vd_t, std::vector<hd_t>> &ivtx_to_incoming_hlist,
+        const std::unordered_map<hd_t, bool> &m0_sm_ihe_to_flag,
+        const std::vector<std::pair<ed_t, fd_t>> &m0_ivtx_to_intersection_registry_entry,
+        const std::unordered_map<hd_t, hd_t> &m0_to_m1_ihe,
         //const std::map<vd_t, vd_t> &m0_to_ps_vtx,
         const std::vector<vd_t> &m0_to_ps_vtx,
         const int ps_vtx_cnt,
@@ -1140,10 +1142,10 @@ std::vector<vd_t> get_vertices_on_ps_edge(
             {
                 //const hd_t s_ps_h = m0_ivtx_to_ps_edge.at(s);
                 //const hd_t t_ps_h = m0_ivtx_to_ps_edge.at(t);
-                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(s) != m0_ivtx_to_intersection_registry_entry.cend());
-                const ed_t s_ps_e = m0_ivtx_to_intersection_registry_entry.at(s).first; //  m0_ivtx_to_ps_edge.at(s); //  ps.edge(s_ps_h);
-                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(t) != m0_ivtx_to_intersection_registry_entry.cend());
-                const ed_t t_ps_e = m0_ivtx_to_intersection_registry_entry.at(t).first; //m0_ivtx_to_ps_edge.at(t); // ps.edge(t_ps_h);
+                MCUT_ASSERT((size_t)s-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(s) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                const ed_t s_ps_e = m0_ivtx_to_intersection_registry_entry.at(s-ps.number_of_vertices()).first; //  m0_ivtx_to_ps_edge.at(s); //  ps.edge(s_ps_h);
+                MCUT_ASSERT((size_t)t-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(t) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                const ed_t t_ps_e = m0_ivtx_to_intersection_registry_entry.at(t-ps.number_of_vertices()).first; //m0_ivtx_to_ps_edge.at(t); // ps.edge(t_ps_h);
                 const bool oh_is_exterior = (s_ps_e == t_ps_e);                         // lays on exterior of ps polygon
 
                 if (oh_is_exterior)
@@ -1253,10 +1255,10 @@ std::vector<vd_t> get_vertices_on_ps_edge(
                 {
                     //const hd_t nxt_src_ps_h = m0_ivtx_to_ps_edge.at(nxt_src);
                     //const hd_t nxt_tgt_ps_h = m0_ivtx_to_ps_edge.at(nxt_tgt);
-                    MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(nxt_src) != m0_ivtx_to_intersection_registry_entry.cend());
-                    const ed_t nxt_src_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_src).first; // m0_ivtx_to_ps_edge.at(nxt_src); // ps.edge(nxt_src_ps_h);
-                    MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(nxt_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                    const ed_t nxt_tgt_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_tgt).first; // m0_ivtx_to_ps_edge.at(nxt_tgt); // ps.edge(nxt_tgt_ps_h);
+                    MCUT_ASSERT((size_t)nxt_src-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(nxt_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                    const ed_t nxt_src_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_src-ps.number_of_vertices()).first; // m0_ivtx_to_ps_edge.at(nxt_src); // ps.edge(nxt_src_ps_h);
+                    MCUT_ASSERT((size_t)nxt_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(nxt_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                    const ed_t nxt_tgt_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_tgt-ps.number_of_vertices()).first; // m0_ivtx_to_ps_edge.at(nxt_tgt); // ps.edge(nxt_tgt_ps_h);
 
                     const bool nxt_is_exterior = (nxt_src_ps_e == nxt_tgt_ps_e); // lays on exterior of ps polygon
                     on_same_side = nxt_is_exterior;
@@ -1333,8 +1335,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         const mesh_t &ps,
         const fd_t sm_face,
         const fd_t cs_face,
-        const std::map<vd_t, std::pair<ed_t, fd_t>> &m0_ivtx_to_intersection_registry_entry,
-        std::map<fd_t, std::vector<ed_t>> &ps_iface_to_m0_edge_list,
+        const std::vector<std::pair<ed_t, fd_t>> &m0_ivtx_to_intersection_registry_entry,
+        std::unordered_map<fd_t, std::vector<ed_t>> &ps_iface_to_m0_edge_list,
         const std::vector<ed_t> &m0_cutpath_edges)
     {
 
@@ -1351,12 +1353,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             neighbouring_ifaces.insert(neighbouring_ifaces.end(), faces_around_face.cbegin(), faces_around_face.cend());
         }
 
-        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-        const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex);
+        MCUT_ASSERT((size_t)src_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+        const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex-ps.number_of_vertices());
         const std::vector<fd_t> src_registry = ps_get_ivtx_registry_entry_faces(ps, src_vertex_ipair); // m0_ivtx_to_ps_faces.at(src_vertex);
 
-        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-        const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex);
+        MCUT_ASSERT((size_t)tgt_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+        const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex-ps.number_of_vertices());
         const std::vector<fd_t> tgt_registry = ps_get_ivtx_registry_entry_faces(ps, tgt_vertex_ipair); // m0_ivtx_to_ps_faces.at(tgt_vertex);
 
         // for each face that is a neighbour to either sm-face or cm-face
@@ -1373,12 +1375,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             if (in_src_reg && in_tgt_reg)
             {
-                std::map<fd_t, std::vector<ed_t>>::iterator fiter = ps_iface_to_m0_edge_list.find(iface);
+                std::unordered_map<fd_t, std::vector<ed_t>>::iterator fiter = ps_iface_to_m0_edge_list.find(iface);
                 bool iface_associated_with_some_edges = true;
                 if (fiter == ps_iface_to_m0_edge_list.cend())
                 {
                     // insert
-                    std::pair<std::map<fd_t, std::vector<ed_t>>::iterator, bool> p = ps_iface_to_m0_edge_list.insert(std::make_pair(iface, std::vector<ed_t>()));
+                    std::pair<std::unordered_map<fd_t, std::vector<ed_t>>::iterator, bool> p = ps_iface_to_m0_edge_list.insert(std::make_pair(iface, std::vector<ed_t>()));
                     MCUT_ASSERT(p.second == true);
                     fiter = p.first;
                     iface_associated_with_some_edges = false;
@@ -1403,6 +1405,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
     }
 
+#if 0
     // check if either "current_edge" or "next_edge" represents a false link
     // i.e. due concave intersection (intersection registry representation is
     // underdetermined)
@@ -1509,9 +1512,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         bool all_vertices_are_connectable = (connectable_vertices == 2);
         return all_vertices_are_connectable;
     }
-
+#endif
     typedef std::vector<hd_t> traced_polygon_t;
 
+#if 0
     bool check_is_floating_patch(
         const traced_polygon_t &patch_poly,
         const mesh_t &m0,
@@ -1566,6 +1570,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         return all_vertices_from_src_mesh_he;
     }
+#endif
 
     bool mesh_is_closed(const mesh_t &mesh)
     {
@@ -1848,14 +1853,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //    m0_ivtx_to_ps_faces;
 
         // ivertex to halfedge that was tested again a face in order to produce this ivertex
+        // NOTE: the ordering of the intersections point is dependant on the order in which they where actually computed
+        // i.e. the data of the first intersection point is at index 0
         //std::map<
         //    vd_t, // intersection point
         //    ed_t // halfedge
         //    >
         //    m0_ivtx_to_ps_edge;
 
-        std::map<
-            vd_t,                 // intersection point
+        std::vector<
             std::pair<ed_t, fd_t> // edge and face that where tested to produce our intersection point.
             >
             m0_ivtx_to_intersection_registry_entry;
@@ -1870,7 +1876,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //    m0_ivtx_to_tested_polygon_normal;
 
         // edges of the polygon soup mesh which intersect a face
-        std::map<ed_t, std::vector<vd_t>> ps_intersecting_edges;
+        std::unordered_map<ed_t, std::vector<vd_t>> ps_intersecting_edges;
 
         // A map of used to create edges along the intersection path.
         // Each element is the information such as intersection points that arise from testing two polygons.
@@ -1885,7 +1891,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             >
             cutpath_edge_creation_info;
 
-        std::map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
+        std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 
         TIME_PROFILE_START("Prepare edge-face tests");
 
@@ -1977,10 +1983,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // compute/extract geometry properties of each tested face
         //--------------------------------------------------------
 
-        std::map<fd_t, math::vec3> ps_tested_face_to_plane_normal;
-        std::map<fd_t, math::real_number_t> ps_tested_face_to_plane_normal_d_param;
-        std::map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
-        std::map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
+        std::unordered_map<fd_t, math::vec3> ps_tested_face_to_plane_normal;
+        std::unordered_map<fd_t, math::real_number_t> ps_tested_face_to_plane_normal_d_param;
+        std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
+        std::unordered_map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
 
         for (std::set<fd_t>::const_iterator tested_faces_iter = ps_tested_faces.cbegin(); tested_faces_iter != ps_tested_faces.cend(); tested_faces_iter++)
         {
@@ -2010,7 +2016,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // edge-to-face intersection tests (narrow-phase)
         // -----------------------------------------
 
-        std::map<
+        std::unordered_map<
             fd_t,             // intersectiong face
             std::vector<vd_t> // intersection point which involve the intersecting face
             >
@@ -2022,7 +2028,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
 
-        for (std::map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin();
+        for (std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin();
              ps_edge_face_intersection_pairs_iter != ps_edge_face_intersection_pairs.cend();
              ps_edge_face_intersection_pairs_iter++)
         {
@@ -2300,8 +2306,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 #endif
                         //m0_ivtx_to_ps_faces.insert(std::make_pair(new_vertex_descr, new_vertex_incident_ps_faces));
                         //m0_ivtx_to_ps_edge.insert(std::make_pair(new_vertex_descr, tested_edge));
-                        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(new_vertex_descr) == m0_ivtx_to_intersection_registry_entry.cend());
-                        m0_ivtx_to_intersection_registry_entry[new_vertex_descr] = std::make_pair(tested_edge, tested_face);
+                        MCUT_ASSERT((size_t)new_vertex_descr-ps.number_of_vertices() == m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(new_vertex_descr) == m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        m0_ivtx_to_intersection_registry_entry.push_back(std::make_pair(tested_edge, tested_face));
 
                         // ed_t e = ps.edge(halfedge_pq);
                         //bool edge_registered_as_intersecting = ps_intersecting_edges.find(tested_edge) != ps_intersecting_edges.cend();
@@ -2497,7 +2503,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         for (mesh_t::vertex_iterator_t i = m0_ivtx_iter_begin; i != m0.vertices_end(); ++i)
         {
 
-            const ed_t &ps_edge = m0_ivtx_to_intersection_registry_entry.at(*i).first;
+            const ed_t &ps_edge = m0_ivtx_to_intersection_registry_entry.at((*i)-ps.number_of_vertices()).first;
             const vd_t ps_edge_v0 = ps.vertex(ps_edge, 0);
             const bool is_sm_edge = !ps_is_cutmesh_vertex(ps_edge_v0, sm_vtx_cnt);
 
@@ -2524,7 +2530,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // A mapping from an intersecting ps-face to the new edges. These edges are those whose
         // src and tgt vertices contain the respective face in their registry entry
         // (note: all or some may be used for used to clip the face).
-        std::map<
+        std::unordered_map<
             fd_t,             // A face intersecting another
             std::vector<ed_t> // edges touching/incident on the intersecting face
             >
@@ -2534,7 +2540,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         std::vector<ed_t> m0_cutpath_edges;
 
         // A mapping from and ivertex to the incoming halfedges
-        std::map<
+        std::unordered_map<
             vd_t,             // intersection point
             std::vector<hd_t> // list of halfedges whose target is the intersection point
             >
@@ -2673,17 +2679,17 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // intersection edges). See benchmark test 34
                         // Thus, we will not add the edge if its mid-point does not lie in the area of [two]
                         // of the shared faces in the resgistry entries of its vertices (intersection points)..
-                        std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator find_iter = m0_ivtx_to_intersection_registry_entry.cend();
+                        //std::vector<std::pair<ed_t, fd_t>>::const_iterator find_iter = m0_ivtx_to_intersection_registry_entry.cend();
 
                         // get intersection-registry faces of src vertex
-                        find_iter = m0_ivtx_to_intersection_registry_entry.find(src_vertex);
-                        MCUT_ASSERT(find_iter != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::vector<fd_t> src_vertex_faces = ps_get_ivtx_registry_entry_faces(ps, find_iter->second);
+                        //find_iter = m0_ivtx_to_intersection_registry_entry.find(src_vertex);
+                        MCUT_ASSERT((size_t)src_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*find_iter != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::vector<fd_t> src_vertex_faces = ps_get_ivtx_registry_entry_faces(ps, m0_ivtx_to_intersection_registry_entry.at(src_vertex-ps.number_of_vertices())/*find_iter->second*/);
 
                         // get intersection-registry faces of tgt vertex
-                        find_iter = m0_ivtx_to_intersection_registry_entry.find(tgt_vertex);
-                        MCUT_ASSERT(find_iter != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::vector<fd_t> tgt_vertex_faces = ps_get_ivtx_registry_entry_faces(ps, find_iter->second);
+                        //find_iter = m0_ivtx_to_intersection_registry_entry.find(tgt_vertex);
+                        MCUT_ASSERT((size_t)tgt_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*find_iter != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::vector<fd_t> tgt_vertex_faces = ps_get_ivtx_registry_entry_faces(ps, m0_ivtx_to_intersection_registry_entry.at(tgt_vertex-ps.number_of_vertices())/*find_iter->second*/);
 
                         std::vector<fd_t> shared_faces;
                         std::copy_if(src_vertex_faces.begin(), src_vertex_faces.end(), std::back_inserter(shared_faces),
@@ -2783,7 +2789,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // We start off by creating "bins" : each bin corresonds to an intersection point
         // and the values/elements in that bin are the [cut-path edges] connected to it.
 
-        std::map<vd_t, std::vector<ed_t>> m0_ivtx_to_cutpath_edges;
+        std::unordered_map<vd_t, std::vector<ed_t>> m0_ivtx_to_cutpath_edges;
 
         for (std::vector<ed_t>::const_iterator cutpath_edge_iter = m0_cutpath_edges.cbegin();
              cutpath_edge_iter != m0_cutpath_edges.cend();
@@ -2808,8 +2814,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // this means that in memory, edges are placed next to others they connect to).
 
         std::vector<std::vector<ed_t>> m0_cutpath_sequences;
-        std::map<vd_t, int> m0_ivtx_to_cutpath_sequence;
-        std::map<ed_t, int> m0_edge_to_cutpath_sequence;
+        std::unordered_map<vd_t, int> m0_ivtx_to_cutpath_sequence;
+        std::unordered_map<ed_t, int> m0_edge_to_cutpath_sequence;
 
         do
         { // an iteration will build a cut-path sequence
@@ -2827,7 +2833,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // or any vertex (if there are not terminal vertices)
 
             // find any intersection point which is not associated with a cut-path and is connected to one edge (terminal vertex)
-            std::map<vd_t, std::vector<ed_t>>::const_iterator m0_ivtx_to_cutpath_edges_iter = std::find_if(
+            std::unordered_map<vd_t, std::vector<ed_t>>::const_iterator m0_ivtx_to_cutpath_edges_iter = std::find_if(
                 m0_ivtx_to_cutpath_edges.cbegin(), m0_ivtx_to_cutpath_edges.cend(),
                 [&](const std::pair<vd_t, std::vector<ed_t>> &elem) {
                     bool is_mapped = m0_ivtx_to_cutpath_sequence.find(elem.first) != m0_ivtx_to_cutpath_sequence.cend();
@@ -2954,7 +2960,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const ed_t &other_edge = (current_edge == edge0) ? edge1 : edge0;
 
                         // check that "other_edge" has not already been mapped to a disjoint implicit cutpath sequence
-                        std::map<ed_t, int>::const_iterator find_iter = m0_edge_to_cutpath_sequence.find(other_edge);
+                        std::unordered_map<ed_t, int>::const_iterator find_iter = m0_edge_to_cutpath_sequence.find(other_edge);
                         bool other_edge_is_already_mapped = (find_iter != m0_edge_to_cutpath_sequence.cend());
 
                         if (other_edge_is_already_mapped == false)                        {
@@ -3020,16 +3026,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //
         // MapKey=intersection point on a border halfedge of either the source-mesh or cut-mesh
         // MapValue=pointer entry in "m0_ivtx_to_ps_edge"
-        std::map<vd_t, std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator> m0_cutpath_terminal_vertices;
+        std::map<vd_t, std::vector<std::pair<ed_t, fd_t>>::const_iterator> m0_cutpath_terminal_vertices;
 
-        for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator iter = m0_ivtx_to_intersection_registry_entry.cbegin();
+        for (std::vector<std::pair<ed_t, fd_t>>::const_iterator iter = m0_ivtx_to_intersection_registry_entry.cbegin();
              iter != m0_ivtx_to_intersection_registry_entry.cend();
              ++iter)
         {
             DEBUG_CODE_MASK(lg.indent(););
-            const vd_t &ivtx = iter->first;
+            const vd_t &ivtx = vd_t(std::distance(m0_ivtx_to_intersection_registry_entry.cbegin(), iter)); //iter->first;
 
-            const ed_t edge_of_ivtx_ps_he = iter->second.first; // ps.edge(ivtx_ps_he);
+            const ed_t edge_of_ivtx_ps_he = iter->first;//iter->second.first; // ps.edge(ivtx_ps_he);
             // check that "ivtx_ps_he" is a border halfedge
             if (ps.is_border(edge_of_ivtx_ps_he))
             {
@@ -3119,13 +3125,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // get the halfedge and check where is comes from (cut-mesh/source-mesh)
 
-                std::map<vd_t, std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator>::const_iterator find_iter = m0_cutpath_terminal_vertices.cend();
+                std::map<vd_t, std::vector<std::pair<ed_t, fd_t>>::const_iterator>::const_iterator find_iter = m0_cutpath_terminal_vertices.cend();
                 find_iter = m0_cutpath_terminal_vertices.find(first_edge_terminal_vertex);
 
                 MCUT_ASSERT(find_iter != m0_cutpath_terminal_vertices.cend());
 
                 // TODO: These variable names are outdated
-                const ed_t &first_edge_terminal_vertex_edge = find_iter->second->second.first;
+                const ed_t &first_edge_terminal_vertex_edge = find_iter->second->first;
                 const hd_t first_edge_terminal_vertex_edge_h0 = ps.halfedge(first_edge_terminal_vertex_edge, 0);
                 fd_t ps_face_of_first_edge_terminal_vertex_he = ps.face(first_edge_terminal_vertex_edge_h0);
                 if (ps_face_of_first_edge_terminal_vertex_he == mesh_t::null_face())
@@ -3183,7 +3189,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //std::map<vd_t, std::map<vd_t, hd_t>::const_iterator>::const_iterator find_iter = m0_cutpath_terminal_vertices.cend();
                 find_iter = m0_cutpath_terminal_vertices.find(last_edge_terminal_vertex);
                 MCUT_ASSERT(find_iter != m0_cutpath_terminal_vertices.cend());
-                const ed_t &last_edge_terminal_vertex_e = find_iter->second->second.first;
+                const ed_t &last_edge_terminal_vertex_e = find_iter->second->first;
                 const hd_t last_edge_terminal_vertex_e_h0 = ps.halfedge(last_edge_terminal_vertex_e, 0);
                 fd_t ps_face_of_last_edge_terminal_vertex_he = ps.face(last_edge_terminal_vertex_e_h0);
 
@@ -3363,15 +3369,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 MCUT_ASSERT(m0_is_intersection_point(v, ps_vtx_cnt));
 
-                std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator v_to_intersection_registry_entry = m0_ivtx_to_intersection_registry_entry.find(v);
+                //std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator v_to_intersection_registry_entry = m0_ivtx_to_intersection_registry_entry.find(v);
                 if (shared_registry_entry_intersected_face == mesh_t::null_face())
                 {
-                    shared_registry_entry_intersected_face = v_to_intersection_registry_entry->second.second; // set to initial value
+                    shared_registry_entry_intersected_face = m0_ivtx_to_intersection_registry_entry.at(v-ps.number_of_vertices()).second;//v_to_intersection_registry_entry->second.second; // set to initial value
                 }
                 else
                 {
                     // i.e. "is same face" which is being pierced by multiple edges [of the same input mesh]
-                    is_floating_polygon = (shared_registry_entry_intersected_face == v_to_intersection_registry_entry->second.second);
+                    is_floating_polygon = (shared_registry_entry_intersected_face == m0_ivtx_to_intersection_registry_entry.at(v-ps.number_of_vertices()).second/*v_to_intersection_registry_entry->second.second*/);
                 }
 
                 if (!is_floating_polygon)
@@ -3538,9 +3544,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         //std::map<vd_t, std::vector<vd_t>> m0_to_m1_poly_ext_int_edge_vertex;
 
-        std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
+        std::unordered_map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
 
-        for (std::map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge)
+        for (std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge)
         {
             DEBUG_CODE_MASK(lg.indent(););
 
@@ -3593,9 +3599,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // In the next for-loop, we sort each list of vertices on each ps-edge
         // which more than 3 coincident vertices
 
-        std::map<ed_t, std::vector<vd_t>> ps_edge_to_sorted_descriptors; // sorted vertex that lie on each edge with > 3 vertices
+        std::unordered_map<ed_t, std::vector<vd_t>> ps_edge_to_sorted_descriptors; // sorted vertex that lie on each edge with > 3 vertices
 
-        for (std::map<ed_t, std::vector<std::pair<vd_t, math::vec3>>>::iterator edge_vertices_iter = ps_edge_to_vertices.begin(); edge_vertices_iter != ps_edge_to_vertices.end(); ++edge_vertices_iter)
+        for (std::unordered_map<ed_t, std::vector<std::pair<vd_t, math::vec3>>>::iterator edge_vertices_iter = ps_edge_to_vertices.begin(); edge_vertices_iter != ps_edge_to_vertices.end(); ++edge_vertices_iter)
         {
             std::vector<std::pair<vd_t, math::vec3>> &incident_vertices = edge_vertices_iter->second;
 
@@ -3646,7 +3652,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             ps_to_m0_edges;
 
         // for each ps-edge with more than 3 coincindent vertices
-        for (std::map<ed_t, std::vector<vd_t>>::const_iterator ps_edge_coincident_vertices_iter = ps_edge_to_sorted_descriptors.begin();
+        for (std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator ps_edge_coincident_vertices_iter = ps_edge_to_sorted_descriptors.begin();
              ps_edge_coincident_vertices_iter != ps_edge_to_sorted_descriptors.end();
              ++ps_edge_coincident_vertices_iter)
         {
@@ -3750,7 +3756,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // a map between edge ids in "ps" and in "m0", which is the data structure we are progressively
         // defining to hold data for the new mesh containing clipped polygons
-        std::map<ed_t, ed_t> ps_to_m0_non_intersecting_edge;
+        std::unordered_map<ed_t, ed_t> ps_to_m0_non_intersecting_edge;
 
         // for each ps-edge
         for (mesh_t::edge_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge)
@@ -3772,7 +3778,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
 
             std::vector<vd_t> vertices_on_ps_edge = {ps_v0, ps_v1}; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
-            std::map<ed_t, std::vector<vd_t>>::const_iterator ps_intersecting_edges_iter = ps_intersecting_edges.find(ps_edge);
+            std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator ps_intersecting_edges_iter = ps_intersecting_edges.find(ps_edge);
             if (ps_intersecting_edges_iter != ps_intersecting_edges.cend())
             {
                 vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), ps_intersecting_edges_iter->second.cbegin(), ps_intersecting_edges_iter->second.cend());
@@ -3924,7 +3930,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         int traced_sm_polygon_count = 0;
 
-        std::map<int, fd_t> m0_to_ps_face; // (we'll later also include reversed polygon patches)
+        std::unordered_map<int, fd_t> m0_to_ps_face; // (we'll later also include reversed polygon patches)
 
         // TODO: find a way to loop over only those ps-faces that where found to be actually intersecting!
         // i.e. those that can be found in a registry entrys
@@ -3938,7 +3944,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             // get all the edges that lie on "ps_face", including the new one after partiting acording to intersection
             // points, and the old one which did not intersect any face
-            std::map<fd_t, std::vector<ed_t>>::iterator ps_iface_to_m0_edge_list_fiter = ps_iface_to_m0_edge_list.find(ps_face);
+            std::unordered_map<fd_t, std::vector<ed_t>>::iterator ps_iface_to_m0_edge_list_fiter = ps_iface_to_m0_edge_list.find(ps_face);
 
             bool is_intersecting_ps_face = ps_iface_to_m0_edge_list_fiter != ps_iface_to_m0_edge_list.end();
             bool is_from_cut_mesh = ps_is_cutmesh_face(ps_face, sm_face_count);
@@ -4073,7 +4079,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 MCUT_ASSERT(coincident_vertices.size() == ps_coincident_vertices.size());
 
                 // now we gather the intersection-points on the face
-                const std::map<fd_t, std::vector<vd_t>>::const_iterator ireg_entry_iter = ps_iface_to_ivtx_list.find(ps_face);
+                const std::unordered_map<fd_t, std::vector<vd_t>>::const_iterator ireg_entry_iter = ps_iface_to_ivtx_list.find(ps_face);
 
                 MCUT_ASSERT(ireg_entry_iter != ps_iface_to_ivtx_list.cend());
 
@@ -4142,12 +4148,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                        //const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(v1);
 
                                        // get their edges
-                                       MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend());
-                                       const std::pair<ed_t, fd_t> &v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0);
+                                       MCUT_ASSERT((size_t)v0-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/* m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                       const std::pair<ed_t, fd_t> &v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0-ps.number_of_vertices());
                                        const ed_t v0_ps_edge = v0_ipair.first; // m0_ivtx_to_ps_edge.at(v0); // ps.edge(v0_coincident_ps_halfedge);
 
-                                       MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend());
-                                       const std::pair<ed_t, fd_t> &v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1);
+                                       MCUT_ASSERT((size_t)v1-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                       const std::pair<ed_t, fd_t> &v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1-ps.number_of_vertices());
                                        const ed_t v1_ps_edge = v1_ipair.first; // m0_ivtx_to_ps_edge.at(v1); // ps.edge(v1_coincident_ps_halfedge);
 
                                        // This is true if v0 and v1 where produced by multiple intersections of one edge
@@ -4763,8 +4769,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             if (is_ox)
                             {
-                                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                                const std::pair<ed_t, fd_t> &m0_edge_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_tgt);
+                                MCUT_ASSERT((size_t)m0_edge_he_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                const std::pair<ed_t, fd_t> &m0_edge_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_tgt-ps.number_of_vertices());
 
                                 // get the incident ps-halfedge of tgt
                                 ed_t tgt_ps_e = m0_edge_he_tgt_ipair.first; // m0_ivtx_to_ps_edge.at(m0_edge_he_tgt);
@@ -4794,10 +4800,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                                     // const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0_edge_he_src);
                                     // const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0_edge_he_tgt);
-                                    MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_src) != m0_ivtx_to_intersection_registry_entry.cend());
-                                    const std::pair<ed_t, fd_t> &m0_edge_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_src);
-                                    MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                                    const std::pair<ed_t, fd_t> &m0_edge_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_tgt);
+                                    MCUT_ASSERT((size_t)m0_edge_he_src-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                    const std::pair<ed_t, fd_t> &m0_edge_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_src-ps.number_of_vertices());
+                                    MCUT_ASSERT((size_t)m0_edge_he_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                    const std::pair<ed_t, fd_t> &m0_edge_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_tgt-ps.number_of_vertices());
 
                                     const ed_t src_ps_edge = m0_edge_he_src_ipair.first; // m0_ivtx_to_ps_edge.at(m0_edge_he_src); // ps.edge(src_coincident_ps_halfedge)
 
@@ -5015,12 +5021,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                                 //const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(v0);
                                 //const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(v1);
-                                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend());
-                                const std::pair<ed_t, fd_t> &v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0);
+                                MCUT_ASSERT((size_t)v0-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/* m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                const std::pair<ed_t, fd_t> &v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0-ps.number_of_vertices());
                                 const ed_t v0_ps_edge = v0_ipair.first; // m0_ivtx_to_ps_edge.at(v0); //ps.edge(v0_coincident_ps_halfedge);
 
-                                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend());
-                                const std::pair<ed_t, fd_t> &v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1);
+                                MCUT_ASSERT((size_t)v1-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/* m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                const std::pair<ed_t, fd_t> &v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1-ps.number_of_vertices());
                                 const ed_t v1_ps_edge = v1_ipair.first; // m0_ivtx_to_ps_edge.at(v1); // ps.edge(v1_coincident_ps_halfedge);
 
                                 is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge); // see also above when gathering exterior incident edges
@@ -5374,7 +5380,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         const std::vector<traced_polygon_t>::const_iterator &traced_cs_polygons_iter_cbegin = traced_sm_polygons_iter_end;
 
         // extract the seam vertices
-        std::map<vd_t, bool> m0_vertex_to_seam_flag;
+        std::vector<bool> m0_vertex_to_seam_flag;
         mark_seam_vertices(m0_vertex_to_seam_flag, m0, ps.number_of_vertices());
 
         MCUT_ASSERT(!m0_vertex_to_seam_flag.empty());
@@ -5420,9 +5426,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     std::vector<int>(), // sm_polygons_below_cs
                     std::vector<int>(), // sm_polygons_above_cs
                     m0_vertex_to_seam_flag,
-                    std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-                    std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-                    std::map<int, int>(),   // Unused ... because we are extracting from "m0"
+                    std::vector<vd_t>(), // Unused ... because we are extracting from "m0"
+                    std::unordered_map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
+                    std::unordered_map<int, int>(),   // Unused ... because we are extracting from "m0"
                     m0_to_ps_vtx,
                     m0_to_ps_face,
                     ps_to_sm_vtx,
@@ -5468,9 +5474,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     std::vector<int>(),
                     std::vector<int>(),
                     m0_vertex_to_seam_flag,
-                    std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-                    std::map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
-                    std::map<int, int>(),   // Unused ... because we are extracting from "m0"
+                    std::vector<vd_t>(), // Unused ... because we are extracting from "m0"
+                    std::unordered_map<vd_t, vd_t>(), // Unused ... because we are extracting from "m0"
+                    std::unordered_map<int, int>(),   // Unused ... because we are extracting from "m0"
                     m0_to_ps_vtx,
                     m0_to_ps_face,
                     ps_to_sm_vtx,
@@ -5669,7 +5675,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // An element here represents the index of an exterior cut-mesh polygon, and the index of
         // halfedge which touches the source-mesh and points torward the interior (inside) of the src-mesh.
-        std::map<int /*m0 cs poly*/, int /*he idx*/> known_exterior_cm_polygons;
+        std::unordered_map<int /*m0 cs poly*/, int /*he idx*/> known_exterior_cm_polygons;
 
         if (explicit_cutpaths_making_holes.size() > 0)
         { // atleast one cut-path makes a hole to be sealed later
@@ -5750,8 +5756,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     const bool is_ox = (!src_is_ivertex && tgt_is_ivertex);
                     bool is_boundary_ih = false; // i.e. is and intersecting halfedge
 
-                    MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(cs_poly_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                    const std::pair<ed_t, fd_t> &cs_poly_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(cs_poly_he_tgt);
+                    MCUT_ASSERT((size_t)cs_poly_he_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/* m0_ivtx_to_intersection_registry_entry.find(cs_poly_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                    const std::pair<ed_t, fd_t> &cs_poly_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(cs_poly_he_tgt-ps.number_of_vertices());
 
                     if (src_is_ivertex && tgt_is_ivertex)
                     {
@@ -5760,8 +5766,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //const ed_t src_ps_edge = m0_ivtx_to_ps_edge.at(m0.source(cs_poly_he)); // ps.edge(src_coincident_ps_halfedge);
                         //const ed_t tgt_ps_edge = m0_ivtx_to_ps_edge.at(m0.target(cs_poly_he)); // ps.edge(tgt_ps_h);
 
-                        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(cs_poly_he_src) != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::pair<ed_t, fd_t> &cs_poly_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(cs_poly_he_src);
+                        MCUT_ASSERT((size_t)cs_poly_he_src-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/* m0_ivtx_to_intersection_registry_entry.find(cs_poly_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &cs_poly_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(cs_poly_he_src-ps.number_of_vertices());
 
                         is_boundary_ih = (cs_poly_he_src_ipair.first == cs_poly_he_tgt_ipair.first);
                     }
@@ -5920,14 +5926,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(sm_poly_he_tgt);
 
                 //const ed_t tgt_ps_edge = m0_ivtx_to_ps_edge.at(sm_poly_he_tgt); //ps.edge(tgt_ps_h);
-                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(sm_poly_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                const std::pair<ed_t, fd_t> &sm_poly_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(sm_poly_he_tgt);
+                MCUT_ASSERT((size_t)sm_poly_he_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(sm_poly_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                const std::pair<ed_t, fd_t> &sm_poly_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(sm_poly_he_tgt-ps.number_of_vertices());
                 const ed_t &tgt_ps_edge = sm_poly_he_tgt_ipair.first;
 
                 if (src_is_ivertex && tgt_is_ivertex)
                 {
-                    MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(sm_poly_he_src) != m0_ivtx_to_intersection_registry_entry.cend());
-                    const std::pair<ed_t, fd_t> &sm_poly_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(sm_poly_he_src);
+                    MCUT_ASSERT((size_t)sm_poly_he_src-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(sm_poly_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                    const std::pair<ed_t, fd_t> &sm_poly_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(sm_poly_he_src-ps.number_of_vertices());
                     const ed_t &src_ps_edge = sm_poly_he_src_ipair.first; // m0_ivtx_to_ps_edge.at(sm_poly_he_src); //ps.edge(src_coincident_ps_halfedge);
 
                     is_boundary_ih = (src_ps_edge == tgt_ps_edge);
@@ -6075,14 +6081,14 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // halfedge"
         //
 
-        std::map<
+        std::unordered_map<
             hd_t, // intersection halfedge which is used for tracing
             bool  // flag for indicating if halfedge has been transformed
             >
             m0_sm_ihe_to_flag;
 
         //for (mesh_t::edge_iterator_t edge_iter = m0.edges_begin(); edge_iter != m0.edges_end(); ++edge_iter) {
-        for (std::map<vd_t, std::vector<hd_t>>::const_iterator ivtx_iter = ivtx_to_incoming_hlist.cbegin(); ivtx_iter != ivtx_to_incoming_hlist.cend(); ++ivtx_iter)
+        for (std::unordered_map<vd_t, std::vector<hd_t>>::const_iterator ivtx_iter = ivtx_to_incoming_hlist.cbegin(); ivtx_iter != ivtx_to_incoming_hlist.cend(); ++ivtx_iter)
         {
             for (std::vector<hd_t>::const_iterator halfedge_iter = ivtx_iter->second.cbegin(); halfedge_iter != ivtx_iter->second.cend(); ++halfedge_iter)
             {
@@ -6210,17 +6216,17 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         mesh_t m1;
 
         // copy vertices from m0 t0 m1 (and save mapping to avoid assumptions).
-        // This map DOES NOT include intersection points because they are new
+        // This map DOES NOT include patch intersection points because they are new
         // i.e. we keep only the points represent original vertices in the source-mesh
         // and cut-mesh (used as data for client tex coord mapping usage)
-        std::map<vd_t, vd_t> m0_to_m1_vtx;
-        std::map<vd_t, vd_t> m1_to_m0_ovtx;
+        std::vector<vd_t> m0_to_m1_vtx(m0.number_of_vertices());
+        std::vector<vd_t> m1_to_m0_ovtx(m0.number_of_vertices());
         for (mesh_t::vertex_iterator_t v = m0.vertices_begin(); v != m0.vertices_end(); ++v)
         {
             const vd_t m1_vd = m1.add_vertex(m0.vertex(*v));
             MCUT_ASSERT(m1_vd != mesh_t::null_vertex());
 
-            MCUT_ASSERT(m0_to_m1_vtx.count(*v) == 0 && m1_to_m0_ovtx.count(m1_vd) == 0);
+            MCUT_ASSERT((size_t)(*v) < m0_to_m1_vtx.size() /*m0_to_m1_vtx.count(*v) == 0*/ && (size_t)m1_vd < m1_to_m0_ovtx.size()/* m1_to_m0_ovtx.count(m1_vd) == 0*/);
             //std::pair<std::map<vd_t, vd_t>::const_iterator, bool> pair = m0_to_m1_vtx.insert(std::make_pair(*v, m1_vd));
             //MCUT_ASSERT(pair.second == true);
             m0_to_m1_vtx[*v] = m1_vd;
@@ -6240,7 +6246,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // lost after duplicating intersection points and transforming all halfedges
         // along the cut-path.
 
-        std::map<hd_t, hd_t> m0_to_m1_he;
+        std::unordered_map<hd_t, hd_t> m0_to_m1_he;
 
         for (mesh_t::edge_iterator_t e = m0.edges_begin(); e != m0.edges_end(); ++e)
         {
@@ -6348,7 +6354,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // This data structure will map the descriptors of intersection-halfedges in "m0"
         // to their descriptor in "m1". Thus, some halfedges (in "m0") will be mapped to
         // new halfedges which are not in "m0" but will be added into "m1".
-        std::map<
+        std::unordered_map<
             hd_t, // "m0" halfedge
             hd_t  // "m1" version
             >
@@ -6427,7 +6433,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // our routine will start from an untransformed class-1 intersection-halfedge. We do this because it makes
         // transformation process easier for us by reducing the number of steps.
-        std::map<hd_t, bool>::iterator m0_1st_sm_ihe_fiter = std::find_if( // for each src-mesh intersection halfedge
+        std::unordered_map<hd_t, bool>::iterator m0_1st_sm_ihe_fiter = std::find_if( // for each src-mesh intersection halfedge
             m0_sm_ihe_to_flag.begin(),
             m0_sm_ihe_to_flag.end(),
             check_if_halfedge_is_transformed);
@@ -6447,7 +6453,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //  The second element in a pair is the halfedge connecting [Map-key] and the first element in the pair
         //
         // NOTE: [Map-key] is always the src vertex of the halfedge which is the second element in a pair of [Map-value]
-        std::map<
+        std::unordered_map<
             vd_t,        // "m1" intersection point
             std::vector< // list of (vertex,halfedge) pairs.
                 std::pair<
@@ -6508,11 +6514,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     const bool m0_cur_h_tgt_is_ivtx = m0_is_intersection_point(m0_cur_h_tgt, ps_vtx_cnt);
                     const bool m0_cur_h_is_ox = !m0_cur_h_src_is_ivtx && m0_cur_h_tgt_is_ivtx; // o-->x
 
-                    MCUT_ASSERT(m0_to_m1_vtx.find(m0_cur_h_src) != m0_to_m1_vtx.cend());
+                    MCUT_ASSERT((size_t)m0_cur_h_src < m0_to_m1_vtx.size() /* m0_to_m1_vtx.find(m0_cur_h_src) != m0_to_m1_vtx.cend()*/);
 
                     vd_t m1_cur_h_src = m0_to_m1_vtx.at(m0_cur_h_src); // from m0 to m1 descriptor
 
-                    MCUT_ASSERT(m0_to_m1_vtx.find(m0_cur_h_tgt) != m0_to_m1_vtx.cend());
+                    MCUT_ASSERT((size_t)m0_cur_h_tgt < m0_to_m1_vtx.size() /*m0_to_m1_vtx.find(m0_cur_h_tgt) != m0_to_m1_vtx.cend()*/);
 
                     vd_t m1_cur_h_tgt = m0_to_m1_vtx.at(m0_cur_h_tgt); // from m0 to m1 descriptor
 
@@ -6525,7 +6531,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //
 
                         // can we find the m1 version of the next halfedge
-                        std::map<hd_t, hd_t>::const_iterator m1_nxt_h_fiter = m0_to_m1_ihe.find(m0_nxt_h);
+                        std::unordered_map<hd_t, hd_t>::const_iterator m1_nxt_h_fiter = m0_to_m1_ihe.find(m0_nxt_h);
                         const bool nxt_is_processed = m1_nxt_h_fiter != m0_to_m1_ihe.cend();
 
                         if (nxt_is_processed)
@@ -6592,12 +6598,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     {
                         //const hd_t m0_cur_h_src_ps_h = m0_ivtx_to_ps_edge.at(m0_cur_h_src);
                         //const hd_t m0_cur_h_tgt_ps_h = m0_ivtx_to_ps_edge.at(m0_cur_h_tgt);
-                        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_cur_h_src) != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::pair<ed_t, fd_t> &m0_cur_h_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_h_src);
+                        MCUT_ASSERT((size_t)m0_cur_h_src-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_cur_h_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &m0_cur_h_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_h_src-ps.number_of_vertices());
                         const ed_t m0_cur_h_src_ps_e = m0_cur_h_src_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_h_src); //ps.edge(m0_cur_h_src_ps_h);
 
-                        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_cur_h_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::pair<ed_t, fd_t> &m0_cur_h_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_h_tgt);
+                        MCUT_ASSERT((size_t)m0_cur_h_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_cur_h_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &m0_cur_h_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_h_tgt-ps.number_of_vertices());
                         const ed_t m0_cur_h_tgt_ps_e = m0_cur_h_tgt_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_h_tgt); // ps.edge(m0_cur_h_tgt_ps_h);
                         m0_cur_h_is_exterior = (m0_cur_h_src_ps_e == m0_cur_h_tgt_ps_e);
                     }
@@ -6630,7 +6636,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             // find entry in the adjancency vector
 
                             // src
-                            std::map<vd_t, std::vector<std::pair<vd_t, hd_t>>>::iterator fiter = m1_ivtx_to_h.find(m1_cur_h_src);
+                            std::unordered_map<vd_t, std::vector<std::pair<vd_t, hd_t>>>::iterator fiter = m1_ivtx_to_h.find(m1_cur_h_src);
 
                             if (fiter != m1_ivtx_to_h.cend()) // check src's entry exists
                             {
@@ -6639,7 +6645,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             }
                             else
                             {
-                                std::pair<std::map<vd_t, std::vector<std::pair<vd_t, hd_t>>>::iterator, bool> p = m1_ivtx_to_h.emplace(m1_cur_h_src, std::vector<std::pair<vd_t, hd_t>>());
+                                std::pair<std::unordered_map<vd_t, std::vector<std::pair<vd_t, hd_t>>>::iterator, bool> p = m1_ivtx_to_h.emplace(m1_cur_h_src, std::vector<std::pair<vd_t, hd_t>>());
                                 MCUT_ASSERT(p.second == true);
                                 fiter = p.first;
                                 fiter->second.emplace_back(m1_cur_h_tgt, m1_cur_h);
@@ -6656,7 +6662,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             }
                             else
                             {
-                                std::pair<std::map<vd_t, std::vector<std::pair<vd_t, hd_t>>>::iterator, bool> p = m1_ivtx_to_h.emplace(m1_cur_h_tgt, std::vector<std::pair<vd_t, hd_t>>());
+                                std::pair<std::unordered_map<vd_t, std::vector<std::pair<vd_t, hd_t>>>::iterator, bool> p = m1_ivtx_to_h.emplace(m1_cur_h_tgt, std::vector<std::pair<vd_t, hd_t>>());
                                 MCUT_ASSERT(p.second == true);
                                 fiter = p.first;
                                 fiter->second.emplace_back(m1_cur_h_src, m1.opposite(m1_cur_h)); // record that it is connected to src (by the opp he of m1_cur_h)
@@ -6780,12 +6786,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //
                         //const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0_ihe_src_vertex);
                         //const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0_ihe_tgt_vertex);
-                        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_ihe_src_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::pair<ed_t, fd_t> &m0_ihe_src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_ihe_src_vertex);
+                        MCUT_ASSERT((size_t)m0_ihe_src_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_ihe_src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &m0_ihe_src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_ihe_src_vertex-ps.number_of_vertices());
                         const ed_t v0_ps_edge = m0_ihe_src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0_ihe_src_vertex); //ps.edge(v0_coincident_ps_halfedge);
 
-                        MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_ihe_tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                        const std::pair<ed_t, fd_t> &m0_ihe_tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_ihe_tgt_vertex);
+                        MCUT_ASSERT((size_t)m0_ihe_tgt_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_ihe_tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &m0_ihe_tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_ihe_tgt_vertex-ps.number_of_vertices());
                         const ed_t v1_ps_edge = m0_ihe_tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0_ihe_tgt_vertex); // ps.edge(v1_coincident_ps_halfedge);
 
                         const bool is_poly_exterior_interior_ihalfedge = (v0_ps_edge == v1_ps_edge);
@@ -6866,8 +6872,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // We do this because cut-mesh polygon will have two version each, where
         // a version corresponds to those that are stitched on the exterior and those interior.
         // We will duplicate the "m1" mesh later into two copies.
-        std::map<int, int> m0_to_m1_face;
-        std::map<int, int> m1_to_m0_face;
+        std::unordered_map<int, int> m0_to_m1_face; //std::map<int, int> m0_to_m1_face;
+        std::unordered_map<int, int> m1_to_m0_face;
 
         // for each traced polygon (in "m0")
         for (std::vector<traced_polygon_t>::const_iterator m0_traced_sm_polygon_iter = m0_polygons.cbegin();
@@ -6929,7 +6935,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //
 
         // extract the seam vertices
-        std::map<vd_t, bool> m1_vertex_to_seam_flag;
+        std::vector<bool> m1_vertex_to_seam_flag;
         mark_seam_vertices(m1_vertex_to_seam_flag, m1, ps.number_of_vertices(), m1_num_vertices_after_srcmesh_partitioning);
 
         MCUT_ASSERT(!m1_vertex_to_seam_flag.empty());
@@ -6951,7 +6957,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 sm_polygons_above_cs,
                 m1_vertex_to_seam_flag,
                 m1_to_m0_ovtx,
-                std::map<vd_t, vd_t>(), // ... because data is only available during "m1" stitching stage (later), and its not needed here
+                std::unordered_map<vd_t, vd_t>(), // ... because data is only available during "m1" stitching stage (later), and its not needed here
                 m1_to_m0_face,
                 m0_to_ps_vtx,
                 m0_to_ps_face,
@@ -7407,7 +7413,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // the polygon-tracing routine will have produced both orientations of such polygons.
                         // bool is_floating_patch = true;
                         const traced_polygon_t &potential_seed_poly = m0_polygons.at(potential_seed_poly_idx);
-                        bool is_floating_patch = check_is_floating_patch(potential_seed_poly, m0, ps, m0_ivtx_to_intersection_registry_entry, ps_vtx_cnt, sm_vtx_cnt);
+                        // NOTE: floating patches not longer exist due to polygn partitioning
+                        bool is_floating_patch = false; //check_is_floating_patch(potential_seed_poly, m0, ps, m0_ivtx_to_intersection_registry_entry, ps_vtx_cnt, sm_vtx_cnt);
 
                         // at this stage, the potential seed polygon will be a true seed from which to start
                         // building a patch if the following conditions hold:
@@ -7530,12 +7537,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             //const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(src_vertex);
                             //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(tgt_vertex);
-                            MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                            const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex);
+                            MCUT_ASSERT((size_t)src_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                            const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex-ps.number_of_vertices());
                             const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(src_vertex); //ps.edge(src_coincident_ps_halfedge);
 
-                            MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                            const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex);
+                            MCUT_ASSERT((size_t)tgt_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                            const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex-ps.number_of_vertices());
                             const ed_t tgt_ps_edge = tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(tgt_vertex); //ps.edge(tgt_ps_h);
 
                             is_valid_ambiguious_boundary_edge = (src_ps_edge == tgt_ps_edge);
@@ -7669,7 +7676,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             if (is_1st_colored_scs)
             {
-
                 // Here we do graph coloring using BFS
                 // NOTE: coloring is used to mark patches as either interior or exterior.
                 // Be aware that since we work only with the topology (connectivity), the
@@ -8227,7 +8233,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
 #if 1
             //std::vector<std::pair<int /*poly*/, int /*he idx*/>> known_exterior_cm_polygons;
-            const std::map<int /*poly*/, int /*he idx*/>::const_iterator known_exterior_cm_polygon = known_exterior_cm_polygons.cbegin();
+            const std::unordered_map<int /*poly*/, int /*he idx*/>::const_iterator known_exterior_cm_polygon = known_exterior_cm_polygons.cbegin();
             MCUT_ASSERT(m0_cm_poly_to_patch_idx.find(known_exterior_cm_polygon->first) != m0_cm_poly_to_patch_idx.cend());
 
             // get the patch containing the polygon
@@ -8642,7 +8648,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //
                 mesh_t patch_mesh;
 
-                std::map<
+                std::unordered_map<
                     vd_t, // vertex descriptor in "m0"
                     vd_t  // vertex descriptor in "patch_mesh"
                     >
@@ -8668,7 +8674,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 std::vector<vd_t> seam_vertices; // vertices along cutpath
 
-                std::map<vd_t, vd_t> patch_to_m0_vertex;
+                std::unordered_map<vd_t, vd_t> patch_to_m0_vertex;
 
                 // for each polygon in the patch
                 for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter)
@@ -8711,7 +8717,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // add faces into patch mesh
                 //
 
-                std::map<fd_t, int> patch_to_m0_face;
+                std::unordered_map<fd_t, int> patch_to_m0_face;
 
                 // for each polygon
                 for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter)
@@ -8987,7 +8993,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //
         std::map<
             char, // color tag
-            std::map<
+            std::unordered_map<
                 hd_t, // "m0" cut-mesh halfedge instance
                 std::map<
                     int, // patch idx
@@ -8997,24 +9003,24 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         std::map<
             char,              // color value
-            std::map<int, int> // copy of m0_to_m1_face (initially containing mappings just for traced source-mesh polygon)
+            std::unordered_map<int, int> // copy of m0_to_m1_face (initially containing mappings just for traced source-mesh polygon)
             >
             color_to_m0_to_m1_face = {{'A', m0_to_m1_face}, {'B', m0_to_m1_face}};
 
         std::map<
             char,              // color value
-            std::map<int, int> // copy of m1_to_m0_face (initially containing mappings just for traced source-mesh polygon)
+            std::unordered_map<int, int> // copy of m1_to_m0_face (initially containing mappings just for traced source-mesh polygon)
             >
             color_to_m1_to_m0_face = {{'A', m1_to_m0_face}, {'B', m1_to_m0_face}};
 
-        std::map<char, std::map<vd_t, // "m1" cut-mesh vtx instance
+        std::map<char, std::unordered_map<vd_t, // "m1" cut-mesh vtx instance
                                 vd_t  // "m0" cut-mesh ovtx instance
                                 >>
             colour_to_m1_to_m0_cm_ovtx;
 
         std::map<
             char,                // color value
-            std::map<vd_t, vd_t> // copy of "m0_to_m1_vtx" (initially containing mappings just for original source-mesh & cut-mesh vertices i.e. no ivertices included!)
+            std::vector<vd_t> // copy of "m0_to_m1_ovtx" (initially containing mappings just for original source-mesh & cut-mesh vertices i.e. no ivertices included!)
             >
             color_to_m1_to_m0_sm_ovtx = {{'A', m1_to_m0_ovtx}, {'B', m1_to_m0_ovtx}};
 
@@ -9072,9 +9078,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 #endif
 
             // create entry
-            color_to_m0_to_m1_he_instances.insert(std::make_pair(color_id, std::map<hd_t, std::map<int, hd_t>>()));
+            color_to_m0_to_m1_he_instances.insert(std::make_pair(color_id, std::unordered_map<hd_t, std::map<int, hd_t>>()));
             // ref to entry
-            std::map<hd_t, std::map<int, hd_t>> &m0_to_m1_he_instances = color_to_m0_to_m1_he_instances.at(color_id);
+            std::unordered_map<hd_t, std::map<int, hd_t>> &m0_to_m1_he_instances = color_to_m0_to_m1_he_instances.at(color_id);
             // copy all of the "m1_polygons" that were created before we got to the stitching stage
             // Note: Before stitching has began, "m1_polygons" contains only source-mesh polygons,
             // which have been partition to allow separation of unsealed connected components
@@ -9088,13 +9094,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // reference to the list connected components (see declaration for details)
             std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> &separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
 
-            std::map<int, int> &m0_to_m1_face_colored = color_to_m0_to_m1_face.at(color_id); // note: containing mappings only for traced source mesh polygons initially!
-            std::map<int, int> &m1_to_m0_face_colored = color_to_m1_to_m0_face.at(color_id);
+            std::unordered_map<int, int> &m0_to_m1_face_colored = color_to_m0_to_m1_face.at(color_id); // note: containing mappings only for traced source mesh polygons initially!
+            std::unordered_map<int, int> &m1_to_m0_face_colored = color_to_m1_to_m0_face.at(color_id);
             MCUT_ASSERT(!m0_to_m1_face_colored.empty());
             MCUT_ASSERT(!m1_to_m0_face_colored.empty());
 
             //std::map<vd_t, vd_t>& m0_to_m1_sm_ovtx_colored = color_to_m0_to_m1_sm_ovtx.at(color_id);
-            std::map<vd_t, vd_t> &m1_to_m0_sm_ovtx_colored = color_to_m1_to_m0_sm_ovtx.at(color_id);
+            std::vector<vd_t> &m1_to_m0_sm_ovtx_colored = color_to_m1_to_m0_sm_ovtx.at(color_id);
             //MCUT_ASSERT(!m0_to_m1_sm_ovtx_colored.empty());
             MCUT_ASSERT(!m1_to_m0_sm_ovtx_colored.empty());
 
@@ -9106,7 +9112,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // "m0" vertex has two "m1" copies because we generate ccw & cw patches.
 
             MCUT_ASSERT(colour_to_m1_to_m0_cm_ovtx.count(color_id) == 0);
-            std::map<vd_t, // "m1" cut-mesh vtx instance
+            std::unordered_map<vd_t, // "m1" cut-mesh vtx instance
                      vd_t  // "m0" cut-mesh ovtx instance
                      > &m1_to_m0_cm_ovtx_colored = colour_to_m1_to_m0_cm_ovtx[color_id];
 
@@ -9361,13 +9367,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he));
                                 // get the ps-edges corresponding to the ps-halfedges
                                 vd_t src_vertex = m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
-                                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                                const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex);
+                                MCUT_ASSERT((size_t)src_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex-ps.number_of_vertices());
                                 const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); // ps.edge(src_coincident_ps_halfedge);
 
                                 vd_t tgt_vertex = m0.target(m0_cur_patch_cur_poly_cur_he);
-                                MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                                const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex);
+                                MCUT_ASSERT((size_t)tgt_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex-ps.number_of_vertices());
                                 const ed_t tgt_ps_edge = tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he)); // ps.edge(tgt_ps_h);
 
                                 // is it an interior halfedge
@@ -9419,7 +9425,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             // the updated opposite halfedge in the current patch
                             hd_t m1_cs_cur_patch_polygon_he_opp = mesh_t::null_halfedge();
                             // query instances of the "m1" version of the opposite halfedge
-                            std::map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp);
+                            std::unordered_map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp);
 
                             // do we have at least one updated copy of the opposite, irrespective of which patch it
                             // belongs to.
@@ -9514,13 +9520,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                             //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he));
                             vd_t src_vertex = m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
-                            MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                            const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex);
+                            MCUT_ASSERT((size_t)src_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                            const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex-ps.number_of_vertices());
                             const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); // ps.edge(src_coincident_ps_halfedge);
 
                             vd_t tgt_vertex = m0.target(m0_cur_patch_cur_poly_cur_he);
-                            MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend());
-                            const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex);
+                            MCUT_ASSERT((size_t)tgt_vertex-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                            const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex-ps.number_of_vertices());
                             const ed_t tgt_ps_edge = tgt_vertex_ipair.first;
 
                             //const ed_t src_ps_edge = m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); //ps.edge(src_coincident_ps_halfedge);
@@ -9633,7 +9639,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                     // only through the polygons of the current patch)
 
                                     hd_t m1_cs_cur_patch_polygon_he_opp = mesh_t::null_halfedge(); // transformed instance of opposite
-                                    std::map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp);
+                                    std::unordered_map<hd_t /*m0*/, std::map<int /*patch idx*/, hd_t /*m1*/>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp);
 
                                     if (m0_to_m1_he_instances_find_iter != m0_to_m1_he_instances.cend())
                                     { // must transformed at least once since opposite patch is transformed
@@ -9905,12 +9911,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                         // NOTE: m0_cur_patch_cur_poly_cur_he will not exist if current patch has CCW orientation
                         // since such a patch will always be transformed first before its CW counterpart.
-                        std::map<hd_t, std::map<int, hd_t>>::iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he);
+                        std::unordered_map<hd_t, std::map<int, hd_t>>::iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he);
 
                         if (m0_to_m1_he_instances_find_iter == m0_to_m1_he_instances.end())
                         { // not yet transformed at all (i.e. m0_cur_patch_cur_poly_cur_he belongs to CCW polygon )
 
-                            std::pair<std::map<hd_t /*m0*/, std::map<int /*initial patch polygon*/, hd_t /*m1*/>>::iterator, bool> pair = m0_to_m1_he_instances.insert(std::make_pair(m0_cur_patch_cur_poly_cur_he, std::map<int, hd_t>()));
+                            std::pair<std::unordered_map<hd_t /*m0*/, std::map<int /*initial patch polygon*/, hd_t /*m1*/>>::iterator, bool> pair = m0_to_m1_he_instances.insert(std::make_pair(m0_cur_patch_cur_poly_cur_he, std::map<int, hd_t>()));
 
                             MCUT_ASSERT(pair.second == true);
 
@@ -10015,12 +10021,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             // MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0_cur_patch_cur_poly_cur_he_tgt) != m0_ivtx_to_ps_edge.cend());
 
                             // const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_tgt);
-                            MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_src) != m0_ivtx_to_intersection_registry_entry.cend());
-                            const std::pair<ed_t, fd_t> &m0_cur_patch_cur_poly_cur_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_patch_cur_poly_cur_he_src);
+                            MCUT_ASSERT((size_t)m0_cur_patch_cur_poly_cur_he_src-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                            const std::pair<ed_t, fd_t> &m0_cur_patch_cur_poly_cur_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_patch_cur_poly_cur_he_src-ps.number_of_vertices());
                             const ed_t src_ps_edge = m0_cur_patch_cur_poly_cur_he_src_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_src); //ps.edge(src_coincident_ps_halfedge);
 
-                            MCUT_ASSERT(m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend());
-                            const std::pair<ed_t, fd_t> &m0_cur_patch_cur_poly_cur_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_patch_cur_poly_cur_he_tgt);
+                            MCUT_ASSERT((size_t)m0_cur_patch_cur_poly_cur_he_tgt-ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size()/*m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                            const std::pair<ed_t, fd_t> &m0_cur_patch_cur_poly_cur_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_patch_cur_poly_cur_he_tgt-ps.number_of_vertices());
                             const ed_t tgt_ps_edge = m0_cur_patch_cur_poly_cur_he_tgt_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_tgt); //ps.edge(tgt_ps_h);
 
                             bool is_valid_ambiguious_interior_edge = (src_ps_edge != tgt_ps_edge);
@@ -10035,7 +10041,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // case 3
                         //
                         const hd_t m0_cur_patch_cur_poly_cur_he_opp = m0.opposite(m0_cur_patch_cur_poly_cur_he);
-                        std::map<hd_t, std::map<int, hd_t>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp); // value will not exist if current patch positive
+                        std::unordered_map<hd_t, std::map<int, hd_t>>::const_iterator m0_to_m1_he_instances_find_iter = m0_to_m1_he_instances.find(m0_cur_patch_cur_poly_cur_he_opp); // value will not exist if current patch positive
 
                         if (m0_to_m1_he_instances_find_iter != m0_to_m1_he_instances.cend())
                         { // check exists (i.e. m0_cur_patch_cur_poly_cur_he_opp has be transform but we dont know for which patch it has been transformed (CCW or CW)
@@ -10339,12 +10345,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 MCUT_ASSERT(color_to_m1_polygons.count(color_label) == 1);
                 const std::vector<traced_polygon_t> &m1_polygons_colored = color_to_m1_polygons.at(color_label);
                 MCUT_ASSERT(color_to_m1_to_m0_sm_ovtx.count(color_label) == 1);
-                const std::map<vd_t, vd_t> &m1_to_m0_sm_ovtx_colored = color_to_m1_to_m0_sm_ovtx.at(color_label);
+                const std::vector<vd_t> &m1_to_m0_sm_ovtx_colored = color_to_m1_to_m0_sm_ovtx.at(color_label);
 
                 MCUT_ASSERT(colour_to_m1_to_m0_cm_ovtx.count(color_label) == 1);
-                const std::map<vd_t, vd_t> &m1_to_m0_cm_ovtx_colored = colour_to_m1_to_m0_cm_ovtx.at(color_label);
+                const std::unordered_map<vd_t, vd_t> &m1_to_m0_cm_ovtx_colored = colour_to_m1_to_m0_cm_ovtx.at(color_label);
                 MCUT_ASSERT(color_to_m1_to_m0_face.count(color_label) == 1);
-                const std::map<int, int> &m1_to_m0_face_colored = color_to_m1_to_m0_face.at(color_label);
+                const std::unordered_map<int, int> &m1_to_m0_face_colored = color_to_m1_to_m0_face.at(color_label);
 
                 // extract the seam vertices
                 extract_connected_components(

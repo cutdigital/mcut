@@ -25,6 +25,7 @@
 #include <mcut/internal/halfedge_mesh.h>
 
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace mcut {
@@ -201,7 +202,7 @@ std::string to_string(const cut_surface_patch_winding_order_t&);
 void dispatch(output_t& out, const input_t& in);
 
 
-int find_connected_components(std::map<face_descriptor_t, int> &fccmap, const mesh_t &mesh);
+int find_connected_components(std::unordered_map<face_descriptor_t, int> &fccmap, const mesh_t &mesh);
 
 
 } // namespace mcut

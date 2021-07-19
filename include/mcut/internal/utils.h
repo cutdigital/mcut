@@ -46,7 +46,7 @@
 #if defined(MCUT_BUILD_WINDOWS)
 #define MCUT_DEBUG_BREAKPOINT_() __debugbreak()
 #else // #if defined(MCUT_BUILD_WINDOWS)
-#define MCUT_DEBUG_BREAKPOINT_()
+#define MCUT_DEBUG_BREAKPOINT_() std::abort()
 #endif // #if defined(MCUT_BUILD_WINDOWS)
 
 //

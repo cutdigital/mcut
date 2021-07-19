@@ -38,7 +38,7 @@
 #include <random> // perturbation
 #include <stdio.h>
 #include <string.h>
-
+#include <unordered_map>
 #if defined(MCUT_BUILD_WINDOWS)
 #pragma warning(disable : 26812)
 #endif
@@ -1672,7 +1672,7 @@ void intersectOIBVHs(
             result = false;
         }
 
-        std::map<mcut::face_descriptor_t, int> fccmap;
+        std::unordered_map<mcut::face_descriptor_t, int> fccmap;
         int n = mcut::find_connected_components(fccmap, m);
 
         if (n != 1)

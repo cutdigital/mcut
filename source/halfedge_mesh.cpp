@@ -516,7 +516,7 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
     }
 
     if (!reusing_removed_face_descr) {
-        MCUT_ASSERT((size_t)new_face_idx < m_faces.size() /*m_faces.count(new_face_idx) == 0*/);
+        MCUT_ASSERT((size_t)new_face_idx == m_faces.size() /*m_faces.count(new_face_idx) == 0*/);
         //m_faces.insert(std::make_pair(new_face_idx, *face_data_ptr));
         m_faces.emplace_back(*face_data_ptr);
     }

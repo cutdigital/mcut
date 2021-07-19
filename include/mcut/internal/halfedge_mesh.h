@@ -984,4 +984,42 @@ void read_off(mcut::mesh_t& mesh, const char* fpath);
 
 } // namespace mcut
 
+namespace std {
+  template <>
+  struct hash<mcut::vertex_descriptor_t>
+  {
+    std::size_t operator()(const mcut::vertex_descriptor_t& k) const
+    {
+      return std::hash<typename mcut::vertex_descriptor_t::index_type>()(static_cast<typename mcut::vertex_descriptor_t::index_type>(k));
+    }
+  };
+
+  template <>
+  struct hash<mcut::edge_descriptor_t>
+  {
+    std::size_t operator()(const mcut::edge_descriptor_t& k) const
+    {
+      return std::hash<typename mcut::edge_descriptor_t::index_type>()(static_cast<typename mcut::edge_descriptor_t::index_type>(k));
+    }
+  };
+
+  template <>
+  struct hash<mcut::halfedge_descriptor_t>
+  {
+    std::size_t operator()(const mcut::halfedge_descriptor_t& k) const
+    {
+      return std::hash<typename mcut::halfedge_descriptor_t::index_type>()(static_cast<typename mcut::halfedge_descriptor_t::index_type>(k));
+    }
+  };
+
+  template <>
+  struct hash<mcut::face_descriptor_t>
+  {
+    std::size_t operator()(const mcut::face_descriptor_t& k) const
+    {
+      return std::hash<typename mcut::face_descriptor_t::index_type>()(static_cast<typename mcut::face_descriptor_t::index_type>(k));
+    }
+  };
+}
+
 #endif // #ifndef MCUT_HALFEDGE_MESH_H_
