@@ -1946,7 +1946,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
             backendInput.cut_mesh = &cutMeshInternal;
 
+            cutMeshBvhAABBs.clear();
+            cutMeshBvhLeafNodeFaces.clear();
             constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+
+            mcut::write_off("cutMeshInternal.off", cutMeshInternal);
+            mcut::write_off("srcMeshInternal.off", srcMeshInternal);
         }
 
         if (floating_polygon_was_detected) {
@@ -2846,8 +2851,17 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
 
         if (intersecting_sm_cm_face_pairs.empty()) {
+
+            if(general_position_assumption_was_violated && perturbationIters > 0)
+            {
+                // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
+                // We need to perturb again. (The whole cut mesh)
+                backendOutput.status = mcut::status_t::GENERAL_POSITION_VIOLATION;
+                continue;
+            }else{
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
             return result;
+            }
         }
 
         backendInput.intersecting_sm_cm_face_pairs = &intersecting_sm_cm_face_pairs;

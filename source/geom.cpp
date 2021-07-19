@@ -151,7 +151,7 @@ namespace geom {
 
         std::vector<math::vec2> x;
         project2D(x, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
-        MCUT_ASSERT(x.size() == polygon_vertex_count);
+        MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
 
         // get any three vertices that are not collinear
         i = 0;

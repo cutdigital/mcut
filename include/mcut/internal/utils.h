@@ -189,6 +189,17 @@ public:
 #endif
     }
 };
+    template<typename T>
+    struct pair : std::pair<T, T>
+    {
+        pair(const  T a, const  T b): std::pair< T,  T>(a<b?a:b, a<b?b:a){}
+    };
+
+    template <typename T>
+    pair<T> make_pair(const T a, const T b){
+        return pair<T>(a, b);
+    }
+    
 
 } // namespace mcut
 

@@ -46,6 +46,7 @@ UTEST_F(DegenerateInput, edgeEdgeIntersection)
         MC_INVALID_OPERATION);
 }
 
+#if 0
 // An intersection between two triangles where a vertex from the cut-mesh triangle
 // lies on the src-mesh triangle.
 UTEST_F(DegenerateInput, faceVertexIntersection)
@@ -75,5 +76,6 @@ UTEST_F(DegenerateInput, faceVertexIntersection)
                   &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 3, 1),
         MC_INVALID_OPERATION);
 }
+#endif
 
 // TODO: add vertex-edge and vertex-vertex intersection tests
