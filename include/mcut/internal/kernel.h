@@ -150,16 +150,16 @@ struct input_t {
 };
 
 struct output_mesh_data_maps_t {
-    std::map<
-        vd_t, // vertex descriptor in connected component
-        vd_t // vertex descriptor in input-mesh e.g. source mesh or cut mesh. ("null_vertex()" if vertex is an intersection point)
-        >
-        vertex_map;
-    std::map<
-        fd_t, // face descriptor in connected component
-        fd_t // face descriptor in input-mesh e.g. source mesh or cut mesh. (new polygons resulting from clipping are mapped to the same input mesh face)
-        >
-        face_map;
+   // std::map<
+    //    vd_t, // vertex descriptor in connected component
+    //    vd_t // vertex descriptor in input-mesh e.g. source mesh or cut mesh. ("null_vertex()" if vertex is an intersection point)
+    //    >
+    std::vector<vd_t>    vertex_map;
+    //std::map<
+    //    fd_t, // face descriptor in connected component
+    //    fd_t // face descriptor in input-mesh e.g. source mesh or cut mesh. (new polygons resulting from clipping are mapped to the same input mesh face)
+    //    >
+     std::vector<fd_t>   face_map;
 };
 
 struct output_mesh_info_t {

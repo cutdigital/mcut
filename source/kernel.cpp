@@ -583,7 +583,8 @@ namespace mcut
         // Before "m1" is created in "dispatch", X = "0". Afterwards, X == "1" to signify the fact that the
         // input paramater called "in" (in this function) represents "m0" or "m1"
         std::map<std::size_t, std::unordered_map<vd_t, vd_t>> ccID_to_mX_to_cc_vertex;
-        std::map<std::size_t, std::unordered_map<vd_t, vd_t>> ccID_to_cc_to_mX_vertex;
+        //std::map<std::size_t, std::unordered_map<vd_t, vd_t>> ccID_to_cc_to_mX_vertex;
+        std::map<std::size_t, std::vector<vd_t>> ccID_to_cc_to_mX_vertex;
         // the vertex descriptors [in the cc] which are seam vertices!
         std::map<std::size_t, std::vector<vd_t>> cc_to_seam_vertices;
         // here we create a map to tag each polygon in "mesh" with the connected component it belongs to.
@@ -618,7 +619,7 @@ namespace mcut
             {
                 // create new component descriptor map
                 ccID_to_mX_to_cc_vertex.insert(std::make_pair(face_cc_id, std::unordered_map<vd_t, vd_t>()));
-                ccID_to_cc_to_mX_vertex[face_cc_id] = std::unordered_map<vd_t, vd_t>();
+                ccID_to_cc_to_mX_vertex[face_cc_id] = std::vector<vd_t>();
             }
 
             //
@@ -667,6 +668,7 @@ namespace mcut
 
             // for each vertex around the current face
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
+            
             for (std::vector<vertex_descriptor_t>::const_iterator face_vertex_iter = vertices_around_face.cbegin();
                  face_vertex_iter != vertices_around_face.cend();
                  ++face_vertex_iter)
@@ -688,7 +690,8 @@ namespace mcut
                     ccID_to_mX_to_cc_vertex.at(face_cc_id).insert(std::make_pair(*face_vertex_iter, cc_descriptor));
                     if (popuplate_vertex_maps)
                     {
-                        ccID_to_cc_to_mX_vertex.at(face_cc_id).insert(std::make_pair(cc_descriptor, *face_vertex_iter));
+                        //ccID_to_cc_to_mX_vertex.at(face_cc_id).insert(std::make_pair(cc_descriptor, *face_vertex_iter));
+                        ccID_to_cc_to_mX_vertex.at(face_cc_id).push_back(*face_vertex_iter);
                     }
                     // check if we need to save vertex as being a seam vertex
                     //std::vector<bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
@@ -724,7 +727,7 @@ namespace mcut
         // Insert faces into connected components using mapped vertex descriptors
         ///////////////////////////////////////////////////////////////////////////
 
-        std::map<size_t, std::unordered_map<fd_t, fd_t>> ccID_to_cc_to_mX_face;
+        std::map<size_t, std::vector<fd_t>> ccID_to_cc_to_mX_face;
 
         // for each face in the auxilliary data structure "mesh" (traced polygon)
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
@@ -740,16 +743,16 @@ namespace mcut
             }
 
             std::vector<vd_t> remapped_face; // using remapped cc descriptors
-            std::map<size_t, std::unordered_map<fd_t, fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
+            std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
 
             if (ccID_to_cc_to_mX_face_fiter == ccID_to_cc_to_mX_face.cend())
             {
-                std::pair<std::map<size_t, std::unordered_map<fd_t, fd_t>>::iterator, bool> r = ccID_to_cc_to_mX_face.insert(std::make_pair(cc_id, std::unordered_map<fd_t, fd_t>()));
+                std::pair<std::map<size_t, std::vector<fd_t>>::iterator, bool> r = ccID_to_cc_to_mX_face.insert(std::make_pair(cc_id, std::vector<fd_t>()));
                 ccID_to_cc_to_mX_face_fiter = r.first;
             }
 
             MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
-            std::unordered_map<fd_t, fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
+            std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
             // for each vertex around face
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
@@ -778,8 +781,9 @@ namespace mcut
 
             if (popuplate_face_maps)
             {
-                MCUT_ASSERT(cc_to_mX_face.count(f) == 0);
-                cc_to_mX_face[f] = fd;
+                MCUT_ASSERT((size_t)f == cc_to_mX_face.size() /*cc_to_mX_face.count(f) == 0*/);
+                //cc_to_mX_face[f] = fd;
+                cc_to_mX_face.push_back(fd);
             }
         }
 
@@ -844,17 +848,17 @@ namespace mcut
                 // the mapped-to value is undefined (mesh_t::null_vertex())
                 //
 
-                const std::unordered_map<vd_t, vd_t> &cc_to_mX_vertex = ccID_to_cc_to_mX_vertex.at(cc_id);
+                const std::vector<vd_t> &cc_to_mX_vertex = ccID_to_cc_to_mX_vertex.at(cc_id);
 
                 if (popuplate_vertex_maps)
                 {
                     // map cc vertices to original input mesh
                     // -----------------------------------
-
+                    ccinfo.data_maps.vertex_map.resize(cc.number_of_vertices());
                     for (mesh_t::vertex_iterator_t i = cc.vertices_begin(); i != cc.vertices_end(); ++i)
                     {
                         const vd_t cc_descr = *i;
-                        MCUT_ASSERT(cc_to_mX_vertex.count(cc_descr) == 1);
+                        MCUT_ASSERT((size_t)cc_descr < cc_to_mX_vertex.size() /*cc_to_mX_vertex.count(cc_descr) == 1*/);
                         const vd_t mX_descr = cc_to_mX_vertex.at(cc_descr);
 
                         // NOTE: "m1_to_m0_sm_ovtx_colored" contains only non-intersection points from the source mesh
@@ -913,7 +917,7 @@ namespace mcut
                                 }
                             }
 
-                            MCUT_ASSERT(ccinfo.data_maps.vertex_map.count(cc_descr) == 0);
+                            MCUT_ASSERT(ccinfo.data_maps.vertex_map.at(cc_descr) == mesh_t::null_vertex() /*ccinfo.data_maps.vertex_map.count(cc_descr) == 0*/);
                             ccinfo.data_maps.vertex_map[cc_descr] = input_mesh_descr;
                         }
                     }
@@ -925,15 +929,15 @@ namespace mcut
                     // -----------------------------------
                     MCUT_ASSERT(ccID_to_cc_to_mX_face.count(cc_id) == 1);
 
-                    std::unordered_map<fd_t, fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
-
+                    std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
+                    ccinfo.data_maps.face_map.resize(cc.number_of_faces());
                     for (mesh_t::face_iterator_t f = cc.faces_begin(); f != cc.faces_end(); ++f)
                     {
                         const fd_t cc_descr = *f;
                         // account for the fact that the parameter "mX_traced_polygons" may contain only a subset of traced polygons
                         // need this to compute correct polygon index to access std::maps
                         //const fd_t cc_descr_offsetted(traced_polygons_base_offset + static_cast<int>(cc_descr));
-                        MCUT_ASSERT(cc_to_mX_face.count(cc_descr) == 1);
+                        MCUT_ASSERT((size_t) cc_descr < cc_to_mX_face.size() /*cc_to_mX_face.count(cc_descr) == 1*/);
                         const fd_t mX_descr = cc_to_mX_face.at(cc_descr);
                         const fd_t offsetted_mX_descr(traced_polygons_base_offset + static_cast<int>(mX_descr)); // global traced polygon index
                         int m0_descr = -1;
@@ -968,7 +972,7 @@ namespace mcut
                         }
 
                         // map to input mesh face
-                        MCUT_ASSERT(ccinfo.data_maps.face_map.count(cc_descr) == 0);
+                        MCUT_ASSERT(ccinfo.data_maps.face_map.at(cc_descr) == mesh_t::null_face()/* (ccinfo.data_maps.face_map.count(cc_descr) == 0*/);
                         ccinfo.data_maps.face_map[cc_descr] = input_mesh_descr;
                     }
                 } // if (popuplate_face_maps) {
@@ -5561,7 +5565,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // by a face (i.e. we just remove those vertices used only by the source mesh in "m0")
                     mesh_t m; // output (seamed connected component)
                     std::vector<vd_t> remapped_seam_vertices;
-                    std::map<vd_t, vd_t> vmap_mesh_vertices;
+                    std::vector<vd_t> vmap_mesh_vertices(merged.number_of_vertices());
 
                     // for each face in the merged mesh
                     for (mesh_t::face_iterator_t f = merged.faces_begin(); f != merged.faces_end(); ++f)
@@ -5573,7 +5577,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // for each vertex on face
                         for (std::vector<vd_t>::const_iterator v = vertices_around_face.cbegin(); v != vertices_around_face.cend(); ++v)
                         {
-                            if (vmap_mesh_vertices.count(*v) == 0)
+                            if (vmap_mesh_vertices.at(*v) == mesh_t::null_vertex() /*vmap_mesh_vertices.count(*v) == 0*/)
                             {                                                             // not registered
                                 vmap_mesh_vertices[*v] = m.add_vertex(merged.vertex(*v)); // add vertex and save it new descriptor
 
@@ -8815,6 +8819,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // compute vertex mapping
                     // ----------------------
 
+                    omi.data_maps.vertex_map.resize(patch_mesh.number_of_vertices());
                     for (mesh_t::vertex_iterator_t v = patch_mesh.vertices_begin(); v != patch_mesh.vertices_end(); ++v)
                     {
                         MCUT_ASSERT(patch_to_m0_vertex.count(*v) == 1);
@@ -8832,7 +8837,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             as_cm_descr = static_cast<vd_t>(as_cm_descr + sm_vtx_cnt);
                         }
 
-                        MCUT_ASSERT(omi.data_maps.vertex_map.count(*v) == 0);
+                        MCUT_ASSERT(omi.data_maps.vertex_map.at(*v) == mesh_t::null_vertex() /*omi.data_maps.vertex_map.count(*v) == 0*/);
                         omi.data_maps.vertex_map[*v] = as_cm_descr;
                     }
                 }
@@ -8842,6 +8847,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // compute face mapping
                     // ----------------------
 
+                    omi.data_maps.face_map.resize(patch_mesh.number_of_faces());
                     for (mesh_t::face_iterator_t f = patch_mesh.faces_begin(); f != patch_mesh.faces_end(); ++f)
                     {
                         MCUT_ASSERT(patch_to_m0_face.count(*f) == 1);
@@ -8856,7 +8862,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
                         as_cm_descr = static_cast<fd_t>(as_cm_descr + sm_face_count);
 
-                        MCUT_ASSERT(omi.data_maps.face_map.count(*f) == 0);
+                        MCUT_ASSERT(omi.data_maps.face_map.at(*f) == mesh_t::null_face() /*omi.data_maps.face_map.count(*f) == 0*/);
                         omi.data_maps.face_map[*f] = as_cm_descr;
                     }
                 }
