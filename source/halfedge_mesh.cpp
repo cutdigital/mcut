@@ -25,9 +25,29 @@
 #include <algorithm>
 #include <cstdio>
 
+// https://math.stackexchange.com/questions/425968/eulers-formula-for-triangle-mesh
+#define VERTEX_VECTOR_PREALLOCATION_SIZE (1 << 10)
+#define FACE_VECTOR_PREALLOCATION_SIZE (VERTEX_VECTOR_PREALLOCATION_SIZE << 1)
+#define EDGE_VECTOR_PREALLOCATION_SIZE ((uint32_t) ((3.0/2.0) * FACE_VECTOR_PREALLOCATION_SIZE))
+#define HALFEDGE_VECTOR_PREALLOCATION_SIZE (EDGE_VECTOR_PREALLOCATION_SIZE * 2)
+
 namespace mcut {
 
-mesh_t::mesh_t() { }
+mesh_t::mesh_t() { 
+    #if 0
+    m_vertices.reserve(VERTEX_VECTOR_PREALLOCATION_SIZE);
+    m_vertices_removed.reserve(VERTEX_VECTOR_PREALLOCATION_SIZE);
+
+    m_faces.reserve(FACE_VECTOR_PREALLOCATION_SIZE);
+    m_faces_removed.reserve(FACE_VECTOR_PREALLOCATION_SIZE);
+
+    m_edges.reserve(EDGE_VECTOR_PREALLOCATION_SIZE);
+    m_edges_removed.reserve(EDGE_VECTOR_PREALLOCATION_SIZE);
+
+    m_halfedges.reserve(HALFEDGE_VECTOR_PREALLOCATION_SIZE);
+    m_halfedges_removed.reserve(HALFEDGE_VECTOR_PREALLOCATION_SIZE);
+    #endif
+    }
 mesh_t::~mesh_t() { }
 
 // static member functions
@@ -462,7 +482,10 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 
         // check if edge exists between v0 and v1 (using halfedges incident to either v0 or v1)
         // TODO: use the halfedge(..., true) function
-
+        //vertex_data_t& v0_data = m_vertices.at(v0);
+        //vertex_data_t& v1_data = m_vertices.at(v1);
+        
+#if 0
         vertex_data_t& v0_data = m_vertices.at(v0);
         vertex_data_t& v1_data = m_vertices.at(v1);
 
@@ -490,29 +513,32 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
                 break;
             }
         }
+#endif
+        halfedge_descriptor_t v1_h = halfedge(v0, v1, true);
+        bool connecting_edge_exists = v1_h != null_halfedge();
+        
+        //halfedge_descriptor_t v1_h = null_halfedge();
+
 
         // we use v1 in the following since v1 is the target (vertices are associated with halfedges which point to them)
 
+        
         halfedge_data_t* v1_hd_ptr = nullptr; // refer to halfedge whose tgt is v1
 
         if (connecting_edge_exists) // edge connecting v0 and v1
         {
             MCUT_ASSERT((size_t)v1_h < m_halfedges.size() /*m_halfedges.count(v1_h) == 1*/);
             v1_hd_ptr = &m_halfedges.at(v1_h);
-
-            face_data_ptr->m_halfedges.push_back(v1_h);
-
         } else { // there exists no edge between v0 and v1, so we create it
-            const halfedge_descriptor_t h = add_edge(v0, v1);
-            MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
-            v1_hd_ptr = &m_halfedges.at(h);
-
-            face_data_ptr->m_halfedges.push_back(h);
+            v1_h = add_edge(v0, v1);
+            MCUT_ASSERT((size_t)v1_h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
+            v1_hd_ptr = &m_halfedges.at(v1_h); // add to vertex list since v1 is the target of h
         }
 
         MCUT_ASSERT(v1_hd_ptr->f == null_face());
 
         v1_hd_ptr->f = new_face_idx; // associate halfedge with face
+        face_data_ptr->m_halfedges.push_back(v1_h);
     }
 
     if (!reusing_removed_face_descr) {

@@ -1889,45 +1889,66 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             >
             cutpath_edge_creation_info;
 
+                // unique list of faces that are tested for intersection
+        std::vector<fd_t> ps_tested_faces;
+        ps_tested_faces.reserve(input.sm_to_cm_faces->size() + input.cm_to_sm_faces->size());
+
+        // all pairs of sm and cm faces to be tested for intersection
+        // includes cm -> sm and sm to cm
+        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> intersection_pairs;
+
+        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = input.sm_to_cm_faces->cbegin();
+            i != input.sm_to_cm_faces->cend();++i)
+        {
+            intersection_pairs[i->first].reserve(i->second.size());
+            for (std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
+            {
+                const fd_t cm_face(*j + sm_face_count); // offset cm faces
+                intersection_pairs[i->first].push_back(cm_face);
+            }
+            ps_tested_faces.push_back(i->first); // sm face
+        }
+
+        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = input.cm_to_sm_faces->cbegin();
+            i != input.cm_to_sm_faces->cend();++i)
+        {
+            const fd_t cm_face(i->first + sm_face_count);
+            intersection_pairs.insert(std::make_pair(cm_face, i->second));
+
+            ps_tested_faces.push_back(cm_face);
+        }
+
         std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
+        // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
+        std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> ps_edge_to_bbox; 
 
         TIME_PROFILE_START("Prepare edge-face tests");
 
         // for each pair of polygons to be tested for intersection
-        for (std::vector<std::pair<fd_t, fd_t>>::const_iterator i = input.intersecting_sm_cm_face_pairs->cbegin();
-             i != input.intersecting_sm_cm_face_pairs->cend();
-             ++i)
+        //for (std::vector<std::pair<fd_t, fd_t>>::const_iterator i = input.intersecting_sm_cm_face_pairs->cbegin();
+        //     i != input.intersecting_sm_cm_face_pairs->cend();
+        //     ++i)
+        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = intersection_pairs.cbegin();
+            i != intersection_pairs.cend();++i)
         {
-            // the current pair of faces to be tested for intersection
-            const std::pair<
-                fd_t, // a face of in source mesh
-                fd_t  // a face of in cut mesh
-                > &intersection_pair = *i;
+            // the face with the intersecting edges (i.e. the edges to be tested against the other face)
+            const fd_t intersecting_edge_face =i->first;// sm_face != mesh_t::null_face() ? sm_face : cm_face;
 
-            const fd_t sm_face = intersection_pair.first;
-            const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps"
-            const fd_t cm_face((uint32_t)intersection_pair.second + cm_faces_start_offset);
-
-            DEBUG_CODE_MASK(lg << "src-mesh polygon = " << fstr(sm_face) << std::endl;);
-            DEBUG_CODE_MASK(lg << "cut-mesh polygon = " << fstr(cm_face) << std::endl;);
-
-            // Create the intersection test permutations. We need these in order to test the
-            // halfedges of one face against the other and vice versa.
-            const std::vector<std::pair<fd_t, fd_t>> test_permutations = {
-                {sm_face, cm_face}, // sm --> cm
-                {cm_face, sm_face}  // cm --> sm
-            };
-
-            // for each test permutation
-            for (std::vector<std::pair<fd_t, fd_t>>::const_iterator j = test_permutations.cbegin();
-                 j != test_permutations.cend();
-                 ++j)
+            for (std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
             {
-
-                // the face with the intersecting edges (i.e. the edges to be tested against the other face)
-                const fd_t intersecting_edge_face = j->first;
+                
                 // the face against which the edge is intersected
-                const fd_t tested_face = j->second;
+                const fd_t tested_face = *j; //j->second;
+
+                const geom::bounding_box_t<mcut::math::fast_vec3> *tested_face_bbox = nullptr;
+                bool tested_face_is_sm_face = (size_t)tested_face < (size_t)sm_face_count;
+                if(tested_face_is_sm_face)
+                {
+                    tested_face_bbox = &((*input.srcMeshFaceBboxes).at((size_t)tested_face));
+                }
+                else{
+                    tested_face_bbox = &((*input.cutMeshFaceBboxes).at(((size_t)tested_face - sm_face_count)));
+                }
 
                 const std::vector<hd_t> &halfedges = ps.get_halfedges_around_face(intersecting_edge_face);
 
@@ -1935,9 +1956,20 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 {
                     const ed_t edge = ps.edge(*hIter);
                     // associate edge with the face(s) it potentially intersects
-
+                    
+                    bool bb_exists = ps_edge_to_bbox.count(edge) > 0;
+                    geom::bounding_box_t<mcut::math::fast_vec3> *edge_bbox = &ps_edge_to_bbox[edge];
                     std::vector<fd_t> &faces = ps_edge_face_intersection_pairs[edge];
-                    if (faces.empty() || std::find(faces.cbegin(), faces.cend(), tested_face) == faces.cend())
+
+                    if(!bb_exists) // first time we have encountered edge
+                    {
+                        edge_bbox->expand(ps.vertex(ps.source(*hIter)));
+                        edge_bbox->expand(ps.vertex(ps.target(*hIter)));
+                    }
+
+                    if (faces.empty() || // 
+                        (geom::intersect_bounding_boxes(*edge_bbox, *tested_face_bbox) ==true && //
+                        std::find(faces.cbegin(), faces.cend(), tested_face) == faces.cend()))
                     {
                         faces.push_back(tested_face);
                     }
@@ -1952,9 +1984,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // These are faces of the src-mesh and cut-mesh
         //--------------------------------------------------------
 
-        // unique list of faces that are tested for intersection
-        std::set<fd_t> ps_tested_faces;
 
+        
+#if 0
         // These two sets offer an optimization to prevent collisions during insertions into "ps_tested_faces"
         // We first collect the cut-mesh faces and then the source mesh faces
         std::set<fd_t> &tested_faces_sm = ps_tested_faces;
@@ -1974,7 +2006,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         ps_tested_faces.insert(tested_faces_cm.cbegin(), tested_faces_cm.cend()); // add unique list of cut-mesh faces
         tested_faces_cm.clear();   
-        
+#endif   
          TIME_PROFILE_END();                                               // clear (no longer needed)
 
         TIME_PROFILE_START("Compute intersecting face properties");
@@ -1986,7 +2018,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
         std::unordered_map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
 
-        for (std::set<fd_t>::const_iterator tested_faces_iter = ps_tested_faces.cbegin(); tested_faces_iter != ps_tested_faces.cend(); tested_faces_iter++)
+        for (std::vector<fd_t>::const_iterator tested_faces_iter = ps_tested_faces.cbegin(); tested_faces_iter != ps_tested_faces.cend(); tested_faces_iter++)
         {
             // get the vertices of tested_face (used to estimate its normal etc.)
             std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(*tested_faces_iter);

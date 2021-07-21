@@ -1271,7 +1271,8 @@ McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
 void constructOIBVH(
     const mcut::mesh_t& mesh,
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& bvhAABBs,
-    std::vector<mcut::fd_t>& bvhLeafNodeFaces)
+    std::vector<mcut::fd_t>& bvhLeafNodeFaces,
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& face_bboxes)
 {
     const int meshFaceCount = mesh.number_of_faces();
     const int bvhNodeCount = mcut::bvh::get_ostensibly_implicit_bvh_size(meshFaceCount);
@@ -1279,7 +1280,7 @@ void constructOIBVH(
     // compute mesh-face bounding boxes and their centers
     // ::::::::::::::::::::::::::::::::::::::::::::::::::
 
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> face_bboxes(meshFaceCount, mcut::geom::bounding_box_t<mcut::math::fast_vec3>());
+    face_bboxes.resize(meshFaceCount); //, mcut::geom::bounding_box_t<mcut::math::fast_vec3>());
     std::vector<mcut::math::fast_vec3> face_bbox_centers(meshFaceCount, mcut::math::fast_vec3());
 
     // for each face in mesh
@@ -1438,8 +1439,8 @@ void constructOIBVH(
 
 void intersectOIBVHs(
     std::vector<std::pair<mcut::fd_t, mcut::fd_t>>& intersecting_sm_cm_face_pairs,
-    std::vector<mcut::fd_t>& intersecting_sm_faces,
-    std::vector<mcut::fd_t>& intersecting_cm_faces,
+    std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> &sm_to_cm_faces,
+    std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> &cm_to_sm_faces,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhAABBs,
     const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhAABBs,
@@ -1513,6 +1514,9 @@ void intersectOIBVHs(
                 MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
 
                 intersecting_sm_cm_face_pairs.emplace_back(sm_node_face, cs_node_face);
+
+                sm_to_cm_faces[sm_node_face].push_back(cs_node_face);
+                cm_to_sm_faces[cs_node_face].push_back(sm_node_face);
 
             } else if (sm_bvh_node_is_leaf && !cs_bvh_node_is_leaf) {
                 MCUT_ASSERT(cs_node_face == mcut::mesh_t::null_face());
@@ -1865,8 +1869,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshBvhAABBs;
     std::vector<mcut::fd_t> srcMeshBvhLeafNodeFaces;
-
-    constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces);
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshFaceBboxes;
+    constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces,srcMeshFaceBboxes);
 
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
@@ -1885,6 +1889,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     mcut::math::real_number_t cutMeshBboxDiagonal(0.0);
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
     std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshFaceBboxes;
 
     int perturbationIters = 0;
     int kernelDispatchCallCounter = -1;
@@ -1948,10 +1953,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
             cutMeshBvhAABBs.clear();
             cutMeshBvhLeafNodeFaces.clear();
-            constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+            
+            constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes);
 
-            mcut::write_off("cutMeshInternal.off", cutMeshInternal);
-            mcut::write_off("srcMeshInternal.off", srcMeshInternal);
+            //mcut::write_off("cutMeshInternal.off", cutMeshInternal);
+            //mcut::write_off("srcMeshInternal.off", srcMeshInternal);
         }
 
         if (floating_polygon_was_detected) {
@@ -2750,12 +2756,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             if (srcMeshIsUpdated) {
                 srcMeshBvhAABBs.clear();
                 srcMeshBvhLeafNodeFaces.clear();
-                constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces);
+                constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
             }
             if (cutMeshIsUpdated) {
                 cutMeshBvhAABBs.clear();
                 cutMeshBvhLeafNodeFaces.clear();
-                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes);
             }
 
             backendOutput.detected_floating_polygons.clear();
@@ -2844,9 +2850,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
         std::vector<std::pair<mcut::fd_t, mcut::fd_t>> intersecting_sm_cm_face_pairs;
-        std::vector<mcut::fd_t> intersecting_sm_faces;
-        std::vector<mcut::fd_t> intersecting_cm_faces;
-        intersectOIBVHs(intersecting_sm_cm_face_pairs, intersecting_sm_faces, intersecting_cm_faces,srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> sm_to_cm_faces;
+        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> cm_to_sm_faces;
+        intersectOIBVHs(intersecting_sm_cm_face_pairs, sm_to_cm_faces, cm_to_sm_faces,srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
 
@@ -2859,12 +2865,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 backendOutput.status = mcut::status_t::GENERAL_POSITION_VIOLATION;
                 continue;
             }else{
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
-            return result;
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+                return result;
             }
         }
 
         backendInput.intersecting_sm_cm_face_pairs = &intersecting_sm_cm_face_pairs;
+        backendInput.sm_to_cm_faces = &sm_to_cm_faces;
+        backendInput.cm_to_sm_faces = &cm_to_sm_faces;
+        backendInput.srcMeshFaceBboxes = &srcMeshFaceBboxes;
+        backendInput.cutMeshFaceBboxes = &cutMeshFaceBboxes;
 
         // Invokee the kernel by calling the mcut::internal dispatch function
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

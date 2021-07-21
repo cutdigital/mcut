@@ -23,6 +23,7 @@
 #ifndef MCUT_KERNEL_H
 #define MCUT_KERNEL_H
 #include <mcut/internal/halfedge_mesh.h>
+#include<mcut/internal/geom.h>
 
 #include <map>
 #include <unordered_map>
@@ -113,6 +114,11 @@ struct input_t {
     const mesh_t* src_mesh = nullptr;
     const mesh_t* cut_mesh = nullptr;
     const std::vector<std::pair<fd_t, fd_t>>* intersecting_sm_cm_face_pairs = nullptr;
+    const std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>* sm_to_cm_faces = nullptr;
+    const std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>* cm_to_sm_faces = nullptr;
+    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *srcMeshFaceBboxes = nullptr;
+    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *cutMeshFaceBboxes = nullptr;
+
     bool verbose = true;
     //bool keep_partially_sealed_connected_components = false;
     bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
