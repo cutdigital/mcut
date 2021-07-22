@@ -1887,26 +1887,22 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             std::vector<std::future<OutputStorageType> > futures;
 
             //////
-            auto fn_compute_ps_edge_to_faces_map = [&](Iterator block_start_, Iterator block_end_)
-            {
+            auto fn_compute_ps_edge_to_faces_map = [&](Iterator block_start_, Iterator block_end_) {
                 std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs_local;
                 // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
                 std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> ps_edge_to_bbox; 
 
-                for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator iter = block_start_; iter != block_end_;++iter)
-                {
+                for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator iter = block_start_; iter != block_end_;++iter){
                     // the face with the intersecting edges (i.e. the edges to be tested against the other face)
                     const fd_t intersecting_edge_face = iter->first;// sm_face != mesh_t::null_face() ? sm_face : cm_face;
 
-                    for (std::vector<fd_t>::const_iterator it = iter->second.cbegin(); it != iter->second.cend(); ++it)
-                    {
+                    for (std::vector<fd_t>::const_iterator it = iter->second.cbegin(); it != iter->second.cend(); ++it) {
                         // the face against which the edge is intersected
                         const fd_t tested_face = *it; //j->second;
-
                         const geom::bounding_box_t<mcut::math::fast_vec3> *tested_face_bbox = nullptr;
                         bool tested_face_is_sm_face = (size_t)tested_face < (size_t)sm_face_count;
-                        if(tested_face_is_sm_face)
-                        {
+
+                        if(tested_face_is_sm_face) {
                             tested_face_bbox = &((*input.srcMeshFaceBboxes).at((size_t)tested_face));
                         }
                         else{
@@ -1915,25 +1911,21 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                         const std::vector<hd_t> &halfedges = ps.get_halfedges_around_face(intersecting_edge_face);
 
-                        for (std::vector<hd_t>::const_iterator hIter = halfedges.cbegin(); hIter != halfedges.cend(); ++hIter)
-                        {
+                        for (std::vector<hd_t>::const_iterator hIter = halfedges.cbegin(); hIter != halfedges.cend(); ++hIter) {
                             const ed_t edge = ps.edge(*hIter);
                             // associate edge with the face(s) it potentially intersects
-                            
                             bool bb_exists = ps_edge_to_bbox.count(edge) > 0;
                             geom::bounding_box_t<mcut::math::fast_vec3> *edge_bbox = &ps_edge_to_bbox[edge];
                             std::vector<fd_t> &faces = ps_edge_face_intersection_pairs_local[edge];
 
-                            if(!bb_exists) // first time we have encountered edge
-                            {
+                            if(!bb_exists) { // first time we have encountered edge
                                 edge_bbox->expand(ps.vertex(ps.source(*hIter)));
                                 edge_bbox->expand(ps.vertex(ps.target(*hIter)));
                             }
 
                             if (faces.empty() || // 
                                 (geom::intersect_bounding_boxes(*edge_bbox, *tested_face_bbox) ==true &&  //
-                                std::find(faces.cbegin(), faces.cend(), tested_face) == faces.cend()))
-                            {
+                                std::find(faces.cbegin(), faces.cend(), tested_face) == faces.cend())) {
                                 faces.push_back(tested_face);
                             }
                         }
@@ -1957,15 +1949,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 #endif
             parallel_fork_and_join(
                 *input.scheduler, 
-                ps_edge_face_intersection_pairs.cbegin(),
-                ps_edge_face_intersection_pairs.cend(),
+                intersection_pairs.cbegin(),
+                intersection_pairs.cend(),
                 (1<<8),
                 fn_compute_ps_edge_to_faces_map,
                 ps_edge_face_intersection_pairs,
                 futures);
 
             // merge results from other threads
-            //for(unsigned long i=0;i<(num_blocks-1);++i)
+            
             while(!futures.empty()) {
                 std::future<OutputStorageType>& f = futures.front(); 
                 MCUT_ASSERT(f.valid());// The behavior is undefined if valid()== false before the call to wait_for
