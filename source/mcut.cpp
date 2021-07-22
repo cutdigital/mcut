@@ -26,6 +26,7 @@
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
+#include "mcut/internal/scheduler.h"
 
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 #include <cfenv>
@@ -210,6 +211,9 @@ void ccDeletorFunc(McConnCompBase* p)
 }
 
 struct McDispatchContextInternal {
+    
+    mcut::thread_pool scheduler;
+
     std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>> connComps = {};
 
     // state & dispatch flags
@@ -562,7 +566,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         vmap[*vIter] = i;
 
         if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
-            MCUT_ASSERT(halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1);
+            MCUT_ASSERT((size_t)*vIter < halfedgeMeshInfo.data_maps.vertex_map.size() /*halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1*/);
 
             // Here we use whatever value was assigned to the current vertex by the kernel.
             // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
@@ -679,7 +683,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         indexArrayMesh.pFaceAdjFacesSizes[faceIndex] = (uint32_t)adjFaces.size();
 
         if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
-            MCUT_ASSERT(halfedgeMeshInfo.data_maps.face_map.count(*i) == 1);
+            MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
             //const size_t idx = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
             uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
@@ -937,7 +941,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pContext, McFlags flag
         return result;
     }
 
-    std::unique_ptr<McDispatchContextInternal> ctxt = std::unique_ptr<McDispatchContextInternal>(new McDispatchContextInternal);
+    std::unique_ptr<McDispatchContextInternal> ctxt = std::unique_ptr<McDispatchContextInternal>(new McDispatchContextInternal());
     ctxt->flags = flags;
     McContext handle = reinterpret_cast<McContext>(ctxt.get());
     auto ret = gDispatchContexts.emplace(handle, std::move(ctxt));
@@ -1773,6 +1777,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     mcut::input_t backendInput;
+    backendInput.scheduler = &ctxtPtr->scheduler;
     backendInput.src_mesh = &srcMeshInternal;
 
     backendInput.verbose = false;

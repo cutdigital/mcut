@@ -24,6 +24,7 @@
 #define MCUT_KERNEL_H
 #include <mcut/internal/halfedge_mesh.h>
 #include<mcut/internal/geom.h>
+#include<mcut/internal/scheduler.h>
 
 #include <map>
 #include <unordered_map>
@@ -111,6 +112,7 @@ struct floating_polygon_info_t {
 // settings for how to execute the function "mcut::dispatch(...)"
 //
 struct input_t {
+    thread_pool *scheduler = nullptr;
     const mesh_t* src_mesh = nullptr;
     const mesh_t* cut_mesh = nullptr;
     const std::vector<std::pair<fd_t, fd_t>>* intersecting_sm_cm_face_pairs = nullptr;
@@ -172,6 +174,7 @@ struct output_mesh_info_t {
 // the output returned from the function "mcut::dispatch"
 //
 struct output_t {
+    
     status_t status = status_t::SUCCESS;
     logger_t logger;
     // fragments
