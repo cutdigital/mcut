@@ -74,6 +74,12 @@
 # define DEBUG_CODE_MASK(code) // do nothing
 #endif // #if defined(MCUT_DEBUG_BUILD)
 
+#define MCUT_MULTI_THREADED_IMPL 1
+
+#if defined(MCUT_MULTI_THREADED_IMPL)
+
+#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -91,10 +97,9 @@ public:
     typedef std::ostream& (*ManipFn)(std::ostream&);
     typedef std::ios_base& (*FlagsFn)(std::ios_base&);
 
-    logger_t()
-        : m_verbose(false)
-    {
-    }
+    logger_t() : m_buffer(), m_verbose(false), m_prepend(), m_reason_for_failure(){}
+    logger_t(const logger_t& other)=delete;
+    logger_t& operator=(const logger_t& other)= delete;
 
     ~logger_t()
     {
@@ -107,12 +112,14 @@ public:
 
     void set_reason_for_failure(const std::string& msg)
     {
-        m_reason_for_failure = msg;
+        if(m_reason_for_failure.empty()) // NOTE
+            m_reason_for_failure = msg;
     }
 
-    const std::string& get_reason_for_failure() const
+    std::string get_reason_for_failure()
     {
-        return m_reason_for_failure;
+        std::string s(m_reason_for_failure);  // copy
+        return s;
     }
 
     inline bool verbose()

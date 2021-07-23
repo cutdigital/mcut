@@ -1442,9 +1442,7 @@ void constructOIBVH(
 }
 
 void intersectOIBVHs(
-    std::vector<std::pair<mcut::fd_t, mcut::fd_t>>& intersecting_sm_cm_face_pairs,
-    std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> &sm_to_cm_faces,
-    std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> &cm_to_sm_faces,
+    std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> &ps_face_to_potentially_intersecting_others,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhAABBs,
     const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhAABBs,
@@ -1517,10 +1515,13 @@ void intersectOIBVHs(
                 MCUT_ASSERT(cs_node_face != mcut::mesh_t::null_face());
                 MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
 
-                intersecting_sm_cm_face_pairs.emplace_back(sm_node_face, cs_node_face);
+                mcut::fd_t cs_node_face_offsetted = mcut::fd_t(cs_node_face + numSrcMeshFaces);
 
-                sm_to_cm_faces[sm_node_face].push_back(cs_node_face);
-                cm_to_sm_faces[cs_node_face].push_back(sm_node_face);
+                MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(sm_node_face) == 0);
+                MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(cs_node_face_offsetted) == 0);
+
+                ps_face_to_potentially_intersecting_others[sm_node_face].push_back(cs_node_face_offsetted);
+                ps_face_to_potentially_intersecting_others[cs_node_face_offsetted].push_back(sm_node_face);
 
             } else if (sm_bvh_node_is_leaf && !cs_bvh_node_is_leaf) {
                 MCUT_ASSERT(cs_node_face == mcut::mesh_t::null_face());
@@ -1901,10 +1902,20 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     do {
         kernelDispatchCallCounter++;
 
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        bool general_position_assumption_was_violated = ((backendOutput.status.load() == mcut::status_t::GENERAL_POSITION_VIOLATION));
+        bool floating_polygon_was_detected = backendOutput.status.load() == mcut::status_t::DETECTED_FLOATING_POLYGON;
+#else
         bool general_position_assumption_was_violated = (/*perturbationIters != -1 &&*/ (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION));
         bool floating_polygon_was_detected = backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON;
+#endif
+        
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        backendOutput.status.store(mcut::status_t::SUCCESS);
+#else
         backendOutput.status = mcut::status_t::SUCCESS;
+#endif
 
         mcut::math::vec3 perturbation;
 
@@ -2854,30 +2865,35 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
-        std::vector<std::pair<mcut::fd_t, mcut::fd_t>> intersecting_sm_cm_face_pairs;
-        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> sm_to_cm_faces;
-        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> cm_to_sm_faces;
-        intersectOIBVHs(intersecting_sm_cm_face_pairs, sm_to_cm_faces, cm_to_sm_faces,srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> ps_face_to_potentially_intersecting_others;
+        intersectOIBVHs(ps_face_to_potentially_intersecting_others,srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Polygon-pairs found = " + std::to_string(intersecting_sm_cm_face_pairs.size()));
+        ctxtPtr->log(
+            McDebugSource::MC_DEBUG_SOURCE_API, 
+            McDebugType::MC_DEBUG_TYPE_OTHER, 
+            0, 
+            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, 
+            "Polygon-pairs found = " + std::to_string(ps_face_to_potentially_intersecting_others.size()));
 
-        if (intersecting_sm_cm_face_pairs.empty()) {
+        if (ps_face_to_potentially_intersecting_others.empty()) {
 
             if(general_position_assumption_was_violated && perturbationIters > 0)
             {
                 // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
                 // We need to perturb again. (The whole cut mesh)
+#if defined(MCUT_MULTI_THREADED_IMPL)
+                backendOutput.status.store(mcut::status_t::GENERAL_POSITION_VIOLATION);
+#else
                 backendOutput.status = mcut::status_t::GENERAL_POSITION_VIOLATION;
+#endif
                 continue;
-            }else{
+            } else {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
                 return result;
             }
         }
 
-        backendInput.intersecting_sm_cm_face_pairs = &intersecting_sm_cm_face_pairs;
-        backendInput.sm_to_cm_faces = &sm_to_cm_faces;
-        backendInput.cm_to_sm_faces = &cm_to_sm_faces;
+        backendInput.ps_face_to_potentially_intersecting_others = &ps_face_to_potentially_intersecting_others;
         backendInput.srcMeshFaceBboxes = &srcMeshFaceBboxes;
         backendInput.cutMeshFaceBboxes = &cutMeshFaceBboxes;
 
@@ -2896,10 +2912,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             result = McResult::MC_RESULT_MAX_ENUM;
         }
     } while (
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        (backendOutput.status.load() == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //
+        backendOutput.status.load() == mcut::status_t::DETECTED_FLOATING_POLYGON
+#else
         // general position voliation
         (backendOutput.status == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //
         // kernel detected a floating polygon and we now need to re-partition the origin polygon (in src mesh or cut-mesh) to then recall mcut::dispatch
-        backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON);
+        backendOutput.status == mcut::status_t::DETECTED_FLOATING_POLYGON
+#endif
+        );
 
     result = convert(backendOutput.status);
 

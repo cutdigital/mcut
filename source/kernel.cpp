@@ -35,11 +35,6 @@
 #include <tuple>
 #include <unordered_map>
 
-#define MCUT_MULTI_THREADED_IMPL
-#if defined(MCUT_MULTI_THREADED_IMPL)
-
-#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
-
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
 
@@ -1647,6 +1642,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         lg.reset();
         lg.set_verbose(input.verbose);
 
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        output.status.store(status_t::SUCCESS);
+#endif
+
         const mesh_t &sm = (*input.src_mesh);
         const mesh_t &cs = (*input.cut_mesh);
 
@@ -1785,60 +1784,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         DEBUG_CODE_MASK(lg << "calculate intersection-points" << std::endl;);
 
-        // ivertex to faces that meet at the this ivertex
-        //std::map<
-        ///    vd_t, // intersection point
-        //    std::vector<fd_t> // list of faces that intersect with another face at the intersection point
-        //    >
-        //    m0_ivtx_to_ps_faces;
-
-        // ivertex to halfedge that was tested again a face in order to produce this ivertex
-        // NOTE: the ordering of the intersections point is dependant on the order in which they where actually computed
-        // i.e. the data of the first intersection point is at index 0
-        //std::map<
-        //    vd_t, // intersection point
-        //    ed_t // halfedge
-        //    >
-        //    m0_ivtx_to_ps_edge;
-
-        std::vector<
-            std::pair<ed_t, fd_t> // edge and face that where tested to produce our intersection point.
-            >
-            m0_ivtx_to_intersection_registry_entry;
-
-        // re-entrant vertices on the border of the cut-mesh
-        std::vector<vd_t> cm_border_reentrant_ivtx_list;
-
-        //std::map<
-        ///    vd_t, // intersection point
-        ///    math::vec3 // the normal vector of intersected face from which intersection point came from
-        //    >
-        //    m0_ivtx_to_tested_polygon_normal;
-
-        // edges of the polygon soup mesh which intersect a face
-        std::unordered_map<ed_t, std::vector<vd_t>> ps_intersecting_edges;
-
-        // A map of used to create edges along the intersection path.
-        // Each element is the information such as intersection points that arise from testing two polygons.
-        // The size of thos vector is dependent on the number of polygon pairs (in "input.intersecting_sm_cm_face_pairs")
-        // which intersect.
-
-        std::map<             // information needed to build edges along the cut-path
-            mcut::pair<fd_t>, // pair of intersecting polygons (source-mesh polygon, cut-mesh polygon)
-            std::vector<vd_t> // resulting intersection points
-            >
-            cutpath_edge_creation_info;
-
+        
+#if 0
                 // unique list of faces that are tested for intersection
-        std::vector<fd_t> ps_tested_faces;
-        ps_tested_faces.reserve(input.sm_to_cm_faces->size() + input.cm_to_sm_faces->size());
+        //std::vector<fd_t> ps_tested_faces;
+        //ps_tested_faces.reserve(input.ps_face_to_potentially_intersecting_others->size());
 
         // all pairs of sm and cm faces to be tested for intersection
         // includes cm -> sm and sm to cm
         std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> intersection_pairs;
 
-        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = input.sm_to_cm_faces->cbegin();
-            i != input.sm_to_cm_faces->cend();++i)
+        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = input.ps_face_to_potentially_intersecting_others->cbegin();
+            i != input.ps_face_to_potentially_intersecting_others->cend();++i)
         {
             intersection_pairs[i->first].reserve(i->second.size());
             for (std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
@@ -1857,48 +1814,31 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             ps_tested_faces.push_back(cm_face);
         }
-
+#endif
         std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
-        TIME_PROFILE_START("Prepare edge-face tests");
-        {
-#if 0
-            typedef std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> InputStorageType;
-            typedef std::unordered_map<ed_t, std::vector<fd_t>> OutputStorageType; 
+        TIME_PROFILE_START("Prepare edge-to-face pairs");
 
-            unsigned long const length= intersection_pairs.size();
-            unsigned long const thread_count = input.scheduler->get_num_threads();
-            unsigned long const block_size_default = (1<<8);
-            unsigned long const block_size = std::min(block_size_default, length);
-            unsigned long const num_blocks=(length+block_size-1)/block_size;
-            
-            std::vector<std::future<OutputStorageType> > futures(num_blocks-1);
-              
-            //thread_pool pool;
-            typedef InputStorageType::const_iterator Iterator;
-            Iterator first = intersection_pairs.cbegin();
-            Iterator last = intersection_pairs.cend();
-            Iterator block_start=first;
-#endif
-            typedef std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> InputStorageType;
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        {
             typedef std::unordered_map<ed_t, std::vector<fd_t>> OutputStorageType; 
-            typedef InputStorageType::const_iterator Iterator;
+            typedef std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator InputStorageIteratorType;
+
             std::vector<std::future<OutputStorageType> > futures;
 
-            //////
-            auto fn_compute_ps_edge_to_faces_map = [&](Iterator block_start_, Iterator block_end_) {
+            auto fn_compute_ps_edge_to_faces_map = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
                 std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs_local;
-                // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
+                // We use representative triangles to cull unnecessary edge face tests
+                // See: http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
                 std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> ps_edge_to_bbox; 
 
                 for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator iter = block_start_; iter != block_end_;++iter){
                     // the face with the intersecting edges (i.e. the edges to be tested against the other face)
-                    const fd_t intersecting_edge_face = iter->first;// sm_face != mesh_t::null_face() ? sm_face : cm_face;
+                    const fd_t& intersecting_edge_face = iter->first;// sm_face != mesh_t::null_face() ? sm_face : cm_face;
 
                     for (std::vector<fd_t>::const_iterator it = iter->second.cbegin(); it != iter->second.cend(); ++it) {
                         // the face against which the edge is intersected
-                        const fd_t tested_face = *it; //j->second;
+                        const fd_t& tested_face = *it; //j->second;
                         const geom::bounding_box_t<mcut::math::fast_vec3> *tested_face_bbox = nullptr;
                         bool tested_face_is_sm_face = (size_t)tested_face < (size_t)sm_face_count;
 
@@ -1933,54 +1873,40 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 }
                 return ps_edge_face_intersection_pairs_local;
             };
-            //////
-#if 0
-            for(unsigned long i=0;i<(num_blocks-1);++i)
-            {
-                Iterator block_end=block_start;
-                std::advance(block_end,block_size);
 
-                futures[i]=input.scheduler->submit([&, block_start, block_end](){ return parallel_task_fn(block_start, block_end); });
-
-                block_start=block_end;
-            }            
-            // compute last result
-            ps_edge_face_intersection_pairs = parallel_task_fn(block_start, last); 
-#endif
             parallel_fork_and_join(
                 *input.scheduler, 
-                intersection_pairs.cbegin(),
-                intersection_pairs.cend(),
+                input.ps_face_to_potentially_intersecting_others->cbegin(),
+                input.ps_face_to_potentially_intersecting_others->cend(),
                 (1<<8),
                 fn_compute_ps_edge_to_faces_map,
-                ps_edge_face_intersection_pairs,
+                ps_edge_face_intersection_pairs, // out
                 futures);
 
             // merge results from other threads
-            
-            while(!futures.empty()) {
-                std::future<OutputStorageType>& f = futures.front(); 
+
+            for(int i =0; i < (int)futures.size(); ++i) {
+
+                std::future<OutputStorageType>& f = futures[i]; 
                 MCUT_ASSERT(f.valid());// The behavior is undefined if valid()== false before the call to wait_for
-                if(f.wait_for(std::chrono::nanoseconds(100)) == std::future_status::ready ) {
-                    OutputStorageType future_res = f.get();
-                    // merge results for current block
-                    for(OutputStorageType::const_iterator i = future_res.cbegin(); i != future_res.cend(); ++i){
-                        OutputStorageType::iterator fiter = ps_edge_face_intersection_pairs.find(i->first);
-                        if(fiter == ps_edge_face_intersection_pairs.cend()){
-                            ps_edge_face_intersection_pairs[i->first] = i->second;
-                        }
-                        else{
-                            for(std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j){
-                                if(std::find(fiter->second.cbegin(), fiter->second.cend(), *j) == fiter->second.cend()) {
-                                    fiter->second.push_back(*j);
-                                }
+                
+                OutputStorageType future_res = f.get();
+                // merge results for current block
+                for(OutputStorageType::const_iterator i = future_res.cbegin(); i != future_res.cend(); ++i){
+                    OutputStorageType::iterator fiter = ps_edge_face_intersection_pairs.find(i->first);
+                    if(fiter == ps_edge_face_intersection_pairs.cend()){
+                        ps_edge_face_intersection_pairs[i->first] = i->second;
+                    }
+                    else{
+                        for(std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j){
+                            if(std::find(fiter->second.cbegin(), fiter->second.cend(), *j) == fiter->second.cend()) {
+                                fiter->second.push_back(*j);
                             }
                         }
                     }
-                    futures.erase(futures.cbegin()); // done
                 }
+                
             }
-            TIME_PROFILE_END();
         }
 #else
         // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
@@ -2039,39 +1965,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
 
 #endif
+        TIME_PROFILE_END();
 
-        //TIME_PROFILE_END();
-#if 0
-        TIME_PROFILE_START("Extract intersecting face list");
-        // compute/extract unique list of faces that are tested for intersection
-        // These are faces of the src-mesh and cut-mesh
-        //--------------------------------------------------------
-
-
-        
-
-        // These two sets offer an optimization to prevent collisions during insertions into "ps_tested_faces"
-        // We first collect the cut-mesh faces and then the source mesh faces
-        std::set<fd_t> &tested_faces_sm = ps_tested_faces;
-        std::set<fd_t> tested_faces_cm;
-
-        // for each pair of polygons to be tested for intersection
-        for (std::vector<std::pair<fd_t, fd_t>>::const_iterator i = input.intersecting_sm_cm_face_pairs->cbegin();
-             i != input.intersecting_sm_cm_face_pairs->cend();
-             ++i)
-        {
-            tested_faces_sm.insert(i->first);
-
-            const uint32_t cm_faces_start_offset = sm_face_count; // i.e. start offset in "ps" (see above when we merged cm and sm faces into ps)
-            const fd_t cm_face((uint32_t)i->second + cm_faces_start_offset);
-            tested_faces_cm.insert(cm_face);
-        }
-
-        ps_tested_faces.insert(tested_faces_cm.cbegin(), tested_faces_cm.cend()); // add unique list of cut-mesh faces
-        tested_faces_cm.clear();   
-
-         TIME_PROFILE_END();                                               // clear (no longer needed)
-#endif   
         TIME_PROFILE_START("Compute intersecting face properties");
         // compute/extract geometry properties of each tested face
         //--------------------------------------------------------
@@ -2081,11 +1976,16 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
         std::unordered_map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
 
-        for (std::vector<fd_t>::const_iterator tested_faces_iter = ps_tested_faces.cbegin(); tested_faces_iter != ps_tested_faces.cend(); tested_faces_iter++)
+        // for each face that is to be tested for intersection 
+        // NOTE: the keys of input.ps_face_to_potentially_intersecting_others are the potentially colliding polygons
+        // that we get after BVH traversal
+        for (std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator tested_faces_iter = input.ps_face_to_potentially_intersecting_others->cbegin(); 
+            tested_faces_iter != input.ps_face_to_potentially_intersecting_others->cend(); 
+            tested_faces_iter++)
         {
             // get the vertices of tested_face (used to estimate its normal etc.)
-            std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(*tested_faces_iter);
-            std::vector<math::vec3> &tested_face_vertices = ps_tested_face_to_vertices[*tested_faces_iter]; // insert and get reference
+            std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_faces_iter->first);
+            std::vector<math::vec3> &tested_face_vertices = ps_tested_face_to_vertices[tested_faces_iter->first]; // insert and get reference
 
             for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it)
             {
@@ -2093,9 +1993,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 tested_face_vertices.push_back(vertex);
             }
 
-            math::vec3 &tested_face_plane_normal = ps_tested_face_to_plane_normal[*tested_faces_iter];
-            math::real_number_t &tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param[*tested_faces_iter];
-            int &tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp[*tested_faces_iter];
+            math::vec3 &tested_face_plane_normal = ps_tested_face_to_plane_normal[tested_faces_iter->first];
+            math::real_number_t &tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param[tested_faces_iter->first];
+            int &tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp[tested_faces_iter->first];
 
             tested_face_plane_normal_max_comp = geom::compute_polygon_plane_coefficients(
                 tested_face_plane_normal,
@@ -2109,6 +2009,50 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // edge-to-face intersection tests (narrow-phase)
         // -----------------------------------------
 
+        // ivertex to faces that meet at the this ivertex
+        //std::map<
+        ///    vd_t, // intersection point
+        //    std::vector<fd_t> // list of faces that intersect with another face at the intersection point
+        //    >
+        //    m0_ivtx_to_ps_faces;
+
+        // ivertex to halfedge that was tested again a face in order to produce this ivertex
+        // NOTE: the ordering of the intersections point is dependant on the order in which they where actually computed
+        // i.e. the data of the first intersection point is at index 0
+        //std::map<
+        //    vd_t, // intersection point
+        //    ed_t // halfedge
+        //    >
+        //    m0_ivtx_to_ps_edge;
+
+        std::vector<
+            std::pair<ed_t, fd_t> // edge and face that where tested to produce our intersection point.
+            >
+            m0_ivtx_to_intersection_registry_entry;
+
+        // re-entrant vertices on the border of the cut-mesh
+        std::vector<vd_t> cm_border_reentrant_ivtx_list;
+
+        //std::map<
+        ///    vd_t, // intersection point
+        ///    math::vec3 // the normal vector of intersected face from which intersection point came from
+        //    >
+        //    m0_ivtx_to_tested_polygon_normal;
+
+        // edges of the polygon soup mesh which intersect a face
+        std::unordered_map<ed_t, std::vector<vd_t>> ps_intersecting_edges;
+
+        // A map of used to create edges along the intersection path.
+        // Each element is the information such as intersection points that arise from testing two polygons.
+        // The size of thos vector is dependent on the number of polygon pairs (in "input.intersecting_sm_cm_face_pairs")
+        // which intersect.
+
+        std::map<             // information needed to build edges along the cut-path
+            mcut::pair<fd_t>, // pair of intersecting polygons (source-mesh polygon, cut-mesh polygon)
+            std::vector<vd_t> // resulting intersection points
+            >
+            cutpath_edge_creation_info;
+
         std::unordered_map<
             fd_t,             // intersectiong face
             std::vector<vd_t> // intersection point which involve the intersecting face
@@ -2121,6 +2065,460 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
 
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        {
+            //typedef std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator InputStorageIteratorType;
+            typedef std::tuple<
+                std::vector<std::pair<ed_t, fd_t>>, // m0_ivtx_to_intersection_registry_entry
+                std::vector<vd_t> ,// cm_border_reentrant_ivtx_list
+                std::unordered_map<ed_t, std::vector<vd_t>>, // ps_intersecting_edges
+                std::map<mcut::pair<fd_t>, std::vector<vd_t>>, // cutpath_edge_creation_info
+                std::unordered_map<fd_t, std::vector<vd_t>>, // ps_iface_to_ivtx_list
+                bool, // partial_cut_detected
+                std::vector<mcut::math::vec3>  // list of intersection points computed in a future
+            > OutputStorageTypesTuple; 
+
+            auto fn_compute_intersection_points = [&](
+                std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator block_start_, 
+                std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator block_end_) -> OutputStorageTypesTuple
+            {
+                OutputStorageTypesTuple local_output;
+
+                std::vector<std::pair<ed_t, fd_t>>& m0_ivtx_to_intersection_registry_entry_LOCAL = std::get<0>(local_output);
+                std::vector<vd_t>& cm_border_reentrant_ivtx_list_LOCAL = std::get<1>(local_output);
+                std::unordered_map<ed_t, std::vector<vd_t>>& ps_intersecting_edges_LOCAL = std::get<2>(local_output);
+                std::map<mcut::pair<fd_t>, std::vector<vd_t>>& cutpath_edge_creation_info_LOCAL = std::get<3>(local_output);
+                std::unordered_map<fd_t, std::vector<vd_t>>& ps_iface_to_ivtx_list_LOCAL = std::get<4>(local_output);
+                bool &partial_cut_detected_LOCAL = std::get<5>(local_output);
+                std::vector<mcut::math::vec3>& intersection_points_LOCAL = std::get<6>(local_output);
+
+                // NOTE: threads do not add vertices into m0 to prevent contention on a shared resource.
+                // They instead store a placeholder value that is analogous to an local offset i.e.
+                // as if each thread was writing into its own mesh.
+
+                // did another thread/job encountered a configuration in which we violated general position
+                // NOTE: we only check at the beginning to prevent contention on "output.status"
+                bool current_status_is_okay = (output.status.load() == status_t::SUCCESS);
+                if(!current_status_is_okay)
+                {
+                    return OutputStorageTypesTuple {}; // immediately
+                }
+
+                // for each edge
+                for (std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = block_start_;
+                    ps_edge_face_intersection_pairs_iter != block_end_;
+                    ps_edge_face_intersection_pairs_iter++)
+                {
+                   
+                    // our edge that we test for intersection with other faces
+                    const ed_t tested_edge = ps_edge_face_intersection_pairs_iter->first;
+                    // the faces against which the edge is tested for intersection
+                    const std::vector<fd_t> &tested_faces = ps_edge_face_intersection_pairs_iter->second;
+
+                    // the halfedges of our edge
+                    const hd_t tested_edge_h0 = ps.halfedge(tested_edge, 0);
+                    const hd_t tested_edge_h1 = ps.halfedge(tested_edge, 1);
+
+                    // source vertex
+                    const vertex_descriptor_t tested_edge_h0_source_descr = ps.source(tested_edge_h0);
+                    const math::vec3 &tested_edge_h0_source_vertex = ps.vertex(tested_edge_h0_source_descr);
+                    // target vertex
+                    const vertex_descriptor_t tested_edge_h0_target_descr = ps.target(tested_edge_h0);
+                    const math::vec3 &tested_edge_h0_target_vertex = ps.vertex(tested_edge_h0_target_descr);
+
+                    // This boolean var is evaluated based on the fact that sm faces come before cm faces inside the "ps" data structure
+                    const fd_t tested_edge_h0_face = ps.face(tested_edge_h0);
+                    const fd_t tested_edge_h1_face = ps.face(tested_edge_h1);
+                    const fd_t tested_edge_face = tested_edge_h0_face != mesh_t::null_face() ? tested_edge_h0_face : tested_edge_h1_face;
+                    const bool tested_edge_belongs_to_cm = ps_is_cutmesh_face(tested_edge_face, sm_face_count);
+
+                    // for each face that is to be intersected with the tested-edge
+                    for (std::vector<fd_t>::const_iterator tested_faces_iter = tested_faces.cbegin();
+                        tested_faces_iter != tested_faces.cend();
+                        ++tested_faces_iter)
+                    {
+                        const fd_t tested_face = *tested_faces_iter;
+
+                        // We are now finding the intersection points determined by calculating the location
+                        // where each halfedge of face A intersects the area defined by face B (if it exists).
+
+                        // get the vertices of tested_face (used to estimate its normal etc.)
+                        MCUT_ASSERT(ps_tested_face_to_vertices.find(tested_face) != ps_tested_face_to_vertices.end());
+                        const std::vector<math::vec3> &tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
+
+                        // compute plane of tested_face
+                        // -----------------------
+
+                        MCUT_ASSERT(ps_tested_face_to_plane_normal.find(tested_face) != ps_tested_face_to_plane_normal.end());
+                        const math::vec3 &tested_face_plane_normal = ps_tested_face_to_plane_normal.at(tested_face);
+                        MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
+                        const math::real_number_t &tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param.at(tested_face);
+                        MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
+                        const int &tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face); // geom::compute_polygon_plane_coefficients(
+                            
+                        math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
+
+                        char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
+                            tested_edge_h0_source_vertex,
+                            tested_edge_h0_target_vertex,
+                            tested_face_vertices.data(),
+                            (int)tested_face_vertices.size(),
+                            tested_face_plane_normal_max_comp);
+
+                        bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
+
+                        if (have_plane_intersection) { 
+                            if (segment_intersection_type != '1') { 
+                                bool violatedGP = false;
+                                std::vector<const math::vec3 *> points_touching_plane;
+
+                                if (segment_intersection_type == 'q' || segment_intersection_type == 'r' ) { 
+                                    points_touching_plane.push_back((segment_intersection_type == 'q') ? &tested_edge_h0_source_vertex : &tested_edge_h0_target_vertex);
+                                }
+                                else { 
+                                    points_touching_plane.push_back(&tested_edge_h0_source_vertex);
+                                    points_touching_plane.push_back(&tested_edge_h0_target_vertex);
+                                }
+
+                                for (std::vector<const math::vec3 *>::const_iterator i = points_touching_plane.cbegin(); i != points_touching_plane.cend(); ++i) {
+                                    const math::vec3 &point = (*(*i));
+                                    char result = geom::compute_point_in_polygon_test(
+                                        point,
+                                        tested_face_vertices.data(),
+                                        (int)tested_face_vertices.size());
+                                    if (result == 'i' || (result == 'v' || result == 'e')) {
+                                        violatedGP = true;
+                                        break;
+                                    }
+                                }
+
+                                if (violatedGP) {
+                                    status_t okay_status = status_t::SUCCESS;
+                                    bool exchanged = output.status.compare_exchange_strong(okay_status, status_t::GENERAL_POSITION_VIOLATION);
+                                    if (!input.enforce_general_position && exchanged) {
+                                        // only one thread can modify "lg". Thus, "lg" does not need to be locked in order to set
+                                        // the reason for failure
+                                        lg.set_reason_for_failure("invalid compute_segment_plane_intersection_type result ('" + std::to_string(segment_intersection_type) + "')");
+                                    }
+                                    return OutputStorageTypesTuple {};; // stop immediately and do not complete the current job
+                                }
+                                else
+                                {
+                                    //  move onto the next edge-face test.
+                                    continue;
+                                }
+                            }
+
+                            geom::compute_segment_plane_intersection(
+                                intersection_point,
+                                tested_face_plane_normal,
+                                tested_face_plane_param_d,
+                                tested_edge_h0_source_vertex,
+                                tested_edge_h0_target_vertex);
+
+                            char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
+                                intersection_point,
+                                tested_face_vertices.data(),
+                                (int)tested_face_vertices.size(),
+                                tested_face_plane_normal_max_comp);
+
+                            if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e') {
+                                status_t okay_status = status_t::SUCCESS;
+                                bool exchanged= output.status.compare_exchange_strong(okay_status, status_t::GENERAL_POSITION_VIOLATION);
+                                //output.status = status_t::GENERAL_POSITION_VIOLATION;
+                                if (!input.enforce_general_position && exchanged) {
+                                    lg.set_reason_for_failure("invalid point-in-polygon test result ('" + std::to_string(in_poly_test_intersection_type) + "')");
+                                }
+                                return OutputStorageTypesTuple {};; // stop immediately and do not complete the current job
+                            }
+
+                            bool have_point_in_polygon = in_poly_test_intersection_type == 'i';
+
+                            if (have_point_in_polygon) { 
+        
+                                fd_t face_pqr = tested_edge_face;                                                                    
+                                fd_t face_xyz = tested_face;                                                                         
+                                fd_t face_pqs = tested_edge_face == tested_edge_h0_face ? tested_edge_h1_face : mesh_t::null_face(); 
+
+                                vd_t new_vertex_descr(intersection_points_LOCAL.size());
+                                intersection_points_LOCAL.push_back(intersection_point); /*m0.add_vertex(intersection_point)*/;                                                                                   
+
+                                MCUT_ASSERT((size_t)new_vertex_descr == m0_ivtx_to_intersection_registry_entry_LOCAL.size() /*m0_ivtx_to_intersection_registry_entry.find(new_vertex_descr) == m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                m0_ivtx_to_intersection_registry_entry_LOCAL.push_back(std::make_pair(tested_edge, tested_face));
+
+                                ps_intersecting_edges_LOCAL[tested_edge].push_back(new_vertex_descr);
+
+                                const fd_t cm_face = tested_edge_belongs_to_cm ? tested_edge_face : tested_face;
+                                const fd_t sm_face = tested_edge_belongs_to_cm ? tested_face : tested_edge_face;
+
+                                if (tested_edge_belongs_to_cm) {
+                                    // NOTE: std::pair format/order is {source-mesh-face, cut-mesh-face}
+                                    cutpath_edge_creation_info_LOCAL[mcut::make_pair(tested_face, face_pqr)].push_back(new_vertex_descr);
+                                    if (face_pqs != mesh_t::null_face()) {
+                                        cutpath_edge_creation_info_LOCAL[mcut::make_pair(tested_face, face_pqs)].push_back(new_vertex_descr);
+                                    }
+                                }
+                                else {
+                                    cutpath_edge_creation_info_LOCAL[mcut::make_pair(tested_edge_face, tested_face)].push_back(new_vertex_descr);
+                                    const fd_t tested_edge_face_other = (tested_edge_face == tested_edge_h0_face) ? tested_edge_h1_face : tested_edge_h0_face;
+
+                                    if (tested_edge_face_other != mesh_t::null_face()) {
+                                        cutpath_edge_creation_info_LOCAL[mcut::make_pair(tested_edge_face_other, tested_face)].push_back(new_vertex_descr);
+                                    }
+                                }
+
+                                if (tested_edge_belongs_to_cm) { 
+                                    const bool is_border_reentrant_ivertex = ps.is_border(tested_edge); // ps.is_border(ps.edge(halfedge_pq));
+
+                                    if (is_border_reentrant_ivertex) {
+                                        cm_border_reentrant_ivtx_list_LOCAL.push_back(new_vertex_descr);
+                                    } 
+                                }
+
+                                ps_iface_to_ivtx_list_LOCAL[tested_face].push_back(new_vertex_descr);
+                                if(tested_edge_h0_face != mesh_t::null_face()){
+                                    ps_iface_to_ivtx_list_LOCAL[tested_edge_h0_face].push_back(new_vertex_descr);
+                                }
+                                if(tested_edge_h1_face != mesh_t::null_face()){
+                                    ps_iface_to_ivtx_list_LOCAL[tested_edge_h1_face].push_back(new_vertex_descr);
+                                }
+
+                                if(partial_cut_detected_LOCAL == false){ // keep checking until (locally) true
+                                    const bool is_cs_edge = ps_is_cutmesh_vertex(tested_edge_h0_source_descr, sm_vtx_cnt);
+                                    bool is_border = (tested_edge_h0_face == mesh_t::null_face() || tested_edge_h1_face == mesh_t::null_face());
+                                    partial_cut_detected_LOCAL = (is_cs_edge && is_border);
+                                }
+                            } // if (have_point_in_polygon)
+                        } // if (have_plane_intersection) {
+                    }     // for (std::vector<fd_t>::const_iterator intersected_faces_iter = intersected_faces.cbegin(); intersected_faces_iter != intersected_faces.cend(); ++intersected_faces_iter) {
+                } // for (std::map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin(); ps_edge_face_intersection_pairs_iter != ps_edge_face_intersection_pairs.cend(); ps_edge_face_intersection_pairs_iter++) {
+                
+                return local_output;
+            };
+#if 0
+            unsigned long const length = std::distance(ps_edge_face_intersection_pairs.cbegin(), ps_edge_face_intersection_pairs.cend());
+            unsigned long const block_size_default = (1<<8);
+            unsigned long const block_size = std::min(block_size_default, length);
+            unsigned long const num_blocks=(length+block_size-1)/block_size;
+
+            InputStorageIteratorType first = ps_edge_face_intersection_pairs.cbegin();
+            InputStorageIteratorType last = ps_edge_face_intersection_pairs.cend();
+            
+
+            futures.resize(num_blocks-1);
+            InputStorageIteratorType block_start=first;
+
+            for(unsigned long i=0;i<(num_blocks-1);++i)
+            {
+                InputStorageIteratorType block_end = block_start;
+                std::advance(block_end,block_size);
+
+                futures[i]=input.scheduler->submit(
+                    [&, block_start, block_end]()
+                    { 
+                        return fn_compute_intersection_points(block_start, block_end); 
+                    });
+
+                block_start=block_end;
+            }            
+            
+            // last/partial result(s) computed by master thread
+            OutputStorageTypesTuple partial_res = fn_compute_intersection_points(block_start, last); 
+#endif            
+            
+            std::vector<std::future<OutputStorageTypesTuple> > futures;
+            OutputStorageTypesTuple partial_res;
+            parallel_fork_and_join(
+                *input.scheduler, 
+                ps_edge_face_intersection_pairs.cbegin(),
+                ps_edge_face_intersection_pairs.cend(),
+                (1<<8),
+                fn_compute_intersection_points,
+                partial_res, // output computed by master thread
+                futures);
+
+            std::vector<mcut::math::vec3> intersection_points;
+            std::tie(
+                m0_ivtx_to_intersection_registry_entry, 
+                cm_border_reentrant_ivtx_list, 
+                ps_intersecting_edges, 
+                cutpath_edge_creation_info, 
+                ps_iface_to_ivtx_list,
+                partial_cut_detected,
+                intersection_points) = partial_res;
+
+            bool status_is_okay = true;
+
+            if(futures.empty()) { // only master thred
+                status_is_okay = (output.status.load() == status_t::SUCCESS);
+                if(!status_is_okay) {
+                    return; 
+                }
+            }
+            else { // one or more worker threads
+                
+                //
+                // This scope is executed by the master thread, which will merge results from other threads via std::futures
+                //
+                vd_t intersection_point_descr_baseoffset(ps.number_of_vertices());
+                
+                // iterate through all available future so that we can 1) get their results
+                // and 2) ensure that all scheduled jobs are completed before exiting (or returning from) 
+                // the kernel 
+                for(int i=0;i<(int)futures.size();++i) {
+                
+                    std::future<OutputStorageTypesTuple>& f = futures[i]; 
+                    MCUT_ASSERT(f.valid());// The behavior is undefined if valid()== false before the call to wait_for
+
+                    OutputStorageTypesTuple future_result = f.get(); // "get()" is a blocking function
+
+                    // As the master thread works to merge the partial results, it is possible that one of the
+                    // worker threads detected a violation of general position. In this case, the current dispatch call
+                    // needs to be stopped so that the front-end will be able to perturb the cut-mesh.
+                    //
+                    // Thus, we ask "did any worker-thread encounter a GP violation?" If so, we must stop all merging
+                    // of partial results [and] wait for the currently running jobs (futures) to finish. Waiting is 
+                    // done automatically by calling f.get()
+                    status_is_okay = (output.status.load() == status_t::SUCCESS);
+
+                    if(!status_is_okay) {
+                        continue; // skip future result
+                    }
+
+                    const std::vector<std::pair<ed_t, fd_t>>& m0_ivtx_to_intersection_registry_entry_FUTURE = std::get<0>(future_result);
+                    const std::vector<vd_t>& cm_border_reentrant_ivtx_list_FUTURE = std::get<1>(future_result);
+                    const std::unordered_map<ed_t, std::vector<vd_t>>& ps_intersecting_edges_FUTURE = std::get<2>(future_result);
+                    const std::map<mcut::pair<fd_t>, std::vector<vd_t>>& cutpath_edge_creation_info_FUTURE = std::get<3>(future_result);
+                    const std::unordered_map<fd_t, std::vector<vd_t>>& ps_iface_to_ivtx_list_FUTURE = std::get<4>(future_result);
+                    const bool &partial_cut_detected_FUTURE = std::get<5>(future_result);
+                    const std::vector<mcut::math::vec3>& intersection_points_FUTURE = std::get<6>(future_result);
+                    const uint32_t intersection_points_in_future = intersection_points_FUTURE.size();
+
+                    MCUT_ASSERT(intersection_points_FUTURE.size() == m0_ivtx_to_intersection_registry_entry_FUTURE.size());
+
+                    // add intersection point corresponding to the current future
+                    for(std::vector<mcut::math::vec3>::const_iterator it = intersection_points_FUTURE.cbegin();
+                        it != intersection_points_FUTURE.cend(); 
+                        ++it)
+                    {
+                        const vd_t stored_descr = m0.add_vertex(*it);
+                        MCUT_ASSERT(stored_descr != mesh_t::null_vertex());
+                    }
+
+                    // merge m0_ivtx_to_intersection_registry_entry_FUTURE
+                    m0_ivtx_to_intersection_registry_entry.insert(
+                        m0_ivtx_to_intersection_registry_entry.cend(),
+                        m0_ivtx_to_intersection_registry_entry_FUTURE.cbegin(),
+                        m0_ivtx_to_intersection_registry_entry_FUTURE.cend()
+                    );
+
+                    // merge cm_border_reentrant_ivtx_list_FUTURE
+                    for(std::vector<vd_t>::const_iterator it = cm_border_reentrant_ivtx_list_FUTURE.cbegin();
+                        it != cm_border_reentrant_ivtx_list_FUTURE.cend(); 
+                        ++it)
+                    {
+                        const vd_t rel_descr = (*it);
+                        const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr);
+                        cm_border_reentrant_ivtx_list.push_back(actual_descr);
+                    }
+
+                    // merge ps_intersecting_edges_FUTURE
+                    for(std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator i =  ps_intersecting_edges_FUTURE.cbegin();
+                        i !=  ps_intersecting_edges_FUTURE.cend(); 
+                        ++i)
+                    {
+                        std::unordered_map<ed_t, std::vector<vd_t>>::iterator fiter = ps_intersecting_edges.find(i->first);
+                        bool collision = (fiter != ps_intersecting_edges.end());
+                        if(collision) { // another thread also encounter the same edge
+                            for(std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
+                                const vd_t rel_descr = (*j);
+                                const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr); 
+                                if(std::find(fiter->second.cbegin(), fiter->second.cend(), *j) == fiter->second.cend()) {
+                                    fiter->second.push_back(actual_descr);
+                                }
+                            }
+                        }
+                        else {
+                            // just insert and account for offset
+                            for(std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
+                                const vd_t rel_descr = (*j);
+                                const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr); 
+                                ps_intersecting_edges[i->first].push_back(actual_descr);
+                            }
+                        }
+                    }
+
+                    // merge cutpath_edge_creation_info_FUTURE
+                    for(std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator i =  cutpath_edge_creation_info_FUTURE.cbegin();
+                        i !=  cutpath_edge_creation_info_FUTURE.cend(); 
+                        ++i)
+                    {
+                        std::map<mcut::pair<fd_t>, std::vector<vd_t>>::iterator fiter = cutpath_edge_creation_info.find(i->first);
+                        bool collision = (fiter != cutpath_edge_creation_info.end());
+                        if(collision) { // another thread also encounter the same key
+                            for(std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
+                                const vd_t rel_descr = (*j);
+                                const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr); 
+                                if(std::find(fiter->second.cbegin(), fiter->second.cend(), actual_descr) == fiter->second.cend()) {
+                                    fiter->second.push_back(actual_descr);
+                                }
+                            }
+                        }
+                        else {
+                            // just insert and account for offset
+                            for(std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
+                                const vd_t rel_descr = (*j);
+                                const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr); 
+                                cutpath_edge_creation_info[i->first].push_back(actual_descr);
+                            }
+                        }
+                    }
+
+                    // merge ps_iface_to_ivtx_list_FUTURE
+                    for(std::unordered_map<fd_t, std::vector<vd_t>>::const_iterator i =  ps_iface_to_ivtx_list_FUTURE.cbegin();
+                        i !=  ps_iface_to_ivtx_list_FUTURE.cend(); 
+                        ++i)
+                    {
+                        std::unordered_map<fd_t, std::vector<vd_t>>::iterator fiter = ps_iface_to_ivtx_list.find(i->first);
+                        bool collision = (fiter != ps_iface_to_ivtx_list.end());
+                        if(collision) { // another thread also encounter the same face
+                            for(std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
+                                const vd_t rel_descr = (*j);
+                                const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr);
+                                if(std::find(fiter->second.cbegin(), fiter->second.cend(), actual_descr) == fiter->second.cend()) {  
+                                    fiter->second.push_back(actual_descr);
+                                }
+                            }
+                        }
+                        else {
+                            // just insert and account for offset
+                            for(std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
+                                const vd_t rel_descr = (*j);
+                                const vd_t actual_descr = vd_t(intersection_point_descr_baseoffset + rel_descr); 
+                                ps_iface_to_ivtx_list[i->first].push_back(actual_descr);
+                            }
+                        }
+                    }
+
+                    // merge (i.e. boolean-wise OR) partial_cut_detected_FUTURE
+                    partial_cut_detected = (partial_cut_detected || partial_cut_detected_FUTURE) ? true : false;
+
+                    // shift to account for the (number of) intersection points computed in the current future
+                    intersection_point_descr_baseoffset += intersection_points_in_future;
+                } // while(!futures.empty()) {
+            } // if(num_blocks > 1)
+
+            if(!status_is_okay) {
+                // Safely return to the front-end since all jobs are now successively finished/cancelled.
+                //
+                // CAUTION: if the master thread returns before all current jobs are done (e.g. 
+                // successively cancelled) the worker threads would end up accessing dangling 
+                // references to e.g. variables like "ps", "m0", etc.
+                return; 
+
+            }
+        } // end of parallel execution scope
+#else
         for (std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin();
              ps_edge_face_intersection_pairs_iter != ps_edge_face_intersection_pairs.cend();
              ps_edge_face_intersection_pairs_iter++)
@@ -2475,7 +2873,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             }     // for (std::vector<fd_t>::const_iterator intersected_faces_iter = intersected_faces.cbegin(); intersected_faces_iter != intersected_faces.cend(); ++intersected_faces_iter) {
 
         } // for (std::map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin(); ps_edge_face_intersection_pairs_iter != ps_edge_face_intersection_pairs.cend(); ps_edge_face_intersection_pairs_iter++) {
-
+#endif
         DEBUG_CODE_MASK(lg << "partial cut = " << std::boolalpha << partial_cut_detected << std::endl;);
 
         // Create edges from the new intersection points

@@ -115,9 +115,7 @@ struct input_t {
     thread_pool *scheduler = nullptr;
     const mesh_t* src_mesh = nullptr;
     const mesh_t* cut_mesh = nullptr;
-    const std::vector<std::pair<fd_t, fd_t>>* intersecting_sm_cm_face_pairs = nullptr;
-    const std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>* sm_to_cm_faces = nullptr;
-    const std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>* cm_to_sm_faces = nullptr;
+    const std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>* ps_face_to_potentially_intersecting_others = nullptr;
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *srcMeshFaceBboxes = nullptr;
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *cutMeshFaceBboxes = nullptr;
 
@@ -175,7 +173,12 @@ struct output_mesh_info_t {
 //
 struct output_t {
     
+#if defined(MCUT_MULTI_THREADED_IMPL)
+    std::atomic<status_t> status;
+#else
     status_t status = status_t::SUCCESS;
+#endif
+    
     logger_t logger;
     // fragments
     std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>> connected_components;

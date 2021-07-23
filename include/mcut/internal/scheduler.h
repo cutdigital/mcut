@@ -265,6 +265,12 @@ class thread_pool
 
 public:
 
+    /*
+        The thread pool takes care of the exception safety too. Any exception thrown by the
+        task gets propagated through the std::future returned from submit() , and if the function
+        exits with an exception, the thread pool destructor abandons any not-yet-completed
+        tasks and waits for the pool threads to finish.
+    */
     template<typename FunctionType>
     std::future<typename std::result_of<FunctionType()>::type> submit(FunctionType f)
     {
@@ -285,9 +291,9 @@ public:
 template<typename InputStorageIteratorType, typename OutputStorageType, typename FunctionType >
 void parallel_fork_and_join(
     thread_pool& pool, 
-    // start of data structure to be processed in parallel
+    // start of data elements to be processed in parallel
     const InputStorageIteratorType& first,
-    // endof of data structure to be processed in parallel
+    // end of of data elements to be processed in parallel (e.g. std::map::end())
     const InputStorageIteratorType& last,
     // the ideal size of the block assigned to each thread
     unsigned long const block_size_default,
