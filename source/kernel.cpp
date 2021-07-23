@@ -623,7 +623,7 @@ namespace mcut
             //
 
             // check if the current face is already marked as "below" (w.r.t the cut-mesh).
-            const bool cc_is_below_cs = std::find(sm_polygons_below_cs.cbegin(), sm_polygons_below_cs.cend(), static_cast<int>(fd)) != sm_polygons_below_cs.cend();
+            const bool cc_is_below_cs =  std::binary_search(sm_polygons_below_cs.cbegin(), sm_polygons_below_cs.cend(), static_cast<int>(fd)) ;
 
             if (cc_is_below_cs)
             {
@@ -642,7 +642,7 @@ namespace mcut
             }
 
             // check if connected component is marked as "above"
-            const bool cc_is_above_cs = std::find(sm_polygons_above_cs.cbegin(), sm_polygons_above_cs.cend(), static_cast<int>(fd)) != sm_polygons_above_cs.cend();
+            const bool cc_is_above_cs = std::binary_search(sm_polygons_above_cs.cbegin(), sm_polygons_above_cs.cend(), static_cast<int>(fd));
 
             if (cc_is_above_cs)
             {
@@ -1714,7 +1714,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // merge cm faces
         for (mesh_t::face_iterator_t i = cs.faces_begin(); i != cs.faces_end(); ++i)
         {
-
             //std::vector<vd_t> fv = get_vertices_on_face(cs, *i);
             std::vector<vd_t> fv = cs.get_vertices_around_face(*i);
             std::vector<vd_t> remapped_face_vertices;
@@ -1800,45 +1799,59 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // We use representative triangles to cull unnecessary edge face tests
                 // See: http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
                 std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> ps_edge_to_bbox; 
+                std::unordered_map<ed_t, const std::vector<mcut::fd_t>*> ps_edge_to_tested_faces; // key is a ptr to input range
 
                 for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator iter = block_start_; iter != block_end_;++iter){
                     // the face with the intersecting edges (i.e. the edges to be tested against the other face)
                     const fd_t& intersecting_edge_face = iter->first;// sm_face != mesh_t::null_face() ? sm_face : cm_face;
+                    const std::vector<hd_t> &halfedges = ps.get_halfedges_around_face(intersecting_edge_face);
 
-                    for (std::vector<fd_t>::const_iterator it = iter->second.cbegin(); it != iter->second.cend(); ++it) {
-                        // the face against which the edge is intersected
-                        const fd_t& tested_face = *it; //j->second;
+                    for (std::vector<hd_t>::const_iterator hIter = halfedges.cbegin(); hIter != halfedges.cend(); ++hIter) {
+                        const ed_t edge =  ed_t((*hIter) / 2);
+
+                        // associate edge with the face(s) it potentially intersects
+                        std::pair<
+                            std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>>::iterator,
+                            bool
+                        > p = ps_edge_to_bbox.insert(std::make_pair(edge, geom::bounding_box_t<mcut::math::fast_vec3>{}));
+
+                        bool edge_bb_exists = p.second != true;
+                        if(!edge_bb_exists) { // first time we have encountered edge, so build Bbox
+                            p.first->second.expand(ps.vertex(ps.source(*hIter)));
+                            p.first->second.expand(ps.vertex(ps.target(*hIter)));
+                        }
+                    
+                        ps_edge_to_tested_faces[edge] = &iter->second;
+                    }                    
+                }
+
+                for(std::unordered_map<ed_t, const std::vector<mcut::fd_t>*>::const_iterator i = ps_edge_to_tested_faces.cbegin();
+                    i != ps_edge_to_tested_faces.cend(); ++i)
+                {
+                    const ed_t &edge = i->first;
+                    geom::bounding_box_t<mcut::math::fast_vec3> &edge_bbox = ps_edge_to_bbox.at(edge);
+                    std::vector<fd_t> &faces = ps_edge_face_intersection_pairs_local[edge];
+
+                    // test against faces
+                    for(std::vector<mcut::fd_t>::const_iterator f = i->second->cbegin(); f !=i->second->cend(); ++f)
+                    {
                         const geom::bounding_box_t<mcut::math::fast_vec3> *tested_face_bbox = nullptr;
-                        bool tested_face_is_sm_face = (size_t)tested_face < (size_t)sm_face_count;
+                        bool tested_face_is_sm_face = (size_t)*f < (size_t)sm_face_count;
 
                         if(tested_face_is_sm_face) {
-                            tested_face_bbox = &((*input.srcMeshFaceBboxes).at((size_t)tested_face));
+                            tested_face_bbox = &((*input.srcMeshFaceBboxes).at((size_t)*f));
                         }
                         else{
-                            tested_face_bbox = &((*input.cutMeshFaceBboxes).at(((size_t)tested_face - sm_face_count)));
+                            tested_face_bbox = &((*input.cutMeshFaceBboxes).at(((size_t)*f - sm_face_count)));
                         }
 
-                        const std::vector<hd_t> &halfedges = ps.get_halfedges_around_face(intersecting_edge_face);
-
-                        for (std::vector<hd_t>::const_iterator hIter = halfedges.cbegin(); hIter != halfedges.cend(); ++hIter) {
-                            const ed_t edge = ps.edge(*hIter);
-                            // associate edge with the face(s) it potentially intersects
-                            bool bb_exists = ps_edge_to_bbox.count(edge) > 0;
-                            geom::bounding_box_t<mcut::math::fast_vec3> *edge_bbox = &ps_edge_to_bbox[edge];
-                            std::vector<fd_t> &faces = ps_edge_face_intersection_pairs_local[edge];
-
-                            if(!bb_exists) { // first time we have encountered edge
-                                edge_bbox->expand(ps.vertex(ps.source(*hIter)));
-                                edge_bbox->expand(ps.vertex(ps.target(*hIter)));
-                            }
-
-                            if (faces.empty() || // 
-                                (geom::intersect_bounding_boxes(*edge_bbox, *tested_face_bbox) ==true &&  //
-                                std::find(faces.cbegin(), faces.cend(), tested_face) == faces.cend())) {
-                                faces.push_back(tested_face);
+                        if(geom::intersect_bounding_boxes(edge_bbox, *tested_face_bbox))
+                        {
+                            if (faces.empty() || std::find(faces.cbegin(), faces.cend(), *f) == faces.cend()) {
+                                faces.push_back(*f);
                             }
                         }
-                    }
+                    }  
                 }
                 return ps_edge_face_intersection_pairs_local;
             };
@@ -1954,8 +1967,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 std::unordered_map<fd_t, std::vector<math::vec3>> // ps_tested_face_to_vertices;
             > OutputStorageTypesTuple; 
             typedef std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator InputStorageIteratorType;
-
-            std::vector<std::future<OutputStorageTypesTuple> > futures;
 
             auto fn_compute_intersecting_face_properties = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
                 OutputStorageTypesTuple output_res;
@@ -2383,6 +2394,41 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 partial_cut_detected,
                 intersection_points) = partial_res;
 
+            // Add intersection points computed by master thread in to "m0" and 
+            // account for intersection point offsets
+            for(std::vector<mcut::math::vec3>::const_iterator i = intersection_points.cbegin(); i != intersection_points.cend(); ++i) {
+                const vd_t stored_descr = m0.add_vertex(*i);
+                MCUT_ASSERT(stored_descr != mesh_t::null_vertex());
+            }
+            
+            for(int i =0; i < (int)cm_border_reentrant_ivtx_list.size(); ++i){
+                cm_border_reentrant_ivtx_list[i] += ps.number_of_vertices();
+            }
+
+            for(std::unordered_map<ed_t, std::vector<vd_t>>::iterator i = ps_intersecting_edges.begin(); 
+                i != ps_intersecting_edges.end(); ++i) {
+                for(std::vector<vd_t>::iterator j = i->second.begin(); j != i->second.end(); j++){
+                    *j += ps.number_of_vertices();
+                }
+            }
+
+            for(std::unordered_map<fd_t, std::vector<vd_t>>::iterator i = ps_iface_to_ivtx_list.begin(); 
+                i != ps_iface_to_ivtx_list.end(); ++i) {
+                for(std::vector<vd_t>::iterator j = i->second.begin(); j != i->second.end(); j++){
+                    *j += ps.number_of_vertices();
+                }
+            }
+
+            for(std::map< mcut::pair<fd_t>, std::vector<vd_t> >::iterator i = cutpath_edge_creation_info.begin(); 
+                i != cutpath_edge_creation_info.end(); ++i) {
+                for(std::vector<vd_t>::iterator j = i->second.begin(); j != i->second.end(); j++){
+                    *j += ps.number_of_vertices();
+                }
+            }
+
+            //
+            // Now we merge the results from futures
+            
             bool status_is_okay = true;
 
             if(futures.empty()) { // only master thred
@@ -2396,7 +2442,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //
                 // This scope is executed by the master thread, which will merge results from other threads via std::futures
                 //
-                vd_t intersection_point_descr_baseoffset(ps.number_of_vertices());
+                vd_t intersection_point_descr_baseoffset(m0.number_of_vertices());
                 
                 // iterate through all available future so that we can 1) get their results
                 // and 2) ensure that all scheduled jobs are completed before exiting (or returning from) 
@@ -3065,44 +3111,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             >
             ivtx_to_incoming_hlist;
 
-        // TODO: this part of the program can AND should be replaced.
-        // We can avoid/replace "cutpath_edge_creation_info" with an std::map.
-        // Each entry in this map is effectively a "bin".
-        // A key will be an std::pair<ed_t, fd_t>, where the ed_t is the edge that intersected fd_t.
-        // A value will an std::vector<vd_t>, where vd_t is an intersection point whose
-        // ... registry-entry faces includes:
-        // 1) the faces incident to/used by ed_t (in the std::pair that is our key to our std::map )
-        // 2) the face fd_t (in the std::pair that is our key to our std::map )
-        // In effect, each value in our map (i.e. our std::vector<vd_t>) will be a list of intersection
-        // points between which we must put an edge (i.e. those edges along the cutpath).
-#if 0
-    std::map<std::pair<vd_t, vd_t>, int> ivtx_adj_mat;
-    for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator i = m0_ivtx_to_intersection_registry_entry.cbegin();
-      i != m0_ivtx_to_intersection_registry_entry.cend();
-      i++) {
-      const std::vector<fd_t> ireg_faces = ps_get_ivtx_registry_entry_faces(ps, i->second);
-      for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator j = m0_ivtx_to_intersection_registry_entry.cbegin();
-        j != m0_ivtx_to_intersection_registry_entry.cend();
-        j++) {
-
-        const std::vector<fd_t> jreg_faces = ps_get_ivtx_registry_entry_faces(ps, j->second);
-        int shared_faces = 0;
-        for (std::vector<fd_t>::const_iterator k = jreg_faces.cbegin(); k != jreg_faces.cend(); ++k) {
-          if (*k != mesh_t::null_face()) {
-            shared_faces = std::count(ireg_faces.cbegin(), ireg_faces.cend(), *k);
-                }
-            }
-
-        bool connectable = (shared_faces >= 2);
-
-        if (connectable) {
-          ivtx_adj_mat.emplace(
-            std::make_pair(i->first, j->second),
-            i != j ? 1 : 0);
-        }
-        }
-    }
-#endif
 
         for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
              cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
@@ -6612,6 +6620,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 }
             }
         }
+
+        // sort that we can do binary search over it
+        std::sort(sm_polygons_below_cs.begin(), sm_polygons_below_cs.end());
+        std::sort(sm_polygons_above_cs.begin(), sm_polygons_above_cs.end());
 
         TIME_PROFILE_END();
 

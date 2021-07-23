@@ -1517,8 +1517,8 @@ void intersectOIBVHs(
 
                 mcut::fd_t cs_node_face_offsetted = mcut::fd_t(cs_node_face + numSrcMeshFaces);
 
-                MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(sm_node_face) == 0);
-                MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(cs_node_face_offsetted) == 0);
+                //MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(sm_node_face) == 0);
+                //MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(cs_node_face_offsetted) == 0);
 
                 ps_face_to_potentially_intersecting_others[sm_node_face].push_back(cs_node_face_offsetted);
                 ps_face_to_potentially_intersecting_others[cs_node_face_offsetted].push_back(sm_node_face);
@@ -3110,12 +3110,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         // be one-to-one (even if with an sm offset ) as in the case when things do not change.
 
         if (backendInput.populate_vertex_maps) {
+            omi.data_maps.vertex_map.resize(cutMeshInternal.number_of_vertices());
             for (mcut::mesh_t::vertex_iterator_t i = cutMeshInternal.vertices_begin(); i != cutMeshInternal.vertices_end(); ++i) {
                 omi.data_maps.vertex_map[*i] = mcut::vd_t((*i) + srcMeshInternal.number_of_vertices()); // apply offset like kernel does
             }
         }
 
         if (backendInput.populate_face_maps) {
+            omi.data_maps.face_map.resize(cutMeshInternal.number_of_faces());
             for (mcut::mesh_t::face_iterator_t i = cutMeshInternal.faces_begin(); i != cutMeshInternal.faces_end(); ++i) {
                 omi.data_maps.face_map[*i] = mcut::fd_t((*i) + srcMeshInternal.number_of_faces()); // apply offset like kernel does
             }
@@ -3140,12 +3142,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         mcut::output_mesh_info_t omi;
         omi.mesh = srcMeshInternal; // naive copy
         if (backendInput.populate_vertex_maps) {
+            omi.data_maps.vertex_map.resize(srcMeshInternal.number_of_vertices());
             for (mcut::mesh_t::vertex_iterator_t i = srcMeshInternal.vertices_begin(); i != srcMeshInternal.vertices_end(); ++i) {
                 omi.data_maps.vertex_map[*i] = *i; // one to one mapping
             }
         }
 
         if (backendInput.populate_face_maps) {
+            omi.data_maps.face_map.resize(srcMeshInternal.number_of_faces());
             for (mcut::mesh_t::face_iterator_t i = srcMeshInternal.faces_begin(); i != srcMeshInternal.faces_end(); ++i) {
                 omi.data_maps.face_map[*i] = *i; // one to one mapping
             }

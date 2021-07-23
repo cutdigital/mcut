@@ -31,10 +31,12 @@
 #define EDGE_VECTOR_PREALLOCATION_SIZE ((uint32_t) ((3.0/2.0) * FACE_VECTOR_PREALLOCATION_SIZE))
 #define HALFEDGE_VECTOR_PREALLOCATION_SIZE (EDGE_VECTOR_PREALLOCATION_SIZE * 2)
 
+#define ENABLE_EDGE_DESCRIPTOR_TRICK 1
+
 namespace mcut {
 
 mesh_t::mesh_t() { 
-    #if 0
+    #if 1
     m_vertices.reserve(VERTEX_VECTOR_PREALLOCATION_SIZE);
     m_vertices_removed.reserve(VERTEX_VECTOR_PREALLOCATION_SIZE);
 
@@ -117,8 +119,12 @@ halfedge_descriptor_t mesh_t::opposite(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
     MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
+#if ENABLE_EDGE_DESCRIPTOR_TRICK
+    return halfedge_descriptor_t((h%2 == 0) ? h+1 : h-1); 
+#else
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.o;
+#endif
 }
 
 halfedge_descriptor_t mesh_t::prev(const halfedge_descriptor_t& h) const
@@ -160,8 +166,12 @@ edge_descriptor_t mesh_t::edge(const halfedge_descriptor_t& h) const
 {
     MCUT_ASSERT(h != null_halfedge());
     MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
+#if ENABLE_EDGE_DESCRIPTOR_TRICK
+    return edge_descriptor_t(h/2);
+#else
     const halfedge_data_t& hd = m_halfedges.at(h);
     return hd.e;
+#endif
 }
 
 face_descriptor_t mesh_t::face(const halfedge_descriptor_t& h) const
@@ -177,6 +187,9 @@ vertex_descriptor_t mesh_t::vertex(const edge_descriptor_t e, const int v) const
     MCUT_ASSERT(e != null_edge());
     MCUT_ASSERT(v == 0 || v == 1);
     MCUT_ASSERT((size_t)e < m_edges.size() /*m_edges.count(e) == 1*/);
+#if ENABLE_EDGE_DESCRIPTOR_TRICK
+    return target(halfedge_descriptor_t((e*2) + v));
+#else
     const edge_data_t& ed = m_edges.at(e);
     const halfedge_descriptor_t h = ed.h;
     MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -191,6 +204,7 @@ vertex_descriptor_t mesh_t::vertex(const edge_descriptor_t e, const int v) const
     }
 
     return v_out;
+#endif
 }
 
 bool mesh_t::is_border(const halfedge_descriptor_t h)
@@ -215,6 +229,9 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
     MCUT_ASSERT(i == 0 || i == 1);
     MCUT_ASSERT(e != null_edge());
     MCUT_ASSERT((size_t)e < m_edges.size() /*m_edges.count(e) == 1*/);
+#if ENABLE_EDGE_DESCRIPTOR_TRICK
+    return halfedge_descriptor_t(e*2 + i);
+#else
     const edge_data_t& ed = m_edges.at(e);
     halfedge_descriptor_t h = ed.h; // assuming i ==0
 
@@ -230,6 +247,7 @@ halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) c
     }
 
     return h;
+#endif
 }
 
 halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
@@ -571,15 +589,15 @@ const math::vec3& mesh_t::vertex(const vertex_descriptor_t& vd) const
 std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_descriptor_t f) const
 {
     MCUT_ASSERT(f != null_face());
-    std::vector<vertex_descriptor_t> vertex_descriptors;
+    
 
     const std::vector<halfedge_descriptor_t>& halfedges_on_face = get_halfedges_around_face(f);
-
+    std::vector<vertex_descriptor_t> vertex_descriptors(halfedges_on_face.size());
     for (int i = 0; i < (int)halfedges_on_face.size(); ++i) {
         const halfedge_descriptor_t h = halfedges_on_face.at(i);
-        MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
-        const halfedge_data_t& hd = m_halfedges.at(h);
-        vertex_descriptors.push_back(hd.t);
+        //MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
+        //const halfedge_data_t& hd = m_halfedges.at(h);
+        vertex_descriptors[i] = (target(h)/*hd.t*/);
     }
     return vertex_descriptors;
 }
