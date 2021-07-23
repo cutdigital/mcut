@@ -1784,37 +1784,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         DEBUG_CODE_MASK(lg << "calculate intersection-points" << std::endl;);
 
-        
-#if 0
-                // unique list of faces that are tested for intersection
-        //std::vector<fd_t> ps_tested_faces;
-        //ps_tested_faces.reserve(input.ps_face_to_potentially_intersecting_others->size());
-
-        // all pairs of sm and cm faces to be tested for intersection
-        // includes cm -> sm and sm to cm
-        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> intersection_pairs;
-
-        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = input.ps_face_to_potentially_intersecting_others->cbegin();
-            i != input.ps_face_to_potentially_intersecting_others->cend();++i)
-        {
-            intersection_pairs[i->first].reserve(i->second.size());
-            for (std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
-            {
-                const fd_t cm_face(*j + sm_face_count); // offset cm faces
-                intersection_pairs[i->first].push_back(cm_face);
-            }
-            ps_tested_faces.push_back(i->first); // sm face
-        }
-
-        for(std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator i = input.cm_to_sm_faces->cbegin();
-            i != input.cm_to_sm_faces->cend();++i)
-        {
-            const fd_t cm_face(i->first + sm_face_count);
-            intersection_pairs.insert(std::make_pair(cm_face, i->second));
-
-            ps_tested_faces.push_back(cm_face);
-        }
-#endif
         std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 
         TIME_PROFILE_START("Prepare edge-to-face pairs");
@@ -1976,6 +1945,103 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
         std::unordered_map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
 
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        {
+            typedef std::tuple<
+                std::unordered_map<fd_t, math::vec3>,// ps_tested_face_to_plane_normal;
+                std::unordered_map<fd_t, math::real_number_t>,// ps_tested_face_to_plane_normal_d_param;
+                std::unordered_map<fd_t, int>,// ps_tested_face_to_plane_normal_max_comp;
+                std::unordered_map<fd_t, std::vector<math::vec3>> // ps_tested_face_to_vertices;
+            > OutputStorageTypesTuple; 
+            typedef std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator InputStorageIteratorType;
+
+            std::vector<std::future<OutputStorageTypesTuple> > futures;
+
+            auto fn_compute_intersecting_face_properties = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
+                OutputStorageTypesTuple output_res;
+                std::unordered_map<fd_t, math::vec3>& ps_tested_face_to_plane_normal_LOCAL = std::get<0>(output_res);
+                std::unordered_map<fd_t, math::real_number_t>& ps_tested_face_to_plane_normal_d_param_LOCAL = std::get<1>(output_res);
+                std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_LOCAL = std::get<2>(output_res);
+                std::unordered_map<fd_t, std::vector<math::vec3>>& ps_tested_face_to_vertices_LOCAL = std::get<3>(output_res);
+
+                for (std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator tested_faces_iter = block_start_; 
+                    tested_faces_iter != block_end_; 
+                    tested_faces_iter++)
+                {
+                    // get the vertices of tested_face (used to estimate its normal etc.)
+                    std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_faces_iter->first);
+                    std::vector<math::vec3> &tested_face_vertices = ps_tested_face_to_vertices_LOCAL[tested_faces_iter->first]; // insert and get reference
+
+                    for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it)
+                    {
+                        const math::vec3 &vertex = ps.vertex(*it);
+                        tested_face_vertices.push_back(vertex);
+                    }
+
+                    math::vec3 &tested_face_plane_normal = ps_tested_face_to_plane_normal_LOCAL[tested_faces_iter->first];
+                    math::real_number_t &tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param_LOCAL[tested_faces_iter->first];
+                    int &tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp_LOCAL[tested_faces_iter->first];
+
+                    tested_face_plane_normal_max_comp = geom::compute_polygon_plane_coefficients(
+                        tested_face_plane_normal,
+                        tested_face_plane_param_d,
+                        tested_face_vertices.data(),
+                        (int)tested_face_vertices.size());
+                }
+                return output_res;
+            };
+
+            std::vector<std::future<OutputStorageTypesTuple> > futures;
+            OutputStorageTypesTuple partial_res;
+
+            parallel_fork_and_join(
+                *input.scheduler, 
+                input.ps_face_to_potentially_intersecting_others->cbegin(),
+                input.ps_face_to_potentially_intersecting_others->cend(),
+                (1<<8),
+                fn_compute_intersecting_face_properties,
+                partial_res, // out
+                futures);
+
+            std::tie(
+                ps_tested_face_to_plane_normal,
+                ps_tested_face_to_plane_normal_d_param,
+                ps_tested_face_to_plane_normal_max_comp,
+                ps_tested_face_to_vertices
+            ) = partial_res;
+            // merge results from other threads
+
+            for(int i =0; i < (int)futures.size(); ++i) {
+
+                std::future<OutputStorageTypesTuple>& f = futures[i]; 
+                MCUT_ASSERT(f.valid());// The behavior is undefined if valid()== false before the call to wait_for
+                
+                OutputStorageTypesTuple future_res = f.get();
+
+                std::unordered_map<fd_t, math::vec3>& ps_tested_face_to_plane_normal_FUTURE = std::get<0>(future_res);
+                std::unordered_map<fd_t, math::real_number_t>& ps_tested_face_to_plane_normal_d_param_FUTURE = std::get<1>(future_res);
+                std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_FUTURE = std::get<2>(future_res);
+                std::unordered_map<fd_t, std::vector<math::vec3>>& ps_tested_face_to_vertices_FUTURE = std::get<3>(future_res);
+
+                ps_tested_face_to_plane_normal.insert(
+                    ps_tested_face_to_plane_normal_FUTURE.cbegin(), 
+                    ps_tested_face_to_plane_normal_FUTURE.cend());
+
+                ps_tested_face_to_plane_normal_d_param.insert(
+                    ps_tested_face_to_plane_normal_d_param_FUTURE.cbegin(), 
+                    ps_tested_face_to_plane_normal_d_param_FUTURE.cend());
+
+                ps_tested_face_to_plane_normal_max_comp.insert(
+                    ps_tested_face_to_plane_normal_max_comp_FUTURE.cbegin(), 
+                    ps_tested_face_to_plane_normal_max_comp_FUTURE.cend());
+
+                ps_tested_face_to_vertices.insert(
+                    ps_tested_face_to_vertices_FUTURE.cbegin(), 
+                    ps_tested_face_to_vertices_FUTURE.cend());
+            }
+
+        } // end of parallel scope
+#else
         // for each face that is to be tested for intersection 
         // NOTE: the keys of input.ps_face_to_potentially_intersecting_others are the potentially colliding polygons
         // that we get after BVH traversal
@@ -2003,7 +2069,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 tested_face_vertices.data(),
                 (int)tested_face_vertices.size());
         }
-
+#endif
         TIME_PROFILE_END();
 
         // edge-to-face intersection tests (narrow-phase)
@@ -2294,37 +2360,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 } // for (std::map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin(); ps_edge_face_intersection_pairs_iter != ps_edge_face_intersection_pairs.cend(); ps_edge_face_intersection_pairs_iter++) {
                 
                 return local_output;
-            };
-#if 0
-            unsigned long const length = std::distance(ps_edge_face_intersection_pairs.cbegin(), ps_edge_face_intersection_pairs.cend());
-            unsigned long const block_size_default = (1<<8);
-            unsigned long const block_size = std::min(block_size_default, length);
-            unsigned long const num_blocks=(length+block_size-1)/block_size;
-
-            InputStorageIteratorType first = ps_edge_face_intersection_pairs.cbegin();
-            InputStorageIteratorType last = ps_edge_face_intersection_pairs.cend();
-            
-
-            futures.resize(num_blocks-1);
-            InputStorageIteratorType block_start=first;
-
-            for(unsigned long i=0;i<(num_blocks-1);++i)
-            {
-                InputStorageIteratorType block_end = block_start;
-                std::advance(block_end,block_size);
-
-                futures[i]=input.scheduler->submit(
-                    [&, block_start, block_end]()
-                    { 
-                        return fn_compute_intersection_points(block_start, block_end); 
-                    });
-
-                block_start=block_end;
-            }            
-            
-            // last/partial result(s) computed by master thread
-            OutputStorageTypesTuple partial_res = fn_compute_intersection_points(block_start, last); 
-#endif            
+            };    
             
             std::vector<std::future<OutputStorageTypesTuple> > futures;
             OutputStorageTypesTuple partial_res;
