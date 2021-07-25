@@ -36,7 +36,7 @@
 namespace mcut {
 
 mesh_t::mesh_t() { 
-    #if 1
+    #if 0
     m_vertices.reserve(VERTEX_VECTOR_PREALLOCATION_SIZE);
     m_vertices_removed.reserve(VERTEX_VECTOR_PREALLOCATION_SIZE);
 
@@ -586,7 +586,7 @@ const math::vec3& mesh_t::vertex(const vertex_descriptor_t& vd) const
     return vdata.p;
 }
 
-std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_descriptor_t f) const
+std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset) const
 {
     MCUT_ASSERT(f != null_face());
     
@@ -594,10 +594,10 @@ std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_des
     const std::vector<halfedge_descriptor_t>& halfedges_on_face = get_halfedges_around_face(f);
     std::vector<vertex_descriptor_t> vertex_descriptors(halfedges_on_face.size());
     for (int i = 0; i < (int)halfedges_on_face.size(); ++i) {
-        const halfedge_descriptor_t h = halfedges_on_face.at(i);
+        const halfedge_descriptor_t h = halfedges_on_face[i];
         //MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
         //const halfedge_data_t& hd = m_halfedges.at(h);
-        vertex_descriptors[i] = (target(h)/*hd.t*/);
+        vertex_descriptors[i] = vertex_descriptor_t(prepend_offset + target(h)/*hd.t*/);
     }
     return vertex_descriptors;
 }

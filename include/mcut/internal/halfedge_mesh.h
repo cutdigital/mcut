@@ -923,12 +923,44 @@ public:
         return std::find(m_vertices_removed.cbegin(), m_vertices_removed.cend(), v) != m_vertices_removed.cend();
     }
 
+    void reserve_for_additional_vertices(std::uint32_t n)
+    {
+        m_vertices.reserve(number_of_internal_vertices() + n);
+    }
+
+    void reserve_for_additional_edges(std::uint32_t n)
+    {
+        m_edges.reserve(number_of_internal_edges() + n);
+    }
+
+    void reserve_for_additional_halfedges(std::uint32_t n)
+    {
+        m_halfedges.reserve(number_of_internal_halfedges() + n);
+    }
+
+    void reserve_for_additional_faces(std::uint32_t n)
+    {
+        m_faces.reserve(number_of_internal_faces() + n);
+    }
+
+    void reserve_for_additional_elements(std::uint32_t n)
+    {
+        const std::uint32_t nv = n;
+        reserve_for_additional_vertices(nv);
+        const std::uint32_t nf = nv*2;
+        reserve_for_additional_faces(nf);
+        const std::uint32_t ne = (3.0/2.0) * nf;
+        reserve_for_additional_edges(ne);
+        const std::uint32_t nh = ne * 2;
+        reserve_for_additional_halfedges(nh);
+    }
+
     const math::vec3& vertex(const vertex_descriptor_t& vd) const;
 
     // returns vector of halfedges which point to vertex (i.e. "v" is their target)
     const std::vector<halfedge_descriptor_t>& get_halfedges_around_vertex(const vertex_descriptor_t v) const;
 
-    std::vector<vertex_descriptor_t> get_vertices_around_face(const face_descriptor_t f) const;
+    std::vector<vertex_descriptor_t> get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset = 0) const;
     std::vector<vertex_descriptor_t> get_vertices_around_vertex(const vertex_descriptor_t v) const;
 
     const std::vector<halfedge_descriptor_t>& get_halfedges_around_face(const face_descriptor_t f) const;

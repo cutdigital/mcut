@@ -34,6 +34,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <numeric> // std::iota
 
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
@@ -1677,23 +1678,31 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         TIME_PROFILE_START("Create ps");
         mesh_t ps = sm; // copy
 
+        ps.reserve_for_additional_elements(cs.number_of_vertices()); // hint
+
         //std::map<vd_t, vd_t> ps_to_sm_vtx;
         std::vector<vd_t> ps_to_sm_vtx(sm_vtx_cnt + cs.number_of_vertices());
+#if 1
+        std::iota (std::begin(ps_to_sm_vtx), std::end(ps_to_sm_vtx), vd_t(0));
+#else
         for (mesh_t::vertex_iterator_t v = sm.vertices_begin(); v != sm.vertices_end(); ++v)
         {
             ps_to_sm_vtx[*v] = *v; // one to one mapping since ps is initially a copy of sm!
         }
-
+#endif
         //std::map<fd_t, fd_t> ps_to_sm_face;
         std::vector<fd_t> ps_to_sm_face(sm.number_of_faces() + cs.number_of_faces());
+#if 1
+        std::iota (std::begin(ps_to_sm_face), std::end(ps_to_sm_face), fd_t(0));
+#else
         for (mesh_t::face_iterator_t f = sm.faces_begin(); f != sm.faces_end(); ++f)
         {
             ps_to_sm_face[*f] = *f; // one to one mapping since ps is initially a copy of sm!
         }
-
+#endif
         //std::map<vd_t, vd_t> cs_to_ps_vtx;
         //std::map<vd_t, vd_t> ps_to_cm_vtx;
-        std::vector<vd_t> cs_to_ps_vtx(cs.number_of_vertices());
+        //std::vector<vd_t> cs_to_ps_vtx(cs.number_of_vertices());
         std::vector<vd_t> ps_to_cm_vtx(sm_vtx_cnt + cs.number_of_vertices());
 
         // merge cm vertices
@@ -1704,7 +1713,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             MCUT_ASSERT(v != mesh_t::null_vertex());
 
             //cs_to_ps_vtx.insert(std::make_pair(*i, v));
-            cs_to_ps_vtx[*i] = v;
+            //cs_to_ps_vtx[*i] = v;
             ps_to_cm_vtx[v] = *i;
         }
 
@@ -1715,14 +1724,17 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         for (mesh_t::face_iterator_t i = cs.faces_begin(); i != cs.faces_end(); ++i)
         {
             //std::vector<vd_t> fv = get_vertices_on_face(cs, *i);
-            std::vector<vd_t> fv = cs.get_vertices_around_face(*i);
+#if 1
+            const std::vector<vd_t> remapped_face_vertices = cs.get_vertices_around_face(*i, sm_vtx_cnt);
+#else
+            const std::vector<vd_t> fv = cs.get_vertices_around_face(*i);
             std::vector<vd_t> remapped_face_vertices;
 
             for (std::vector<vd_t>::const_iterator j = fv.cbegin(); j != fv.cend(); ++j)
             {
-                remapped_face_vertices.push_back(cs_to_ps_vtx.at(*j));
+                remapped_face_vertices.push_back(vd_t(sm_vtx_cnt + (*j)));
             }
-
+#endif
             const fd_t f = ps.add_face(remapped_face_vertices);
 
             MCUT_ASSERT(f != mesh_t::null_face());
@@ -1732,7 +1744,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         
         TIME_PROFILE_END();
 
-        cs_to_ps_vtx.clear();
+        //cs_to_ps_vtx.clear();
 
         if (input.verbose) {
           dump_mesh(ps, "polygon-soup");
@@ -1948,6 +1960,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
 #endif
         TIME_PROFILE_END();
+
+        // assuming each edge will produce a new vertex
+        m0.reserve_for_additional_elements(ps_edge_face_intersection_pairs.size());
 
         TIME_PROFILE_START("Compute intersecting face properties");
         // compute/extract geometry properties of each tested face
@@ -3090,7 +3105,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Create new edges along the intersection
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Create edges"); // &&&&&
+        TIME_PROFILE_START("Create edges with intersection points "); // &&&&&
 
         // A mapping from an intersecting ps-face to the new edges. These edges are those whose
         // src and tgt vertices contain the respective face in their registry entry
@@ -3294,6 +3309,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             } // else if (new_ivertices_count > 2) {
         }
 
+        TIME_PROFILE_END();
+
         // NOTE: at this stage we have all vertices and edges which are needed to clip
         // intersecting faces in the polygon-soup ("ps").
 
@@ -3306,6 +3323,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // Find cut-paths (the boundaries of the openings/holes in the source mesh)
         ///////////////////////////////////////////////////////////////////////////
 
+        TIME_PROFILE_START("Find cut-paths ");
         DEBUG_CODE_MASK(lg << "find cut-paths" << std::endl;);
 
         DEBUG_CODE_MASK(lg.indent(););
@@ -3535,6 +3553,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //m0_ivtx_to_cutpath_edges.clear();      // free
         //m0_cutpath_sequences.clear(); // free
 
+        TIME_PROFILE_END();
+
         DEBUG_CODE_MASK(lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;);
 
         MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
@@ -3550,6 +3570,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //
 
         DEBUG_CODE_MASK(lg << "find border intersection points" << std::endl;);
+
+        TIME_PROFILE_START("Infer cutpath ino");
 
         //
         // MapKey=intersection point on a border halfedge of either the source-mesh or cut-mesh
@@ -3796,6 +3818,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         DEBUG_CODE_MASK(lg.unindent();); // end of cutpath sequence detection code
 
+        TIME_PROFILE_END();
+
         // NOTE:    at this point we have all vertices, edges, and the lists of
         //          edge sequences identifying the cutpaths
         // =====================================================================
@@ -3856,6 +3880,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             }
         }
 #endif
+
+        TIME_PROFILE_START("Detect floating polygons");
+
         // Detect floating polygons
         // ::::::::::::::::::::::::
         // NOTE: The following code is what we used to determine when to do polygon partitioning in the front end
@@ -4075,9 +4102,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
 #endif
 
+        TIME_PROFILE_END();
+
         ///////////////////////////////////////////////////////////////////////////
         // Create new edges partitioning the intersecting ps edges (2-part process)
         ///////////////////////////////////////////////////////////////////////////
+
+        TIME_PROFILE_START("Create polygon-exterior edges (w/ > 3 vertices)");
 
         DEBUG_CODE_MASK(lg << "create polygon-exterior edges" << std::endl;);
         DEBUG_CODE_MASK(lg.indent(););
@@ -4299,6 +4330,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             DEBUG_CODE_MASK(lg.unindent(););
         }
+
+        TIME_PROFILE_END();
+
+        TIME_PROFILE_START("Create polygon-exterior edges (2 or 3 vertices)");
 
         // Part 2
         //
