@@ -4494,7 +4494,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //MCUT_ASSERT(h != mesh_t::null_halfedge());
                         edges_LOCAL.push_back(
                             std::make_pair(
-                                ed_t((uint32_t)h / 2),                                                  // local edge descriptor
+                                local_edge_descr_offset,                                                  // local edge descriptor
                                 std::make_pair(vertices_on_ps_edge.back(), vertices_on_ps_edge.front()) // the vertices which define the edge
                                 ));
 
@@ -4543,7 +4543,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 //h0 = m0.add_edge(first, second);
                                 //MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                                 h0 = hd_t(local_edge_descr_offset * 2); // mimmick halfedge descriptor
-                                m0_h0_edge_local = ed_t((uint32_t)h0 / 2);
+                                m0_h0_edge_local = local_edge_descr_offset;
                                 edges_LOCAL.push_back(
                                     std::make_pair(
                                         m0_h0_edge_local,             // local edge descriptor
@@ -4558,7 +4558,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 //MCUT_ASSERT(h1 != mesh_t::null_halfedge());
 
                                 h1 = hd_t(local_edge_descr_offset * 2); // mimmick halfedge descriptor
-                                m0_h1_edge_local = ed_t((uint32_t)h1 / 2);
+                                m0_h1_edge_local = local_edge_descr_offset;
                                 edges_LOCAL.push_back(
                                     std::make_pair(
                                         m0_h0_edge_local,             // local edge descriptor
@@ -4576,7 +4576,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 //h0 = m0.add_edge(first, third);
                                 //MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                                 h0 = hd_t(local_edge_descr_offset * 2); // mimmick halfedge descriptor
-                                m0_h0_edge_local = ed_t((uint32_t)h0 / 2);
+                                m0_h0_edge_local = local_edge_descr_offset;
                                 edges_LOCAL.push_back(
                                     std::make_pair(
                                         m0_h0_edge_local,            // local edge descriptor
@@ -4589,7 +4589,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 //h1 = m0.add_edge(third, second);
                                 //MCUT_ASSERT(h1 != mesh_t::null_halfedge());
                                 h1 = hd_t(local_edge_descr_offset * 2); // mimmick halfedge descriptor
-                                m0_h1_edge_local = ed_t((uint32_t)h1 / 2);
+                                m0_h1_edge_local = local_edge_descr_offset;
                                 edges_LOCAL.push_back(
                                     std::make_pair(
                                         m0_h1_edge_local,             // local edge descriptor
@@ -4607,7 +4607,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             //h0 = m0.add_edge(second, first); // o-->x
                             //MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                             h0 = hd_t(local_edge_descr_offset * 2);    // mimmick halfedge descriptor
-                            m0_h0_edge_local = ed_t((uint32_t)h0 / 2); // local edge descriptor
+                            m0_h0_edge_local = local_edge_descr_offset; // local edge descriptor
                             edges_LOCAL.push_back(
                                 std::make_pair(
                                     m0_h0_edge_local,
@@ -4620,7 +4620,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             //h1 = m0.add_edge(first, third);
                             //MCUT_ASSERT(h1 != mesh_t::null_halfedge());
                             h1 = hd_t(local_edge_descr_offset * 2);    // mimmick halfedge descriptor
-                            m0_h1_edge_local = ed_t((uint32_t)h1 / 2); // local edge descriptor
+                            m0_h1_edge_local = local_edge_descr_offset; // local edge descriptor
                             edges_LOCAL.push_back(
                                 std::make_pair(
                                     m0_h1_edge_local,            // local edge descriptor
@@ -4651,10 +4651,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         }
                     }
                 }
+
+                return local_output;
             };
 
             std::vector<std::future<OutputStorageTypesTuple>> futures;
-            OutputStorageTypesTuple partial_res;
+            OutputStorageTypesTuple partial_res; // master thread output
             
             parallel_fork_and_join(
                 *input.scheduler,
@@ -4666,7 +4668,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 futures);
 
             // locally computed edge
-                // local-edge-id to the m0-vertex-descriptors that are used to create edge
+            // local-edge-id to the m0-vertex-descriptors that are used to create edge
+            // the sequence of elements signifies the order in which they were computed  
             std::vector<std::pair<ed_t, std::pair<vd_t, vd_t>>> edge_create_info;                
 
             std::tie(
@@ -4675,22 +4678,108 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 ivtx_to_incoming_hlist,
                 edge_create_info) = partial_res;
 
-            // TODO: continue from here
+            ed_t m0_edge_descr_baseoffset(m0.number_of_edges()); // start after existing edges
 
-#if 0
-            // Add intersection points computed by master thread in to "m0" and
-            // account for intersection point offsets
-            for (std::vector<mcut::math::vec3>::const_iterator i = intersection_points.cbegin(); i != intersection_points.cend(); ++i)
-            {
-                const vd_t stored_descr = m0.add_vertex(*i);
-                MCUT_ASSERT(stored_descr != mesh_t::null_vertex());
-            }
+            // NOTE: this lambda adds the edges stored in "edge_create_info_" into m0
+            // the other iterable parameters are simply updated (i.e. ed_t of "m0" variables are given their proper offset) 
+            auto add_edges_and_update_edge_local_offsets = [] (
+                mesh_t& m0_,
+                std::unordered_map<ed_t, ed_t> &ps_to_m0_non_intersecting_edge_,
+                std::unordered_map<fd_t, std::vector<ed_t>> &ps_iface_to_m0_edge_list_,
+                std::unordered_map<vd_t, std::vector<hd_t>> &ivtx_to_incoming_hlist_,
+                std::vector<std::pair<ed_t, std::pair<vd_t, vd_t>>> &edge_create_info_,
+                ed_t &m0_edge_descr_baseoffset_
+            ){
+                // merge ps_to_m0_non_intersecting_edge 
 
-            for (int i = 0; i < (int)cm_border_reentrant_ivtx_list.size(); ++i)
-            {
-                cm_border_reentrant_ivtx_list[i] += ps.number_of_vertices();
+                for(std::unordered_map<ed_t, ed_t>::iterator it = ps_to_m0_non_intersecting_edge_.begin(); 
+                    it != ps_to_m0_non_intersecting_edge_.end(); 
+                    ++it)
+                {
+                    it->second = ed_t(m0_edge_descr_baseoffset_ + it->second);
+                }
+
+                // merge ps_iface_to_m0_edge_list
+                for(std::unordered_map<fd_t, std::vector<ed_t>>::iterator it = ps_iface_to_m0_edge_list_.begin(); 
+                    it != ps_iface_to_m0_edge_list_.end(); 
+                    ++it) {
+                    for(std::vector<ed_t>::iterator i = it->second.begin(); i != it->second.end(); ++i) {
+                        *i = ed_t(m0_edge_descr_baseoffset_ + *i);
+                    }
+                }
+
+                // merge ivtx_to_incoming_hlist
+                for( std::unordered_map<vd_t, std::vector<hd_t>>::iterator it = ivtx_to_incoming_hlist_.begin(); 
+                    it != ivtx_to_incoming_hlist_.end(); 
+                    ++it) {
+                    for(std::vector<hd_t>::iterator i = it->second.begin(); i != it->second.end(); ++i) {
+                        *i = hd_t((m0_edge_descr_baseoffset_*2) + (*i));
+                    }
+                }
+
+                // add edges using edge_create_info
+                for(std::vector<std::pair<ed_t, std::pair<vd_t, vd_t>>>::const_iterator it = edge_create_info_.begin(); 
+                    it != edge_create_info_.end(); 
+                    ++it) {
+                    hd_t h = m0_.add_edge(it->second.first, it->second.second);
+                    MCUT_ASSERT(h%2 == 0); // this is what allows indexing trick
+                    MCUT_ASSERT(ed_t((uint32_t)h/2) == ed_t(m0_edge_descr_baseoffset_ + it->first));
+                }
+
+                // shift m0_edge_descr_baseoffset by the number of edges we just added into m0_
+                m0_edge_descr_baseoffset_ = ed_t(m0_edge_descr_baseoffset_ + edge_create_info_.size());
+            };
+
+            // master thread output
+            add_edges_and_update_edge_local_offsets( m0, ps_to_m0_non_intersecting_edge, ps_iface_to_m0_edge_list, 
+                            ivtx_to_incoming_hlist, edge_create_info, m0_edge_descr_baseoffset);
+
+            // worker-thread output
+            for(int i =0; i < (int)futures.size(); ++i){
+                std::future<OutputStorageTypesTuple> &f = futures[i];
+                MCUT_ASSERT(f.valid()); 
+                OutputStorageTypesTuple future_result = f.get(); // "get()" is a blocking function
+
+                std::unordered_map<ed_t, ed_t> &ps_to_m0_non_intersecting_edge_FUTURE = std::get<0>(future_result);
+                std::unordered_map<fd_t, std::vector<ed_t>> &ps_iface_to_m0_edge_list_FUTURE = std::get<1>(future_result);
+                std::unordered_map<vd_t, std::vector<hd_t>> &ivtx_to_incoming_hlist_FUTURE = std::get<2>(future_result);
+                std::vector<std::pair<ed_t, std::pair<vd_t, vd_t>>> &edge_create_info_FUTURE = std::get<3>(future_result);
+
+                add_edges_and_update_edge_local_offsets( 
+                    m0, ps_to_m0_non_intersecting_edge_FUTURE, ps_iface_to_m0_edge_list_FUTURE, 
+                    ivtx_to_incoming_hlist_FUTURE, edge_create_info_FUTURE, m0_edge_descr_baseoffset);
+                
+                // merge future results
+                ps_to_m0_non_intersecting_edge.insert(
+                    ps_to_m0_non_intersecting_edge_FUTURE.cbegin(), 
+                    ps_to_m0_non_intersecting_edge_FUTURE.cend());
+
+                for(std::unordered_map<fd_t, std::vector<ed_t>>::iterator it = ps_iface_to_m0_edge_list_FUTURE.begin(); 
+                    it != ps_iface_to_m0_edge_list_FUTURE.end(); 
+                    ++it) {
+                    std::unordered_map<fd_t, std::vector<ed_t>>::iterator fiter = ps_iface_to_m0_edge_list.find(it->first);
+                    bool exists = fiter != ps_iface_to_m0_edge_list.end();
+                    if(exists) {
+                        fiter->second.insert(fiter->second.end(), it->second.begin(), it->second.end());
+                    }
+                    else {
+                        ps_iface_to_m0_edge_list[it->first] = it->second;
+                    }
+                }
+
+                for(std::unordered_map<vd_t, std::vector<hd_t>>::iterator it = ivtx_to_incoming_hlist_FUTURE.begin(); 
+                    it != ivtx_to_incoming_hlist_FUTURE.end(); 
+                    ++it) {
+                    std::unordered_map<vd_t, std::vector<hd_t>>::iterator fiter = ivtx_to_incoming_hlist.find(it->first);
+                    bool exists = fiter != ivtx_to_incoming_hlist.end();
+                    if(exists) {
+                        fiter->second.insert(fiter->second.end(), it->second.begin(), it->second.end());
+                    }
+                    else {
+                        ivtx_to_incoming_hlist[it->first] = it->second;
+                    }
+                }
             }
-#endif
 
         } // end of parallel scope
 #else

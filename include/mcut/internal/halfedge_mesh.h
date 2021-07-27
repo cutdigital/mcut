@@ -386,7 +386,7 @@ public:
 
     template <typename V>
     class array_iterator_t : public V::const_iterator {
-        const mesh_t* const mesh_ptr;
+        const mesh_t* mesh_ptr;
         typedef typename V::value_type::descriptor_type element_descriptor_type;
         typename V::value_type* operator->() = delete;
     public:
