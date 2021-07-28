@@ -4434,26 +4434,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // a map between edge ids in "ps" and in "m0", which is the data structure we are progressively
         // defining to hold data for the new mesh containing clipped polygons
         std::unordered_map<ed_t, ed_t> ps_to_m0_non_intersecting_edge;
-        int ps_iface_to_m0_edge_list_before = [&]()
-        {
-            int c = 0;
-            for (auto &i : ps_iface_to_m0_edge_list)
-            {
-                c += i.second.size();
-            }
-            return c;
-        }();
-        int ivtx_to_incoming_hlist_before = [&]()
-        {
-            int c = 0;
-            for (auto &i : ivtx_to_incoming_hlist)
-            {
-                c += i.second.size();
-            }
-            return c;
-        }();
-        ;
-        int ps_to_m0_non_intersecting_edge_before = ps_to_m0_non_intersecting_edge.size();
 
 #if defined(MCUT_MULTI_THREADED_IMPL)
         {
@@ -4651,7 +4631,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 *input.scheduler,
                 ps.edges_begin(),
                 ps.edges_end(),
-                (1 << 8),
+                (1 << 10),
                 fn_compute_polygon_boundary_edges,
                 partial_res, // output computed by master thread
                 futures);
@@ -4758,25 +4738,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         } // end of parallel scope
 
-        int ps_iface_to_m0_edge_list_after = [&]()
-        {
-            int c = 0;
-            for (auto &i : ps_iface_to_m0_edge_list)
-            {
-                c += i.second.size();
-            }
-            return c;
-        }();
-        int ivtx_to_incoming_hlist_after = [&]()
-        {
-            int c = 0;
-            for (auto &i : ivtx_to_incoming_hlist)
-            {
-                c += i.second.size();
-            }
-            return c;
-        }();
-        int ps_to_m0_non_intersecting_edge_after = ps_to_m0_non_intersecting_edge.size();
 #else
 
         // for each ps-edge
