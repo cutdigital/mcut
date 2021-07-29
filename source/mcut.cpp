@@ -1681,7 +1681,7 @@ void intersectOIBVHs(
             result = false;
         }
 
-        std::unordered_map<mcut::face_descriptor_t, int> fccmap;
+        std::vector<int> fccmap;
         int n = mcut::find_connected_components(fccmap, m);
 
         if (n != 1)

@@ -309,12 +309,12 @@ namespace mcut
                     visited[v] = true
                     dfs(v)
     */
-    void dfs_cc(vd_t u, const mesh_t &mesh, std::unordered_map<vd_t, int> &visited, int connected_component_id)
+    void dfs_cc(vd_t u, const mesh_t &mesh, std::vector<int> &visited, int connected_component_id)
     {
         std::vector<vd_t> verts = mesh.get_vertices_around_vertex(u);
         for (std::vector<vd_t>::const_iterator v = verts.cbegin(); v != verts.cend(); ++v)
         {
-            if (visited.find(*v) == visited.cend())
+            if (visited.at(*v) == -1)
             {
                 visited[*v] = connected_component_id;
                 dfs_cc(*v, mesh, visited, connected_component_id);
@@ -322,113 +322,13 @@ namespace mcut
         }
     }
 
-    int find_connected_components(std::unordered_map<face_descriptor_t, int> &fccmap, const mesh_t &mesh)
+    int find_connected_components(std::vector<int> &fccmap, const mesh_t &mesh)
     {
         MCUT_ASSERT(mesh.number_of_vertices() >= 3);
         MCUT_ASSERT(mesh.number_of_edges() >= 3);
         MCUT_ASSERT(mesh.number_of_faces() >= 1);
+        
 
-        fccmap.clear();
-
-#if 0
-        std::vector<std::vector<mcut::vertex_descriptor_t>> vertex_sets;
-        std::map<mcut::vertex_descriptor_t, int> vertex_to_set_index;
-
-        for (mcut::mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
-        {
-            vertex_to_set_index[*v] = (int)mcut::mesh_t::vertex_iterator_t::distance(mesh.vertices_begin(), v); // std::distance(mesh.vertices_begin(), v);
-            vertex_sets.push_back({*v});                                                                        // make set of one
-        }
-
-        for (mcut::mesh_t::edge_iterator_t e = mesh.edges_begin(); e != mesh.edges_end(); ++e)
-        {
-
-            mcut::vertex_descriptor_t v0 = mesh.vertex(*e, 0);
-            mcut::vertex_descriptor_t v1 = mesh.vertex(*e, 1);
-
-            int v0_set_index = vertex_to_set_index[v0];
-            int v1_set_index = vertex_to_set_index[v1];
-
-            if (v0_set_index != v1_set_index)
-            { // are they in different sets...?
-
-                std::vector<std::vector<mcut::vertex_descriptor_t>>::iterator v0_set = vertex_sets.begin() + v0_set_index;
-                std::vector<std::vector<mcut::vertex_descriptor_t>>::iterator v1_set = vertex_sets.begin() + v1_set_index;
-                ;
-
-                v0_set->insert(v0_set->cend(), v1_set->cbegin(), v1_set->cend()); // union/join sets
-
-                // update the set index of all vertices in set of v1
-
-                for (std::vector<mcut::vertex_descriptor_t>::const_iterator it = v1_set->cbegin();
-                     it != v1_set->cend();
-                     ++it)
-                {
-                    vertex_to_set_index[*it] = v0_set_index; // update set index
-                }
-
-                v1_set->clear(); // wipe elements (no longer needed) but keep empty set
-            }
-        }
-
-        // the sets which contain vertices that belong to separate connected components i.e. each set is a conn comp.
-        // size of set is the number of connected components
-        std::set<int> final_set_indices;
-        std::map<int, int> final_set_index_to_vertex_count;
-
-        for (mcut::mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
-        {
-
-            const int vertex_set_index = vertex_to_set_index[*v];
-            final_set_indices.insert(vertex_set_index); // NOTE: unique elements only
-
-            if (final_set_index_to_vertex_count.count(vertex_set_index) == 0)
-            {
-                final_set_index_to_vertex_count[vertex_set_index] = 0; // init
-            }
-
-            final_set_index_to_vertex_count[vertex_set_index] += 1;
-        }
-
-        // map set index to a renormalized index (0 ,..., N-1)
-        std::map<int, int> final_set_index_to_linear_index;
-
-        for (std::set<int>::const_iterator set_index_iter = final_set_indices.cbegin(); set_index_iter != final_set_indices.cend(); set_index_iter++)
-        {
-            if (final_set_index_to_vertex_count[*set_index_iter] < 3) // 3 is min number of vertices which make up a "connected component" (triangle)
-            {
-                continue;
-            }
-            final_set_index_to_linear_index[*set_index_iter] = (int)final_set_index_to_linear_index.size();
-        }
-
-        // map each face to a connected component
-        for (mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
-        {
-            const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f);
-
-#ifndef NDEBUG
-
-            // assert
-            for (int i = 0; i < (int)vertices.size(); ++i)
-            {
-                for (int j = 0; j < (int)vertices.size(); ++j)
-                {
-                    if (i != j)
-                    {
-                        MCUT_ASSERT(vertex_to_set_index[vertices[i]] == vertex_to_set_index[vertices[j]]);
-                    }
-                }
-            }
-
-#endif // !NDEBUG
-            int set_idx = vertex_to_set_index[vertices.front()]; // all vertices belong to the same conn comp
-            int descr = final_set_index_to_linear_index[set_idx];
-            fccmap[*f] = descr;
-        }
-
-        return (int)final_set_index_to_linear_index.size();
-#else
         /*
             for each node u:
                 if u is not visited :
@@ -436,17 +336,20 @@ namespace mcut
                     connected_component += 1
                     dfs(u)
         */
-        std::unordered_map<vd_t, int> visited; // if vertex does not exist, then its not visited
+        std::vector<int> visited(mesh.number_of_vertices(), -1); // if vertex does not exist, then its not visited
         int connected_component_id = -1;
         for (mesh_t::vertex_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u)
         {
-            if (visited.empty() || visited.find(*u) == visited.cend())
+            if (visited.empty() || visited.at(*u) == -1)
             {
                 connected_component_id += 1;
                 visited[*u] = connected_component_id;
                 dfs_cc(*u, mesh, visited, connected_component_id);
             }
         }
+
+        fccmap.clear();
+        fccmap.resize(mesh.number_of_faces());
 
         // map each face to a connected component
         for (mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
@@ -455,8 +358,8 @@ namespace mcut
             // all vertices belong to the same conn comp
             fccmap[*f] = visited.at(vertices.front());
         }
+
         return connected_component_id + 1; // number of CCs
-#endif
     }
 
     struct connected_component_info_t
@@ -520,19 +423,21 @@ namespace mcut
         bool keep_fragments_above_cutmesh,
         bool keep_fragments_partially_cut)
     {
-        TIME_PROFILE_START("Extract connected components");
+        
         DEBUG_CODE_MASK((*logger_ptr) << "extract connected components" << std::endl;);
         DEBUG_CODE_MASK((*logger_ptr).indent();)
 
-        // the auxilliary halfedge mesh containing the vertices and edges
-        // referenced by the traced polygons
+        // the auxilliary halfedge mesh containing vertices and edges referenced by the traced polygons
         mesh_t mesh = in; // copy
+        mesh.reserve_for_additional_elements(mX_traced_polygons.size()/2);
 
         ///////////////////////////////////////////////////////////////////////////
         // Insert traced polygons into the auxilliary mesh
         ///////////////////////////////////////////////////////////////////////////
 
         DEBUG_CODE_MASK((*logger_ptr) << "total polygons = " << mX_traced_polygons.size() << std::endl;);
+
+        TIME_PROFILE_START("Extract CC: Insert polygons");
 
         // for each traced polygon
         for (std::vector<std::vector<hd_t>>::const_iterator mX_traced_polygons_iter = mX_traced_polygons.cbegin();
@@ -566,6 +471,7 @@ namespace mcut
             // and its opposite in one polygon
             MCUT_ASSERT(f != mesh_t::null_face());
         }
+        TIME_PROFILE_END();
 
         ///////////////////////////////////////////////////////////////////////////
         // find connected components in "mesh"
@@ -589,9 +495,11 @@ namespace mcut
         // the vertex descriptors [in the cc] which are seam vertices!
         std::map<std::size_t, std::vector<vd_t>> cc_to_seam_vertices;
         // here we create a map to tag each polygon in "mesh" with the connected component it belongs to.
-        std::unordered_map<face_descriptor_t, int> fccmap;
+        std::vector<int> fccmap;
 
+        TIME_PROFILE_START("Extract CC: find connected components");
         const std::size_t num = find_connected_components(fccmap, mesh);
+        TIME_PROFILE_END();
 
         DEBUG_CODE_MASK((*logger_ptr) << "connected components = " << num << std::endl;);
 
@@ -602,25 +510,55 @@ namespace mcut
         // NOTE: even if the number of connected components is one, we proceed anyway
         // because each connected connected excludes unused vertices in "mesh"
 
+        TIME_PROFILE_START("Extract CC: Map vertices");
+
         // for each face in the auxilliary mesh (i.e. traced polygon)
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
 
             face_descriptor_t fd = *face_iter;
             const int face_cc_id = fccmap[fd]; // get connected component of face
-
-            if (ccID_to_mesh.find(face_cc_id) == ccID_to_mesh.end())
+            
+            std::map<std::size_t, mesh_t>::iterator ccID_to_mesh_fiter = ccID_to_mesh.find(face_cc_id);
+            if (ccID_to_mesh_fiter == ccID_to_mesh.end())
             {
                 // create new mesh to store connected component
-                ccID_to_mesh.insert(std::make_pair(face_cc_id, mesh_t()));
+                std::pair<std::map<std::size_t, mesh_t>::iterator, bool> p = ccID_to_mesh.insert(std::make_pair(face_cc_id, mesh_t()));
+                ccID_to_mesh_fiter = p.first;
             }
 
-            if (ccID_to_mX_to_cc_vertex.find(face_cc_id) == ccID_to_mX_to_cc_vertex.end())
+            mesh_t &cc_mesh = ccID_to_mesh_fiter->second;
+
+            std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ccID_to_mX_to_cc_vertex.find(face_cc_id);
+            
+            if (ccID_to_mX_to_cc_vertex_fiter == ccID_to_mX_to_cc_vertex.end())
             {
                 // create new component descriptor map
-                ccID_to_mX_to_cc_vertex.insert(std::make_pair(face_cc_id, std::unordered_map<vd_t, vd_t>()));
-                ccID_to_cc_to_mX_vertex[face_cc_id] = std::vector<vd_t>();
+                std::pair<std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator, bool> p = ccID_to_mX_to_cc_vertex.insert(std::make_pair(face_cc_id, std::unordered_map<vd_t, vd_t>()));
+                ccID_to_mX_to_cc_vertex_fiter = p.first;
             }
+
+            std::unordered_map<vd_t, vd_t> &mX_to_cc_vertex = ccID_to_mX_to_cc_vertex_fiter->second;
+
+            std::map<std::size_t, std::vector<vd_t>>::iterator ccID_to_cc_to_mX_vertex_fiter = ccID_to_cc_to_mX_vertex.find(face_cc_id);
+
+            if(ccID_to_cc_to_mX_vertex_fiter == ccID_to_cc_to_mX_vertex.end())
+            {
+                std::pair<std::map<std::size_t, std::vector<vd_t>>::iterator, bool> p = ccID_to_cc_to_mX_vertex.insert(std::make_pair(face_cc_id, std::vector<vd_t>()));
+                ccID_to_cc_to_mX_vertex_fiter = p.first;
+            }
+
+            std::vector<vd_t>& cc_to_mX_vertex = ccID_to_cc_to_mX_vertex_fiter->second;
+
+            std::map<std::size_t, std::vector<vd_t>>::iterator cc_to_seam_vertices_fiter = cc_to_seam_vertices.find(face_cc_id);
+
+            if(cc_to_seam_vertices_fiter == cc_to_seam_vertices.end())
+            {
+                std::pair<std::map<std::size_t, std::vector<vd_t>>::iterator, bool> p = cc_to_seam_vertices.insert(std::make_pair(face_cc_id, std::vector<vd_t>()));
+                cc_to_seam_vertices_fiter = p.first;
+            }
+
+            std::vector<vd_t>& cc_seam_vertices = cc_to_seam_vertices_fiter->second;
 
             //
             // Determine the location of the connected component w.r.t the cut-mesh (above/below/undefined)
@@ -677,32 +615,34 @@ namespace mcut
                 MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(face_cc_id) != ccID_to_mX_to_cc_vertex.cend());
 
                 // if vertex is not already mapped from "mesh" to connected component
-                if (ccID_to_mX_to_cc_vertex.at(face_cc_id).find(*face_vertex_iter) == ccID_to_mX_to_cc_vertex.at(face_cc_id).end())
+                if (mX_to_cc_vertex.find(*face_vertex_iter) == mX_to_cc_vertex.end())
                 {
 
-                    MCUT_ASSERT(ccID_to_mesh.find(face_cc_id) != ccID_to_mesh.cend());
+                    //MCUT_ASSERT(ccID_to_mesh.find(face_cc_id) != ccID_to_mesh.cend());
 
                     // copy vertex from auxilliary data structure "mesh", add it into connected component mesh,
                     // and save the vertex's descriptor in the conected component mesh.
-                    const vd_t cc_descriptor = ccID_to_mesh.at(face_cc_id).add_vertex(mesh.vertex(*face_vertex_iter));
+                    const vd_t cc_descriptor = cc_mesh.add_vertex(mesh.vertex(*face_vertex_iter));
 
                     // map vertex
-                    ccID_to_mX_to_cc_vertex.at(face_cc_id).insert(std::make_pair(*face_vertex_iter, cc_descriptor));
+                    mX_to_cc_vertex.insert(std::make_pair(*face_vertex_iter, cc_descriptor));
                     if (popuplate_vertex_maps)
                     {
                         //ccID_to_cc_to_mX_vertex.at(face_cc_id).insert(std::make_pair(cc_descriptor, *face_vertex_iter));
-                        ccID_to_cc_to_mX_vertex.at(face_cc_id).push_back(*face_vertex_iter);
+                        cc_to_mX_vertex.push_back(*face_vertex_iter);
                     }
                     // check if we need to save vertex as being a seam vertex
                     //std::vector<bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
                     bool is_seam_vertex = mesh_vertex_to_seam_flag[*face_vertex_iter]; //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
                     if (is_seam_vertex)
                     {
-                        cc_to_seam_vertices[face_cc_id].push_back(cc_descriptor);
+                        cc_seam_vertices.push_back(cc_descriptor);
                     }
                 }
             }
-        }
+        } // for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
+
+        TIME_PROFILE_END();
 
         //bool extractingSeams = (m1_num_vertices_after_srcmesh_partitioning == -1);
 
@@ -729,6 +669,8 @@ namespace mcut
 
         std::map<size_t, std::vector<fd_t>> ccID_to_cc_to_mX_face;
 
+        TIME_PROFILE_START("Extract CC: Map faces");
+
         // for each face in the auxilliary data structure "mesh" (traced polygon)
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
@@ -754,6 +696,10 @@ namespace mcut
             MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
             std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
+            std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ccID_to_mX_to_cc_vertex.find(cc_id);
+            MCUT_ASSERT (ccID_to_mX_to_cc_vertex_fiter != ccID_to_mX_to_cc_vertex.end());
+            std::unordered_map<vd_t, vd_t> &mX_to_cc_vertex = ccID_to_mX_to_cc_vertex_fiter->second;
+
             // for each vertex around face
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
 
@@ -763,7 +709,7 @@ namespace mcut
             {
                 MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.cend());
 
-                const std::unordered_map<vd_t, vd_t> &vertex_map = ccID_to_mX_to_cc_vertex.at(cc_id);
+                const std::unordered_map<vd_t, vd_t> &vertex_map = mX_to_cc_vertex;
                 const vd_t m1_sm_descr = *face_vertex_iter;
 
                 MCUT_ASSERT(vertex_map.find(m1_sm_descr) != vertex_map.cend());
@@ -772,9 +718,10 @@ namespace mcut
                 remapped_face.push_back(cc_descr);
             }
 
-            MCUT_ASSERT(ccID_to_mesh.find(cc_id) != ccID_to_mesh.cend());
+            std::map<std::size_t, mesh_t>::iterator ccID_to_mesh_fiter = ccID_to_mesh.find(cc_id);
+            MCUT_ASSERT (ccID_to_mesh_fiter != ccID_to_mesh.end());
 
-            mesh_t &cc_mesh = ccID_to_mesh.at(cc_id);
+            mesh_t &cc_mesh = ccID_to_mesh_fiter->second;
             fd_t f = cc_mesh.add_face(remapped_face); // insert the face
 
             MCUT_ASSERT(f != mesh_t::null_face());
@@ -787,12 +734,16 @@ namespace mcut
             }
         }
 
+        TIME_PROFILE_END();
+
         // Note: at this stage we have our connected components (meshes) with their
         // vertices and faces defined
 
         ///////////////////////////////////////////////////////////////////////////
         // Save the output connected components marked with location
         ///////////////////////////////////////////////////////////////////////////
+
+        TIME_PROFILE_START("Extract CC: save CCs with location properties");
 
         // for each connected component
         for (std::map<std::size_t, mesh_t>::const_iterator cc_iter = ccID_to_mesh.cbegin();
@@ -988,9 +939,11 @@ namespace mcut
                 DEBUG_CODE_MASK((*logger_ptr).unindent(););
             }
         }
+        TIME_PROFILE_END()
+
         DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
-        TIME_PROFILE_END()
+        
         return mesh;
     }
 
