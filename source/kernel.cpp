@@ -322,12 +322,15 @@ namespace mcut
         }
     }
 
-    int find_connected_components(std::vector<int> &fccmap, const mesh_t &mesh)
+    int find_connected_components(
+        std::vector<int> &fccmap,
+        const mesh_t &mesh,
+        std::vector<int> &cc_to_vertex_count,
+        std::vector<int> &cc_to_face_count)
     {
         MCUT_ASSERT(mesh.number_of_vertices() >= 3);
         MCUT_ASSERT(mesh.number_of_edges() >= 3);
         MCUT_ASSERT(mesh.number_of_faces() >= 1);
-        
 
         /*
             for each node u:
@@ -338,28 +341,78 @@ namespace mcut
         */
         std::vector<int> visited(mesh.number_of_vertices(), -1); // if vertex does not exist, then its not visited
         int connected_component_id = -1;
+        std::vector<bool> queued(mesh.number_of_vertices(), false);
+
         for (mesh_t::vertex_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u)
         {
-            if (visited.empty() || visited.at(*u) == -1)
+            if (visited[*u] == -1)
             {
                 connected_component_id += 1;
                 visited[*u] = connected_component_id;
-                dfs_cc(*u, mesh, visited, connected_component_id);
+                queued[*u] = true;
+
+                cc_to_vertex_count.push_back(1); // each discovered cc has at least one vertex
+
+                std::vector<vd_t> vertices_of_u = mesh.get_vertices_around_vertex(*u);
+                std::queue<vd_t> queue; // .. to discover all vertices of current connected component
+                
+                for (int i = 0; i < (int)vertices_of_u.size(); ++i)
+                {
+                    vd_t vou = vertices_of_u[i];
+                    queue.push(vou);
+                    queued[vou] = true;
+                }
+
+                while (!queue.empty())
+                {
+                    vd_t v = queue.front(); // current
+                    queue.pop();
+
+                    if (visited[v] == -1) // v not yet associated with a cc
+                    {
+                        visited[v] = connected_component_id;
+                        cc_to_vertex_count[connected_component_id] += 1;
+                        std::vector<vd_t> vertices_of_v = mesh.get_vertices_around_vertex(v);
+
+                        for (int i = 0; i < (int)vertices_of_v.size(); ++i)
+                        {
+                            vd_t vov = vertices_of_v[i];
+                            if(visited[vov] == -1 || queued[vov] == false)
+                            {
+                                queue.push(vertices_of_v[i]);
+                                queued[vov] = true;
+                            }
+                        }
+                    }
+                }
+
+                //dfs_cc(*u, mesh, visited, connected_component_id);
             }
         }
 
         fccmap.clear();
         fccmap.resize(mesh.number_of_faces());
+        int num_connected_components = (connected_component_id + 1); // number of CCs
+        cc_to_face_count.resize(mesh.number_of_faces());
+        for (int i = 0; i < num_connected_components; ++i)
+        {
+            cc_to_face_count[i] = 0;
+        }
 
         // map each face to a connected component
         for (mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
         {
-            const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f); // !NDEBUG
+            const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f);
+
+            int face_cc_id = visited.at(vertices.front());
+
             // all vertices belong to the same conn comp
-            fccmap[*f] = visited.at(vertices.front());
+            fccmap[*f] = face_cc_id;
+
+            cc_to_face_count[connected_component_id] += 1;
         }
 
-        return connected_component_id + 1; // number of CCs
+        return num_connected_components;
     }
 
     struct connected_component_info_t
@@ -423,13 +476,13 @@ namespace mcut
         bool keep_fragments_above_cutmesh,
         bool keep_fragments_partially_cut)
     {
-        
+
         DEBUG_CODE_MASK((*logger_ptr) << "extract connected components" << std::endl;);
         DEBUG_CODE_MASK((*logger_ptr).indent();)
 
         // the auxilliary halfedge mesh containing vertices and edges referenced by the traced polygons
         mesh_t mesh = in; // copy
-        mesh.reserve_for_additional_elements(mX_traced_polygons.size()/2);
+        mesh.reserve_for_additional_elements(mX_traced_polygons.size() / 2);
 
         ///////////////////////////////////////////////////////////////////////////
         // Insert traced polygons into the auxilliary mesh
@@ -498,7 +551,9 @@ namespace mcut
         std::vector<int> fccmap;
 
         TIME_PROFILE_START("Extract CC: find connected components");
-        const std::size_t num = find_connected_components(fccmap, mesh);
+        std::vector<int> cc_to_vertex_count;
+        std::vector<int> cc_to_face_count;
+        const std::size_t num = find_connected_components(fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
         TIME_PROFILE_END();
 
         DEBUG_CODE_MASK((*logger_ptr) << "connected components = " << num << std::endl;);
@@ -518,19 +573,21 @@ namespace mcut
 
             face_descriptor_t fd = *face_iter;
             const int face_cc_id = fccmap[fd]; // get connected component of face
-            
+
             std::map<std::size_t, mesh_t>::iterator ccID_to_mesh_fiter = ccID_to_mesh.find(face_cc_id);
             if (ccID_to_mesh_fiter == ccID_to_mesh.end())
             {
                 // create new mesh to store connected component
                 std::pair<std::map<std::size_t, mesh_t>::iterator, bool> p = ccID_to_mesh.insert(std::make_pair(face_cc_id, mesh_t()));
                 ccID_to_mesh_fiter = p.first;
+
+                p.first->second.reserve_for_additional_elements(cc_to_vertex_count[face_cc_id]);
             }
 
             mesh_t &cc_mesh = ccID_to_mesh_fiter->second;
 
             std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ccID_to_mX_to_cc_vertex.find(face_cc_id);
-            
+
             if (ccID_to_mX_to_cc_vertex_fiter == ccID_to_mX_to_cc_vertex.end())
             {
                 // create new component descriptor map
@@ -542,23 +599,23 @@ namespace mcut
 
             std::map<std::size_t, std::vector<vd_t>>::iterator ccID_to_cc_to_mX_vertex_fiter = ccID_to_cc_to_mX_vertex.find(face_cc_id);
 
-            if(ccID_to_cc_to_mX_vertex_fiter == ccID_to_cc_to_mX_vertex.end())
+            if (ccID_to_cc_to_mX_vertex_fiter == ccID_to_cc_to_mX_vertex.end())
             {
                 std::pair<std::map<std::size_t, std::vector<vd_t>>::iterator, bool> p = ccID_to_cc_to_mX_vertex.insert(std::make_pair(face_cc_id, std::vector<vd_t>()));
                 ccID_to_cc_to_mX_vertex_fiter = p.first;
             }
 
-            std::vector<vd_t>& cc_to_mX_vertex = ccID_to_cc_to_mX_vertex_fiter->second;
+            std::vector<vd_t> &cc_to_mX_vertex = ccID_to_cc_to_mX_vertex_fiter->second;
 
             std::map<std::size_t, std::vector<vd_t>>::iterator cc_to_seam_vertices_fiter = cc_to_seam_vertices.find(face_cc_id);
 
-            if(cc_to_seam_vertices_fiter == cc_to_seam_vertices.end())
+            if (cc_to_seam_vertices_fiter == cc_to_seam_vertices.end())
             {
                 std::pair<std::map<std::size_t, std::vector<vd_t>>::iterator, bool> p = cc_to_seam_vertices.insert(std::make_pair(face_cc_id, std::vector<vd_t>()));
                 cc_to_seam_vertices_fiter = p.first;
             }
 
-            std::vector<vd_t>& cc_seam_vertices = cc_to_seam_vertices_fiter->second;
+            std::vector<vd_t> &cc_seam_vertices = cc_to_seam_vertices_fiter->second;
 
             //
             // Determine the location of the connected component w.r.t the cut-mesh (above/below/undefined)
@@ -696,9 +753,9 @@ namespace mcut
             MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
             std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
-            std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ccID_to_mX_to_cc_vertex.find(cc_id);
-            MCUT_ASSERT (ccID_to_mX_to_cc_vertex_fiter != ccID_to_mX_to_cc_vertex.end());
-            std::unordered_map<vd_t, vd_t> &mX_to_cc_vertex = ccID_to_mX_to_cc_vertex_fiter->second;
+            //std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ;
+            MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.end());
+            std::unordered_map<vd_t, vd_t> &mX_to_cc_vertex = ccID_to_mX_to_cc_vertex.at(cc_id);
 
             // for each vertex around face
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
@@ -718,10 +775,9 @@ namespace mcut
                 remapped_face.push_back(cc_descr);
             }
 
-            std::map<std::size_t, mesh_t>::iterator ccID_to_mesh_fiter = ccID_to_mesh.find(cc_id);
-            MCUT_ASSERT (ccID_to_mesh_fiter != ccID_to_mesh.end());
+            MCUT_ASSERT(ccID_to_mesh.find(cc_id) != ccID_to_mesh.end());
 
-            mesh_t &cc_mesh = ccID_to_mesh_fiter->second;
+            mesh_t &cc_mesh = ccID_to_mesh.at(cc_id);
             fd_t f = cc_mesh.add_face(remapped_face); // insert the face
 
             MCUT_ASSERT(f != mesh_t::null_face());
@@ -943,7 +999,6 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
-        
         return mesh;
     }
 
@@ -4627,7 +4682,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                      it != ps_to_m0_non_intersecting_edge_FUTURE.cend();
                      ++it)
                 {
-                    ps_to_m0_non_intersecting_edge[it->first] = emap.at(it->second); 
+                    ps_to_m0_non_intersecting_edge[it->first] = emap.at(it->second);
                 }
 
                 // merge ps_iface_to_m0_edge_list
@@ -4637,7 +4692,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 {
                     for (std::vector<ed_t>::const_iterator i = it->second.cbegin(); i != it->second.cend(); ++i)
                     {
-                        ps_iface_to_m0_edge_list[it->first].push_back(emap.at(*i)); 
+                        ps_iface_to_m0_edge_list[it->first].push_back(emap.at(*i));
                     }
                 }
 
@@ -4657,10 +4712,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             // add edges computed by master thread and update local edge (and halfedge) descriptors
             merge_local_m0_edges(
-                m0, 
-                ps_to_m0_non_intersecting_edge_MASTER_THREAD_LOCAL, 
+                m0,
+                ps_to_m0_non_intersecting_edge_MASTER_THREAD_LOCAL,
                 ps_iface_to_m0_edge_list_MASTER_THREAD_LOCAL,
-                ivtx_to_incoming_hlist_MASTER_THREAD_LOCAL, 
+                ivtx_to_incoming_hlist_MASTER_THREAD_LOCAL,
                 edge_create_info_MASTER_THREAD_LOCAL,
                 ps_to_m0_non_intersecting_edge,
                 ps_iface_to_m0_edge_list,
@@ -4679,10 +4734,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 const std::vector<std::pair<vd_t, vd_t>> &edge_create_info_FUTURE = std::get<3>(future_result);
 
                 merge_local_m0_edges(
-                    m0, 
-                    ps_to_m0_non_intersecting_edge_FUTURE, 
+                    m0,
+                    ps_to_m0_non_intersecting_edge_FUTURE,
                     ps_iface_to_m0_edge_list_FUTURE,
-                    ivtx_to_incoming_hlist_FUTURE, 
+                    ivtx_to_incoming_hlist_FUTURE,
                     edge_create_info_FUTURE,
                     ps_to_m0_non_intersecting_edge,
                     ps_iface_to_m0_edge_list,
@@ -8562,8 +8617,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                                 if (!poly_already_in_patch)
                                 {
-                                    const bool poly_already_in_queue = std::find(flood_fill_queue.crbegin(), flood_fill_queue.crend(), incident_poly) != flood_fill_queue.crend();
-                                    if (!poly_already_in_queue)
+                                    const bool poly_already_queued = std::find(flood_fill_queue.crbegin(), flood_fill_queue.crend(), incident_poly) != flood_fill_queue.crend();
+                                    if (!poly_already_queued)
                                     {
                                         flood_fill_queue.push_back(incident_poly); // add adjacent polygon to bfs-queue
                                     }
@@ -11211,7 +11266,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         {
                             //                   if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
                             // check the main global queue to make sure poly has not already been added
-                            const bool poly_is_already_in_main_queue = std::find_if(
+                            const bool poly_is_already_in_maqueued = std::find_if(
                                                                            patch_poly_stitching_queue.crbegin(),
                                                                            patch_poly_stitching_queue.crend(),
                                                                            [&](const std::tuple<hd_t, int, int> &elem)
@@ -11219,7 +11274,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                                                                return std::get<1>(elem) == m0_next_poly_idx; // there is an element in the queue with the polygon's ID
                                                                            }) != patch_poly_stitching_queue.crend();
 
-                            if (!poly_is_already_in_main_queue)
+                            if (!poly_is_already_in_maqueued)
                             {
                                 patch_poly_stitching_queue_tmp.push_back(std::make_tuple(m1_next_poly_seed_he, m0_next_poly_idx, m0_next_poly_he_idx));
                             }

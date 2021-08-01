@@ -1682,7 +1682,9 @@ void intersectOIBVHs(
         }
 
         std::vector<int> fccmap;
-        int n = mcut::find_connected_components(fccmap, m);
+        std::vector<int> cc_to_vertex_count;
+        std::vector<int> cc_to_face_count;
+        int n = mcut::find_connected_components(fccmap, m, cc_to_vertex_count, cc_to_face_count);
 
         if (n != 1)
         {
