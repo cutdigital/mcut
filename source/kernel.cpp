@@ -355,7 +355,7 @@ namespace mcut
 
                 std::vector<vd_t> vertices_of_u = mesh.get_vertices_around_vertex(*u);
                 std::queue<vd_t> queue; // .. to discover all vertices of current connected component
-                
+
                 for (int i = 0; i < (int)vertices_of_u.size(); ++i)
                 {
                     vd_t vou = vertices_of_u[i];
@@ -377,7 +377,7 @@ namespace mcut
                         for (int i = 0; i < (int)vertices_of_v.size(); ++i)
                         {
                             vd_t vov = vertices_of_v[i];
-                            if(visited[vov] == -1 || queued[vov] == false)
+                            if (visited[vov] == -1 || queued[vov] == false)
                             {
                                 queue.push(vertices_of_v[i]);
                                 queued[vov] = true;
@@ -444,6 +444,7 @@ namespace mcut
 
     // returns the unseparated/merged connected components
     mesh_t extract_connected_components(
+        thread_pool &scheduler,
         // key = cc-id; value = list of cc copies each differing by one newly stitched polygon
         std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> &connected_components,
         const mesh_t &in,
@@ -492,6 +493,80 @@ namespace mcut
 
         TIME_PROFILE_START("Extract CC: Insert polygons");
 
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        {
+            typedef std::tuple<
+                std::vector<std::vector<vd_t>> // "mesh" faces
+                >
+                OutputStorageTypesTuple;
+            typedef std::vector<std::vector<hd_t>>::const_iterator InputStorageIteratorType;
+
+            auto fn_compute_inserted_faces = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple
+            {
+                OutputStorageTypesTuple local_output;
+                std::vector<std::vector<vd_t>> &faces_LOCAL = std::get<0>(local_output);
+
+                for (InputStorageIteratorType mX_traced_polygons_iter = block_start_; mX_traced_polygons_iter != block_end_; ++mX_traced_polygons_iter)
+                {
+                    const std::vector<hd_t> &mX_traced_polygon = *mX_traced_polygons_iter;
+
+                    faces_LOCAL.push_back(std::vector<vd_t>());
+                    std::vector<vd_t>& polygon_vertices = faces_LOCAL.back();
+                    polygon_vertices.reserve(mX_traced_polygon.size());
+
+                    // for each halfedge in polygon
+                    for (std::vector<hd_t>::const_iterator mX_traced_polygon_halfedge_iter = mX_traced_polygon.cbegin();
+                        mX_traced_polygon_halfedge_iter != mX_traced_polygon.cend();
+                        ++mX_traced_polygon_halfedge_iter)
+                    {
+                        polygon_vertices.push_back(mesh.source(*mX_traced_polygon_halfedge_iter));
+                    }
+                }
+
+                return local_output;
+
+            };
+
+            std::vector<std::future<OutputStorageTypesTuple>> futures;
+            OutputStorageTypesTuple partial_res;
+
+            parallel_fork_and_join(
+                scheduler,
+                mX_traced_polygons.cbegin(),
+                mX_traced_polygons.cend(),
+                (1 << 10),
+                fn_compute_inserted_faces,
+                partial_res, // output computed by master thread
+                futures);
+
+            const std::vector<std::vector<vd_t>> &faces_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
+
+            auto merge_local_faces = [](mesh_t& mesh, const std::vector<std::vector<vd_t>> &faces_)
+            {
+                for (std::vector<std::vector<vd_t>>::const_iterator face_iter = faces_.cbegin();
+                     face_iter != faces_.cend();
+                     ++face_iter)
+                {
+                    const fd_t f = mesh.add_face(*face_iter);
+                    MCUT_ASSERT(f != mesh_t::null_face());
+                }
+            };
+
+            merge_local_faces(mesh, faces_MASTER_THREAD_LOCAL);
+
+            for (int i = 0; i < (int)futures.size(); ++i)
+            {
+                std::future<OutputStorageTypesTuple> &f = futures[i];
+                MCUT_ASSERT(f.valid());
+                OutputStorageTypesTuple future_result = f.get(); // "get()" is a blocking function
+
+                const std::vector<std::vector<vd_t>> &faces_FUTURE = std::get<0>(future_result);
+
+                merge_local_faces(mesh, faces_FUTURE);
+            }
+        } // endif of parallel scope
+
+#else
         // for each traced polygon
         for (std::vector<std::vector<hd_t>>::const_iterator mX_traced_polygons_iter = mX_traced_polygons.cbegin();
              mX_traced_polygons_iter != mX_traced_polygons.cend();
@@ -524,6 +599,7 @@ namespace mcut
             // and its opposite in one polygon
             MCUT_ASSERT(f != mesh_t::null_face());
         }
+#endif
         TIME_PROFILE_END();
 
         ///////////////////////////////////////////////////////////////////////////
@@ -725,9 +801,164 @@ namespace mcut
         ///////////////////////////////////////////////////////////////////////////
 
         std::map<size_t, std::vector<fd_t>> ccID_to_cc_to_mX_face;
+        for (std::map<size_t, mesh_t>::const_iterator it = ccID_to_mesh.cbegin(); it != ccID_to_mesh.cend(); ++it)
+        {
+            bool userWantsCC = ccID_to_keepFlag.at(it->first);
+
+            if (!userWantsCC)
+            {
+                continue;
+            }
+
+            ccID_to_cc_to_mX_face[it->first] = std::vector<fd_t>();
+        }
 
         TIME_PROFILE_START("Extract CC: Map faces");
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        {
+            typedef std::tuple<
+                std::vector<std::vector<vd_t>>, // remapped_faces, // using remapped cc descriptors
+                std::vector<int>,               // the cc id of each remapped
+                std::vector<fd_t>               // the mX mesh i.e. the halfedge data structure we call "mesh" that is remapped
+                >
+                OutputStorageTypesTuple;
+            typedef mesh_t::face_iterator_t InputStorageIteratorType;
 
+            auto fn_compute_remapped_cc_faces = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple
+            {
+                OutputStorageTypesTuple local_output;
+                std::vector<std::vector<vd_t>> &remapped_faces_LOCAL = std::get<0>(local_output);
+                std::vector<int> &local_remapped_face_to_ccID = std::get<1>(local_output);
+                std::vector<fd_t> &local_remapped_face_to_mX_face = std::get<2>(local_output);
+                for (mesh_t::face_iterator_t face_iter = block_start_; face_iter != block_end_; ++face_iter)
+                {
+                    face_descriptor_t fd = *face_iter;
+                    const size_t cc_id = fccmap[fd]; // the connected component which contains the current face
+
+                    bool userWantsCC = ccID_to_keepFlag.at(cc_id);
+
+                    if (!userWantsCC)
+                    {
+                        continue;
+                    }
+
+                    remapped_faces_LOCAL.push_back(std::vector<vd_t>());
+                    std::vector<vd_t> &remapped_face = remapped_faces_LOCAL.back(); // using remapped cc descriptors
+                    local_remapped_face_to_ccID.push_back(cc_id);
+                    local_remapped_face_to_mX_face.push_back(fd);
+
+                    std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
+
+                    MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
+                    std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
+
+                    //std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ;
+                    MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.end());
+                    std::unordered_map<vd_t, vd_t> &mX_to_cc_vertex = ccID_to_mX_to_cc_vertex.at(cc_id);
+
+                    // for each vertex around face
+                    const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
+
+                    for (std::vector<vertex_descriptor_t>::const_iterator face_vertex_iter = vertices_around_face.cbegin();
+                         face_vertex_iter != vertices_around_face.cend();
+                         ++face_vertex_iter)
+                    {
+                        MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.cend());
+
+                        const std::unordered_map<vd_t, vd_t> &vertex_map = mX_to_cc_vertex;
+                        const vd_t m1_sm_descr = *face_vertex_iter;
+
+                        MCUT_ASSERT(vertex_map.find(m1_sm_descr) != vertex_map.cend());
+
+                        const vd_t cc_descr = vertex_map.at(m1_sm_descr);
+                        remapped_face.push_back(cc_descr);
+                    }
+                }
+
+                return local_output;
+            };
+
+            std::vector<std::future<OutputStorageTypesTuple>> futures;
+            OutputStorageTypesTuple partial_res;
+
+            parallel_fork_and_join(
+                scheduler,
+                mesh.faces_begin(),
+                mesh.faces_end(),
+                (1 << 8),
+                fn_compute_remapped_cc_faces,
+                partial_res, // output computed by master thread
+                futures);
+
+            // remapped_faces
+            const std::vector<std::vector<vd_t>> &remapped_faces_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
+            const std::vector<int> &local_remapped_face_to_ccID_MASTER_THREAD_LOCAL = std::get<1>(partial_res);
+            const std::vector<fd_t> &local_remapped_face_to_mX_face_MASTER_THREAD_LOCAL = std::get<2>(partial_res);
+
+            auto merge_local_remapped_cc_faces = [](
+                                                     const std::vector<std::vector<vd_t>> &remapped_faces_,
+                                                     const std::vector<int> &local_remapped_face_to_ccID_,
+                                                     const std::vector<fd_t> &local_remapped_face_to_mX_face_,
+                                                     const bool popuplate_face_maps,
+                                                     std::map<size_t, mesh_t> &ccID_to_mesh,
+                                                     std::map<size_t, std::vector<fd_t>> &ccID_to_cc_to_mX_face)
+            {
+                for (std::vector<std::vector<vd_t>>::const_iterator remapped_face_iter = remapped_faces_.cbegin();
+                     remapped_face_iter != remapped_faces_.cend();
+                     ++remapped_face_iter)
+                {
+                    int idx = std::distance(remapped_faces_.cbegin(), remapped_face_iter);
+                    int remapped_face_cc_id = local_remapped_face_to_ccID_.at(idx);
+
+                    MCUT_ASSERT(ccID_to_mesh.find(remapped_face_cc_id) != ccID_to_mesh.end());
+
+                    mesh_t &cc_mesh = ccID_to_mesh.at(remapped_face_cc_id);
+                    fd_t f = cc_mesh.add_face(*remapped_face_iter); // insert the face
+
+                    MCUT_ASSERT(f != mesh_t::null_face());
+
+                    if (popuplate_face_maps)
+                    {
+                        // NOTE: "mX" refers to our halfedge data structure called "mesh" (see single threaded code)
+                        std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face.at(remapped_face_cc_id);
+                        MCUT_ASSERT((size_t)f == cc_to_mX_face.size() /*cc_to_mX_face.count(f) == 0*/);
+                        const fd_t fd = local_remapped_face_to_mX_face_[idx];
+                        //cc_to_mX_face[f] = fd;
+                        cc_to_mX_face.push_back(fd);
+                    }
+                }
+            };
+
+            merge_local_remapped_cc_faces(
+                remapped_faces_MASTER_THREAD_LOCAL,
+                local_remapped_face_to_ccID_MASTER_THREAD_LOCAL,
+                local_remapped_face_to_mX_face_MASTER_THREAD_LOCAL,
+                popuplate_face_maps,
+                ccID_to_mesh,
+                ccID_to_cc_to_mX_face);
+
+            // merge thread-local output into global data structures
+            for (int i = 0; i < (int)futures.size(); ++i)
+            {
+                std::future<OutputStorageTypesTuple> &f = futures[i];
+                MCUT_ASSERT(f.valid());
+                OutputStorageTypesTuple future_result = f.get(); // "get()" is a blocking function
+
+                const std::vector<std::vector<vd_t>> &remapped_faces_FUTURE = std::get<0>(future_result);
+                const std::vector<int> &local_remapped_face_to_ccID_FUTURE = std::get<1>(future_result);
+                const std::vector<fd_t> &local_remapped_face_to_mX_face_FUTURE = std::get<2>(future_result);
+
+                merge_local_remapped_cc_faces(
+                    remapped_faces_FUTURE,
+                    local_remapped_face_to_ccID_FUTURE,
+                    local_remapped_face_to_mX_face_FUTURE,
+                    popuplate_face_maps,
+                    ccID_to_mesh,
+                    ccID_to_cc_to_mX_face);
+            }
+
+        } // end of parallel scope
+#else
         // for each face in the auxilliary data structure "mesh" (traced polygon)
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
@@ -743,13 +974,6 @@ namespace mcut
 
             std::vector<vd_t> remapped_face; // using remapped cc descriptors
             std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
-
-            if (ccID_to_cc_to_mX_face_fiter == ccID_to_cc_to_mX_face.cend())
-            {
-                std::pair<std::map<size_t, std::vector<fd_t>>::iterator, bool> r = ccID_to_cc_to_mX_face.insert(std::make_pair(cc_id, std::vector<fd_t>()));
-                ccID_to_cc_to_mX_face_fiter = r.first;
-            }
-
             MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
             std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
@@ -789,6 +1013,7 @@ namespace mcut
                 cc_to_mX_face.push_back(fd);
             }
         }
+#endif
 
         TIME_PROFILE_END();
 
@@ -6414,6 +6639,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // NOTE: The result is a mesh identical to the original source mesh except at the edges introduced by the cut..
                 extract_connected_components(
+                    *input.scheduler,
                     separated_src_mesh_fragments,
                     m0,
                     0, // no offset because traced source-mesh polygons start from the beginning of "m0_polygons"
@@ -6462,6 +6688,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_cut_mesh_fragments;
 
                 mesh_t merged = extract_connected_components(
+                    *input.scheduler,
                     separated_cut_mesh_fragments,
                     m0,
                     traced_sm_polygon_count, // offset to start of traced cut-mesh polygons in "m0_polygons".
@@ -7981,6 +8208,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> unsealed_connected_components;
 
             extract_connected_components(
+                *input.scheduler,
                 unsealed_connected_components,
                 m1,
                 0,
@@ -11267,12 +11495,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             //                   if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
                             // check the main global queue to make sure poly has not already been added
                             const bool poly_is_already_in_maqueued = std::find_if(
-                                                                           patch_poly_stitching_queue.crbegin(),
-                                                                           patch_poly_stitching_queue.crend(),
-                                                                           [&](const std::tuple<hd_t, int, int> &elem)
-                                                                           {
-                                                                               return std::get<1>(elem) == m0_next_poly_idx; // there is an element in the queue with the polygon's ID
-                                                                           }) != patch_poly_stitching_queue.crend();
+                                                                         patch_poly_stitching_queue.crbegin(),
+                                                                         patch_poly_stitching_queue.crend(),
+                                                                         [&](const std::tuple<hd_t, int, int> &elem)
+                                                                         {
+                                                                             return std::get<1>(elem) == m0_next_poly_idx; // there is an element in the queue with the polygon's ID
+                                                                         }) != patch_poly_stitching_queue.crend();
 
                             if (!poly_is_already_in_maqueued)
                             {
@@ -11334,6 +11562,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         ///////////////////////////////////////////////////////////////////////////
 
                         extract_connected_components(
+                            *input.scheduler,
                             separated_stitching_CCs,
                             m1_colored,
                             0,
@@ -11431,6 +11660,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 // extract the seam vertices
                 extract_connected_components(
+                    *input.scheduler,
                     separated_sealed_CCs,
                     m1_colored,
                     0,
