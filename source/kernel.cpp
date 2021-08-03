@@ -511,20 +511,19 @@ namespace mcut
                     const std::vector<hd_t> &mX_traced_polygon = *mX_traced_polygons_iter;
 
                     faces_LOCAL.push_back(std::vector<vd_t>());
-                    std::vector<vd_t>& polygon_vertices = faces_LOCAL.back();
+                    std::vector<vd_t> &polygon_vertices = faces_LOCAL.back();
                     polygon_vertices.reserve(mX_traced_polygon.size());
 
                     // for each halfedge in polygon
                     for (std::vector<hd_t>::const_iterator mX_traced_polygon_halfedge_iter = mX_traced_polygon.cbegin();
-                        mX_traced_polygon_halfedge_iter != mX_traced_polygon.cend();
-                        ++mX_traced_polygon_halfedge_iter)
+                         mX_traced_polygon_halfedge_iter != mX_traced_polygon.cend();
+                         ++mX_traced_polygon_halfedge_iter)
                     {
                         polygon_vertices.push_back(mesh.source(*mX_traced_polygon_halfedge_iter));
                     }
                 }
 
                 return local_output;
-
             };
 
             std::vector<std::future<OutputStorageTypesTuple>> futures;
@@ -541,7 +540,7 @@ namespace mcut
 
             const std::vector<std::vector<vd_t>> &faces_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
 
-            auto merge_local_faces = [](mesh_t& mesh, const std::vector<std::vector<vd_t>> &faces_)
+            auto merge_local_faces = [](mesh_t &mesh, const std::vector<std::vector<vd_t>> &faces_)
             {
                 for (std::vector<std::vector<vd_t>>::const_iterator face_iter = faces_.cbegin();
                      face_iter != faces_.cend();
@@ -10307,11 +10306,15 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             >
             color_to_m0_to_m1_face = {{'A', m0_to_m1_face}, {'B', m0_to_m1_face}};
 
+        m0_to_m1_face.clear();
+
         std::map<
             char,                        // color value
             std::unordered_map<int, int> // copy of m1_to_m0_face (initially containing mappings just for traced source-mesh polygon)
             >
             color_to_m1_to_m0_face = {{'A', m1_to_m0_face}, {'B', m1_to_m0_face}};
+
+        m1_to_m0_face.clear();
 
         std::map<char, std::unordered_map<vd_t, // "m1" cut-mesh vtx instance
                                           vd_t  // "m0" cut-mesh ovtx instance
@@ -10323,6 +10326,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             std::vector<vd_t> // copy of "m0_to_m1_ovtx" (initially containing mappings just for original source-mesh & cut-mesh vertices i.e. no ivertices included!)
             >
             color_to_m1_to_m0_sm_ovtx = {{'A', m1_to_m0_ovtx}, {'B', m1_to_m0_ovtx}};
+
+        m1_to_m0_ovtx.clear();
 
         // for each color  ("interior" / "exterior")
         for (std::map<char, std::vector<int>>::const_iterator color_to_patches_iter = color_to_patch.cbegin();
@@ -10347,36 +10352,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             // get the reference to the copy of "m1" to which patches of the current color will be stitched
             mesh_t &m1_colored = color_to_m1.at(color_id);
 
-#if 0
-        // used to keep track of already-calculated edges in "color_to_m1"
-        // TODO: maybe its better to use a map for this look-up
-        std::map<vd_t, std::vector<std::pair<vd_t, ed_t>>> m1_computed_edges; // note: local var and in same scope as m1_colored
-
-        auto get_computed_edge = [&](/*const mesh_t& m,*/ const vd_t& src, const vd_t& tgt) -> ed_t {
-            // for (std::vector<ed_t>::const_iterator i = m1_computed_edges.cbegin(); i != m1_computed_edges.cend(); ++i) {
-            //    if ((m.vertex(*i, 0) == src && m.vertex(*i, 1) == tgt) || (m.vertex(*i, 0) == tgt && m.vertex(*i, 1) == src)) {
-            //        return *i;
-            //    }
-            // }
-
-            ed_t edge = mesh_t::null_edge();
-            std::map<vd_t, std::vector<std::pair<vd_t, ed_t>>>::const_iterator i = m1_computed_edges.find(src);
-
-            if (i != m1_computed_edges.cend()) {
-                // for each vertex connected to "i"
-                for (std::vector<std::pair<vd_t, ed_t>>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
-                    MCUT_ASSERT(j->first != src); // src cannot be connected to itself
-                    if (j->first == tgt) {
-                        edge = j->second; // the edge which connnects them
-                        break;
-                    }
-                }
-            }
-
-            return edge;
-        };
-#endif
-
             // create entry
             color_to_m0_to_m1_he_instances.insert(std::make_pair(color_id, std::unordered_map<hd_t, std::map<int, hd_t>>()));
             // ref to entry
@@ -10399,7 +10374,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             MCUT_ASSERT(!m0_to_m1_face_colored.empty());
             MCUT_ASSERT(!m1_to_m0_face_colored.empty());
 
-            //std::map<vd_t, vd_t>& m0_to_m1_sm_ovtx_colored = color_to_m0_to_m1_sm_ovtx.at(color_id);
             std::vector<vd_t> &m1_to_m0_sm_ovtx_colored = color_to_m1_to_m0_sm_ovtx.at(color_id);
             //MCUT_ASSERT(!m0_to_m1_sm_ovtx_colored.empty());
             MCUT_ASSERT(!m1_to_m0_sm_ovtx_colored.empty());
@@ -10440,10 +10414,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 DEBUG_CODE_MASK(lg << "is " << (is_ccw_patch ? "ccw" : "cw") << " patch" << std::endl;);
 
                 MCUT_ASSERT(patches.find(cur_patch_idx) != patches.cend());
-
-                // get list of patch polygons
-                //const std::vector<int>& patch = patches.at(cur_patch_idx);
-
                 ///////////////////////////////////////////////////////////////////////////
                 // stitch patch into a connected component stored in "m1_colored"
                 ///////////////////////////////////////////////////////////////////////////
@@ -10517,8 +10487,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // this queue contains information identifying the patch polygons next-in-queue
                 // to be stitched into the inferred connected component
                 std::deque<std::tuple<hd_t /*m1*/, int /*m0 poly*/, int /*m0 he*/>> patch_poly_stitching_queue;
+                std::unordered_map<int, bool> m0_poly_already_enqueued; // i.e. in "patch_poly_stitching_queue" 
                 // thus, the first element is the seed polygon and the seed halfedge
-                patch_poly_stitching_queue.push_back(std::make_tuple(m1_seed_interior_ihe_opp_opp, m0_patch_seed_poly_idx, m0_patch_seed_poly_he_idx));
+                patch_poly_stitching_queue.push_back(
+                    std::make_tuple(
+                        m1_seed_interior_ihe_opp_opp,
+                        m0_patch_seed_poly_idx,
+                        m0_patch_seed_poly_he_idx));
 
                 //
                 // In the following loop, we will stitch patch polygons iteratively as we
@@ -10537,7 +10512,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     int m0_cur_patch_cur_poly_1st_he_idx = -1; // index into m0_polygon
 
                     // pop element from queue (the next polygon to stitch)
-                    std::tie(m1_cur_patch_cur_poly_1st_he, m0_cur_patch_cur_poly_idx, m0_cur_patch_cur_poly_1st_he_idx) = patch_poly_stitching_queue.front();
+                    std::tie(
+                        m1_cur_patch_cur_poly_1st_he,
+                        m0_cur_patch_cur_poly_idx,
+                        m0_cur_patch_cur_poly_1st_he_idx) = patch_poly_stitching_queue.front();
 
                     DEBUG_CODE_MASK(lg << "polygon = " << m0_cur_patch_cur_poly_idx << std::endl;);
 
@@ -10666,12 +10644,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 // get the ps-halfedge in the intersection-registry entry of src
                                 //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he));
                                 // get the ps-edges corresponding to the ps-halfedges
-                                vd_t src_vertex = m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
+                                vd_t src_vertex = m0_cur_patch_cur_poly_cur_he_src;// m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
                                 MCUT_ASSERT((size_t)src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                                 const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex - ps.number_of_vertices());
                                 const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); // ps.edge(src_coincident_ps_halfedge);
 
-                                vd_t tgt_vertex = m0.target(m0_cur_patch_cur_poly_cur_he);
+                                vd_t tgt_vertex = m0_cur_patch_cur_poly_cur_he_tgt;//m0.target(m0_cur_patch_cur_poly_cur_he);
                                 MCUT_ASSERT((size_t)tgt_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                                 const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex - ps.number_of_vertices());
                                 const ed_t tgt_ps_edge = tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he)); // ps.edge(tgt_ps_h);
@@ -10820,12 +10798,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             //MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0.target(m0_cur_patch_cur_poly_cur_he)) != m0_ivtx_to_ps_edge.cend());
 
                             //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he));
-                            vd_t src_vertex = m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
+                            const vd_t src_vertex = m0_cur_patch_cur_poly_cur_he_src;// m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
                             MCUT_ASSERT((size_t)src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                             const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex - ps.number_of_vertices());
                             const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); // ps.edge(src_coincident_ps_halfedge);
 
-                            vd_t tgt_vertex = m0.target(m0_cur_patch_cur_poly_cur_he);
+                            const vd_t tgt_vertex = m0_cur_patch_cur_poly_cur_he_tgt;//m0.target(m0_cur_patch_cur_poly_cur_he);
                             MCUT_ASSERT((size_t)tgt_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                             const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex - ps.number_of_vertices());
                             const ed_t tgt_ps_edge = tgt_vertex_ipair.first;
@@ -10994,7 +10972,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                             //
 
                                             bool found_transformed_neigh_he = false; // any updated halfedge whose m0 instance references m0_cur_patch_cur_poly_cur_he_tgt
-#if 1
+
                                             /*
                                           1. get "m0" halfedges around vertex
                                           2. for each halfedge around vertex, check if it has a transformed instance that belonging to the current patch
@@ -11058,75 +11036,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                                     break; // done
                                                 }
                                             }
-#else
-                                            //
-                                            // TODO: replace the following loop over "patch", with a loop over the
-                                            // halfedges around vertex, where vertex is "m0_cur_patch_cur_poly_cur_he_tgt"
-                                            // finding the halfedges around a vertex can be found by use our traced polygons!
-                                            //
-
-                                            // for each polygon in current patch
-                                            for (std::vector<int>::const_iterator patch_poly_idx_iter = patch.cbegin();
-                                                 patch_poly_idx_iter != patch.cend();
-                                                 ++patch_poly_idx_iter)
-                                            {
-
-                                                const int &patch_poly_idx = *patch_poly_idx_iter;
-                                                const traced_polygon_t &patch_poly = m0_polygons.at(patch_poly_idx);
-
-                                                // for each halfedge in polygon
-                                                for (traced_polygon_t::const_iterator patch_poly_he_iter = patch_poly.cbegin();
-                                                     patch_poly_he_iter != patch_poly.cend();
-                                                     ++patch_poly_he_iter)
-                                                {
-
-                                                    const hd_t &patch_poly_he = *patch_poly_he_iter;
-
-                                                    if (m0_cur_patch_cur_poly_cur_he == patch_poly_he)
-                                                    {
-                                                        continue; // its the current halfedge we are trying to transform!
-                                                    }
-
-                                                    const vd_t patch_poly_he_src = m0.source(patch_poly_he);
-                                                    const vd_t patch_poly_he_tgt = m0.target(patch_poly_he);
-                                                    const bool connected_by_src = (patch_poly_he_src == m0_cur_patch_cur_poly_cur_he_tgt);
-                                                    const bool connected_by_tgt = (patch_poly_he_tgt == m0_cur_patch_cur_poly_cur_he_tgt);
-
-                                                    if (connected_by_src || connected_by_tgt)
-                                                    {
-
-                                                        std::map<hd_t, std::map<int, hd_t>>::iterator m0_to_m1_he_instances_find_iter_ = m0_to_m1_he_instances.find(patch_poly_he);
-
-                                                        if (m0_to_m1_he_instances_find_iter_ != m0_to_m1_he_instances.end())
-                                                        {
-                                                            std::map<int, hd_t>::const_iterator patch_to_m1_he_iter = m0_to_m1_he_instances_find_iter_->second.find(cur_patch_idx);
-
-                                                            const bool is_transformed = (patch_to_m1_he_iter != m0_to_m1_he_instances_find_iter_->second.cend());
-
-                                                            if (is_transformed)
-                                                            {
-                                                                const hd_t &m1_patch_poly_he = patch_to_m1_he_iter->second;
-                                                                if (connected_by_src)
-                                                                {
-                                                                    m1_cs_cur_patch_polygon_he_tgt = m1_colored.source(m1_patch_poly_he);
-                                                                }
-                                                                else
-                                                                { //connected_by_tgt
-                                                                    m1_cs_cur_patch_polygon_he_tgt = m1_colored.target(m1_patch_poly_he);
-                                                                }
-                                                                found_transformed_neigh_he = true;
-                                                                break; // done
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                if (found_transformed_neigh_he)
-                                                {
-                                                    break;
-                                                }
-                                            }
-#endif
 
                                             if (!found_transformed_neigh_he)
                                             {
@@ -11135,6 +11044,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                                 //
 
                                                 // is "m1_cs_cur_patch_polygon_he_tgt" a vertex we can duplicate? (partial cut, interior sealing)
+                                                // TODO: std::sort(sm_interior_cs_border_vertices) and then we can use binary search
                                                 const bool is_sm_interior_cs_boundary_vertex = std::find(sm_interior_cs_border_vertices.cbegin(), sm_interior_cs_border_vertices.cend(), m0_cur_patch_cur_poly_cur_he_tgt) != sm_interior_cs_border_vertices.cend();
 
                                                 if (!is_sm_interior_cs_boundary_vertex)
@@ -11308,21 +11218,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //
                         // case 2
                         //
-                        // TODO: no need to query m0 [again] ("m0.source(m0_cur_patch_cur_poly_cur_he)" is already in a var above)
                         const vd_t m0_cur_patch_cur_poly_cur_he_src = m0.source(m0_cur_patch_cur_poly_cur_he);
                         const vd_t m0_cur_patch_cur_poly_cur_he_tgt = m0.target(m0_cur_patch_cur_poly_cur_he);
                         bool is_ambiguious_interior_edge_case = m0_is_intersection_point(m0_cur_patch_cur_poly_cur_he_src, ps_vtx_cnt) && m0_is_intersection_point(m0_cur_patch_cur_poly_cur_he_tgt, ps_vtx_cnt);
 
                         if (is_ambiguious_interior_edge_case)
                         {
-
-                            //MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0_cur_patch_cur_poly_cur_he_src) != m0_ivtx_to_ps_edge.cend());
-
-                            //const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_src);
-
-                            // MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0_cur_patch_cur_poly_cur_he_tgt) != m0_ivtx_to_ps_edge.cend());
-
-                            // const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_tgt);
                             MCUT_ASSERT((size_t)m0_cur_patch_cur_poly_cur_he_src - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                             const std::pair<ed_t, fd_t> &m0_cur_patch_cur_poly_cur_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_cur_patch_cur_poly_cur_he_src - ps.number_of_vertices());
                             const ed_t src_ps_edge = m0_cur_patch_cur_poly_cur_he_src_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_src); //ps.edge(src_coincident_ps_halfedge);
@@ -11405,9 +11306,6 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                     has_patch_winding_orientation = (poly_idx >= traced_polygon_count);
                                 }
 
-                                // polygon has same winding-order as current patch, and polygon is part of the current patch
-                                // TODO: Using the cs_poly_to_patch map for O(Log N) improvement does not work i.e. replace the second condition
-                                // with "m0_cm_poly_to_patch_idx.at(poly_idx) == cur_patch_idx"
                                 return has_patch_winding_orientation && m0_cm_poly_to_patch_idx.at(poly_idx) == cur_patch_idx; // std::find(patch_polys.cbegin(), patch_polys.cend(), poly_idx) != patch_polys.cend(); // NOTE: only one polygon in the current patch will match
                             });
 
@@ -11442,7 +11340,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // adjacent polygon
                         const traced_polygon_t &next_poly = m0_polygons.at(m0_next_poly_idx);
                         // pointer to the first halfedge in the polygon from which its stitching will begin
-                        const traced_polygon_t::const_iterator he_find_iter = std::find(next_poly.cbegin(), next_poly.cend(), m0_cur_patch_cur_poly_cur_he_opp);
+                        const traced_polygon_t::const_iterator he_find_iter = std::find(
+                            next_poly.cbegin(), 
+                            next_poly.cend(), 
+                            m0_cur_patch_cur_poly_cur_he_opp);
 
                         // "m0_cur_patch_cur_poly_cur_he_opp" must exist in next_poly since we have
                         // already established that "m0_cur_patch_cur_poly_cur_he" is not a border
@@ -11457,31 +11358,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         // because our 4 conditions above take care of this.
                         // However, we do have to take care not to add the polygon to the queue more
                         // than once (due to BFS nature of stitching), hence the following.
-#if 0
-                    //
-                    // NOTE: the following is redundant!
-                    // we don't need to calculate "poly_is_already_stitched_wrt_cur_patch" because
-                    // this is precisely waht case 3 above is checking for. Remove this ASAP, its also a major performance hit.
-                    //
-                    bool poly_is_already_stitched_wrt_cur_patch = std::find_if(
-                                                                      m0_to_m1_he_instances.cbegin(),
-                                                                      m0_to_m1_he_instances.cend(),
-                                                                      // for each transformed halfedge, check it it has been transformed w.r.t the
-                                                                      // current patch. Further, check if the transformed value is the one we are about
-                                                                      // to seed the next polygon's stitching with (m1_next_poly_seed_he)
-                                                                      [&](const std::pair<hd_t, std::map<int, hd_t>>& elem) {
-                                                                          bool is_transformed_in_current_patch = false;
 
-                                                                          for (std::map<int, hd_t>::const_iterator iter = elem.second.cbegin(); iter != elem.second.cend(); ++iter) {
-                                                                              if (iter->first == cur_patch_idx && iter->second == m1_next_poly_seed_he) {
-                                                                                  is_transformed_in_current_patch = true;
-                                                                                  break;
-                                                                              }
-                                                                          }
-                                                                          return is_transformed_in_current_patch;
-                                                                      })
-                        != m0_to_m1_he_instances.cend();
-#endif
                         const bool poly_is_already_in_tmp_queue = std::find_if(
                                                                       patch_poly_stitching_queue_tmp.crbegin(),
                                                                       patch_poly_stitching_queue_tmp.crend(),
@@ -11494,17 +11371,19 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         {
                             //                   if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
                             // check the main global queue to make sure poly has not already been added
-                            const bool poly_is_already_in_maqueued = std::find_if(
+                            std::unordered_map<int, bool>::const_iterator qmap_iter = m0_poly_already_enqueued.find(m0_next_poly_idx);
+                            const bool poly_is_already_in_maqueued = qmap_iter == m0_poly_already_enqueued.cend(); /*std::find_if(
                                                                          patch_poly_stitching_queue.crbegin(),
                                                                          patch_poly_stitching_queue.crend(),
                                                                          [&](const std::tuple<hd_t, int, int> &elem)
                                                                          {
                                                                              return std::get<1>(elem) == m0_next_poly_idx; // there is an element in the queue with the polygon's ID
-                                                                         }) != patch_poly_stitching_queue.crend();
+                                                                         }) != patch_poly_stitching_queue.crend();*/
 
                             if (!poly_is_already_in_maqueued)
                             {
                                 patch_poly_stitching_queue_tmp.push_back(std::make_tuple(m1_next_poly_seed_he, m0_next_poly_idx, m0_next_poly_he_idx));
+                                m0_poly_already_enqueued[m0_next_poly_idx] = true;
                             }
                         }
 
