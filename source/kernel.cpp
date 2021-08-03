@@ -8763,7 +8763,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 std::vector<int> &patch = patches.at(cur_scs_cur_patch_idx); // patch_insertion.first->second; // polygons of patch
                 patch.reserve(cs_face_count);
                 std::deque<int> flood_fill_queue;                        // for building patch using BFS
+                std::unordered_map<int, bool> seed_poly_already_enqueued;
                 flood_fill_queue.push_back(cur_scs_patch_seed_poly_idx); // first polygon
+                seed_poly_already_enqueued[cur_scs_patch_seed_poly_idx] = true;
 
                 do
                 { // each interation adds a polygon to the patch
@@ -8844,10 +8846,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                                 if (!poly_already_in_patch)
                                 {
-                                    const bool poly_already_queued = std::find(flood_fill_queue.crbegin(), flood_fill_queue.crend(), incident_poly) != flood_fill_queue.crend();
+                                    std::unordered_map<int, bool>::const_iterator qmap_fiter = seed_poly_already_enqueued.find(incident_poly);
+                                    const bool poly_already_queued = qmap_fiter != seed_poly_already_enqueued.cend(); //std::find(flood_fill_queue.crbegin(), flood_fill_queue.crend(), incident_poly) != flood_fill_queue.crend();
                                     if (!poly_already_queued)
                                     {
                                         flood_fill_queue.push_back(incident_poly); // add adjacent polygon to bfs-queue
+                                        seed_poly_already_enqueued[incident_poly] = true;
                                     }
                                 }
                             }
@@ -9042,7 +9046,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     error: we do not handle this case due ambiguities that arise because we only rely on topological information   
 
             */
-
+#if 0 // floating patches no longer exist!
                 if (cur_scs_is_floating_patch)
                 { // TODO: calculate "cur_scs_is_floating_patch" with "check_is_floating_patch(...)"
                     // 1 get patch polygon vertices
@@ -9122,6 +9126,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // NOTE: at the end of this scope, we have inferred the color of the floating-patch in the current scs
                 }
                 else
+                #endif
+                
                 {
                     // NOTE: Keep in mind at this point that our objective have been to infer the color of a
                     // normal SCS from a floating patch
