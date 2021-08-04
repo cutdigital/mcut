@@ -5147,9 +5147,702 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         std::unordered_map<int, fd_t> m0_to_ps_face; // (we'll later also include reversed polygon patches)
 
-        // TODO: find a way to loop over only those ps-faces that where found to be actually intersecting!
-        // i.e. those that can be found in a registry entrys
+#if defined(MCUT_MULTI_THREADED_IMPL)
+        {
+            typedef mesh_t::face_iterator_t InputStorageIteratorType;
+            typedef std::tuple<
+                std::vector<traced_polygon_t>, // m0_polygons;
+                std::vector<int>,              // m0_sm_cutpath_adjacent_polygons
+                std::vector<int>,              // m0_cm_cutpath_adjacent_polygons;
+                int,                           //traced_sm_polygon_count
+                std::unordered_map<int, fd_t>> // m0_to_ps_face
+                OutputStorageTypesTuple;
 
+            auto fn_trace_polygons = [&](
+                                         InputStorageIteratorType block_start_,
+                                         InputStorageIteratorType block_end_) -> OutputStorageTypesTuple
+            {
+                OutputStorageTypesTuple local_output;
+
+                std::vector<traced_polygon_t> &m0_polygons_LOCAL = std::get<0>(local_output);
+                std::vector<int> &m0_sm_cutpath_adjacent_polygons_LOCAL = std::get<1>(local_output);
+                std::vector<int> &m0_cm_cutpath_adjacent_polygons_LOCAL = std::get<2>(local_output);
+                int &traced_sm_polygon_count_LOCAL = std::get<3>(local_output);
+                std::unordered_map<int, fd_t>&m0_to_ps_face_LOCAL = std::get<4>(local_output);
+
+                traced_sm_polygon_count_LOCAL = 0;
+
+                for (mesh_t::face_iterator_t ps_face_iter = block_start_; ps_face_iter != block_end_; ++ps_face_iter)
+                {
+                    const fd_t &ps_face = *ps_face_iter;
+
+                    // get all the edges that lie on "ps_face", including the new one after partiting acording to intersection
+                    // points, and the old one which did not intersect any face
+                    std::unordered_map<fd_t, std::vector<ed_t>>::iterator ps_iface_to_m0_edge_list_fiter = ps_iface_to_m0_edge_list.find(ps_face);
+
+                    bool is_intersecting_ps_face = ps_iface_to_m0_edge_list_fiter != ps_iface_to_m0_edge_list.end();
+                    bool is_from_cut_mesh = ps_is_cutmesh_face(ps_face, sm_face_count);
+
+                    std::vector<traced_polygon_t> child_polygons; // new polygons traced on current face
+
+                    if (is_intersecting_ps_face == false)
+                    { // non-intersecting face
+
+                        traced_polygon_t retraced_poly; // ordered sequence of halfedges defining the unchanged polygon
+                        std::vector<hd_t> halfedges_around_face = ps.get_halfedges_around_face(ps_face);
+                        retraced_poly.reserve(halfedges_around_face.size()); // minimum 3 (triangle)
+
+                        // for each halfedge in the current polygon
+                        for (std::vector<hd_t>::const_iterator hbegin = halfedges_around_face.cbegin(); hbegin != halfedges_around_face.cend(); ++hbegin)
+                        {
+                            // get the source and target vertex descriptors in the polygon soup
+                            const vd_t ps_h_src = ps.source(*hbegin);
+                            const vd_t ps_h_tgt = ps.target(*hbegin);
+
+                            MCUT_ASSERT((int)(ps_h_src) < (int)ps_to_m0_vtx.size());
+                            const vd_t m0_h_src = ps_to_m0_vtx.at(ps_h_src);
+                            MCUT_ASSERT((int)(ps_h_tgt) < (int)ps_to_m0_vtx.size());
+                            const vd_t m0_h_tgt = ps_to_m0_vtx.at(ps_h_tgt);
+
+                            const ed_t ps_edge = ps.edge(*hbegin);
+                            const ed_t m0_edge = ps_to_m0_non_intersecting_edge.at(ps_edge);
+                            const hd_t m0_edge_h0 = m0.halfedge(m0_edge, 0);
+                            const hd_t m0_edge_h1 = m0.halfedge(m0_edge, 1);
+
+                            // resolve the correct halfedge by match the source and target vertex descriptors
+                            if (m0.source(m0_edge_h0) == m0_h_src && m0.target(m0_edge_h0) == m0_h_tgt)
+                            {
+                                retraced_poly.emplace_back(m0_edge_h0);
+                            }
+                            else
+                            {
+                                retraced_poly.emplace_back(m0_edge_h1);
+                            }
+                        }
+
+                        MCUT_ASSERT(retraced_poly.size() == halfedges_around_face.size());
+
+                        const int poly_idx = (int)(m0_polygons_LOCAL.size() + child_polygons.size());
+                        m0_to_ps_face_LOCAL[poly_idx] = ps_face;
+
+                        child_polygons.emplace_back(retraced_poly);
+                    }
+                    else
+                    {
+
+                        // Here we enter the complex case of having to actually clip the current face
+                        // because it is intersecting
+                        // --------------------------------------------------------------------------
+
+                        const std::vector<ed_t> &ps_iface_m0_edge_list = ps_iface_to_m0_edge_list_fiter->second;
+                        std::vector<vd_t> ps_coincident_vertices = ps.get_vertices_around_face(ps_face);
+                        std::vector<vd_t> coincident_vertices(ps_coincident_vertices.size()); // "m0" versions of those stored in "ps_coincident_vertices"
+
+                        for (int i = 0; i < (int)ps_coincident_vertices.size(); ++i)
+                        {
+                            const vd_t ps_v = ps_coincident_vertices[i];
+                            MCUT_ASSERT((int)(ps_v) < (int)ps_to_m0_vtx.size() /*ps_to_m0_vtx.find(ps_v) != ps_to_m0_vtx.cend()*/);
+                            const vd_t m0_v = ps_to_m0_vtx.at(ps_v);
+                            coincident_vertices[i] = m0_v;
+                        }
+
+                        MCUT_ASSERT(coincident_vertices.size() == ps_coincident_vertices.size());
+
+                        const std::unordered_map<fd_t, std::vector<vd_t>>::const_iterator ireg_entry_iter = ps_iface_to_ivtx_list.find(ps_face);
+
+                        MCUT_ASSERT(ireg_entry_iter != ps_iface_to_ivtx_list.cend());
+
+                        const std::vector<vd_t> &intersection_points_on_face = ireg_entry_iter->second;
+                        coincident_vertices.reserve(coincident_vertices.size() + intersection_points_on_face.size());
+                        coincident_vertices.insert(coincident_vertices.end(), intersection_points_on_face.cbegin(), intersection_points_on_face.cend());
+
+                        MCUT_ASSERT(intersection_points_on_face.size() >= 2); // minimum (two intersecting convex polygons)
+
+                        std::vector<ed_t> incident_edges = ps_iface_m0_edge_list; // COPY because "incident_edges" will be modified later
+                        int incident_boundary_edge_count = 0;
+
+                        std::partition(incident_edges.begin(), incident_edges.end(),
+                                       [&](const ed_t &e)
+                                       {
+                                           const vd_t v0 = m0.vertex(e, 0);
+                                           const vd_t v1 = m0.vertex(e, 1);
+                                           const bool v0_is_ivtx = m0_is_intersection_point(v0, ps_vtx_cnt);
+                                           const bool v1_is_ivtx = m0_is_intersection_point(v1, ps_vtx_cnt);
+                                           const bool is_ambiguious_boundary_edge_case = (v0_is_ivtx && v1_is_ivtx);
+                                           bool is_valid_ambiguious_boundary_edge = false;
+
+                                           if (is_ambiguious_boundary_edge_case)
+                                           {
+                                               MCUT_ASSERT((size_t)v0 - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /* m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                               const std::pair<ed_t, fd_t> &v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0 - ps.number_of_vertices());
+                                               const ed_t v0_ps_edge = v0_ipair.first; // m0_ivtx_to_ps_edge.at(v0); // ps.edge(v0_coincident_ps_halfedge);
+
+                                               MCUT_ASSERT((size_t)v1 - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                               const std::pair<ed_t, fd_t> &v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1 - ps.number_of_vertices());
+                                               const ed_t v1_ps_edge = v1_ipair.first; // m0_ivtx_to_ps_edge.at(v1); // ps.edge(v1_coincident_ps_halfedge);
+
+                                               is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge);
+                                           }
+
+                                           bool is_boundary_edge = (!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge);
+                                           if (is_boundary_edge)
+                                           {
+                                               incident_boundary_edge_count++; // count
+                                           }
+                                           return is_boundary_edge;
+                                       });
+
+                        MCUT_ASSERT(incident_boundary_edge_count >= 3); // minimum is 3 edge which is for a triangle
+
+                        const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
+                        std::vector<hd_t> incident_halfedges;
+                        hd_t first_boundary_halfedge = mesh_t::null_halfedge();
+
+                        for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin();
+                             incident_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count;
+                             ++incident_edge_iter)
+                        {
+                            const ed_t &edge = (*incident_edge_iter);
+
+                            for (int edge_he_iter = 0; edge_he_iter < 2; ++edge_he_iter)
+                            {
+                                const hd_t m0_edge_he = m0.halfedge(edge, edge_he_iter);
+                                const vd_t m0_edge_he_src = m0.source(m0_edge_he);
+                                const vd_t m0_edge_he_tgt = m0.target(m0_edge_he);
+                                const bool m0_edge_he_src_is_ivertex = m0_is_intersection_point(m0_edge_he_src, ps_vtx_cnt);
+                                const bool m0_edge_he_tgt_is_ivertex = m0_is_intersection_point(m0_edge_he_tgt, ps_vtx_cnt);
+
+                                if (!m0_edge_he_src_is_ivertex && !m0_edge_he_tgt_is_ivertex)
+                                { // o-->o (unmodified original edge)
+
+                                    const vd_t ps_he_src = m0_to_ps_vtx.at(m0_edge_he_src);
+                                    const vd_t ps_he_tgt = m0_to_ps_vtx.at(m0_edge_he_tgt);
+                                    const hd_t ps_he = ps.halfedge(ps_he_src, ps_he_tgt);
+
+                                    if (ps_he == mesh_t::null_halfedge())
+                                    {
+                                        continue;
+                                    }
+
+                                    if (ps.face(ps_he) == ps_face)
+                                    {
+                                        first_boundary_halfedge = m0_edge_he;
+                                        break;
+                                    }
+                                }
+                                else
+                                { // x-->x OR o-->x OR x-->o
+                                    const bool is_ox = (!m0_edge_he_src_is_ivertex && m0_edge_he_tgt_is_ivertex);
+
+                                    if (is_ox)
+                                    {
+                                        MCUT_ASSERT((size_t)m0_edge_he_tgt - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                        const std::pair<ed_t, fd_t> &m0_edge_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_tgt - ps.number_of_vertices());
+
+                                        // get the incident ps-halfedge of tgt
+                                        ed_t tgt_ps_e = m0_edge_he_tgt_ipair.first;
+                                        hd_t tgt_ps_h = ps.halfedge(tgt_ps_e, 0);
+
+                                        if (ps.face(tgt_ps_h) != ps_face)
+                                        {
+                                            tgt_ps_h = ps.opposite(tgt_ps_h);
+                                            MCUT_ASSERT(tgt_ps_h != mesh_t::null_halfedge());
+                                        }
+
+                                        const vd_t &m0_edge_he_src_as_ps_vertex = m0_to_ps_vtx.at(m0_edge_he_src);
+
+                                        if (m0_edge_he_src_as_ps_vertex == ps.source(tgt_ps_h))
+                                        { // is counter clock-wise halfedge
+                                            first_boundary_halfedge = m0_edge_he;
+                                            break;
+                                        }
+                                    }
+                                    else
+                                    { // x-->x OR x-->o
+
+                                        const bool is_xx = m0_edge_he_src_is_ivertex && m0_edge_he_tgt_is_ivertex;
+
+                                        if (is_xx)
+                                        { // exterior interior-iedge
+                                            MCUT_ASSERT((size_t)m0_edge_he_src - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                            const std::pair<ed_t, fd_t> &m0_edge_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_src - ps.number_of_vertices());
+                                            MCUT_ASSERT((size_t)m0_edge_he_tgt - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_edge_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                            const std::pair<ed_t, fd_t> &m0_edge_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_edge_he_tgt - ps.number_of_vertices());
+
+                                            const ed_t src_ps_edge = m0_edge_he_src_ipair.first; // ps.edge(src_coincident_ps_halfedge)
+                                            const ed_t tgt_ps_edge = m0_edge_he_tgt_ipair.first; // ps.edge(tgt_ps_h);
+                                            const bool is_exterior_ih = (src_ps_edge == tgt_ps_edge);
+
+                                            if (!is_exterior_ih)
+                                            {
+                                                continue; // interior ihalfedges cannot be used as the first exterior ihalfedge
+                                            }
+
+                                            hd_t ps_halfedge_of_face = ps.halfedge(tgt_ps_edge, 0); //tgt_ps_h;
+
+                                            if (ps.face(ps_halfedge_of_face) != ps_face)
+                                            {
+                                                ps_halfedge_of_face = ps.opposite(ps_halfedge_of_face);
+                                                MCUT_ASSERT(ps_halfedge_of_face != mesh_t::null_halfedge()); // guarranteed to exist since we have a poly-boundary interior ihalfedge
+                                            }
+
+                                            const ed_t &incident_ps_edge = ps.edge(ps_halfedge_of_face);
+                                            std::map<ed_t, std::vector<ed_t>>::const_iterator ps_to_m0_edges_find_iter = ps_to_m0_edges.find(incident_ps_edge);
+                                            MCUT_ASSERT(ps_to_m0_edges_find_iter != ps_to_m0_edges.cend()); // because incident_ps_edge contains a polygon exterior interior ihalfedge
+
+                                            const std::vector<ed_t> &sorted_m0_edges = ps_to_m0_edges_find_iter->second;
+                                            std::vector<hd_t> halfedge_sequence;
+                                            const ed_t &first_e = sorted_m0_edges.front();
+                                            hd_t first_he = m0.halfedge(first_e, 0);
+                                            vd_t first_he_src = m0.source(first_he);
+
+                                            if (m0_is_intersection_point(first_he_src, ps_vtx_cnt))
+                                            {
+                                                // TODO: I think this scope is never entered based on how we created "sorted_m0_edges".
+                                                // Thus, the source vertex of the first halfedge in the sequence cannot be an intersection point
+                                                first_he = m0.halfedge(first_e, 1);
+                                                first_he_src = m0.source(first_he);
+                                                MCUT_ASSERT(!m0_is_intersection_point(first_he_src, ps_vtx_cnt)); // expect original vertex since halfedge edge is the first in sequence
+                                            }
+
+                                            halfedge_sequence.push_back(first_he);
+
+                                            for (std::vector<ed_t>::const_iterator seq_edge_iter = sorted_m0_edges.cbegin() + 1; // we have already added the first halfedge
+                                                 seq_edge_iter != sorted_m0_edges.cend(); ++seq_edge_iter)
+                                            {
+                                                const ed_t &e = *seq_edge_iter;
+                                                const hd_t h0 = m0.halfedge(e, 0);
+
+                                                if (m0.source(h0) == m0.target(halfedge_sequence.back()))
+                                                {
+                                                    halfedge_sequence.push_back(h0);
+                                                }
+                                                else
+                                                {
+                                                    const hd_t h1 = m0.halfedge(e, 1);
+                                                    halfedge_sequence.push_back(h1);
+                                                }
+                                            }
+
+                                            MCUT_ASSERT(halfedge_sequence.size() == sorted_m0_edges.size());
+
+                                            const vd_t &first_he_src_as_ps_vertex = m0_to_ps_vtx.at(first_he_src); // first he of sequence
+
+                                            if (first_he_src_as_ps_vertex != ps.source(ps_halfedge_of_face))
+                                            {
+                                                std::for_each(
+                                                    halfedge_sequence.begin(),
+                                                    halfedge_sequence.end(),
+                                                    [&](hd_t &he)
+                                                    {
+                                                        he = m0.opposite(he);
+                                                    }); // flip seq
+                                            }
+
+                                            std::vector<hd_t>::const_iterator matching_he_find_iter = std::find_if(
+                                                halfedge_sequence.cbegin(),
+                                                halfedge_sequence.cend(),
+                                                [&](const hd_t &he)
+                                                {
+                                                    const vd_t &he_src = m0.source(he);
+                                                    const vd_t &he_tgt = m0.target(he);
+
+                                                    return (he_src == m0_edge_he_src && he_tgt == m0_edge_he_tgt /*|| (he_src == m0_edge_he_tgt && he_tgt == m0_edge_he_src*/);
+                                                });
+
+                                            MCUT_ASSERT(matching_he_find_iter != halfedge_sequence.cend()); // does the potential halfedge actually point in the correct direction or not
+                                            {
+                                                first_boundary_halfedge = *matching_he_find_iter;
+                                                break;
+                                            }
+                                        } // if (is_xx) {
+                                        else
+                                        {
+                                        }
+                                    } // } else { // x-->x OR x-->o
+                                }     // } else { // x-->x OR o-->x OR x-->o
+                            }         // for (int edge_he_iter = 0; edge_he_iter < 2; ++edge_he_iter) {
+
+                            if (first_boundary_halfedge != mesh_t::null_halfedge())
+                            {
+                                break; // done
+                            }
+                        }
+
+                        MCUT_ASSERT(first_boundary_halfedge != mesh_t::null_halfedge());
+
+                        hd_t current_exterior_halfedge = mesh_t::null_halfedge();
+                        hd_t next_exterior_halfedge = first_boundary_halfedge;
+                        std::unordered_map<ed_t, bool> walked_edges;
+
+                        do
+                        {
+
+                            current_exterior_halfedge = next_exterior_halfedge;
+                            incident_halfedges.push_back(current_exterior_halfedge);
+                            walked_edges[m0.edge(current_exterior_halfedge)] = true;
+
+                            const vd_t current_tgt = m0.target(current_exterior_halfedge);
+                            next_exterior_halfedge = mesh_t::null_halfedge(); // reset
+
+                            // find next boundary halfedge from incident edges
+                            for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin();
+                                 incident_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count; // we only want exterior edges;
+                                 ++incident_edge_iter)
+                            {
+                                const ed_t &edge = *incident_edge_iter;
+                                bool edge_walked = walked_edges.find(edge) != walked_edges.cend(); //std::find(walked_edges.cbegin(), walked_edges.cend(), edge) != walked_edges.cend();
+
+                                if (edge_walked)
+                                {
+                                    continue; // skip edge is walked already
+                                }
+
+                                const vd_t v0 = m0.vertex(edge, 0);
+                                const vd_t v1 = m0.vertex(edge, 1);
+
+                                if (v0 == current_tgt || v1 == current_tgt) // check if connected to current (i.e. they share one vertex)
+                                {
+                                    const bool v0_is_ivtx = m0_is_intersection_point(v0, ps_vtx_cnt);
+                                    const bool v1_is_ivtx = m0_is_intersection_point(v1, ps_vtx_cnt);
+                                    bool is_ambiguious_boundary_edge_case = v0_is_ivtx && v1_is_ivtx;
+                                    bool is_valid_ambiguious_boundary_edge = false;
+
+                                    if (is_ambiguious_boundary_edge_case)
+                                    { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
+
+                                        MCUT_ASSERT((size_t)v0 - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /* m0_ivtx_to_intersection_registry_entry.find(v0) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                        const std::pair<ed_t, fd_t> &v0_ipair = m0_ivtx_to_intersection_registry_entry.at(v0 - ps.number_of_vertices());
+                                        const ed_t v0_ps_edge = v0_ipair.first; // m0_ivtx_to_ps_edge.at(v0); //ps.edge(v0_coincident_ps_halfedge);
+
+                                        MCUT_ASSERT((size_t)v1 - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /* m0_ivtx_to_intersection_registry_entry.find(v1) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                                        const std::pair<ed_t, fd_t> &v1_ipair = m0_ivtx_to_intersection_registry_entry.at(v1 - ps.number_of_vertices());
+                                        const ed_t v1_ps_edge = v1_ipair.first; // m0_ivtx_to_ps_edge.at(v1); // ps.edge(v1_coincident_ps_halfedge);
+
+                                        is_valid_ambiguious_boundary_edge = (v0_ps_edge == v1_ps_edge); // see also above when gathering exterior incident edges
+                                    }
+
+                                    if (!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge)
+                                    {
+                                        const hd_t h0 = m0.halfedge(edge, 0);
+                                        const hd_t h1 = m0.halfedge(edge, 1);
+
+                                        next_exterior_halfedge = h0;
+
+                                        if (m0.source(h0) != current_tgt) // h0 is facing the opposite dir
+                                        {
+                                            next_exterior_halfedge = h1;
+                                        }
+
+                                        break; // found
+                                    }
+                                }
+                            }
+                        } while (next_exterior_halfedge != mesh_t::null_halfedge() /*first_boundary_halfedge*/);
+
+                        MCUT_ASSERT(incident_halfedges.size() >= 3); // minimum i.e. for a triangles!
+
+                        const int exterior_halfedge_count = (int)incident_halfedges.size();
+
+                        MCUT_ASSERT(exterior_halfedge_count == incident_boundary_edge_count);
+
+                        for (std::vector<ed_t>::const_iterator incident_edge_iter = incident_edges.cbegin() + incident_boundary_edge_count; // start from polygon interior edges offset
+                             incident_edge_iter != incident_edges.cend();
+                             ++incident_edge_iter)
+                        {
+                            const ed_t &edge = (*incident_edge_iter);
+                            const hd_t h0 = m0.halfedge(edge, 0);
+                            const hd_t h1 = m0.halfedge(edge, 1);
+                            incident_halfedges.push_back(h0);
+                            incident_halfedges.push_back(h1);
+                        }
+
+                        std::vector<hd_t> incident_halfedges_to_be_walked(incident_halfedges.cbegin(), incident_halfedges.cend()); // copy
+
+                        do
+                        { // each iteration traces a child polygon
+
+                            traced_polygon_t child_polygon;
+                            hd_t current_halfedge = mesh_t::null_halfedge();
+                            hd_t next_halfedge = incident_halfedges_to_be_walked.front();
+
+                            MCUT_ASSERT(incident_halfedges_to_be_walked.size() >= 2);
+
+                            bool is_valid_polygon = false;
+                            do
+                            { // each iteration walks a halfedge to incremetally trace a child polygon
+
+                                current_halfedge = next_halfedge;
+                                child_polygon.push_back(current_halfedge);
+                                const vd_t current_halfedge_target = m0.target(current_halfedge);
+                                next_halfedge = mesh_t::null_halfedge(); // reset
+
+                                {
+                                    std::vector<hd_t>::const_iterator find_iter = std::find(incident_halfedges_to_be_walked.cbegin(), incident_halfedges_to_be_walked.cend(), current_halfedge);
+                                    MCUT_ASSERT(find_iter != incident_halfedges_to_be_walked.cend());
+                                    incident_halfedges_to_be_walked.erase(find_iter); // remove
+                                }
+
+                                if (child_polygon.size() >= 3)
+                                { // minimum halfedge count to constitute a valid polygon (triangle)
+
+                                    // source of first halfedge is target of last
+                                    if (m0.source(child_polygon.front()) == m0.target(child_polygon.back()))
+                                    {
+                                        if (current_halfedge != m0.opposite(child_polygon.front()))
+                                        {
+                                            is_valid_polygon = true;
+                                            break;
+                                        }
+                                        else
+                                        { // ... if the current halfedge is the opposite of the first halfedge in list
+                                            std::vector<hd_t> premptive_candidate_halfedges;
+                                            for (std::vector<hd_t>::const_iterator incident_halfedges_to_be_walked_iter = incident_halfedges_to_be_walked.cbegin(); incident_halfedges_to_be_walked_iter != incident_halfedges_to_be_walked.cend(); ++incident_halfedges_to_be_walked_iter)
+                                            {
+                                                const hd_t &potential_candidate = *incident_halfedges_to_be_walked_iter;
+                                                if (m0.source(potential_candidate) == current_halfedge_target)
+                                                {
+                                                    premptive_candidate_halfedges.push_back(potential_candidate);
+                                                }
+                                            }
+
+                                            hd_t prime_candidate = mesh_t::null_halfedge();
+                                            if (premptive_candidate_halfedges.size() == 2)
+                                            {
+
+                                                const std::vector<hd_t>::const_iterator current_halfedge_find_iter = std::find(incident_halfedges.cbegin(), incident_halfedges.cend(), current_halfedge);
+                                                MCUT_ASSERT(current_halfedge_find_iter != incident_halfedges.cend());
+                                                const bool current_halfedge_is_exterior = std::distance(incident_halfedges.cbegin(), current_halfedge_find_iter) < exterior_halfedge_count;
+
+                                                if (current_halfedge_is_exterior)
+                                                {
+
+                                                    // pick interior candidate
+                                                    const std::vector<hd_t>::const_iterator prime_candidate_find_iter = std::find(incident_halfedges.cbegin(), incident_halfedges.cend(), current_halfedge);
+                                                    MCUT_ASSERT(prime_candidate_find_iter != incident_halfedges.cend());
+                                                    const bool prime_candidate_is_exterior = std::distance(incident_halfedges.cbegin(), prime_candidate_find_iter) < exterior_halfedge_count;
+
+                                                    if (prime_candidate_is_exterior)
+                                                    {
+                                                        prime_candidate = premptive_candidate_halfedges.back(); // select correct interior halfedge
+                                                    }
+                                                }
+                                                else
+                                                { // interior
+
+                                                    // pick non-opposite
+                                                    const bool prime_candidate_is_opposite = m0.opposite(current_halfedge) == prime_candidate;
+
+                                                    if (prime_candidate_is_opposite)
+                                                    {
+                                                        prime_candidate = premptive_candidate_halfedges.back(); // select correct non-opposite halfedge
+                                                    }
+                                                }
+                                            }
+
+                                            const hd_t premptive_next = prime_candidate;
+
+                                            MCUT_ASSERT(premptive_candidate_halfedges.size() <= 2);
+
+                                            if (std::find(child_polygon.cbegin(), child_polygon.cend(), premptive_next) != child_polygon.cend())
+                                            {
+                                                is_valid_polygon = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                std::vector<hd_t> candidate_halfedges;
+                                candidate_halfedges.reserve(2); // two candidates at most because we filtered out exterior interior-halfedges as well as clockwise (cw) halfedge
+
+                                for (std::vector<hd_t>::const_iterator incident_halfedges_to_be_walked_iter = incident_halfedges_to_be_walked.cbegin(); incident_halfedges_to_be_walked_iter != incident_halfedges_to_be_walked.cend(); ++incident_halfedges_to_be_walked_iter)
+                                {
+                                    const hd_t &potential_candidate = *incident_halfedges_to_be_walked_iter;
+                                    if (m0.source(potential_candidate) == current_halfedge_target)
+                                    {
+                                        candidate_halfedges.push_back(potential_candidate);
+                                    }
+                                }
+
+                                MCUT_ASSERT(candidate_halfedges.size() <= 2);
+
+                                // 2.2. select prime candidate
+                                hd_t prime_candidate = mesh_t::null_halfedge();
+
+                                if (!candidate_halfedges.empty())
+                                {
+                                    prime_candidate = candidate_halfedges.front(); // assuming: candidate_halfedges.size() == 1
+                                }
+
+                                if (candidate_halfedges.size() == 2)
+                                {
+
+                                    const std::vector<hd_t>::const_iterator current_halfedge_find_iter = std::find(incident_halfedges.cbegin(), incident_halfedges.cend(), current_halfedge);
+                                    MCUT_ASSERT(current_halfedge_find_iter != incident_halfedges.cend());
+                                    const bool current_halfedge_is_exterior = std::distance(incident_halfedges.cbegin(), current_halfedge_find_iter) < exterior_halfedge_count;
+
+                                    if (current_halfedge_is_exterior)
+                                    {
+                                        // pick interior candidate
+                                        const std::vector<hd_t>::const_iterator prime_candidate_find_iter = std::find(incident_halfedges.cbegin(), incident_halfedges.cend(), current_halfedge);
+                                        MCUT_ASSERT(prime_candidate_find_iter != incident_halfedges.cend());
+                                        const bool prime_candidate_is_exterior = std::distance(incident_halfedges.cbegin(), prime_candidate_find_iter) < exterior_halfedge_count;
+
+                                        if (prime_candidate_is_exterior)
+                                        {
+                                            prime_candidate = candidate_halfedges.back(); // select correct interior halfedge
+                                        }
+                                    }
+                                    else
+                                    { // interior
+                                        const bool prime_candidate_is_opposite = m0.opposite(current_halfedge) == prime_candidate;
+
+                                        if (prime_candidate_is_opposite)
+                                        {
+                                            prime_candidate = candidate_halfedges.back(); // select correct non-opposite halfedge
+                                        }
+                                    }
+                                }
+
+                                next_halfedge = prime_candidate;
+                            } while (next_halfedge != mesh_t::null_halfedge());
+
+                            if (is_valid_polygon)
+                            {
+
+                                const int poly_idx = (int)(m0_polygons_LOCAL.size() + child_polygons.size());
+                                if (ps_is_cutmesh_face(ps_face, sm_face_count))
+                                {
+                                    m0_cm_cutpath_adjacent_polygons_LOCAL.push_back(poly_idx);
+                                }
+                                else
+                                {
+                                    m0_sm_cutpath_adjacent_polygons_LOCAL.push_back(poly_idx);
+                                }
+
+                                m0_to_ps_face_LOCAL[poly_idx] = ps_face;
+                                child_polygons.emplace_back(child_polygon);
+                            }
+
+                        } while (!incident_halfedges_to_be_walked.empty());
+                    } // if (!is_intersecting_ps_face) {
+
+                    m0_polygons_LOCAL.insert(m0_polygons_LOCAL.end(), child_polygons.cbegin(), child_polygons.cend());
+
+                    if (!is_from_cut_mesh)
+                    {
+                        traced_sm_polygon_count_LOCAL += (int)child_polygons.size();
+                    }
+                }
+
+                return local_output;
+            };
+
+            std::vector<std::future<OutputStorageTypesTuple>> futures;
+            OutputStorageTypesTuple partial_res;
+
+            parallel_fork_and_join(
+                *input.scheduler,
+                ps.faces_begin(),
+                ps.faces_end(),
+                (1 << 8),
+                fn_trace_polygons,
+                partial_res, // output computed by master thread
+                futures);
+
+            // This lambda merges the local traced face data structures computed by each
+            // thread into their corresponding global data structure.
+            auto merge_local_traced_faces = [](
+                                                const std::vector<traced_polygon_t> &m0_polygons_FUTURE,
+                                                const std::vector<int> &m0_sm_cutpath_adjacent_polygons_FUTURE,
+                                                const std::vector<int> &m0_cm_cutpath_adjacent_polygons_FUTURE,
+                                                const int &traced_sm_polygon_count_FUTURE,
+                                                const std::unordered_map<int, fd_t> &m0_to_ps_face_FUTURE,
+                                                std::vector<traced_polygon_t> &m0_polygons,
+                                                std::vector<int> &m0_sm_cutpath_adjacent_polygons,
+                                                std::vector<int> &m0_cm_cutpath_adjacent_polygons,
+                                                int &traced_sm_polygon_count,
+                                                std::unordered_map<int, fd_t> &m0_to_ps_face)
+            {
+                int base_offset = (int)m0_polygons.size();
+                m0_polygons.reserve(m0_polygons.size() + m0_polygons_FUTURE.size());
+                m0_polygons.insert(m0_polygons.cend(), m0_polygons_FUTURE.cbegin(), m0_polygons_FUTURE.cend());
+                
+                m0_sm_cutpath_adjacent_polygons.reserve(m0_sm_cutpath_adjacent_polygons.size() + m0_sm_cutpath_adjacent_polygons_FUTURE.size());
+                for(int i =0; i < (int)m0_sm_cutpath_adjacent_polygons_FUTURE.size(); ++i)
+                {
+                    const int local_polygon_idx = m0_sm_cutpath_adjacent_polygons_FUTURE[i];
+                    const int global_polygon_idx = local_polygon_idx + base_offset;
+                    m0_sm_cutpath_adjacent_polygons.push_back(global_polygon_idx);
+                }
+                
+                m0_cm_cutpath_adjacent_polygons.reserve(m0_cm_cutpath_adjacent_polygons.size() + m0_cm_cutpath_adjacent_polygons_FUTURE.size());
+                for(int i =0; i < (int)m0_cm_cutpath_adjacent_polygons_FUTURE.size(); ++i)
+                {
+                    const int local_polygon_idx = m0_cm_cutpath_adjacent_polygons_FUTURE[i];
+                    const int global_polygon_idx = local_polygon_idx + base_offset;
+                    m0_cm_cutpath_adjacent_polygons.push_back(global_polygon_idx);
+                }
+
+                traced_sm_polygon_count += traced_sm_polygon_count_FUTURE;
+
+                for(std::unordered_map<int, fd_t>::const_iterator i = m0_to_ps_face_FUTURE.cbegin(); i != m0_to_ps_face_FUTURE.cend(); ++i)
+                {
+                    const int local_polygon_idx = i->first;
+                    const int global_polygon_idx = local_polygon_idx + base_offset;
+                    m0_to_ps_face[global_polygon_idx] = i->second;
+                }
+            };
+
+            // merge thread-local output into global data structures
+            for (int i = 0; i < (int)futures.size(); ++i)
+            {
+                std::future<OutputStorageTypesTuple> &f = futures[i];
+                MCUT_ASSERT(f.valid());
+                OutputStorageTypesTuple future_result = f.get(); // "get()" is a blocking function
+
+                const std::vector<traced_polygon_t> &m0_polygons_FUTURE = std::get<0>(future_result);
+                const std::vector<int> &m0_sm_cutpath_adjacent_polygons_FUTURE = std::get<1>(future_result);
+                const std::vector<int> &m0_cm_cutpath_adjacent_polygons_FUTURE = std::get<2>(future_result);
+                const int &traced_sm_polygon_count_FUTURE = std::get<3>(future_result);
+                const std::unordered_map<int, fd_t> &m0_to_ps_face_FUTURE = std::get<4>(future_result);
+
+                merge_local_traced_faces(
+                    m0_polygons_FUTURE,
+                    m0_sm_cutpath_adjacent_polygons_FUTURE,
+                    m0_cm_cutpath_adjacent_polygons_FUTURE,
+                    traced_sm_polygon_count_FUTURE,
+                    m0_to_ps_face_FUTURE,
+                    m0_polygons,
+                    m0_sm_cutpath_adjacent_polygons,
+                    m0_cm_cutpath_adjacent_polygons,
+                    traced_sm_polygon_count,
+                    m0_to_ps_face);
+            }
+
+            // merge master thread output at the end to that we maintain the order of the traced polygons
+            // This order is important for a number of tricks employed throughout the code in following parts
+            // e.g. using integer offsets to infer the start of cm traced polygons etc.
+            const std::vector<traced_polygon_t> &m0_polygons_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
+            const std::vector<int> &m0_sm_cutpath_adjacent_polygons_MASTER_THREAD_LOCAL = std::get<1>(partial_res);
+            const std::vector<int> &m0_cm_cutpath_adjacent_polygons_MASTER_THREAD_LOCAL = std::get<2>(partial_res);
+            const int &traced_sm_polygon_count_MASTER_THREAD_LOCAL = std::get<3>(partial_res);
+            const std::unordered_map<int, fd_t> &m0_to_ps_face_MASTER_THREAD_LOCAL = std::get<4>(partial_res);
+
+            merge_local_traced_faces(
+                m0_polygons_MASTER_THREAD_LOCAL,
+                m0_sm_cutpath_adjacent_polygons_MASTER_THREAD_LOCAL,
+                m0_cm_cutpath_adjacent_polygons_MASTER_THREAD_LOCAL,
+                traced_sm_polygon_count_MASTER_THREAD_LOCAL,
+                m0_to_ps_face_MASTER_THREAD_LOCAL,
+                m0_polygons,
+                m0_sm_cutpath_adjacent_polygons,
+                m0_cm_cutpath_adjacent_polygons,
+                traced_sm_polygon_count,
+                m0_to_ps_face);
+        } // end of parallel scope
+#else
         // for each face in the polygon-soup mesh
         for (mesh_t::face_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter)
         {
@@ -5633,7 +6326,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 hd_t current_exterior_halfedge = mesh_t::null_halfedge();
                 hd_t next_exterior_halfedge = first_boundary_halfedge;
-                std::unordered_map<ed_t,bool> walked_edges;
+                std::unordered_map<ed_t, bool> walked_edges;
                 //walked_edges.reserve(incident_edges.size());
                 do
                 {
@@ -5754,7 +6447,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //-------------------------------------------
 
                 std::vector<hd_t> incident_halfedges_to_be_walked(incident_halfedges.cbegin(), incident_halfedges.cend()); // copy
-                
+
                 do
                 { // each iteration traces a child polygon
 
@@ -5966,6 +6659,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             DEBUG_CODE_MASK(lg.unindent(););
             DEBUG_CODE_MASK(lg.unindent(););
         } // for each ps-face to trace
+
+#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
 
         TIME_PROFILE_END(); // &&&&&
 
@@ -8164,7 +8859,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 std::vector<int> &patch = patches.at(cur_scs_cur_patch_idx); // patch_insertion.first->second; // polygons of patch
                 patch.reserve(cs_face_count);
-                std::deque<int> flood_fill_queue;                        // for building patch using BFS
+                std::deque<int> flood_fill_queue; // for building patch using BFS
                 std::unordered_map<int, bool> seed_poly_already_enqueued;
                 flood_fill_queue.push_back(cur_scs_patch_seed_poly_idx); // first polygon
                 seed_poly_already_enqueued[cur_scs_patch_seed_poly_idx] = true;
@@ -8528,8 +9223,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     // NOTE: at the end of this scope, we have inferred the color of the floating-patch in the current scs
                 }
                 else
-                #endif
-                
+#endif
+
                 {
                     // NOTE: Keep in mind at this point that our objective have been to infer the color of a
                     // normal SCS from a floating patch
@@ -9895,7 +10590,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // this queue contains information identifying the patch polygons next-in-queue
                 // to be stitched into the inferred connected component
                 std::deque<std::tuple<hd_t /*m1*/, int /*m0 poly*/, int /*m0 he*/>> patch_poly_stitching_queue;
-                std::unordered_map<int, bool> m0_poly_already_enqueued; // i.e. in "patch_poly_stitching_queue" 
+                std::unordered_map<int, bool> m0_poly_already_enqueued; // i.e. in "patch_poly_stitching_queue"
                 // thus, the first element is the seed polygon and the seed halfedge
                 patch_poly_stitching_queue.push_back(
                     std::make_tuple(
@@ -10052,12 +10747,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                                 // get the ps-halfedge in the intersection-registry entry of src
                                 //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he));
                                 // get the ps-edges corresponding to the ps-halfedges
-                                vd_t src_vertex = m0_cur_patch_cur_poly_cur_he_src;// m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
+                                vd_t src_vertex = m0_cur_patch_cur_poly_cur_he_src; // m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
                                 MCUT_ASSERT((size_t)src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                                 const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex - ps.number_of_vertices());
                                 const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); // ps.edge(src_coincident_ps_halfedge);
 
-                                vd_t tgt_vertex = m0_cur_patch_cur_poly_cur_he_tgt;//m0.target(m0_cur_patch_cur_poly_cur_he);
+                                vd_t tgt_vertex = m0_cur_patch_cur_poly_cur_he_tgt; //m0.target(m0_cur_patch_cur_poly_cur_he);
                                 MCUT_ASSERT((size_t)tgt_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                                 const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex - ps.number_of_vertices());
                                 const ed_t tgt_ps_edge = tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he)); // ps.edge(tgt_ps_h);
@@ -10206,12 +10901,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                             //MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0.target(m0_cur_patch_cur_poly_cur_he)) != m0_ivtx_to_ps_edge.cend());
 
                             //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(m0_cur_patch_cur_poly_cur_he));
-                            const vd_t src_vertex = m0_cur_patch_cur_poly_cur_he_src;// m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
+                            const vd_t src_vertex = m0_cur_patch_cur_poly_cur_he_src; // m0.source(m0_cur_patch_cur_poly_cur_he); // TODO: no need to query m0 [again] (see above)
                             MCUT_ASSERT((size_t)src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                             const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex - ps.number_of_vertices());
                             const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0.source(m0_cur_patch_cur_poly_cur_he)); // ps.edge(src_coincident_ps_halfedge);
 
-                            const vd_t tgt_vertex = m0_cur_patch_cur_poly_cur_he_tgt;//m0.target(m0_cur_patch_cur_poly_cur_he);
+                            const vd_t tgt_vertex = m0_cur_patch_cur_poly_cur_he_tgt; //m0.target(m0_cur_patch_cur_poly_cur_he);
                             MCUT_ASSERT((size_t)tgt_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                             const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex - ps.number_of_vertices());
                             const ed_t tgt_ps_edge = tgt_vertex_ipair.first;
@@ -10749,8 +11444,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const traced_polygon_t &next_poly = m0_polygons.at(m0_next_poly_idx);
                         // pointer to the first halfedge in the polygon from which its stitching will begin
                         const traced_polygon_t::const_iterator he_find_iter = std::find(
-                            next_poly.cbegin(), 
-                            next_poly.cend(), 
+                            next_poly.cbegin(),
+                            next_poly.cend(),
                             m0_cur_patch_cur_poly_cur_he_opp);
 
                         // "m0_cur_patch_cur_poly_cur_he_opp" must exist in next_poly since we have
