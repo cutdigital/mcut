@@ -621,12 +621,12 @@ const std::vector<halfedge_descriptor_t>& mesh_t::get_halfedges_around_face(cons
     return m_faces.at(f).m_halfedges;
 }
 
-const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_descriptor_t f) const
+const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_) const
 {
     MCUT_ASSERT(f != null_face());
 
     std::vector<face_descriptor_t> faces_around_face;
-    const std::vector<halfedge_descriptor_t>& halfedges_on_face = get_halfedges_around_face(f);
+    const std::vector<halfedge_descriptor_t>& halfedges_on_face = (halfedges_around_face_ != nullptr) ? *halfedges_around_face_ : get_halfedges_around_face(f);
 
     for (int i = 0; i < (int)halfedges_on_face.size(); ++i) {
 

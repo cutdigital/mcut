@@ -26,8 +26,9 @@
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
+#if defined(MCUT_MULTI_THREADED_IMPL)
 #include "mcut/internal/scheduler.h"
-
+#endif
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 #include <cfenv>
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -211,9 +212,9 @@ void ccDeletorFunc(McConnCompBase* p)
 }
 
 struct McDispatchContextInternal {
-    
+    #if defined(MCUT_MULTI_THREADED_IMPL)
     mcut::thread_pool scheduler;
-
+#endif
     std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>> connComps = {};
 
     // state & dispatch flags
@@ -1442,7 +1443,7 @@ void constructOIBVH(
 }
 
 void intersectOIBVHs(
-    std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> &ps_face_to_potentially_intersecting_others,
+    std::map<mcut::fd_t, std::vector<mcut::fd_t>> &ps_face_to_potentially_intersecting_others,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhAABBs,
     const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
     const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhAABBs,
@@ -1516,9 +1517,6 @@ void intersectOIBVHs(
                 MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
 
                 mcut::fd_t cs_node_face_offsetted = mcut::fd_t(cs_node_face + numSrcMeshFaces);
-
-                //MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(sm_node_face) == 0);
-                //MCUT_ASSERT(ps_face_to_potentially_intersecting_others.count(cs_node_face_offsetted) == 0);
 
                 ps_face_to_potentially_intersecting_others[sm_node_face].push_back(cs_node_face_offsetted);
                 ps_face_to_potentially_intersecting_others[cs_node_face_offsetted].push_back(sm_node_face);
@@ -1780,7 +1778,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     mcut::input_t backendInput;
+#if defined(MCUT_MULTI_THREADED_IMPL)
     backendInput.scheduler = &ctxtPtr->scheduler;
+#endif
     backendInput.src_mesh = &srcMeshInternal;
 
     backendInput.verbose = false;
@@ -2867,7 +2867,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
-        std::unordered_map<mcut::fd_t, std::vector<mcut::fd_t>> ps_face_to_potentially_intersecting_others;
+        std::map<mcut::fd_t, std::vector<mcut::fd_t>> ps_face_to_potentially_intersecting_others;
         intersectOIBVHs(ps_face_to_potentially_intersecting_others,srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 
         ctxtPtr->log(

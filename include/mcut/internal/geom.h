@@ -177,23 +177,23 @@ namespace geom {
             m_maximum = vector_type(std::numeric_limits<double>::min());
         }
 
-        const vector_type& minimum() const
+        inline const vector_type& minimum() const
         {
             return m_minimum;
         }
 
-        const vector_type& maximum() const
+        inline const vector_type& maximum() const
         {
             return m_maximum;
         }
 
-        void expand(const vector_type& point)
+        inline void expand(const vector_type& point)
         {
             m_maximum = compwise_max(m_maximum, point);
             m_minimum = compwise_min(m_minimum, point);
         }
 
-        void expand(const bounding_box_t<vector_type>& bbox)
+        inline void expand(const bounding_box_t<vector_type>& bbox)
         {
             m_maximum = compwise_max(m_maximum, bbox.maximum());
             m_minimum = compwise_min(m_minimum, bbox.minimum());
@@ -201,11 +201,15 @@ namespace geom {
     };
 
     template <typename T>
-    bool intersect_bounding_boxes(const bounding_box_t<math::vec3_<T>>& a, const bounding_box_t<math::vec3_<T>>& b)
+    inline bool intersect_bounding_boxes(const bounding_box_t<math::vec3_<T>>& a, const bounding_box_t<math::vec3_<T>>& b)
     {
-        return (a.minimum().x() <= b.maximum().x() && a.maximum().x() >= b.minimum().x()) && //
-            (a.minimum().y() <= b.maximum().y() && a.maximum().y() >= b.minimum().y()) && //
-            (a.minimum().z() <= b.maximum().z() && a.maximum().z() >= b.minimum().z());
+        const math::vec3_<T> &amin = a.minimum();
+        const math::vec3_<T> &amax = a.maximum();
+        const math::vec3_<T> &bmin = b.minimum();
+        const math::vec3_<T> &bmax = b.maximum();
+        return (amin.x() <= bmax.x() && amax.x() >= bmin.x()) && //
+            (amin.y() <= bmax.y() && amax.y() >= bmin.y()) && //
+            (amin.z() <= bmax.z() && amax.z() >= bmin.z());
     }
 
     bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox);

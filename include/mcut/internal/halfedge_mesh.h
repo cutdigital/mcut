@@ -965,7 +965,7 @@ public:
 
     const std::vector<halfedge_descriptor_t>& get_halfedges_around_face(const face_descriptor_t f) const;
 
-    const std::vector<face_descriptor_t> get_faces_around_face(const face_descriptor_t f) const;
+    const std::vector<face_descriptor_t> get_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_ =nullptr) const;
 
     // iterators
     // ---------
