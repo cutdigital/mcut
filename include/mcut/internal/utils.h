@@ -74,7 +74,7 @@
 # define DEBUG_CODE_MASK(code) // do nothing
 #endif // #if defined(MCUT_DEBUG_BUILD)
 
-//#define MCUT_MULTI_THREADED_IMPL 1
+#define MCUT_MULTI_THREADED_IMPL 1
 
 #if defined(MCUT_MULTI_THREADED_IMPL)
 
