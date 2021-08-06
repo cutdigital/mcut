@@ -1866,6 +1866,18 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         return sorted_descriptors;
     }
 
+    // TODO: replace code parts that use "m0_ivtx_to_intersection_registry_entry" with calls to this
+    // function which is much cheaper 
+    inline bool m0_is_polygon_boundary_halfedge(const hd_t& h, uint32_t m0_num_cutpath_halfedges)
+    {
+        return (uint32_t)h >= m0_num_cutpath_halfedges;
+    } 
+
+    inline bool m0_is_polygon_boundary_edge(const ed_t& e, uint32_t m0_num_cutpath_edges)
+    {
+        return (uint32_t)e >= m0_num_cutpath_edges;
+    } 
+
     //
     // entry point
     //
@@ -2310,7 +2322,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             for (int i = 0; i < (int)futures.size(); ++i)
             {
                 std::future<int> &f = futures[i];
-                MCUT_ASSERT(f.valid()); 
+                MCUT_ASSERT(f.valid());
                 f.wait(); // simply wait for result to be done
             }
         }
@@ -3767,6 +3779,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         {
             dump_mesh(m0, "m0.v.e"); // containing only vertices & edges
         }
+
+        const uint32_t m0_num_cutpath_edges = (uint32_t)m0_cutpath_edges.size();
+        const uint32_t m0_num_cutpath_halfedges = m0_num_cutpath_edges*2;
 
         ///////////////////////////////////////////////////////////////////////////
         // Find cut-paths (the boundaries of the openings/holes in the source mesh)
@@ -7396,7 +7411,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 // (they have an opposite direction wrt the face normal)
                 const bool is_ox = (!src_is_ivertex && tgt_is_ivertex);
 
-                bool is_boundary_ih = false;
+                const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(sm_poly_he, m0_num_cutpath_halfedges);
+                bool is_boundary_ih = is_boundary_halfedge;
 
                 //const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(sm_poly_he_src);
                 //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(sm_poly_he_tgt);
@@ -7405,7 +7421,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 MCUT_ASSERT((size_t)sm_poly_he_tgt - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(sm_poly_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                 const std::pair<ed_t, fd_t> &sm_poly_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at(sm_poly_he_tgt - ps.number_of_vertices());
                 const ed_t &tgt_ps_edge = sm_poly_he_tgt_ipair.first;
-
+#if 0
                 if (src_is_ivertex && tgt_is_ivertex)
                 {
                     MCUT_ASSERT((size_t)sm_poly_he_src - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(sm_poly_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
@@ -7414,7 +7430,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     is_boundary_ih = (src_ps_edge == tgt_ps_edge);
                 }
-
+#endif
                 if (!(is_ox || is_boundary_ih))
                 {
                     continue;
@@ -8089,8 +8105,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     const bool m0_cur_h_is_xx = m0_cur_h_src_is_ivtx && m0_cur_h_tgt_is_ivtx;
                     //std::map<vd_t, std::vector<std::pair<vd_t, hd_t> > >::iterator fiter = m1_ivtx_to_h.end();
 
-                    bool m0_cur_h_is_exterior = true;
+                    const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(m0_cur_h, m0_num_cutpath_halfedges);
+                    bool m0_cur_h_is_exterior = is_boundary_halfedge;
 
+            #if 0
                     if (m0_cur_h_is_xx)
                     {
                         //const hd_t m0_cur_h_src_ps_h = m0_ivtx_to_ps_edge.at(m0_cur_h_src);
@@ -8104,7 +8122,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const ed_t m0_cur_h_tgt_ps_e = m0_cur_h_tgt_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_h_tgt); // ps.edge(m0_cur_h_tgt_ps_h);
                         m0_cur_h_is_exterior = (m0_cur_h_src_ps_e == m0_cur_h_tgt_ps_e);
                     }
-
+#endif
                     // get the opposite of the current halfedge ("m0")
                     const hd_t opp = m0.opposite(m0_cur_h);
                     // check if this opposite halfedge was used to traced a polygon
@@ -8286,6 +8304,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         //
                         //const hd_t v0_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0_ihe_src_vertex);
                         //const hd_t v1_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0_ihe_tgt_vertex);
+                        #if 0
                         MCUT_ASSERT((size_t)m0_ihe_src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_ihe_src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                         const std::pair<ed_t, fd_t> &m0_ihe_src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(m0_ihe_src_vertex - ps.number_of_vertices());
                         const ed_t v0_ps_edge = m0_ihe_src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0_ihe_src_vertex); //ps.edge(v0_coincident_ps_halfedge);
@@ -8295,8 +8314,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         const ed_t v1_ps_edge = m0_ihe_tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(m0_ihe_tgt_vertex); // ps.edge(v1_coincident_ps_halfedge);
 
                         const bool is_poly_exterior_interior_ihalfedge = (v0_ps_edge == v1_ps_edge);
+#endif
+                        const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(m0_ihe, m0_num_cutpath_halfedges);
 
-                        if (is_poly_exterior_interior_ihalfedge)
+                        if (is_boundary_halfedge/*is_poly_exterior_interior_ihalfedge*/)
                         { // we want only polygon-exterior interior ihalfedges
 
                             // get the traced polygon which uses the current halfedge
@@ -8569,16 +8590,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //
         // Thus, in the following std::vector, each element is a pair of a 1) cut-mesh polygon index
         // and 2) the index of a halfedge (on a cut-path) in that polygon ("m0" version).
-        // Note that the referenced polygon will (by construction) be adjacent to the
-        // border/boundary of the patch.
         //
-        // The elements of this vector are used to initiate our graph search (building
-        // the patch-graph), where a graph is a collection of one or more cut-mesh
-        // patches which are adjacent (i.e. sharing a cut-path).
-        std::vector<std::pair<int, int>> primary_interior_ihalfedge_pool; // NOTE: pertains to all graphs
 
         TIME_PROFILE_START("Find primary halfedges for patch identification");
-#if 1
+
+        std::vector<std::pair<int, int>> patch_discovery_seeds;
+
         // for each cutpath that makes a hole
         for (std::vector<int>::const_iterator ecpmh_iter = explicit_cutpaths_making_holes.cbegin();
              ecpmh_iter != explicit_cutpaths_making_holes.cend();
@@ -8632,56 +8649,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                 const int h_idx = (int)std::distance(h_polygon.cbegin(), h_polygon_find_iter);
 
-                primary_interior_ihalfedge_pool.emplace_back(h_polygon_idx, h_idx); // save
+                patch_discovery_seeds.emplace_back(h_polygon_idx, h_idx); // save
             }
         }
+
+        std::vector<std::pair<int, int>> primary_interior_ihalfedge_pool = patch_discovery_seeds; // copy because it gets modify
 
         TIME_PROFILE_END();
-#else
-        // for each traced cut-mesh polygon (TODO: clean this up)
-        for (std::vector<traced_polygon_t>::const_iterator cs_poly_iter = traced_cs_polygons_iter_cbegin;
-             cs_poly_iter != m0_polygons.cend();
-             ++cs_poly_iter)
-        {
-            const traced_polygon_t &cs_poly = *cs_poly_iter;
-            const int cs_poly_idx = (int)std::distance(m0_polygons.cbegin(), cs_poly_iter);
-
-            for (traced_polygon_t::const_iterator cs_poly_he_iter = cs_poly.cbegin();
-                 cs_poly_he_iter != cs_poly.cend();
-                 ++cs_poly_he_iter)
-            {
-
-                const hd_t &cs_poly_he = *cs_poly_he_iter;
-                vd_t s = m0.source(cs_poly_he);
-                vd_t t = m0.target(cs_poly_he);
-                const bool is_ihalfedge = m0_is_intersection_point(s, ps_vtx_cnt) && m0_is_intersection_point(t, ps_vtx_cnt);
-                if (!is_ihalfedge)
-                {
-                    continue; // NOTE: This is how we ensure that the original cs-polygon is never referenced during the degenerate case of tet v tri (ccsplete cut)
-                }
-
-                bool is_ambiguious_interior_edge_case = m0_is_intersection_point(m0.source(cs_poly_he), ps_vtx_cnt) && m0_is_intersection_point(m0.target(cs_poly_he), ps_vtx_cnt);
-                bool is_valid_ambiguious_interior_edge = false;
-
-                if (is_ambiguious_interior_edge_case)
-                { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
-
-                    const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(m0.source(cs_poly_he));
-                    const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(m0.target(cs_poly_he));
-                    const ed_t src_ps_edge = ps.edge(src_coincident_ps_halfedge);
-                    const ed_t tgt_ps_edge = ps.edge(tgt_ps_h);
-                    is_valid_ambiguious_interior_edge = (src_ps_edge != tgt_ps_edge); // see also above when gathering exterior incident edges
-                }
-
-                // TODO: use "cut-paths" to ensure that we store just one primary ihalfedge for each
-                // cut-path ( at the moment its a extremely redundant and very slow to store all ihalfedges into the pool)
-                if (!is_ambiguious_interior_edge_case || is_valid_ambiguious_interior_edge)
-                { // check is interior ihalfedge (minor ambiguity which may arise with exterior interior halfedges x-->x)
-                    primary_interior_ihalfedge_pool.emplace_back(cs_poly_idx, (int)std::distance(cs_poly.cbegin(), cs_poly_he_iter));
-                }
-            }
-        }
-#endif
 
         m0_cutpath_sequences.clear(); // free, no longer needed.
 
@@ -8698,17 +8672,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // reversed winding order will be created later (once all patches are
         // identified).
         //
-        // There is `normally` one graph which arises from the intersection of the
-        // source-mesh with the cut-mesh. In this `normal` case, the graph is planar
+        // There is one graph which arises from the intersection of the
+        // source-mesh with the cut-mesh. This graph is planar
         // and there is exactly one node with e.g. color "A" and the rest are "B".
         // When visualised, it looks like a star, and this graph topology
         // is bipartite. We call this a "strongly-connected set" (SCS) because there
         // is a path from one graph node to another.
         //
-        // An abnormality can also occurs when, we find more than one SCS. Cuch SCSs
-        // happen if there exists one or more floating patches. Thus, in this case,
-        // each floating patch forms an SCS of its own because we cannot establish
-        // adjacency with another (i.e. the exterior) patch.
         //
         std::map<
             int,             // patch index
@@ -8748,7 +8718,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             >
             color_to_m1 = {{'A' /*e.g. "red"*/, m1}, {'B' /*e.g. "blue"*/, m1}};
 
-        // TODO: implement --> m1.free_data();
+        m1.reset(); // clear data
 
         // Patch (node) colors
         // NOTE: we use the letters 'A' and 'B' just to ensure lexicographical order
@@ -8764,11 +8734,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // All patches have an entry, including the reversed patches that are created
         // later.
         //
-        std::map<
-            int, // patch id
-            bool // flag to indicate of patch is a floating patch.
-            >
-            patch_to_floating_flag;
+        //std::map<
+        //    int, // patch id
+        //    bool // flag to indicate of patch is a floating patch.
+        //    >
+        //    patch_to_floating_flag;
 
         // tracks how many cut-mesh polygons have been stitched. Used only for naming damped meshes
         int global_cm_poly_stitch_counter = 0;
@@ -8776,618 +8746,316 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // keeps track of the total number of default-winding-order (e.g. CCW) patches which has been identified
         // NOTE: not all will be CCW if we have floating patches (in this case winding could be flipped)
         int total_ccw_patch_count = 0;
+        std::vector<bool> patch_poly_enqueued(m0_polygons.size(), false);
 
-        // Each iteration of the following do-while loop will discover a strongly-connected
-        // set (SCS) of patches (i.e. our graph of nodes which will also be colored).
-        //
-        // Note: The total number of SCS's is unknown beforehand (but is typically one). Thus,
-        // our goal in the following loop will be to find each SCS.
         do
         {
             ///////////////////////////////////////////////////////////////////////////
-            // Associate cut-mesh polygons with patches of the current SCS
+            // Associate cut-mesh polygons with patches of the graph
             ///////////////////////////////////////////////////////////////////////////
 
-            // index of the first patch discovered
-            const int cur_scs_1st_patch_idx = total_ccw_patch_count;
-            // index of last-discovered patch
-            int cur_scs_prev_patch_idx = cur_scs_1st_patch_idx;
-            // index of the current patch
-            int cur_scs_cur_patch_idx = cur_scs_1st_patch_idx;
+            int graph_cur_patch_idx = patches.size();
+            ;
             // counter to keep track of the number of patches discovered for
             // the current SCS
-            int cur_scs_patch_counter = 0;
-
-            std::map<
-                int,             // patch index
-                std::vector<int> // adjacent patches (i.e. sharing a cut-path)
-                >
-                cur_scs_patch_to_adj_list;
 
             //
             // Here, we will pick an interior intersection halfedge (and its polygon) from
-            // which we can identify the [first patch] of the current SCS. This halfedge
-            // and its polygon are called "seeds" because they seed the patch-polygon search.
-            //
-            // This vector stores interior intersection-halfedges in the current
-            // SCS whose cut-mesh polygons have not been associated with a patch.
-            // Each element is defined as:
-            // <patch index, cut-mesh polygon index, halfedge index>
-            std::vector<std::tuple<int, int, int>> cur_scs_interior_ihalfedge_pool;
+            // which we can identify the [first patch] of the graph
+            std::tuple<int, int, int> graph_interior_ihalfedge_pool;
+            std::get<0>(graph_interior_ihalfedge_pool) = -1;
 
             // find the [first] interior intersection-halfedge of a cut-mesh polygon
             // which has not already been associated with a patch
-            while (cur_scs_interior_ihalfedge_pool.empty() && !primary_interior_ihalfedge_pool.empty())
+            while (!primary_interior_ihalfedge_pool.empty())
             { // while seeds are not found
 
                 // pull an interior intersection-halfedge from the queue
                 std::vector<std::pair<int, int>>::const_iterator primary_interior_ihalfedge_pool_citer = primary_interior_ihalfedge_pool.cend() - 1; // last element
                 // halfedge polygon index
-                const int &potential_seed_poly_idx = primary_interior_ihalfedge_pool_citer->first;
+                const int potential_seed_poly_idx = primary_interior_ihalfedge_pool_citer->first;
                 // halfedge index in polygon
-                const int &potential_seed_poly_he_idx = primary_interior_ihalfedge_pool_citer->second;
+                const int potential_seed_poly_he_idx = primary_interior_ihalfedge_pool_citer->second;
                 // check if the polygon has already been associated with a patch
                 const bool poly_patch_is_known = m0_cm_poly_to_patch_idx.find(potential_seed_poly_idx) != m0_cm_poly_to_patch_idx.cend();
+                primary_interior_ihalfedge_pool_citer = primary_interior_ihalfedge_pool.erase(primary_interior_ihalfedge_pool_citer);
 
                 if (!poly_patch_is_known)
                 {
-
                     // we can use the halfedge as a seed from which to starting point to build [a] patch
-                    cur_scs_interior_ihalfedge_pool.emplace_back(
-                        cur_scs_cur_patch_idx,
-                        potential_seed_poly_idx,
-                        potential_seed_poly_he_idx);
+                    std::get<0>(graph_interior_ihalfedge_pool) = graph_cur_patch_idx;
+                    std::get<1>(graph_interior_ihalfedge_pool) = potential_seed_poly_idx;
+                    std::get<2>(graph_interior_ihalfedge_pool) = potential_seed_poly_he_idx;
+                    break; // start patch discovery with the current seed
                 }
-
-                // remove from the potential set
-                primary_interior_ihalfedge_pool_citer = primary_interior_ihalfedge_pool.erase(primary_interior_ihalfedge_pool_citer);
             }
 
-            // NOTE: an iteration of the following loop will build a patch/node.
-            //
-            // Cases when an iteration does not build a patch:
-            //  1. if the elements in cur_scs_interior_ihalfedge_pool are interior-intersection
-            // halfedges whose opposite halfedge is used to trace a cut-mesh polygon defining a
-            // floating patch, and the reversed version of this cut-mesh polygon has already been
-            // associated with a patch.
-            while (!cur_scs_interior_ihalfedge_pool.empty())
-            { // TODO: this loop may have to go (see TODO comments at the end. Algorithm needs revision)
-
-                // stores all ihalfedges (borders) of current patch
-                // <patch idx, cs-polygon idx, he idx>halfedges which mark shared borders between patches
-                std::vector<std::tuple<int, int, int>> cur_scs_patch_interior_ihalfedges;
-
-                //
-                // Find the seeds from which to begin building the current patch with flood-fill
-                // A seed is an interior intersection-halfedge and together with its coincident cut-mesh polygon.
-                //
-                bool cur_scs_patch_seeds_found = false;
-                // These are the seed variables
-                int cur_scs_patch_seed_poly_he_idx = -1; // an interior ihalfedge
-                int cur_scs_patch_seed_poly_idx = -1;    // index of the cs polygon coincident to seed_he
-
-                while (!cur_scs_patch_seeds_found && !cur_scs_interior_ihalfedge_pool.empty())
-                {
-                    // for each untested interior ihalfedge of last-built patch.
-
-                    // get element from pool of interior ihalfedges
-                    std::vector<std::tuple<int, int, int>>::iterator cur_scs_interior_ihalfedge_pool_elem = cur_scs_interior_ihalfedge_pool.end() - 1;
-
-                    // patch index
-                    const int pool_elem_patch_idx = std::get<0>(*cur_scs_interior_ihalfedge_pool_elem);
-                    // polygon index
-                    const int pool_elem_poly_idx = std::get<1>(*cur_scs_interior_ihalfedge_pool_elem);
-                    // halfedge index in polygon
-                    const int pool_elem_poly_he_idx = std::get<2>(*cur_scs_interior_ihalfedge_pool_elem);
-                    // the traced polygon
-                    const traced_polygon_t &pool_elem_poly = m0_polygons.at(pool_elem_poly_idx);
-                    // polygon halfedge
-                    const hd_t &pool_elem_poly_he = pool_elem_poly.at(pool_elem_poly_he_idx);
-
-                    // The following halfedge is an interior intersection-halfedge which belongs to a
-                    // patch that is [assumed] to have already been built and is adjacent to the new
-                    // patch that we are about to build. (hence the name "..._opp").
-                    //
-                    // This halfedge belongs to a polygon which may potentially be the seed if
-                    // the following conditions are held
-                    const hd_t pool_elem_poly_he_opp = m0.opposite(pool_elem_poly_he);
-                    vd_t s = m0.source(pool_elem_poly_he_opp);
-                    vd_t t = m0.target(pool_elem_poly_he_opp);
-                    //const bool is_ihalfedge = m0_is_intersection_point(s, ps_vtx_cnt) || m0_is_intersection_point(t, ps_vtx_cnt);
-                    //
-                    // We are now going to find the cut-mesh polygon which is traced with "pool_elem_poly_he_opp"
-                    //
-                    const std::vector<int> &coincident_polys = m0_h_to_ply.at(pool_elem_poly_he_opp); // coincident polygons (always one cut-mesh and one src-mesh)
-                    const std::vector<int>::const_iterator find_iter = std::find_if(coincident_polys.cbegin(), coincident_polys.cend(),
-                                                                                    [&](const int &e)
-                                                                                    {
-                                                                                        return (e >= traced_sm_polygon_count); // our condition for "cut-mesh" polygons
-                                                                                    });
-
-                    // coincident cut-mesh polygon must exist because "pool_elem_poly_he_opp" is
-                    // an interior intersection-halfedge, and such halfedges are used to traced
-                    // both source-mesh and cut-mesh polygons
-                    MCUT_ASSERT(find_iter != coincident_polys.cend());
-
-                    // Now that we have found the cut-mesh polygon traced with "pool_elem_poly_he_opp",
-                    // the next step is to check that:
-                    // 1)  this polygon polygon is a not floating patch (in which case its opposite
-                    // polygon will have already been identified as forming a patch)
-                    const int potential_seed_poly_idx = *find_iter; // potential seed (starting) polygon for the new patch we want to build
-                    // has it already been associated with a patch..?
-                    const bool coincident_cs_poly_patch_is_known = m0_cm_poly_to_patch_idx.find(potential_seed_poly_idx) != m0_cm_poly_to_patch_idx.cend();
-
-                    if (!coincident_cs_poly_patch_is_known)
-                    {
-
-                        // check if the coincident cut-mesh polygon is a floating-patch polygon because
-                        // such polygons will already have their opposite traced too. The opposite polygon
-                        // is already traced because our polygon tracing cannot distinguish the winding-order
-                        // (CCW or CW) of polygons incident only to interior intersection-halfedges. So,
-                        // the polygon-tracing routine will have produced both orientations of such polygons.
-                        // bool is_floating_patch = true;
-                        const traced_polygon_t &potential_seed_poly = m0_polygons.at(potential_seed_poly_idx);
-                        // NOTE: floating patches not longer exist due to polygn partitioning
-                        bool is_floating_patch = false; //check_is_floating_patch(potential_seed_poly, m0, ps, m0_ivtx_to_intersection_registry_entry, ps_vtx_cnt, sm_vtx_cnt);
-
-                        // at this stage, the potential seed polygon will be a true seed from which to start
-                        // building a patch if the following conditions hold:
-                        // 1) the potential polygon is a floating patch, which is the first built in the current SCS.
-                        //  This is what prevents degeneracy of the adjacency matrix of the current SCS. OR
-                        // 2) the potential seed polygon is not a floating patch
-
-                        // NOTE: the condition "(cur_scs_patch_counter == 0)" below is needed to indicate
-                        // that the a patch containing reverse  polygon of potential_seed_poly has not been created.
-                        if ((is_floating_patch && (cur_scs_patch_counter == 0)) || !is_floating_patch)
-                        {
-
-                            cur_scs_patch_seeds_found = true; // we have found the seed polygon of the current patch
-                            cur_scs_patch_seed_poly_idx = potential_seed_poly_idx;
-                            // get the seed polygon
-                            const traced_polygon_t &cur_scs_patch_seed_poly = m0_polygons.at(cur_scs_patch_seed_poly_idx);
-                            // get index of the halfedge we used to find the seed polygon
-                            cur_scs_patch_seed_poly_he_idx = (int)std::distance(
-                                cur_scs_patch_seed_poly.cbegin(),
-                                std::find(cur_scs_patch_seed_poly.cbegin(), cur_scs_patch_seed_poly.cend(), pool_elem_poly_he_opp));
-
-                            // update patch adjacency list for the current SCS if necessary.
-                            if (cur_scs_cur_patch_idx != pool_elem_patch_idx)
-                            {
-                                auto &a = cur_scs_patch_to_adj_list[cur_scs_cur_patch_idx];
-                                if (std::find(a.cbegin(), a.cend(), pool_elem_patch_idx) == a.cend())
-                                {
-                                    a.push_back(pool_elem_patch_idx);
-                                }
-
-                                auto &b = cur_scs_patch_to_adj_list[pool_elem_patch_idx];
-                                if (std::find(b.cbegin(), b.cend(), cur_scs_cur_patch_idx) == b.cend())
-                                {
-                                    b.push_back(cur_scs_cur_patch_idx);
-                                }
-                            }
-
-                            std::pair<std::map<int, bool>::const_iterator, bool> patch_to_floating_flag_insertion = patch_to_floating_flag.insert(std::make_pair(cur_scs_cur_patch_idx, is_floating_patch));
-                            MCUT_ASSERT(patch_to_floating_flag_insertion.second == true);
-                        }
-                    }
-
-                    cur_scs_interior_ihalfedge_pool_elem = cur_scs_interior_ihalfedge_pool.erase(cur_scs_interior_ihalfedge_pool_elem);
-
-                } // while not found seeds
-
-                if (!cur_scs_patch_seeds_found)
-                {
-                    // done. We have identified all nodes (patches)
-                    // of the current SCS (or we simply couldn't find any
-                    // based on initial ihalfedges in the local pool)
-                    break;
-                }
-
-                MCUT_ASSERT(cur_scs_patch_seed_poly_he_idx != -1);
-
-                ///////////////////////////////////////////////////////////////////////////
-                // build the patch by flood-fill (BFS)
-                ///////////////////////////////////////////////////////////////////////////
-
-                // create patch entry
-                MCUT_ASSERT(patches.count(cur_scs_cur_patch_idx) == 0);
-                patches[cur_scs_cur_patch_idx] = std::vector<int>();
-                //std::pair<std::map<int, std::vector<int>>::iterator, bool> patch_insertion = patches.insert(std::make_pair(cur_scs_cur_patch_idx, std::vector<int>()));
-                //MCUT_ASSERT(patch_insertion.second == true);
-                MCUT_ASSERT(patches.count(cur_scs_cur_patch_idx) == 1);
-
-                MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(cur_scs_cur_patch_idx) == 0);
-                patch_to_seed_interior_ihalfedge_idx[cur_scs_cur_patch_idx] = cur_scs_patch_seed_poly_he_idx;
-                //std::pair<std::map<int, int>::const_iterator, bool> seed_interior_ihalfedge_idx_insertion = patch_to_seed_interior_ihalfedge_idx.insert(std::make_pair(cur_scs_cur_patch_idx, cur_scs_patch_seed_poly_he_idx));
-                //MCUT_ASSERT(seed_interior_ihalfedge_idx_insertion.second == true);
-                MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(cur_scs_cur_patch_idx) == 1);
-
-                MCUT_ASSERT(patch_to_seed_poly_idx.count(cur_scs_cur_patch_idx) == 0);
-                patch_to_seed_poly_idx[cur_scs_cur_patch_idx] = cur_scs_patch_seed_poly_idx;
-                //std::pair<std::map<int, int>::const_iterator, bool> seed_poly_idx_insertion = patch_to_seed_poly_idx.insert(std::make_pair(cur_scs_cur_patch_idx, cur_scs_patch_seed_poly_idx));
-                //MCUT_ASSERT(seed_poly_idx_insertion.second == true);
-                MCUT_ASSERT(patch_to_seed_poly_idx.count(cur_scs_cur_patch_idx) == 1);
-
-                std::vector<int> &patch = patches.at(cur_scs_cur_patch_idx); // patch_insertion.first->second; // polygons of patch
-                patch.reserve(cs_face_count);
-                std::deque<int> flood_fill_queue; // for building patch using BFS
-                std::unordered_map<int, bool> seed_poly_already_enqueued;
-                flood_fill_queue.push_back(cur_scs_patch_seed_poly_idx); // first polygon
-                seed_poly_already_enqueued[cur_scs_patch_seed_poly_idx] = true;
-
-                do
-                { // each interation adds a polygon to the patch
-
-                    // get the polygon at the front of the queue
-                    const int cur_scs_patch_poly_idx = flood_fill_queue.front();
-                    // add polygon to patch
-                    patch.push_back(cur_scs_patch_poly_idx);
-
-                    // relate polygon to patch
-                    MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(cur_scs_patch_poly_idx) == 0);
-                    m0_cm_poly_to_patch_idx[cur_scs_patch_poly_idx] = cur_scs_cur_patch_idx;
-                    //std::pair<std::map<int, int>::const_iterator, bool> pair = m0_cm_poly_to_patch_idx.insert(std::make_pair(cur_scs_patch_poly_idx, cur_scs_cur_patch_idx)); // signifies that polygon has been associated with a patch
-                    //MCUT_ASSERT(pair.second == true);
-                    MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(cur_scs_patch_poly_idx) == 1);
-
-                    //
-                    // find adjacent polygons which share class 0,1,2 (o-->o, o-->x, x-->o) halfedges, and
-                    // the class 3 (x-->x) halfedges which are [exterior/boundary] intersection-halfedges.
-                    //
-
-                    // adjacent polygons to the current
-                    std::vector<int> adj_polys;
-                    // the current polygon
-                    const traced_polygon_t &cur_scs_patch_poly = m0_polygons.at(cur_scs_patch_poly_idx);
-
-                    // for each halfedge of the current polygon
-                    for (traced_polygon_t::const_iterator poly_he_iter = cur_scs_patch_poly.cbegin();
-                         poly_he_iter != cur_scs_patch_poly.cend();
-                         ++poly_he_iter)
-                    {
-
-                        const vd_t src_vertex = m0.source(*poly_he_iter);
-                        const vd_t tgt_vertex = m0.target(*poly_he_iter);
-                        bool is_ambiguious_boundary_edge_case = m0_is_intersection_point(src_vertex, ps_vtx_cnt) && m0_is_intersection_point(tgt_vertex, ps_vtx_cnt);
-                        bool is_valid_ambiguious_boundary_edge = false;
-
-                        if (is_ambiguious_boundary_edge_case)
-                        { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
-
-                            //const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(src_vertex);
-                            //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(tgt_vertex);
-                            MCUT_ASSERT((size_t)src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
-                            const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex - ps.number_of_vertices());
-                            const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(src_vertex); //ps.edge(src_coincident_ps_halfedge);
-
-                            MCUT_ASSERT((size_t)tgt_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
-                            const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex - ps.number_of_vertices());
-                            const ed_t tgt_ps_edge = tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(tgt_vertex); //ps.edge(tgt_ps_h);
-
-                            is_valid_ambiguious_boundary_edge = (src_ps_edge == tgt_ps_edge);
-                        }
-
-                        // "is the halfdge not along the cut-path"
-                        if (!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge)
-                        {
-
-                            // get the opposite halfedge which is used to trace the adjacent polygon
-                            const hd_t poly_he_opp = m0.opposite(*poly_he_iter);
-                            // get the coincident polygons (if any)
-                            std::vector<std::vector<int>>::const_iterator find_iter = m0_h_to_ply.cbegin() + poly_he_opp; //m0_h_to_ply.find(poly_he_opp);
-
-                            // check if "poly_he_opp" is used to trace a polygon i.e its not a border halfedge
-                            if (find_iter->size() > 0 /*find_iter != m0_h_to_ply.cend()*/)
-                            {
-
-                                MCUT_ASSERT(find_iter->size() == 1); // only used to trace a CCW cut-mesh polygon
-
-                                // get the polygon which is traced with "poly_he_opp" i.e. the adjacent polygon we are looking for!
-                                const int incident_poly = find_iter->front();
-
-                                // mustbe  cut-mesh polygon since we are only dealing with such polygons when building patches
-                                MCUT_ASSERT(incident_poly >= traced_sm_polygon_count);
-
-                                // does the patch already contain the polygon ...?
-                                // TODO: search "m0_cm_poly_to_patch_idx" which has O(log N) compared to O(N) here
-                                const bool poly_already_in_patch = m0_cm_poly_to_patch_idx.find(incident_poly) != m0_cm_poly_to_patch_idx.cend(); // std::find(patch.cbegin(), patch.cend(), incident_poly) != patch.cend();
-
-                                if (!poly_already_in_patch)
-                                {
-                                    std::unordered_map<int, bool>::const_iterator qmap_fiter = seed_poly_already_enqueued.find(incident_poly);
-                                    const bool poly_already_queued = qmap_fiter != seed_poly_already_enqueued.cend(); //std::find(flood_fill_queue.crbegin(), flood_fill_queue.crend(), incident_poly) != flood_fill_queue.crend();
-                                    if (!poly_already_queued)
-                                    {
-                                        flood_fill_queue.push_back(incident_poly); // add adjacent polygon to bfs-queue
-                                        seed_poly_already_enqueued[incident_poly] = true;
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        { // we have an interior-ihalfedge (i.e a border between patches)
-                            const int cur_scs_patch_poly_he_idx = (int)std::distance(cur_scs_patch_poly.cbegin(), poly_he_iter);
-                            // TODO: I think there is a logical innefficency in our path identification algorithm which
-                            // leads to what we are doing here. I should not need to add [every] border/boundary halfedge
-                            // in order to search for the adjacent patch. This may be why the algorithm does not scale
-                            // so well.
-                            //
-                            // The algorithm need to be fixed to so that we instead just rely on the information we
-                            // already have in "primary_interior_ihalfedge_pool" which contains at-least one
-                            // border/boundary halfedge of each patch!!!
-                            cur_scs_patch_interior_ihalfedges.emplace_back(cur_scs_cur_patch_idx, cur_scs_patch_poly_idx, cur_scs_patch_poly_he_idx); // NOTE: patches only join at interior ihalfedges
-                        }
-                    }
-
-                    flood_fill_queue.pop_front(); // cur_scs_patch_poly_idx
-
-                } while (!flood_fill_queue.empty()); // while there are more adjacent polygons for building current patch
-
-                MCUT_ASSERT(!patch.empty()); // there has to be at least one polygon
-
-                ++cur_scs_patch_counter;
-                cur_scs_prev_patch_idx = cur_scs_cur_patch_idx;
-                ++cur_scs_cur_patch_idx;
-
-                // update the SCS pool with the interior ihalfedges (borders) of the current patch
-                // TODO: again, this feel sub-optimal!!! (see TODO comment a few line above)
-                cur_scs_interior_ihalfedge_pool.insert(cur_scs_interior_ihalfedge_pool.end(), cur_scs_patch_interior_ihalfedges.cbegin(), cur_scs_patch_interior_ihalfedges.cend());
-                cur_scs_patch_interior_ihalfedges.clear();
-
-            } // while there are more adjacent patches
-
-            // NOTE: At this stage, we have identified all patches of the current graph
-
-            if (cur_scs_patch_counter == 0)
+            if (std::get<0>(graph_interior_ihalfedge_pool) == -1)
             {
-                // could not identitfy a patch with the halfedges which where available in the primary_interior_ihalfedge_pool.
-                continue; // pick another ihalfedge from primary_interior_ihalfedge_pool
+                break; // done
             }
-
-            total_ccw_patch_count += cur_scs_patch_counter;
-            const bool cur_scs_is_floating_patch = cur_scs_patch_counter == 1 && patch_to_floating_flag.at(cur_scs_prev_patch_idx) == true; // last created patch
 
             ///////////////////////////////////////////////////////////////////////////
-            // Identify which patches are interior and which are exterior (coloring)
+            // build the patch by flood-fill (BFS)
             ///////////////////////////////////////////////////////////////////////////
 
-            //
-            // We will now sort the patches into two sets - interior and exterior.
-            // We do this by building an adjacency matrix and its square (^2) to produce
-            // a bipartite graph via coloring. The adjacency matrix represents the
-            // adjacency between patches (sharing a cut path).
-            //
+            MCUT_ASSERT(patch_to_seed_interior_ihalfedge_idx.count(graph_cur_patch_idx) == 0);
+            patch_to_seed_interior_ihalfedge_idx[graph_cur_patch_idx] = std::get<2>(graph_interior_ihalfedge_pool);
 
-            math::matrix_t scs_adj_matrix(total_ccw_patch_count, total_ccw_patch_count); // square
+            MCUT_ASSERT(patch_to_seed_poly_idx.count(graph_cur_patch_idx) == 0);
+            patch_to_seed_poly_idx[graph_cur_patch_idx] = std::get<1>(graph_interior_ihalfedge_pool);
 
-            for (std::map<int, std::vector<int>>::const_iterator patch_iter = cur_scs_patch_to_adj_list.cbegin();
-                 patch_iter != cur_scs_patch_to_adj_list.cend();
-                 ++patch_iter)
-            {
+            std::vector<int> &patch = patches[graph_cur_patch_idx]; // patch_insertion.first->second; // polygons of patch
+            patch.reserve(cs_face_count);
+            std::queue<int> flood_fill_queue; // for building patch using BFS
 
-                const int row_id = patch_iter->first; // same as patch index
+            flood_fill_queue.push(std::get<1>(graph_interior_ihalfedge_pool)); // first polygon
+            patch_poly_enqueued[std::get<1>(graph_interior_ihalfedge_pool)] = true;
 
-                for (std::vector<int>::const_iterator adj_patch_iter = patch_iter->second.cbegin();
-                     adj_patch_iter != patch_iter->second.cend();
-                     ++adj_patch_iter)
+            do
+            { // each interation adds a polygon to the patch
+
+                // get the polygon at the front of the queue
+                const int graph_patch_poly_idx = flood_fill_queue.front();
+                flood_fill_queue.pop(); // graph_patch_poly_idx
+
+                // add polygon to patch
+                patch.push_back(graph_patch_poly_idx);
+
+                // relate polygon to patch
+                MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(graph_patch_poly_idx) == 0);
+                m0_cm_poly_to_patch_idx[graph_patch_poly_idx] = graph_cur_patch_idx;
+                //std::pair<std::map<int, int>::const_iterator, bool> pair = m0_cm_poly_to_patch_idx.insert(std::make_pair(graph_patch_poly_idx, graph_cur_patch_idx)); // signifies that polygon has been associated with a patch
+                //MCUT_ASSERT(pair.second == true);
+                MCUT_ASSERT(m0_cm_poly_to_patch_idx.count(graph_patch_poly_idx) == 1);
+
+                //
+                // find adjacent polygons which share class 0,1,2 (o-->o, o-->x, x-->o) halfedges, and
+                // the class 3 (x-->x) halfedges which are [exterior/boundary] intersection-halfedges.
+                //
+
+                // the current polygon
+                const traced_polygon_t &graph_patch_poly = m0_polygons.at(graph_patch_poly_idx);
+
+                // for each halfedge of the current polygon
+                for (traced_polygon_t::const_iterator poly_he_iter = graph_patch_poly.cbegin();
+                     poly_he_iter != graph_patch_poly.cend();
+                     ++poly_he_iter)
                 {
 
-                    const int col_id = *adj_patch_iter;
+#if 0
+                    const vd_t src_vertex = m0.source(*poly_he_iter);
+                    const vd_t tgt_vertex = m0.target(*poly_he_iter);
+                    bool is_ambiguious_boundary_edge_case = m0_is_intersection_point(src_vertex, ps_vtx_cnt) && m0_is_intersection_point(tgt_vertex, ps_vtx_cnt);
+                    bool is_valid_ambiguious_boundary_edge = false;
 
-                    if (row_id == col_id)
-                    {
-                        // our adjacency matrix is no self referent because patches
-                        // do not connect to themselves!
-                        continue;
+                    if (is_ambiguious_boundary_edge_case)
+                    { // exterior edge with two intersection vertices (ambigious case arising from concave polyhedron cut)
+
+                        //const hd_t src_coincident_ps_halfedge = m0_ivtx_to_ps_edge.at(src_vertex);
+                        //const hd_t tgt_ps_h = m0_ivtx_to_ps_edge.at(tgt_vertex);
+                        MCUT_ASSERT((size_t)src_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(src_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &src_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(src_vertex - ps.number_of_vertices());
+                        const ed_t src_ps_edge = src_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(src_vertex); //ps.edge(src_coincident_ps_halfedge);
+
+                        MCUT_ASSERT((size_t)tgt_vertex - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(tgt_vertex) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                        const std::pair<ed_t, fd_t> &tgt_vertex_ipair = m0_ivtx_to_intersection_registry_entry.at(tgt_vertex - ps.number_of_vertices());
+                        const ed_t tgt_ps_edge = tgt_vertex_ipair.first; // m0_ivtx_to_ps_edge.at(tgt_vertex); //ps.edge(tgt_ps_h);
+
+                        is_valid_ambiguious_boundary_edge = (src_ps_edge == tgt_ps_edge);
                     }
-
-                    scs_adj_matrix(row_id, col_id) = 1; // mark adjacent
-                }
-            }
-
-            DEBUG_CODE_MASK(lg << "patch-graph adjacency matrix:\n"
-                               << scs_adj_matrix << std::endl;);
-
-            const math::matrix_t scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
-
-            DEBUG_CODE_MASK(lg << "squared:\n"
-                               << scs_adj_matrix_sqrd << std::endl;);
-
-            const bool is_1st_colored_scs = (cur_scs_1st_patch_idx == 0); // the first scs whose patches/nodes are to be colored
-
-            if (is_1st_colored_scs)
-            {
-                // Here we do graph coloring using BFS
-                // NOTE: coloring is used to mark patches as either interior or exterior.
-                // Be aware that since we work only with the topology (connectivity), the
-                // notion color itself will not tell us whether a patch is interior or
-                // exterior. The coloring simply tells us that a patch belongs to one
-                // group or the other. One exception is when we have a floating-patch
-                // in which case it is possible to infer that the patch is interior.
-                // This is because floating patches are always defined by interior
-                // intersection-halfedges.
-
-                std::deque<int> cur_scs_patch_coloring_queue;
-                // start coloring with the first patch
-                cur_scs_patch_coloring_queue.push_back(cur_scs_1st_patch_idx);
-                // "red" chosen arbitrarilly
-                std::vector<int> &red_nodes = color_to_patch.at('A');
-
-                do
-                { // color the current node/patch of the red set
-                    const int cur_scs_cur_colored_patch_idx = cur_scs_patch_coloring_queue.front();
-                    red_nodes.push_back(cur_scs_cur_colored_patch_idx);
-
-                    const int row_id = cur_scs_cur_colored_patch_idx; // NOTE: no need to account for the fact that the number of patches accumulates since cur_scs_1st_patch_idx == 0
-
-                    // find adjacent patch using A^2 and push adj patch onto queue (if not already colored)
-                    for (int col_id = 0; col_id < scs_adj_matrix_sqrd.cols(); ++col_id)
-                    {
-
-                        if (row_id == col_id)
-                        {
-                            continue; // we dont care about two-walks from a node back to itself
-                        }
-
-                        const unsigned int entry = scs_adj_matrix_sqrd(row_id, col_id);
-
-                        if (entry > 0) // two-walk exists
-                        {
-                            const int cur_scs_next_colored_patch_idx = col_id;
-
-                            if ( // not already colored
-                                std::find(red_nodes.cbegin(), red_nodes.cend(), cur_scs_next_colored_patch_idx) == red_nodes.cend() &&
-                                // not in queue
-                                std::find(cur_scs_patch_coloring_queue.cbegin(), cur_scs_patch_coloring_queue.cend(), cur_scs_next_colored_patch_idx) == cur_scs_patch_coloring_queue.cend())
-                            {
-                                cur_scs_patch_coloring_queue.push_back(cur_scs_next_colored_patch_idx);
-                            }
-                        }
-                    }
-
-                    cur_scs_patch_coloring_queue.pop_front(); // rm cur_scs_cur_colored_patch_idx
-
-                } while (!cur_scs_patch_coloring_queue.empty());
-
-                // color the remaining uncolored nodes
-                std::vector<int> &blue_nodes = color_to_patch.at('B'); // i.e. blue patches
-
-                for (std::map<int, std::vector<int>>::const_iterator patch_iter = cur_scs_patch_to_adj_list.cbegin();
-                     patch_iter != cur_scs_patch_to_adj_list.cend();
-                     ++patch_iter)
-                {
-
-                    const bool is_red = std::find(red_nodes.cbegin(), red_nodes.cend(), patch_iter->first) != red_nodes.cend();
-
-                    if (!is_red)
-                    {
-                        blue_nodes.push_back(patch_iter->first);
-                    }
-                }
-            }
-            else
-            { // current SCS is not the first SCS to be colored (rarely happens but crucial)
-
-                /*
-                Objective: infering color value from an already-colored scs
-
-                if the [1st patch of the current scs] is a [floating patch]
-                    #
-                    # Then any already-color scs will be either 
-                    # 1) normal scs with at-least one interior patch and one exterior patch OR 
-                    # 2) another floating patch
-                    #
-
-                    1. extract the vertices of the 1st patch of the current scs
-                    2. find any already-colored scs
-                    3. if <2> is a floating-patch scs
-                    4.      infer color from <2> by using "color_to_patch" (same color because <2> is a floating patch and floating patches are always interior)
-                    5. ELSE # <2> is a normal scs
-                            error: we do not handle this case due ambiguities that arise because we only rely on topological information  e
-                                
-                else // the 1st patch of the current scs is a normal patch
-                    #
-                    # Any already-colored scs will be a floating patch.
-                    # This stipulation follows one reason: 
-                    #  - The current (to-be colored) scs has one or more patches: Floating-patches arise simply because their one & only polygon cannot have a topological connection to the normal scs. 
-                    # 
-                    error: we do not handle this case due ambiguities that arise because we only rely on topological information   
-
-            */
-#if 0 // floating patches no longer exist!
-                if (cur_scs_is_floating_patch)
-                { // TODO: calculate "cur_scs_is_floating_patch" with "check_is_floating_patch(...)"
-                    // 1 get patch polygon vertices
-                    const std::vector<int> &first_patch_of_cur_graph = patches.at(cur_scs_1st_patch_idx);
-
-                    MCUT_ASSERT(first_patch_of_cur_graph.size() == 1); // ... floating patch
-
-                    // get index of the only polygon of patch
-                    const int &patch_poly_idx = first_patch_of_cur_graph.front();
-                    const traced_polygon_t &new_patch_poly = m0_polygons.at(patch_poly_idx); // the patch polygon
-                    std::vector<vd_t> new_polygon_vertices;                                  // vertices of the polygon
-
-                    for (traced_polygon_t::const_iterator patch_poly_he_iter = new_patch_poly.cbegin();
-                         patch_poly_he_iter != new_patch_poly.cend();
-                         ++patch_poly_he_iter)
-                    {
-                        const vd_t tgt = m0.target(*patch_poly_he_iter);
-                        // floating-patch graphs only have one polygon, where that polygon is defined
-                        // only by intersection vertices (think tet ccsplete cut example)
-                        MCUT_ASSERT(m0_is_intersection_point(tgt, ps_vtx_cnt));
-                        new_polygon_vertices.push_back(tgt);
-                    }
-
-                    // 2. find any already-colored scs
-                    std::map<int, std::vector<int>>::const_iterator colored_patch_find_iter = std::find_if(
-                        patches.cbegin(), patches.cend(),
-                        [&](const std::pair<int, std::vector<int>> &e)
-                        {
-                            // we want to compare with the patches/nodes of the other scs (not the current scs)
-                            // path indices of current (just created) scs will be bigger than patches of preceeding
-                            // scs's
-                            return e.first < cur_scs_1st_patch_idx;
-                        });
-
-                    // must exist because the current scs is not the first (hence we why we are in this scope)
-                    MCUT_ASSERT(colored_patch_find_iter != patches.cend());
-
-                    // if <2> is a floating-patch scs
-                    //const bool colored_patch_is_floating_patch = colored_patch_find_iter->second.size() == 1;
-                    //const bool patch_has_one_polygon = colored_patch_find_iter->second.size() == 1;
-                    bool colored_patch_is_floating_patch = patch_to_floating_flag.at(colored_patch_find_iter->first) == true;
-
-                    //if (patch_has_one_polygon) {
-                    //     const int patch_poly_idx = colored_patch_find_iter->second.front();
-                    //     const traced_polygon_t& patch_poly = m0_polygons.at(patch_poly_idx);
-                    //    colored_patch_is_floating_patch = check_is_floating_patch(patch_poly, m0, ps, m0_ivtx_to_ps_edge, ps_vtx_cnt, sm_vtx_cnt);
-                    //}
-
-                    if (colored_patch_is_floating_patch)
-                    {
-                        // 4. infer color from <2> by using "color_to_patch"
-                        // (same color because <2> is a floating patch and floating patches are always interior)
-                        std::map<char, std::vector<int>>::const_iterator color_to_patch_idx_find_iter = std::find_if(
-                            color_to_patch.cbegin(), color_to_patch.cend(),
-                            [&](const std::pair<char, std::vector<int>> &e)
-                            {
-                                return std::find(e.second.cbegin(), e.second.cend(), colored_patch_find_iter->first) != e.second.cend();
-                            });
-
-                        // if it is pre-existing then it should be assigned a colour already!
-                        MCUT_ASSERT(color_to_patch_idx_find_iter != color_to_patch.cend());
-
-                        // same color because they are both the new scs patch and the already-colored one are both floating patch scs's
-                        color_to_patch.at(color_to_patch_idx_find_iter->first).push_back(cur_scs_1st_patch_idx);
-                    }
-                    else
-                    { // colored_patch_is_floating_patch == false
-
-                        // NOTE: Keep in mind at this point that our objective have been to infer the color of a
-                        // floating patch from an SCS which has >= 1 polygon i.e. its not a floating patch itself
-
-                        lg.set_reason_for_failure("ambiguous configuraton: floating patch found with pre-existing regular patch(es)");
-                        output.status = status_t::INVALID_MESH_INTERSECTION;
-                        return; // exit
-                    }           // if(colored_patch_is_floating_patch){
-
-                    // NOTE: at the end of this scope, we have inferred the color of the floating-patch in the current scs
-                }
-                else
 #endif
+                    const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge((*poly_he_iter), m0_num_cutpath_halfedges);
 
-                {
-                    // NOTE: Keep in mind at this point that our objective have been to infer the color of a
-                    // normal SCS from a floating patch
+                    // "is the halfdge not along the cut-path"
+                    if (is_boundary_halfedge/*!is_ambiguious_boundary_edge_case || is_valid_ambiguious_boundary_edge*/)
+                    {
+                        // get the opposite halfedge which is used to trace the adjacent polygon
+                        const hd_t poly_he_opp = m0.opposite(*poly_he_iter);
+                        // get the coincident polygons (if any)
+                        std::vector<std::vector<int>>::const_iterator find_iter = m0_h_to_ply.cbegin() + poly_he_opp; //m0_h_to_ply.find(poly_he_opp);
 
-                    lg.set_reason_for_failure("ambiguous configuraton: regular patch found with pre-existing floating patch(es)");
-                    output.status = status_t::INVALID_MESH_INTERSECTION;
-                    return; // exit
-                }           // if (cur_scs_is_floating_patch) {
-            }               // if (is_1st_colored_scs) {
+                        // check if "poly_he_opp" is used to trace a polygon i.e its not a border halfedge
+                        if (find_iter->size() > 0 /*find_iter != m0_h_to_ply.cend()*/)
+                        {
+
+                            MCUT_ASSERT(find_iter->size() == 1); // only used to trace a CCW cut-mesh polygon
+
+                            // get the polygon which is traced with "poly_he_opp" i.e. the adjacent polygon we are looking for!
+                            const int incident_poly = find_iter->front();
+
+                            // mustbe  cut-mesh polygon since we are only dealing with such polygons when building patches
+                            MCUT_ASSERT(incident_poly >= traced_sm_polygon_count);
+
+                            //if (!poly_already_in_patch)
+                            {
+                                //std::unordered_map<int, bool>::const_iterator qmap_fiter = patch_poly_enqueued.find(incident_poly);
+                                const bool poly_already_queued = patch_poly_enqueued[incident_poly]; //qmap_fiter != patch_poly_enqueued.cend(); //std::find(flood_fill_queue.crbegin(), flood_fill_queue.crend(), incident_poly) != flood_fill_queue.crend();
+                                if (!poly_already_queued)
+                                {
+                                    flood_fill_queue.push(incident_poly); // add adjacent polygon to bfs-queue
+                                    patch_poly_enqueued[incident_poly] = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } while (!flood_fill_queue.empty()); // while there are more adjacent polygons for building current patch
+
+            MCUT_ASSERT(!patch.empty()); // there has to be at least one polygon
 
             // NOTE: at this stage, all patches/nodes of the current graph have been coloured i.e. we have bipartite graph of the patches (except if there is only one patch i.e. a floating patch).
         } while (!primary_interior_ihalfedge_pool.empty()); // while there are more interior ihalfedges coincident to polygons which have not been associated with a patch (hence, there are remaining graphs of patches to be stitched)
+
+        patch_poly_enqueued.clear();
+
+        // NOTE: At this stage, we have identified all patches of the current graph
+
+        MCUT_ASSERT(patches.size() >= 1);
+
+        total_ccw_patch_count = patches.size();
+
+        std::map<
+            int,             // patch index
+            std::vector<int> // adjacent patches (i.e. sharing a cut-path)
+            >
+            graph_patch_to_adj_list;
+
+        MCUT_ASSERT(patch_discovery_seeds.size() % 2 == 0);
+
+        // To understand this loop see how "patch_discovery_seeds" is define above.
+        // We are effetcively using the seed polygon for each patch, to determing adjacency.
+        // "patch_discovery_seeds" is populated with two polygons are any one time,
+        // where these polygons shared a cutpath edge, and hence belong to the boundaries
+        // of their respective patches
+        for (int i = 0; i < (int)patch_discovery_seeds.size(); i += 2)
+        {
+            const std::pair<int, int> &cur = patch_discovery_seeds[i];
+            const int cur_cm_traced_poly = cur.first;
+            const int cur_patch_idx = m0_cm_poly_to_patch_idx.at(cur_cm_traced_poly);
+
+            const std::pair<int, int> &nxt = patch_discovery_seeds[i + 1];
+            const int nxt_cm_traced_poly = nxt.first;
+            const int nxt_patch_idx = m0_cm_poly_to_patch_idx.at(nxt_cm_traced_poly);
+
+            graph_patch_to_adj_list[cur_patch_idx].push_back(nxt_patch_idx);
+            graph_patch_to_adj_list[nxt_patch_idx].push_back(cur_patch_idx);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////
+        // Identify which patches are interior and which are exterior (coloring)
+        ///////////////////////////////////////////////////////////////////////////
+
+        //
+        // We will now sort the patches into two sets - interior and exterior.
+        // We do this by building an adjacency matrix and its square (^2) to produce
+        // a bipartite graph via coloring. The adjacency matrix represents the
+        // adjacency between patches (sharing a cut path).
+        //
+
+        math::matrix_t scs_adj_matrix(patches.size(), patches.size()); // square
+
+        for (std::map<int, std::vector<int>>::const_iterator patch_iter = graph_patch_to_adj_list.cbegin();
+             patch_iter != graph_patch_to_adj_list.cend();
+             ++patch_iter)
+        {
+
+            const int row_id = patch_iter->first; // same as patch index
+
+            for (std::vector<int>::const_iterator adj_patch_iter = patch_iter->second.cbegin();
+                 adj_patch_iter != patch_iter->second.cend();
+                 ++adj_patch_iter)
+            {
+
+                const int col_id = *adj_patch_iter;
+
+                if (row_id == col_id)
+                {
+                    // our adjacency matrix is no self referent because patches
+                    // do not connect to themselves!
+                    continue;
+                }
+
+                scs_adj_matrix(row_id, col_id) = 1; // mark adjacent
+            }
+        }
+
+        DEBUG_CODE_MASK(lg << "patch-graph adjacency matrix:\n"
+                           << scs_adj_matrix << std::endl;);
+
+        const math::matrix_t scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
+
+        DEBUG_CODE_MASK(lg << "squared:\n"
+                           << scs_adj_matrix_sqrd << std::endl;);
+
+        // Here we do graph coloring using BFS
+        // NOTE: coloring is used to mark patches as either interior or exterior.
+        // Be aware that since we work only with the topology (connectivity), the
+        // notion color itself will not tell us whether a patch is interior or
+        // exterior. The coloring simply tells us that a patch belongs to one
+        // group or the other. One exception is when we have a floating-patch
+        // in which case it is possible to infer that the patch is interior.
+        // This is because floating patches are always defined by interior
+        // intersection-halfedges.
+
+        std::deque<int> graph_patch_coloring_queue;
+        // start coloring with the first patch
+        graph_patch_coloring_queue.push_back(0);
+        // "red" chosen arbitrarilly
+        std::vector<int> &red_nodes = color_to_patch.at('A');
+
+        do
+        { // color the current node/patch of the red set
+            const int graph_cur_colored_patch_idx = graph_patch_coloring_queue.front();
+            red_nodes.push_back(graph_cur_colored_patch_idx);
+
+            const int row_id = graph_cur_colored_patch_idx; // NOTE: no need to account for the fact that the number of patches accumulates since graph_1st_patch_idx == 0
+
+            // find adjacent patch using A^2 and push adj patch onto queue (if not already colored)
+            for (int col_id = 0; col_id < scs_adj_matrix_sqrd.cols(); ++col_id)
+            {
+
+                if (row_id == col_id)
+                {
+                    continue; // we dont care about two-walks from a node back to itself
+                }
+
+                const unsigned int entry = scs_adj_matrix_sqrd(row_id, col_id);
+
+                if (entry > 0) // two-walk exists
+                {
+                    const int graph_next_colored_patch_idx = col_id;
+
+                    if ( // not already colored
+                        std::find(red_nodes.cbegin(), red_nodes.cend(), graph_next_colored_patch_idx) == red_nodes.cend() &&
+                        // not in queue
+                        std::find(graph_patch_coloring_queue.cbegin(), graph_patch_coloring_queue.cend(), graph_next_colored_patch_idx) == graph_patch_coloring_queue.cend())
+                    {
+                        graph_patch_coloring_queue.push_back(graph_next_colored_patch_idx);
+                    }
+                }
+            }
+
+            graph_patch_coloring_queue.pop_front(); // rm graph_cur_colored_patch_idx
+
+        } while (!graph_patch_coloring_queue.empty());
+
+        // color the remaining uncolored nodes
+        std::vector<int> &blue_nodes = color_to_patch.at('B'); // i.e. blue patches
+
+        for (std::map<int, std::vector<int>>::const_iterator patch_iter = graph_patch_to_adj_list.cbegin();
+             patch_iter != graph_patch_to_adj_list.cend();
+             ++patch_iter)
+        {
+
+            const bool is_red = std::find(red_nodes.cbegin(), red_nodes.cend(), patch_iter->first) != red_nodes.cend();
+
+            if (!is_red)
+            {
+                blue_nodes.push_back(patch_iter->first);
+            }
+        }
 
         TIME_PROFILE_END(); // &&&&&
 
@@ -9970,6 +9638,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
                     // get the normal polygon
                     const traced_polygon_t &patch_poly = m0_polygons.at(ccw_patch_poly_idx);
+#if 0
                     const bool is_floating_patch = patch_to_floating_flag.at(patch_idx);
 
                     if (is_floating_patch)
@@ -9998,6 +9667,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                         cw_poly_idx = patch_poly_opp; // found opposite polygon
                     }
                     else
+#endif
                     {
 
                         //
@@ -10078,7 +9748,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     if (m0_to_ps_face.count(cw_poly_idx) == 0)
                     {
                         // must not be a floating patch because such ccw and cw patch polygons are created and mapped during "m0" tracing stage
-                        MCUT_ASSERT(patch_to_floating_flag.count(cw_poly_idx) == false);
+                        // MCUT_ASSERT(patch_to_floating_flag.count(cw_poly_idx) == false);
                         MCUT_ASSERT(m0_to_ps_face.count(ccw_patch_poly_idx) == 1);
                         // both polygon will have originated from the same ps-face!
                         m0_to_ps_face[cw_poly_idx] = m0_to_ps_face.at(ccw_patch_poly_idx);
@@ -10426,13 +10096,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 //
                 // copy information from opposite (ccw/normal) patch
                 //
-                std::pair<std::map<int, bool>::const_iterator, bool> patch_to_floating_flag_insertion = patch_to_floating_flag.insert(
-                    std::make_pair(cw_patch_idx, patch_to_floating_flag.at(ccw_patch_idx)));
+                // std::pair<std::map<int, bool>::const_iterator, bool> patch_to_floating_flag_insertion = patch_to_floating_flag.insert(
+                //    std::make_pair(cw_patch_idx, patch_to_floating_flag.at(ccw_patch_idx)));
 
-                MCUT_ASSERT(patch_to_floating_flag_insertion.second == true);
+                //MCUT_ASSERT(patch_to_floating_flag_insertion.second == true);
 
                 // was the opposite patch determined to be a floating patch
-                const bool is_floating_patch = patch_to_floating_flag_insertion.first->second;
+                //const bool is_floating_patch = patch_to_floating_flag_insertion.first->second;
                 // get the index of seed interior intersection halfedge of the opposite ccw/normal patch
                 const int ccw_patch_seed_interior_ihalfedge_idx = patch_to_seed_interior_ihalfedge_idx.at(ccw_patch_idx);
                 // get the index of seed polygon of the opposite ccw/normal patch
@@ -10453,11 +10123,13 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 std::vector<int>::const_iterator find_iter = std::find_if(coincident_polys.cbegin(), coincident_polys.cend(),
                                                                           [&](const int &e)
                                                                           {
+#if 0
                                                                               if (is_floating_patch)
                                                                               {
                                                                                   return e >= traced_sm_polygon_count && e < traced_polygon_count; // interior ihalfedges of floating patches are already coincident to two polygons due to polygon tracing
                                                                               }
                                                                               else
+#endif
                                                                               {
                                                                                   return e >= traced_polygon_count;
                                                                               }
@@ -10498,9 +10170,9 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        patch_to_floating_flag.clear(); // free
-        color_to_cw_patch.clear();      // free
-        patch_to_opposite.clear();      // free
+        //patch_to_floating_flag.clear(); // free
+        color_to_cw_patch.clear(); // free
+        patch_to_opposite.clear(); // free
 
         TIME_PROFILE_END();
 
