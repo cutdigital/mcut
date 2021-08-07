@@ -6944,9 +6944,11 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         const std::vector<traced_polygon_t>::const_iterator m0_traced_sm_polygons_iter_cend = m0_polygons.cbegin() + traced_sm_polygon_count;
         const std::vector<traced_polygon_t>::const_iterator &traced_cs_polygons_iter_cbegin = traced_sm_polygons_iter_end;
 
+        TIME_PROFILE_START("Mark seam edges *");
         // extract the seam vertices
         std::vector<bool> m0_vertex_to_seam_flag;
         mark_seam_vertices(m0_vertex_to_seam_flag, m0, ps.number_of_vertices());
+        TIME_PROFILE_END();
 
         MCUT_ASSERT(!m0_vertex_to_seam_flag.empty());
 
@@ -7070,68 +7072,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                     output.seamed_cut_mesh.seam_vertices = std::move(separated_cut_mesh_fragments.begin()->second.front().second.seam_vertices);
                     output.seamed_cut_mesh.data_maps = std::move(separated_cut_mesh_fragments.begin()->second.front().second.data_maps);
                 }
-                else // cutmesh is a single (large) polygon [and] we have multiple patches which are not connected at the edges
-                {    // NOTE: this code is never executed because we no longer have floating polygons
-                    // here we create a new mesh containing only the polygons of the cut-mesh [and] where every vertex is referenced
-                    // by a face (i.e. we just remove those vertices used only by the source mesh in "m0")
-                    mesh_t m; // output (seamed connected component)
-                    std::vector<vd_t> remapped_seam_vertices;
-                    std::vector<vd_t> vmap_mesh_vertices(merged.number_of_vertices());
-
-                    // for each face in the merged mesh
-                    for (mesh_t::face_iterator_t f = merged.faces_begin(); f != merged.faces_end(); ++f)
-                    {
-                        // get vertices on face
-                        const std::vector<vd_t> vertices_around_face = merged.get_vertices_around_face(*f);
-                        std::vector<vd_t> remapped_face;
-
-                        // for each vertex on face
-                        for (std::vector<vd_t>::const_iterator v = vertices_around_face.cbegin(); v != vertices_around_face.cend(); ++v)
-                        {
-                            if (vmap_mesh_vertices.at(*v) == mesh_t::null_vertex() /*vmap_mesh_vertices.count(*v) == 0*/)
-                            {                                                             // not registered
-                                vmap_mesh_vertices[*v] = m.add_vertex(merged.vertex(*v)); // add vertex and save it new descriptor
-
-                                if (m0_vertex_to_seam_flag.at(*v) == true)
-                                { // is it a seam vertex? (i.e. on a cutpath)
-                                    remapped_seam_vertices.push_back(vmap_mesh_vertices[*v]);
-                                }
-
-                                const vd_t m0_descr = *v; // ... because the vertex list in "merged" is the same as "m0"
-                                //std::map<vd_t, vd_t>::const_iterator m0_to_ps_vtx_fiter = m0_to_ps_vtx.find(m0_descr);
-                                bool is_ps_vertex = (int)m0_descr < (int)m0_to_ps_vtx.size(); //m0_to_ps_vtx_fiter != m0_to_ps_vtx.cend();
-                                vd_t cm_descr = mesh_t::null_vertex();
-                                if (is_ps_vertex)
-                                {
-                                    vd_t ps_descr = m0_to_ps_vtx.at(m0_descr); //m0_to_ps_vtx_fiter->second;
-                                    MCUT_ASSERT((int)ps_descr < (int)ps_to_cm_vtx.size() /*ps_to_cm_vtx.count(ps_descr) == 1*/);
-                                    cm_descr = ps_to_cm_vtx.at(ps_descr);
-
-                                    // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
-                                    cm_descr = static_cast<vd_t>(cm_descr + sm_face_count);
-                                }
-
-                                vd_t local_cc_descr = vmap_mesh_vertices.at(*v);
-
-                                output.seamed_cut_mesh.data_maps.vertex_map[local_cc_descr] = cm_descr;
-                            }
-                            remapped_face.push_back(vmap_mesh_vertices[*v]);
-                        }
-
-                        fd_t fd = m.add_face(remapped_face);
-                        MCUT_ASSERT(fd != mesh_t::null_face());
-
-                        fd_t inputMeshFaceDescr(0); // only one (large) cut-mesh polygon!
-                        // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
-                        inputMeshFaceDescr = static_cast<fd_t>(inputMeshFaceDescr + sm_face_count);
-
-                        output.seamed_cut_mesh.data_maps.face_map[fd] = inputMeshFaceDescr;
-                    }
-
-                    output.seamed_cut_mesh.mesh = std::move(m);
-                    output.seamed_cut_mesh.seam_vertices = std::move(remapped_seam_vertices);
-                }
-
+                
                 if (input.verbose)
                 {
                     dump_mesh(output.seamed_src_mesh.mesh, "cut-mesh-traced-poly");
@@ -8548,9 +8489,12 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         // NOTE: at this stage "m1_polygons" (and "m0_to_m1...") contains only source-mesh polygons.
         //
 
+        TIME_PROFILE_START("Mark seam edges");
         // extract the seam vertices
         std::vector<bool> m1_vertex_to_seam_flag;
         mark_seam_vertices(m1_vertex_to_seam_flag, m1, ps.number_of_vertices(), m1_num_vertices_after_srcmesh_partitioning);
+
+        TIME_PROFILE_END();
 
         MCUT_ASSERT(!m1_vertex_to_seam_flag.empty());
 
@@ -9863,6 +9807,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         // merge the opposite color_to_patch data structure
 
+        TIME_PROFILE_START("merge opposite color to path data structures");
+
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_cw_patch_iter = color_to_cw_patch.cbegin();
              color_to_cw_patch_iter != color_to_cw_patch.cend();
@@ -9912,6 +9858,8 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
             DEBUG_CODE_MASK(lg.unindent(););
         }
+
+        TIME_PROFILE_END();
 
         ///////////////////////////////////////////////////////////////////////////
         // save the patches into the output
