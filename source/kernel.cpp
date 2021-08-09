@@ -36,6 +36,8 @@
 #include <unordered_map>
 #include <numeric> // std::iota
 
+#include <chrono>
+
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
 
@@ -44,10 +46,9 @@
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
 
-#define DUMP_ELAPSED_TIME_INFO
+//#define DUMP_ELAPSED_TIME_INFO
 
 #if defined(DUMP_ELAPSED_TIME_INFO)
-#include <chrono>
 std::map<std::string, std::chrono::time_point<std::chrono::steady_clock>> ptimes;
 std::string ptimeName;
 std::vector<double> elapsed_times;
@@ -1883,8 +1884,10 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
     //
     void dispatch(output_t &output, const input_t &input)
     {
+        #if defined(DUMP_ELAPSED_TIME_INFO)
         ptimes.clear();
         elapsed_times.clear();
+        #endif
         auto kernel_time_start = std::chrono::steady_clock::now();
 
         logger_t &lg = output.logger;
@@ -2916,7 +2919,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
                 *input.scheduler,
                 ps_edge_face_intersection_pairs.cbegin(),
                 ps_edge_face_intersection_pairs.cend(),
-                (1 << 8),
+                (1 << 6),
                 fn_compute_intersection_points,
                 partial_res, // output computed by master thread
                 futures);
@@ -4132,7 +4135,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
 
         DEBUG_CODE_MASK(lg << "find border intersection points" << std::endl;);
 
-        TIME_PROFILE_START("Infer cutpath ino");
+        TIME_PROFILE_START("Infer cutpath info");
 
         //
         // MapKey=intersection point on a border halfedge of either the source-mesh or cut-mesh
@@ -4385,46 +4388,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         //          edge sequences identifying the cutpaths
         // =====================================================================
 
-#if 0
-        // associate/map intersection points to their cut-path sequences
-        std::map<vd_t, int> m0_ivtx_to_cutpath_sequence;
-        for (std::vector<std::vector<ed_t>>::const_iterator iter = m0_cutpath_sequences.cbegin();
-             iter != m0_cutpath_sequences.cend();
-             ++iter)
-        {
 
-            const int cutpath_index = (int)std::distance(m0_cutpath_sequences.cbegin(), iter);
-
-            for (std::vector<ed_t>::const_iterator it = iter->cbegin(); it != iter->cend(); ++it)
-            {
-                const ed_t &edge = *it;
-                const vd_t vertex0 = m0.vertex(edge, 0);
-                const vd_t vertex1 = m0.vertex(edge, 1);
-
-                // insert vertex0
-                if (m0_ivtx_to_cutpath_sequence.count(vertex0) == 0)
-                {
-                    m0_ivtx_to_cutpath_sequence.insert(std::make_pair(vertex0, cutpath_index));
-                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(vertex0) == 1);
-                }
-                else
-                {
-                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence[vertex0] == cutpath_index);
-                }
-
-                // insert vertex1
-                if (m0_ivtx_to_cutpath_sequence.count(vertex1) == 0)
-                {
-                    m0_ivtx_to_cutpath_sequence.insert(std::make_pair(vertex1, cutpath_index));
-                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence.count(vertex1) == 1);
-                }
-                else
-                {
-                    MCUT_ASSERT(m0_ivtx_to_cutpath_sequence[vertex1] == cutpath_index);
-                }
-            }
-        }
-#endif
 
 #if 0
         // Detect degeneracy (see note "limitations")
@@ -11603,6 +11567,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - kernel_time_start).count()
                   << "ms" << std::endl;
 
+#if defined(DUMP_ELAPSED_TIME_INFO)
         double measured_time(0);
         for (auto t : elapsed_times)
         {
@@ -11611,7 +11576,7 @@ inline bool interior_edge_exists(const mesh_t& m, const vd_t& src, const vd_t& t
         }
 
         std::cout << "[MCUT PROFILE]: dispatch() measured : " << measured_time << std::endl;
-
+#endif
         return;
     } // dispatch
 

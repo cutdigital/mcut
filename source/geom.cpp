@@ -453,7 +453,7 @@ namespace geom {
         return compute_point_in_polygon_test(pp, polygon_vertices2d.data(), (int)polygon_vertices2d.size());
     }
 
-    bool Between(math::vec2 a, math::vec2 b, math::vec2 c)
+    inline bool Between(const math::vec2& a, const math::vec2& b, const math::vec2& c)
     {
         math::vec2 ba, ca;
         /* If ab not vertical check betweenness on x; else on y. */
@@ -553,7 +553,7 @@ namespace geom {
         return code;
     }
 
-    bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox)
+    inline bool point_in_bounding_box(const math::vec2& point, const bounding_box_t<math::vec2>& bbox)
     {
         if ((point.x() < bbox.m_minimum.x() || point.x() > bbox.m_maximum.x()) || //
             (point.y() < bbox.m_minimum.y() || point.y() > bbox.m_maximum.y())) {
@@ -563,7 +563,7 @@ namespace geom {
         }
     }
 
-    bool point_in_bounding_box(const math::vec3& point, const bounding_box_t<math::vec3>& bbox)
+    inline bool point_in_bounding_box(const math::vec3& point, const bounding_box_t<math::vec3>& bbox)
     {
         if ((point.x() < bbox.m_minimum.x() || point.x() > bbox.m_maximum.x()) || //
             (point.y() < bbox.m_minimum.y() || point.y() > bbox.m_maximum.y()) || //
