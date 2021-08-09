@@ -26,7 +26,7 @@
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/scheduler.h"
 #endif
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -212,7 +212,7 @@ void ccDeletorFunc(McConnCompBase* p)
 }
 
 struct McDispatchContextInternal {
-    #if defined(MCUT_MULTI_THREADED_IMPL)
+    #if defined(MCUT_MULTI_THREADED)
     mcut::thread_pool scheduler;
 #endif
     std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>> connComps = {};
@@ -1778,7 +1778,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     mcut::input_t backendInput;
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
     backendInput.scheduler = &ctxtPtr->scheduler;
 #endif
     backendInput.src_mesh = &srcMeshInternal;
@@ -1904,7 +1904,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     do {
         kernelDispatchCallCounter++;
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         bool general_position_assumption_was_violated = ((backendOutput.status.load() == mcut::status_t::GENERAL_POSITION_VIOLATION));
         bool floating_polygon_was_detected = backendOutput.status.load() == mcut::status_t::DETECTED_FLOATING_POLYGON;
 #else
@@ -1913,7 +1913,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #endif
         
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         backendOutput.status.store(mcut::status_t::SUCCESS);
 #else
         backendOutput.status = mcut::status_t::SUCCESS;
@@ -2883,7 +2883,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             {
                 // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
                 // We need to perturb again. (The whole cut mesh)
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
                 backendOutput.status.store(mcut::status_t::GENERAL_POSITION_VIOLATION);
 #else
                 backendOutput.status = mcut::status_t::GENERAL_POSITION_VIOLATION;
@@ -2914,7 +2914,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             result = McResult::MC_RESULT_MAX_ENUM;
         }
     } while (
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         (backendOutput.status.load() == mcut::status_t::GENERAL_POSITION_VIOLATION && backendInput.enforce_general_position) || //
         backendOutput.status.load() == mcut::status_t::DETECTED_FLOATING_POLYGON
 #else

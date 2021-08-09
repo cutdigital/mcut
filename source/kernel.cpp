@@ -445,7 +445,7 @@ namespace mcut
 
     // returns the unseparated/merged connected components
     mesh_t extract_connected_components(
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         thread_pool &scheduler,
 #endif
         // key = cc-id; value = list of cc copies each differing by one newly stitched polygon
@@ -496,7 +496,7 @@ namespace mcut
 
         TIME_PROFILE_START("Extract CC: Insert polygons");
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef std::tuple<
                 std::vector<std::vector<vd_t>> // "mesh" faces
@@ -650,7 +650,7 @@ namespace mcut
         {
 
             face_descriptor_t fd = *face_iter;
-            const int face_cc_id = fccmap[fd]; // get connected component of face
+            const int face_cc_id = fccmap.at(fd); // get connected component of face
 
             std::map<std::size_t, mesh_t>::iterator ccID_to_mesh_fiter = ccID_to_mesh.find(face_cc_id);
             if (ccID_to_mesh_fiter == ccID_to_mesh.end())
@@ -658,8 +658,6 @@ namespace mcut
                 // create new mesh to store connected component
                 std::pair<std::map<std::size_t, mesh_t>::iterator, bool> p = ccID_to_mesh.insert(std::make_pair(face_cc_id, mesh_t()));
                 ccID_to_mesh_fiter = p.first;
-
-                p.first->second.reserve_for_additional_elements(cc_to_vertex_count[face_cc_id]);
             }
 
             mesh_t &cc_mesh = ccID_to_mesh_fiter->second;
@@ -768,7 +766,7 @@ namespace mcut
                     }
                     // check if we need to save vertex as being a seam vertex
                     //std::vector<bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
-                    bool is_seam_vertex = mesh_vertex_to_seam_flag[*face_vertex_iter]; //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
+                    bool is_seam_vertex = mesh_vertex_to_seam_flag.at(*face_vertex_iter); //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
                     if (is_seam_vertex)
                     {
                         cc_seam_vertices.push_back(cc_descriptor);
@@ -816,7 +814,7 @@ namespace mcut
         }
 
         TIME_PROFILE_START("Extract CC: Map faces");
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef std::tuple<
                 std::vector<std::vector<vd_t>>, // remapped_faces, // using remapped cc descriptors
@@ -965,7 +963,7 @@ namespace mcut
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
             face_descriptor_t fd = *face_iter;
-            const size_t cc_id = fccmap[fd]; // the connected component which contains the current face
+            const size_t cc_id = fccmap.at(fd); // the connected component which contains the current face
 
             bool userWantsCC = ccID_to_keepFlag.at(cc_id);
 
@@ -1057,7 +1055,8 @@ namespace mcut
             // 1) "connected_components[cc_id]" is empty (making the added connected component new and unique)
             // 2) the most-recent connected component instance at "connected_components[cc_id].back()" has less faces (in which case, always differing by one)
             //    than the new connected component we wish to add i.e. "cc"
-            bool proceed_to_save_mesh = connected_components[cc_id].empty() || connected_components[cc_id].back().first.number_of_faces() != cc.number_of_faces();
+            auto cc_fiter = connected_components.find(cc_id);
+            bool proceed_to_save_mesh = cc_fiter == connected_components.cend() || cc_fiter->second.back().first.number_of_faces() != cc.number_of_faces();
 
             if (proceed_to_save_mesh)
             {
@@ -1074,7 +1073,7 @@ namespace mcut
 
                 connected_component_info_t ccinfo;
                 ccinfo.location = location;
-                ccinfo.seam_vertices = std::move(cc_to_seam_vertices[cc_id]);
+                ccinfo.seam_vertices = std::move(cc_to_seam_vertices.at(cc_id));
 
                 //
                 // Map vertex and face descriptors to original values in the input source- and cut-mesh
@@ -1673,7 +1672,7 @@ namespace mcut
         lg.reset();
         lg.set_verbose(input.verbose);
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         output.status.store(status_t::SUCCESS);
 #endif
 
@@ -1831,7 +1830,7 @@ namespace mcut
 
         TIME_PROFILE_START("Prepare edge-to-face pairs");
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         { // NOTE: parallel implementation is different from sequential one
             typedef std::unordered_map<ed_t, std::vector<fd_t>> OutputStorageType;
             typedef std::map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator InputStorageIteratorType;
@@ -2004,15 +2003,20 @@ namespace mcut
                         // Here we simply access corresponding element in "cur_ps_face_neigh_faces" based on
                         // how "ps.get_faces_around_face" populates "cur_ps_face_neigh_faces", given "cur_ps_face_halfedges"
                         // as done above
-                        const size_t idx = std::distance(cur_ps_face_halfedges.cbegin(), hiter);
-                        const fd_t opp_he_face = cur_ps_face_neigh_faces.at(idx); // same as ps.face(opp_he);
+                        
+                        
 
                         if (ps_edge_visited[halfedge_edge] == false)
                         {
                             ps_edge_face_intersection_pairs.insert(std::make_pair(halfedge_edge, cur_ps_face_ifaces_sorted)); // add edge
                             ps_edge_visited[halfedge_edge] = true;
 
-                            if (ps_iface_enqueued[opp_he_face] == false)
+                            bool is_border_ps_face = cur_ps_face_neigh_faces.size() != cur_ps_face_halfedges.size();
+                            const size_t idx = std::distance(cur_ps_face_halfedges.cbegin(), hiter);
+                            fd_t opp_he_face = is_border_ps_face ? ps.face(opp_he) : cur_ps_face_neigh_faces.at(idx);
+                        
+
+                            if (!is_virtual_face(opp_he_face) && ps_iface_enqueued[opp_he_face] == false)
                             { // two neighbouring faces might share more that 1 edge (case of non-triangulated mesh)
                                 bool is_iface = std::binary_search(cur_ps_face_neigh_ifaces.cbegin(), cur_ps_face_neigh_ifaces.cend(), opp_he_face);
                                 if (is_iface)
@@ -2056,7 +2060,7 @@ namespace mcut
 
             } while (next_ps_cc_face != input.ps_face_to_potentially_intersecting_others->cend());
         }
-#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
+#endif // #if defined(MCUT_MULTI_THREADED)
         TIME_PROFILE_END();
 
         //
@@ -2068,7 +2072,7 @@ namespace mcut
         // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
         std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> ps_edge_to_bbox;
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> OutputStorageType;
             typedef std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator InputStorageIteratorType;
@@ -2125,7 +2129,7 @@ namespace mcut
             edge_bbox.expand(ps.vertex(v0));
             edge_bbox.expand(ps.vertex(v1));
         }
-#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
+#endif // #if defined(MCUT_MULTI_THREADED)
 
         TIME_PROFILE_END();
 
@@ -2134,7 +2138,7 @@ namespace mcut
         //
         TIME_PROFILE_START("Cull redundant edge-face pairs");
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef std::unordered_map<ed_t, std::vector<fd_t>>::iterator InputStorageIteratorType;
 
@@ -2233,7 +2237,7 @@ namespace mcut
                 }
             }
         }
-#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
+#endif // #if defined(MCUT_MULTI_THREADED)
         TIME_PROFILE_END();
 
         ps_edge_to_bbox.clear();
@@ -2250,7 +2254,7 @@ namespace mcut
         std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
         std::unordered_map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef std::tuple<
                 std::unordered_map<fd_t, math::vec3>,             // ps_tested_face_to_plane_normal;
@@ -2303,7 +2307,7 @@ namespace mcut
                 *input.scheduler,
                 input.ps_face_to_potentially_intersecting_others->cbegin(),
                 input.ps_face_to_potentially_intersecting_others->cend(),
-                (1 << 10),
+                (1 << 7),
                 fn_compute_intersecting_face_properties,
                 partial_res, // out
                 futures);
@@ -2436,7 +2440,7 @@ namespace mcut
 
         TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             //typedef std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator InputStorageIteratorType;
             typedef std::tuple<
@@ -4658,7 +4662,7 @@ namespace mcut
         // defining to hold data for the new mesh containing clipped polygons
         std::unordered_map<ed_t, ed_t> ps_to_m0_non_intersecting_edge;
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef mesh_t::edge_iterator_t InputStorageIteratorType;
             typedef std::tuple<
@@ -5103,7 +5107,7 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         }
         DEBUG_CODE_MASK(lg.unindent(););
-#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
+#endif // #if defined(MCUT_MULTI_THREADED)
 
         TIME_PROFILE_END(); // &&&&&
 
@@ -5138,7 +5142,7 @@ namespace mcut
 
         std::unordered_map<int, fd_t> m0_to_ps_face; // (we'll later also include reversed polygon patches)
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         {
             typedef mesh_t::face_iterator_t InputStorageIteratorType;
             typedef std::tuple<
@@ -6651,7 +6655,7 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         } // for each ps-face to trace
 
-#endif // #if defined(MCUT_MULTI_THREADED_IMPL)
+#endif // #if defined(MCUT_MULTI_THREADED)
 
         TIME_PROFILE_END(); // &&&&&
 
@@ -6728,7 +6732,7 @@ namespace mcut
 
                 // NOTE: The result is a mesh identical to the original source mesh except at the edges introduced by the cut..
                 extract_connected_components(
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
                     *input.scheduler,
 #endif
                     separated_src_mesh_fragments,
@@ -6779,7 +6783,7 @@ namespace mcut
                 std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> separated_cut_mesh_fragments;
 
                 mesh_t merged = extract_connected_components(
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
                     *input.scheduler,
 #endif
                     separated_cut_mesh_fragments,
@@ -8249,7 +8253,7 @@ namespace mcut
             std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>> unsealed_connected_components;
 
             extract_connected_components(
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
                 *input.scheduler,
 #endif
                 unsealed_connected_components,
@@ -8295,9 +8299,9 @@ namespace mcut
                 std::pair<mesh_t, connected_component_info_t> &md = mesh_data.front();
                 output_mesh_info_t omi;
                 omi.mesh = md.first;
-                omi.seam_vertices = std::move(md.second.seam_vertices);
-                omi.data_maps = std::move(md.second.data_maps);
-                output.unsealed_cc[md.second.location].emplace_back(std::move(omi));
+                omi.seam_vertices = (md.second.seam_vertices);
+                omi.data_maps = (md.second.data_maps);
+                output.unsealed_cc[md.second.location].emplace_back((omi));
             }
 
             unsealed_connected_components.clear();
@@ -8387,7 +8391,7 @@ namespace mcut
 
             for (int i = 0; i < 2; ++i)
             { // for each halfedge of current edge
-                hd_t h = m0.halfedge(edge, 0);
+                hd_t h = m0.halfedge(edge, i);
                 MCUT_ASSERT(h != mesh_t::null_halfedge());
 
                 /*
@@ -11146,7 +11150,7 @@ namespace mcut
                         ///////////////////////////////////////////////////////////////////////////
 
                         extract_connected_components(
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
                             *input.scheduler,
 #endif
                             separated_stitching_CCs,
@@ -11246,7 +11250,7 @@ namespace mcut
 
                 // extract the seam vertices
                 extract_connected_components(
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
                     *input.scheduler,
 #endif
                     separated_sealed_CCs,

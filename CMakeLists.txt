@@ -37,11 +37,25 @@ cmake_minimum_required(VERSION 3.12...3.13 FATAL_ERROR)
 
 project(mcut LANGUAGES CXX C)
 
-set ( DESCRIPTION "2-manifold surface-mesh cutting library." )
-
-if(NOT CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose build type (None Debug Release RelWithDebInfo MinSizeRel)." FORCE)
+get_directory_property(MCUT_PARENT_DIR PARENT_DIRECTORY)
+if(NOT MCUT_PARENT_DIR)
+	set(MCUT_TOPLEVEL_PROJECT ON)
+else()
+	set(MCUT_TOPLEVEL_PROJECT OFF)
 endif()
+
+set ( DESCRIPTION "Surface-mesh cutting library." )
+
+if (NOT WIN32 AND NOT CMAKE_BUILD_TYPE)
+	message(STATUS "No build type selected, default to Release")
+	set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel." FORCE)
+endif()
+
+set (CMAKE_DEBUG_POSTFIX "d")
+
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -68,6 +82,7 @@ option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by 
 option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" OFF)
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
+option(MCUT_BUILD_AS_MULTI_THREADED_LIB "Configure to build MCUT as a multi-threaded library" OFF)
 option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" OFF)
 
 #
@@ -104,9 +119,12 @@ message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
 list(APPEND compilation_flags "")
 
-find_package(Threads REQUIRED)
+if (MCUT_BUILD_AS_MULTI_THREADED_LIB)
+	find_package(Threads REQUIRED)
 
-list(APPEND extra_libs Threads::Threads) 
+	list(APPEND extra_libs Threads::Threads) 
+	list(APPEND preprocessor_defs -DMCUT_MULTI_THREADED=1)
+endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	list(APPEND compilation_flags -Wall -Wextra)

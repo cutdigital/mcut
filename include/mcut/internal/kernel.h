@@ -24,7 +24,7 @@
 #define MCUT_KERNEL_H
 #include <mcut/internal/halfedge_mesh.h>
 #include <mcut/internal/geom.h>
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
 #include <mcut/internal/scheduler.h>
 #endif
 #include <map>
@@ -120,7 +120,7 @@ namespace mcut
     //
     struct input_t
     {
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         thread_pool *scheduler = nullptr;
 #endif
         const mesh_t *src_mesh = nullptr;
@@ -188,7 +188,7 @@ namespace mcut
     struct output_t
     {
 
-#if defined(MCUT_MULTI_THREADED_IMPL)
+#if defined(MCUT_MULTI_THREADED)
         std::atomic<status_t> status;
 #else
         status_t status = status_t::SUCCESS;
