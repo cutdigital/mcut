@@ -148,7 +148,7 @@ namespace math {
         {
         }
 
-        vec3_(const T& x, const T& y, const T& z)
+        vec3_(const T &x, const T &y, const T& z)
             : vec2_<T>(x, y)
             , m_z(z)
         {

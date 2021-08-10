@@ -157,10 +157,7 @@ struct IndexArrayMesh {
     IndexArrayMesh() { }
     ~IndexArrayMesh()
     {
-        pVertices.release();
-        pFaceIndices.release();
-        pFaceSizes.release();
-        pEdges.release();
+        
     }
 
     std::unique_ptr<mcut::math::real_number_t[]> pVertices;
@@ -546,10 +543,11 @@ McResult halfedgeMeshToIndexArrayMesh(
     indexArrayMesh.numVertices = halfedgeMeshInfo.mesh.number_of_vertices();
 
     MCUT_ASSERT(indexArrayMesh.numVertices >= 3);
-
-    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[(size_t)indexArrayMesh.numVertices * 3u]);
+    
+    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[indexArrayMesh.numVertices * 3u]);
+    
     if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
-        indexArrayMesh.pVertexMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[(size_t)indexArrayMesh.numVertices]);
+        indexArrayMesh.pVertexMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numVertices]);
     }
 
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i) {
@@ -649,6 +647,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     MCUT_ASSERT(indexArrayMesh.numFaces > 0);
 
     indexArrayMesh.pFaceSizes = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
+
     if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
         indexArrayMesh.pFaceMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
     }

@@ -395,7 +395,7 @@ namespace mcut
         fccmap.resize(mesh.number_of_faces());
         int num_connected_components = (connected_component_id + 1); // number of CCs
         cc_to_face_count.resize(mesh.number_of_faces());
-        for (int i = 0; i < num_connected_components; ++i)
+        for (int i = 0; i < (int)cc_to_face_count.size(); ++i)
         {
             cc_to_face_count[i] = 0;
         }
@@ -410,7 +410,7 @@ namespace mcut
             // all vertices belong to the same conn comp
             fccmap[*f] = face_cc_id;
 
-            cc_to_face_count[connected_component_id] += 1;
+            cc_to_face_count[face_cc_id] += 1;
         }
 
         return num_connected_components;
@@ -1277,6 +1277,18 @@ namespace mcut
         return is_duplicate;
     }
 
+    // TODO: replace code parts that use "m0_ivtx_to_intersection_registry_entry" with calls to this
+    // function which is much cheaper
+    inline bool m0_is_polygon_boundary_halfedge(const hd_t &h, uint32_t m0_num_cutpath_halfedges)
+    {
+        return (uint32_t)h >= m0_num_cutpath_halfedges;
+    }
+
+    inline bool m0_is_polygon_boundary_edge(const ed_t &e, uint32_t m0_num_cutpath_edges)
+    {
+        return (uint32_t)e >= m0_num_cutpath_edges;
+    }
+
     // point an intersection halfedge to the correct instance of an intersection point
     vd_t resolve_intersection_point_descriptor(
         const mesh_t &ps,
@@ -1295,7 +1307,8 @@ namespace mcut
         const std::vector<vd_t> &m0_to_ps_vtx,
         const int ps_vtx_cnt,
         const int sm_vtx_cnt,
-        const int sm_face_count)
+        const int sm_face_count,
+        const int m0_num_cutpath_halfedges)
     {
         // the descriptor instance we want to return
         vd_t resolved_inst = m1_h_tgt;
@@ -1337,17 +1350,25 @@ namespace mcut
 
             if (!is_strictly_cs_h && is_xx)
             {
+#if 0
                 //const hd_t s_ps_h = m0_ivtx_to_ps_edge.at(s);
                 //const hd_t t_ps_h = m0_ivtx_to_ps_edge.at(t);
                 MCUT_ASSERT((size_t)s - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(s) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                 const ed_t s_ps_e = m0_ivtx_to_intersection_registry_entry.at(s - ps.number_of_vertices()).first; //  m0_ivtx_to_ps_edge.at(s); //  ps.edge(s_ps_h);
                 MCUT_ASSERT((size_t)t - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(t) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                 const ed_t t_ps_e = m0_ivtx_to_intersection_registry_entry.at(t - ps.number_of_vertices()).first; //m0_ivtx_to_ps_edge.at(t); // ps.edge(t_ps_h);
-                const bool oh_is_exterior = (s_ps_e == t_ps_e);                                                   // lays on exterior of ps polygon
+     #else
+                const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(
+                    *halfedge_across_cut_path_iter, 
+                    m0_num_cutpath_halfedges);
+     #endif           
+                const bool oh_is_exterior = is_boundary_halfedge;//(s_ps_e == t_ps_e);                                                   // lays on exterior of ps polygon
 
                 if (oh_is_exterior)
                 {
-
+                    MCUT_ASSERT((size_t)s - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(s) != m0_ivtx_to_intersection_registry_entry.cend()*/);
+                    const ed_t s_ps_e = m0_ivtx_to_intersection_registry_entry.at(s - ps.number_of_vertices()).first; //  m0_ivtx_to_ps_edge.at(s); //  ps.edge(s_ps_h);
+                
                     const hd_t s_ps_h0 = ps.halfedge(s_ps_e, 0); // could alternatively use t_ps_e since both he's are part of same edge
                     fd_t incident_face = ps.face(s_ps_h0);
 
@@ -1450,14 +1471,20 @@ namespace mcut
 
                 if (nxt_is_xx)
                 {
+#if 0
                     //const hd_t nxt_src_ps_h = m0_ivtx_to_ps_edge.at(nxt_src);
                     //const hd_t nxt_tgt_ps_h = m0_ivtx_to_ps_edge.at(nxt_tgt);
                     MCUT_ASSERT((size_t)nxt_src - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(nxt_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                     const ed_t nxt_src_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_src - ps.number_of_vertices()).first; // m0_ivtx_to_ps_edge.at(nxt_src); // ps.edge(nxt_src_ps_h);
                     MCUT_ASSERT((size_t)nxt_tgt - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(nxt_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                     const ed_t nxt_tgt_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_tgt - ps.number_of_vertices()).first; // m0_ivtx_to_ps_edge.at(nxt_tgt); // ps.edge(nxt_tgt_ps_h);
+#else
+                    const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(
+                    nxt, 
+                    m0_num_cutpath_halfedges);
+#endif
+                    const bool nxt_is_exterior = is_boundary_halfedge;//(nxt_src_ps_e == nxt_tgt_ps_e); // lays on exterior of ps polygon
 
-                    const bool nxt_is_exterior = (nxt_src_ps_e == nxt_tgt_ps_e); // lays on exterior of ps polygon
                     on_same_side = nxt_is_exterior;
                 }
 
@@ -1485,9 +1512,13 @@ namespace mcut
             MCUT_ASSERT(!halfedges_across_cut_path.empty());
 
             const hd_t &h = halfedges_across_cut_path.front();
+            MCUT_ASSERT(m0_to_m1_ihe.find(h) != m0_to_m1_ihe.cend());
             const hd_t &h_proc = m0_to_m1_ihe.at(h);
+            MCUT_ASSERT((uint32_t)h_proc < (uint32_t)m1.number_of_halfedges());
             vd_t h_tgt = m1.target(h_proc);
-            const vd_t tgt_copy = m1.add_vertex(m1.vertex(h_tgt)); // make a copy
+            MCUT_ASSERT((uint32_t)h_tgt < (uint32_t)m1.number_of_vertices());
+            const math::vec3& vertex = m1.vertex(h_tgt);
+            const vd_t tgt_copy = m1.add_vertex(vertex); // make a copy
 
             DEBUG_CODE_MASK((*logger_ptr) << "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;);
             resolved_inst = tgt_copy;
@@ -1644,17 +1675,7 @@ namespace mcut
         return sorted_descriptors;
     }
 
-    // TODO: replace code parts that use "m0_ivtx_to_intersection_registry_entry" with calls to this
-    // function which is much cheaper
-    inline bool m0_is_polygon_boundary_halfedge(const hd_t &h, uint32_t m0_num_cutpath_halfedges)
-    {
-        return (uint32_t)h >= m0_num_cutpath_halfedges;
-    }
-
-    inline bool m0_is_polygon_boundary_edge(const ed_t &e, uint32_t m0_num_cutpath_edges)
-    {
-        return (uint32_t)e >= m0_num_cutpath_edges;
-    }
+    
 
     //
     // entry point
@@ -7835,7 +7856,7 @@ namespace mcut
                             // otherwise, we need to determined the correct instance of the tgt
                             // vertex to be used (see paper for details)
                             m1_cur_h_tgt = resolve_intersection_point_descriptor(ps, m0, m1, m0_cur_h, m0_cur_h_tgt, m1_cur_h_tgt, m0_cur_h_is_ox,
-                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count);
+                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count,m0_num_cutpath_halfedges);
                         }
                     }
 
@@ -7848,7 +7869,7 @@ namespace mcut
                             const hd_t opp = m0.opposite(m0_cur_h); // NOTE: m0_cur_h_src == target(opp)
                             // we need to determined the correct instance of the src vertex to be used (see paper for details)
                             m1_cur_h_src = resolve_intersection_point_descriptor(ps, m0, m1, opp, m0_cur_h_src, m1_cur_h_src, m0_cur_h_is_ox,
-                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count);
+                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count,m0_num_cutpath_halfedges);
                         }
                         else
                         { // current halfedge is not the first halfedge of the current SCBS

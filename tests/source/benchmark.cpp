@@ -109,6 +109,10 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
                       utest_fixture->numCutMeshFaces),
             MC_NO_ERROR);
 
+        // TODO: free
+        // utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces
+        // utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces
+        
         uint32_t numConnComps = 0;
 
         ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);

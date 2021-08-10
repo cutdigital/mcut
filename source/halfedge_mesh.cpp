@@ -299,7 +299,10 @@ edge_descriptor_t mesh_t::edge(const vertex_descriptor_t s, const vertex_descrip
 
 vertex_descriptor_t mesh_t::add_vertex(const math::vec3& point)
 {
-    return add_vertex(point.x(), point.y(), point.z());
+    const math::real_number_t x = point.x();
+    const math::real_number_t y = point.y();
+    const math::real_number_t z = point.z();
+    return add_vertex(x, y, z);
 }
 
 #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
@@ -331,7 +334,7 @@ vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math:
     }
 
     MCUT_ASSERT(vd != mesh_t::null_vertex());
-
+    
     data_ptr->p = math::vec3(x, y, z);
 
     return vd;
