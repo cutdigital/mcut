@@ -394,7 +394,7 @@ namespace mcut
         fccmap.clear();
         fccmap.resize(mesh.number_of_faces());
         int num_connected_components = (connected_component_id + 1); // number of CCs
-        cc_to_face_count.resize(mesh.number_of_faces());
+        cc_to_face_count.resize(num_connected_components);
         for (int i = 0; i < (int)cc_to_face_count.size(); ++i)
         {
             cc_to_face_count[i] = 0;
@@ -766,7 +766,7 @@ namespace mcut
                     }
                     // check if we need to save vertex as being a seam vertex
                     //std::vector<bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
-                    bool is_seam_vertex = mesh_vertex_to_seam_flag.at(*face_vertex_iter); //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
+                    bool is_seam_vertex = (size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size() && mesh_vertex_to_seam_flag.at(*face_vertex_iter); //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
                     if (is_seam_vertex)
                     {
                         cc_seam_vertices.push_back(cc_descriptor);
@@ -8258,6 +8258,10 @@ namespace mcut
 
         TIME_PROFILE_START("Mark seam edges");
         // extract the seam vertices
+        // NOTE: the size of this vector include only ps vertices, intersection points, and
+        // the duplicates of intersection points (for separating the source mesh).
+        // new vertices that will later be created (by duplicate ps cut-mesh vertices during stitching)
+        // are not included  
         std::vector<bool> m1_vertex_to_seam_flag;
         mark_seam_vertices(m1_vertex_to_seam_flag, m1, ps.number_of_vertices(), m1_num_vertices_after_srcmesh_partitioning);
 
