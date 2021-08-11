@@ -10214,7 +10214,8 @@ namespace mcut
                 // this queue contains information identifying the patch polygons next-in-queue
                 // to be stitched into the inferred connected component
                 std::deque<std::tuple<hd_t /*m1*/, int /*m0 poly*/, int /*m0 he*/>> patch_poly_stitching_queue;
-                std::unordered_map<int, bool> m0_poly_already_enqueued; // i.e. in "patch_poly_stitching_queue"
+                // enough space for cut-mesh polygons
+                std::vector<bool> m0_poly_already_enqueued(m0_polygons.size()-traced_sm_polygon_count, false); // i.e. in "patch_poly_stitching_queue"
                 // thus, the first element is the seed polygon and the seed halfedge
                 patch_poly_stitching_queue.push_back(
                     std::make_tuple(
@@ -10243,6 +10244,8 @@ namespace mcut
                         m1_cur_patch_cur_poly_1st_he,
                         m0_cur_patch_cur_poly_idx,
                         m0_cur_patch_cur_poly_1st_he_idx) = patch_poly_stitching_queue.front();
+
+                    m0_poly_already_enqueued[m0_cur_patch_cur_poly_idx - traced_sm_polygon_count] = true;
 
                     DEBUG_CODE_MASK(lg << "polygon = " << m0_cur_patch_cur_poly_idx << std::endl;);
 
@@ -11098,8 +11101,8 @@ namespace mcut
                         {
                             //                   if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
                             // check the main global queue to make sure poly has not already been added
-                            std::unordered_map<int, bool>::const_iterator qmap_iter = m0_poly_already_enqueued.find(m0_next_poly_idx);
-                            const bool poly_is_already_in_maqueued = qmap_iter != m0_poly_already_enqueued.cend(); /*std::find_if(
+                            //std::unordered_map<int, bool>::const_iterator qmap_iter = m0_poly_already_enqueued.find(m0_next_poly_idx);
+                            const bool poly_is_already_in_maqueued = m0_poly_already_enqueued[m0_next_poly_idx - traced_sm_polygon_count]; /*std::find_if(
                                                                          patch_poly_stitching_queue.crbegin(),
                                                                          patch_poly_stitching_queue.crend(),
                                                                          [&](const std::tuple<hd_t, int, int> &elem)
@@ -11110,7 +11113,7 @@ namespace mcut
                             if (!poly_is_already_in_maqueued)
                             {
                                 patch_poly_stitching_queue_tmp.push_back(std::make_tuple(m1_next_poly_seed_he, m0_next_poly_idx, m0_next_poly_he_idx));
-                                m0_poly_already_enqueued[m0_next_poly_idx] = true;
+                                m0_poly_already_enqueued[m0_next_poly_idx- traced_sm_polygon_count] = true;
                             }
                         }
 
