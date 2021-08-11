@@ -1357,18 +1357,18 @@ namespace mcut
                 const ed_t s_ps_e = m0_ivtx_to_intersection_registry_entry.at(s - ps.number_of_vertices()).first; //  m0_ivtx_to_ps_edge.at(s); //  ps.edge(s_ps_h);
                 MCUT_ASSERT((size_t)t - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(t) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                 const ed_t t_ps_e = m0_ivtx_to_intersection_registry_entry.at(t - ps.number_of_vertices()).first; //m0_ivtx_to_ps_edge.at(t); // ps.edge(t_ps_h);
-     #else
+#else
                 const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(
-                    *halfedge_across_cut_path_iter, 
+                    *halfedge_across_cut_path_iter,
                     m0_num_cutpath_halfedges);
-     #endif           
-                const bool oh_is_exterior = is_boundary_halfedge;//(s_ps_e == t_ps_e);                                                   // lays on exterior of ps polygon
+#endif
+                const bool oh_is_exterior = is_boundary_halfedge; //(s_ps_e == t_ps_e);                                                   // lays on exterior of ps polygon
 
                 if (oh_is_exterior)
                 {
                     MCUT_ASSERT((size_t)s - ps.number_of_vertices() < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(s) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                     const ed_t s_ps_e = m0_ivtx_to_intersection_registry_entry.at(s - ps.number_of_vertices()).first; //  m0_ivtx_to_ps_edge.at(s); //  ps.edge(s_ps_h);
-                
+
                     const hd_t s_ps_h0 = ps.halfedge(s_ps_e, 0); // could alternatively use t_ps_e since both he's are part of same edge
                     fd_t incident_face = ps.face(s_ps_h0);
 
@@ -1480,10 +1480,10 @@ namespace mcut
                     const ed_t nxt_tgt_ps_e = m0_ivtx_to_intersection_registry_entry.at(nxt_tgt - ps.number_of_vertices()).first; // m0_ivtx_to_ps_edge.at(nxt_tgt); // ps.edge(nxt_tgt_ps_h);
 #else
                     const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(
-                    nxt, 
-                    m0_num_cutpath_halfedges);
+                        nxt,
+                        m0_num_cutpath_halfedges);
 #endif
-                    const bool nxt_is_exterior = is_boundary_halfedge;//(nxt_src_ps_e == nxt_tgt_ps_e); // lays on exterior of ps polygon
+                    const bool nxt_is_exterior = is_boundary_halfedge; //(nxt_src_ps_e == nxt_tgt_ps_e); // lays on exterior of ps polygon
 
                     on_same_side = nxt_is_exterior;
                 }
@@ -1517,7 +1517,7 @@ namespace mcut
             MCUT_ASSERT((uint32_t)h_proc < (uint32_t)m1.number_of_halfedges());
             vd_t h_tgt = m1.target(h_proc);
             MCUT_ASSERT((uint32_t)h_tgt < (uint32_t)m1.number_of_vertices());
-            const math::vec3& vertex = m1.vertex(h_tgt);
+            const math::vec3 &vertex = m1.vertex(h_tgt);
             const vd_t tgt_copy = m1.add_vertex(vertex); // make a copy
 
             DEBUG_CODE_MASK((*logger_ptr) << "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;);
@@ -1675,17 +1675,15 @@ namespace mcut
         return sorted_descriptors;
     }
 
-    
-
     //
     // entry point
     //
     void dispatch(output_t &output, const input_t &input)
     {
-        #if defined(DUMP_ELAPSED_TIME_INFO)
+#if defined(DUMP_ELAPSED_TIME_INFO)
         ptimes.clear();
         elapsed_times.clear();
-        #endif
+#endif
         auto kernel_time_start = std::chrono::steady_clock::now();
 
         logger_t &lg = output.logger;
@@ -2024,8 +2022,6 @@ namespace mcut
                         // Here we simply access corresponding element in "cur_ps_face_neigh_faces" based on
                         // how "ps.get_faces_around_face" populates "cur_ps_face_neigh_faces", given "cur_ps_face_halfedges"
                         // as done above
-                        
-                        
 
                         if (ps_edge_visited[halfedge_edge] == false)
                         {
@@ -2035,7 +2031,6 @@ namespace mcut
                             bool is_border_ps_face = cur_ps_face_neigh_faces.size() != cur_ps_face_halfedges.size();
                             const size_t idx = std::distance(cur_ps_face_halfedges.cbegin(), hiter);
                             fd_t opp_he_face = is_border_ps_face ? ps.face(opp_he) : cur_ps_face_neigh_faces.at(idx);
-                        
 
                             if (!is_virtual_face(opp_he_face) && ps_iface_enqueued[opp_he_face] == false)
                             { // two neighbouring faces might share more that 1 edge (case of non-triangulated mesh)
@@ -4190,8 +4185,6 @@ namespace mcut
         // NOTE:    at this point we have all vertices, edges, and the lists of
         //          edge sequences identifying the cutpaths
         // =====================================================================
-
-
 
 #if 0
         // Detect degeneracy (see note "limitations")
@@ -6839,7 +6832,7 @@ namespace mcut
                     output.seamed_cut_mesh.seam_vertices = std::move(separated_cut_mesh_fragments.begin()->second.front().second.seam_vertices);
                     output.seamed_cut_mesh.data_maps = std::move(separated_cut_mesh_fragments.begin()->second.front().second.data_maps);
                 }
-                
+
                 if (input.verbose)
                 {
                     dump_mesh(output.seamed_src_mesh.mesh, "cut-mesh-traced-poly");
@@ -7856,7 +7849,7 @@ namespace mcut
                             // otherwise, we need to determined the correct instance of the tgt
                             // vertex to be used (see paper for details)
                             m1_cur_h_tgt = resolve_intersection_point_descriptor(ps, m0, m1, m0_cur_h, m0_cur_h_tgt, m1_cur_h_tgt, m0_cur_h_is_ox,
-                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count,m0_num_cutpath_halfedges);
+                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count, m0_num_cutpath_halfedges);
                         }
                     }
 
@@ -7869,7 +7862,7 @@ namespace mcut
                             const hd_t opp = m0.opposite(m0_cur_h); // NOTE: m0_cur_h_src == target(opp)
                             // we need to determined the correct instance of the src vertex to be used (see paper for details)
                             m1_cur_h_src = resolve_intersection_point_descriptor(ps, m0, m1, opp, m0_cur_h_src, m1_cur_h_src, m0_cur_h_is_ox,
-                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count,m0_num_cutpath_halfedges);
+                                                                                 m0_h_to_ply, ivtx_to_incoming_hlist, m0_sm_ihe_to_flag, m0_ivtx_to_intersection_registry_entry, m0_to_m1_ihe, m0_to_ps_vtx, ps_vtx_cnt, sm_vtx_cnt, sm_face_count, m0_num_cutpath_halfedges);
                         }
                         else
                         { // current halfedge is not the first halfedge of the current SCBS
@@ -8261,7 +8254,7 @@ namespace mcut
         // NOTE: the size of this vector include only ps vertices, intersection points, and
         // the duplicates of intersection points (for separating the source mesh).
         // new vertices that will later be created (by duplicate ps cut-mesh vertices during stitching)
-        // are not included  
+        // are not included
         std::vector<bool> m1_vertex_to_seam_flag;
         mark_seam_vertices(m1_vertex_to_seam_flag, m1, ps.number_of_vertices(), m1_num_vertices_after_srcmesh_partitioning);
 
@@ -11106,7 +11099,7 @@ namespace mcut
                             //                   if (!poly_is_already_stitched_wrt_cur_patch) { // TODO: the [if check] will have to go once "poly_is_already_stitched_wrt_cur_patch" is removed
                             // check the main global queue to make sure poly has not already been added
                             std::unordered_map<int, bool>::const_iterator qmap_iter = m0_poly_already_enqueued.find(m0_next_poly_idx);
-                            const bool poly_is_already_in_maqueued = qmap_iter == m0_poly_already_enqueued.cend(); /*std::find_if(
+                            const bool poly_is_already_in_maqueued = qmap_iter != m0_poly_already_enqueued.cend(); /*std::find_if(
                                                                          patch_poly_stitching_queue.crbegin(),
                                                                          patch_poly_stitching_queue.crend(),
                                                                          [&](const std::tuple<hd_t, int, int> &elem)

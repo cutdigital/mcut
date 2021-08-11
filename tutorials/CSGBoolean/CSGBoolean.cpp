@@ -163,7 +163,7 @@ int main()
             exit(0);
         }
 
-        my_assert(numConnComps == 1); // exactly 1 result (for this example)
+        //my_assert(numConnComps == 1); // exactly 1 result (for this example)
 
         std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
         connectedComponents.resize(numConnComps);
