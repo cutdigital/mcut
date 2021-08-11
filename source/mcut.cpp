@@ -123,6 +123,7 @@ McRoundingModeFlags convertRoundingMode(mp_rnd_t rm)
 #if defined(MCUT_DEBUG_BUILD)
         fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
 #endif
+        break;
     }
     return rmf;
 }
@@ -343,9 +344,9 @@ McResult indexArrayMeshToHalfedgeMesh(
             const float& y = vptr[(i * 3) + 1];
             const float& z = vptr[(i * 3) + 2];
             vmap[i] = halfedgeMesh.add_vertex(
-                x + (perturbation != NULL ? (*perturbation).x() : 0.f),
-                y + (perturbation != NULL ? (*perturbation).y() : 0.f),
-                z + (perturbation != NULL ? (*perturbation).z() : 0.f));
+                mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
+                mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
+                mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
         }
     } else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) {
         const double* vptr = reinterpret_cast<const double*>(pVertices);
@@ -354,9 +355,9 @@ McResult indexArrayMeshToHalfedgeMesh(
             const double& y = vptr[(i * 3) + 1];
             const double& z = vptr[(i * 3) + 2];
             vmap[i] = halfedgeMesh.add_vertex(
-                x + (perturbation != NULL ? (*perturbation).x() : 0.f),
-                y + (perturbation != NULL ? (*perturbation).y() : 0.f),
-                z + (perturbation != NULL ? (*perturbation).z() : 0.f));
+                mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
+                mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
+                mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
         }
     } else {
         result = McResult::MC_INVALID_VALUE;
@@ -1933,9 +1934,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 std::mt19937 mt(rd());
                 std::uniform_real_distribution<double> dist(-1.0, 1.0);
                 perturbation = mcut::math::vec3(
-                    dist(mt) * scalar,
-                    dist(mt) * scalar,
-                    dist(mt) * scalar);
+                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * scalar,
+                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * scalar,
+                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * scalar);
             }
         } // if (general_position_assumption_was_violated) {
 
@@ -2037,7 +2038,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     std::vector<mcut::math::vec2> fpVertexCoords2D;
 
-                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices.data(), (int)fpi.polygon_vertices.size(), fpi.projection_component);
+                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.projection_component);
 
                     // face to be (potentially) partitioned
                     mcut::fd_t origin_face = fpOriginFace;
@@ -2104,7 +2105,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             // project face coords to 2D
                             std::vector<mcut::math::vec2> faceVertexCoords2D;
 
-                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D.data(), (int)faceVertexCoords3D.size(), fpi.projection_component);
+                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.projection_component);
 
                             const int numFaceEdges = (int)faceVertexDescriptors.size(); // num edges == num verts
                             const int numFaceVertices = numFaceEdges;
@@ -2149,7 +2150,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                                     // for each floating polygon vertex ...
                                     for (int fpVertIter = 0; fpVertIter < (int)fpVertexCoords2D.size(); ++fpVertIter) {
-                                        const char ret = mcut::geom::compute_point_in_polygon_test(fpVertexCoords2D.at(fpVertIter), faceVertexCoords2D.data(), (int)faceVertexCoords2D.size());
+                                        const char ret = mcut::geom::compute_point_in_polygon_test(fpVertexCoords2D.at(fpVertIter), faceVertexCoords2D);
                                         if (ret == 'i') { // check if strictly interior
                                             faceContainingFP = *it;
                                             break;
@@ -2212,7 +2213,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     //
 
                     std::vector<mcut::math::vec2> originFaceVertexCoords2D;
-                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d.data(), (int)originFaceVertices3d.size(), fpi.projection_component);
+                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.projection_component);
 
                     // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
                     // 1. pick two edges in the floating polygon
@@ -2247,8 +2248,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         fpGetEdgeVertexCoords(edgeIdx, edgeV0, edgeV1);
 
                         const mcut::math::vec2 midPoint(
-                            (edgeV0.x() + edgeV1.x()) / 2, //
-                            (edgeV0.y() + edgeV1.y()) / 2);
+                            (edgeV0.x() + edgeV1.x()) / mcut::math::real_number_t(2.0), //
+                            (edgeV0.y() + edgeV1.y()) / mcut::math::real_number_t(2.0));
 
                         return midPoint;
                     };
@@ -2436,8 +2437,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     // compute mid-point of "fpSegment", which we will used to find closest intersection points
 
                     const mcut::math::vec2 fpSegmentMidPoint(
-                        (fpSegment.first.x() + fpSegment.second.x()) * 0.5, //
-                        (fpSegment.first.y() + fpSegment.second.y()) * 0.5);
+                        (fpSegment.first.x() + fpSegment.second.x()) * mcut::math::real_number_t(0.5), //
+                        (fpSegment.first.y() + fpSegment.second.y()) * mcut::math::real_number_t(0.5));
 
                     // Get the two closest [valid] intersection points to "fpSegmentMidPoint".
                     // We do this by sorting elements of "originFaceIntersectedEdgeInfo" by the distance
@@ -2454,7 +2455,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             //    originFaceVertexCoords2D.data(),
                             //    (int)originFaceVertexCoords2D.size());
 
-                            bool aOnEdge = (.0 <= a.second.second && 1. >= a.second.second);
+                            bool aOnEdge = (mcut::math::real_number_t(.0) <= a.second.second && mcut::math::real_number_t(1.) >= a.second.second);
                             //for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
                             //    int i0 = i;
                             //    int i1 = (i0 + 1) % (int)originFaceVertexCoords2D.size();
@@ -2474,7 +2475,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             //    b.second.first,
                             //    originFaceVertexCoords2D.data(),
                             //    (int)originFaceVertexCoords2D.size());
-                            bool bOnEdge = (.0 <= b.second.second && 1. >= b.second.second);
+                            bool bOnEdge = (mcut::math::real_number_t(.0) <= b.second.second && mcut::math::real_number_t(1.) >= b.second.second);
 
                             //for (int i = 0; i < (int)originFaceVertexCoords2D.size(); ++i) {
                             //    int i0 = i;

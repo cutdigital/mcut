@@ -81,14 +81,11 @@ namespace math {
         {
             MCUT_ASSERT(index >= 0 && index <= 1);
 
-            const T* val = nullptr;
             if (index == 0) {
-                val = &m_x;
+                return m_x;
             } else {
-                val = &m_y;
+                return m_y;
             }
-
-            return *val;
         }
 
         T& operator[](int index)

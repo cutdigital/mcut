@@ -100,8 +100,7 @@ namespace geom {
     char compute_segment_plane_intersection_type(
         const math::vec3& q,
         const math::vec3& r,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
         const int polygon_normal_max_comp);
 
     // Test if a point 'q' (in 2D) lies inside or outside a given polygon (count the number ray crossings).
@@ -113,8 +112,7 @@ namespace geom {
     // 'v': q is a vertex.
     char compute_point_in_polygon_test(
         const math::vec2& q,
-        const math::vec2* polygon_vertices,
-        const int polygon_vertex_count);
+        const std::vector<math::vec2>& polygon_vertices);
 
     // Test if a point 'q' (in 3D) lies inside or outside a given polygon (count the number ray crossings).
     //
@@ -125,15 +123,13 @@ namespace geom {
     // 'v': q is a vertex.
     char compute_point_in_polygon_test(
         const math::vec3& p,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
         const int polygon_plane_normal_largest_component);
 
     // project a 3d polygon to 3d by eliminating the largest component of its normal
     void project2D(
         std::vector<math::vec2>& out,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
         const int polygon_plane_normal_largest_component);
 
     bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c, math::real_number_t& predResult);

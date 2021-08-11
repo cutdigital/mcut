@@ -112,8 +112,8 @@ namespace geom {
         const math::vec3 rq = (r - q);
         math::real_number_t denom = math::dot_product(rq, normal);
 
-        if (denom == 0.0 /* Segment is parallel to plane.*/) {
-            if (num == 0.0) { // 'q' is on plane.
+        if (denom == mcut::math::real_number_t(0.0) /* Segment is parallel to plane.*/) {
+            if (num == mcut::math::real_number_t(0.0)) { // 'q' is on plane.
                 return 'p'; // The segment lies wholly within the plane
             } else {
                 return '0';
@@ -126,9 +126,9 @@ namespace geom {
             p[i] = q[i] + t * (r[i] - q[i]);
         }
 
-        if ((0.0 < t) && (t < 1.0)) {
+        if ((mcut::math::real_number_t(0.0) < t) && (t < mcut::math::real_number_t(1.0))) {
             return '1'; // The segment intersects the plane, and none of {p, q, r} hold
-        } else if (num == 0) // t==0
+        } else if (num == mcut::math::real_number_t(0.0) ) // t==0
         {
             return 'q'; // The (first) q endpoint is on the plane (but not 'p').
         } else if (num == denom) // t==1
@@ -143,14 +143,15 @@ namespace geom {
         int& i,
         int& j,
         int& k,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
+        
         const int polygon_normal_max_comp)
     {
+        const int polygon_vertex_count = (int)polygon_vertices.size();
         MCUT_ASSERT(polygon_vertex_count >= 3);
 
         std::vector<math::vec2> x;
-        project2D(x, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+        project2D(x, polygon_vertices, polygon_normal_max_comp);
         MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
 
         // get any three vertices that are not collinear
@@ -181,32 +182,33 @@ namespace geom {
     char compute_segment_plane_intersection_type(
         const math::vec3& q,
         const math::vec3& r,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
+        
         const int polygon_normal_max_comp)
     {
+        const int polygon_vertex_count = (int)polygon_vertices.size();
         // ... any three vertices that are not collinear
         int i = 0;
         int j = 1;
         int k = 2;
         if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
-            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal_max_comp);
 
             if (!b) {
                 return '0'; // all polygon points are collinear
             }
         }
 
-        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+        mcut::math::real_number_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        mcut::math::real_number_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-        if (qRes == 0 && rRes == 0) {
+        if (qRes == mcut::math::real_number_t(0.0) && rRes == mcut::math::real_number_t(0.0)) {
             return 'p';
-        } else if (qRes == 0) {
+        } else if (qRes == mcut::math::real_number_t(0.0)) {
             return 'q';
-        } else if (rRes == 0) {
+        } else if (rRes == mcut::math::real_number_t(0.0)) {
             return 'r';
-        } else if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) {
+        } else if ((rRes < mcut::math::real_number_t(0.0) && qRes < mcut::math::real_number_t(0.0)) || (rRes > mcut::math::real_number_t(0.0) && qRes > mcut::math::real_number_t(0.0))) {
             return '0';
         } else {
             return '1';
@@ -216,39 +218,39 @@ namespace geom {
     char compute_segment_line_plane_intersection_type(
         const math::vec3& q,
         const math::vec3& r,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
+        
         const int polygon_normal_max_comp,
         const math::vec3& polygon_plane_normal)
     {
-
+        const int polygon_vertex_count =(int)polygon_vertices.size();
         // ... any three vertices that are not collinear
         int i = 0;
         int j = 1;
         int k = 2;
         if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
-            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal_max_comp);
 
             if (!b) {
                 return '0'; // all polygon points are collinear
             }
         }
 
-        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+        mcut::math::real_number_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        mcut::math::real_number_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-        if (qRes == 0 && rRes == 0) {
+        if (qRes == mcut::math::real_number_t(0.0)  && rRes == mcut::math::real_number_t(0.0) ) {
             // both points used to define line lie on plane therefore we have an in-plane intersection
             // or the polygon is a degenerate triangle
             return 'p';
         } else {
-            if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) { // both points used to define line lie on same side of plane
+            if ((rRes < mcut::math::real_number_t(0.0)  && qRes < mcut::math::real_number_t(0.0) ) || (rRes > mcut::math::real_number_t(0.0)  && qRes > mcut::math::real_number_t(0.0) )) { // both points used to define line lie on same side of plane
                 // check if line is parallel to plane
                 //const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
                 const math::vec3 rq = (r - q);
                 const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
 
-                if (denom == 0.0 /* Segment is parallel to plane.*/) {
+                if (denom == mcut::math::real_number_t(0.0)  /* Segment is parallel to plane.*/) {
                     //MCUT_ASSERT(num != 0.0); // implies 'q' is on plane (see: "compute_segment_plane_intersection(...)") but we have already established that q and r are on same side.
                     return '0';
                 }
@@ -279,28 +281,29 @@ namespace geom {
         math::vec3& p, //intersection point
         const math::vec3& q,
         const math::vec3& r,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
         const int polygon_normal_max_comp,
         const math::vec3& polygon_plane_normal,
         const math::real_number_t& polygon_plane_d_coeff)
     {
+
+        const int polygon_vertex_count = (int) polygon_vertices.size();
         // ... any three vertices that are not collinear
         int i = 0;
         int j = 1;
         int k = 2;
         if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
-            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_vertex_count, polygon_normal_max_comp);
+            bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal_max_comp);
 
             if (!b) {
                 return '0'; // all polygon points are collinear
             }
         }
 
-        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+        mcut::math::real_number_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        mcut::math::real_number_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-        if (qRes == 0 && rRes == 0) {
+        if (qRes == mcut::math::real_number_t(0.) && rRes == mcut::math::real_number_t(0.)) {
             return 'p'; // both points used to define line lie on plane therefore we have an in-plane intersection
         } else {
 
@@ -308,8 +311,8 @@ namespace geom {
             const math::vec3 rq = (r - q);
             const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
 
-            if ((rRes < 0 && qRes < 0) || (rRes > 0 && qRes > 0)) { // both q an r are on same side of plane
-                if (denom == 0.0 /* line is parallel to plane.*/) {
+            if ((rRes < mcut::math::real_number_t(0.) && qRes < mcut::math::real_number_t(0.)) || (rRes > mcut::math::real_number_t(0.) && qRes > mcut::math::real_number_t(0.))) { // both q an r are on same side of plane
+                if (denom == mcut::math::real_number_t(0.) /* line is parallel to plane.*/) {
                     return '0';
                 }
             }
@@ -336,16 +339,19 @@ namespace geom {
     // 'v': q is a vertex.
     char compute_point_in_polygon_test(
         const math::vec2& q,
-        const math::vec2* polygon_vertices,
-        const int polygon_vertex_count)
+        const std::vector<math::vec2>& polygon_vertices)
     {
+        const int polygon_vertex_count = (int)polygon_vertices.size();
         std::vector<math::vec2> vertices(polygon_vertex_count, math::vec2());
 
         // Shift so that q is the origin. Note this destroys the polygon.
         // This is done for pedagogical clarity.
         for (int i = 0; i < polygon_vertex_count; i++) {
             for (int d = 0; d < 2; d++) {
-                vertices[i][d] = polygon_vertices[i][d] - q[d];
+                const mcut::math::real_number_t &a = polygon_vertices[i][d];
+                const mcut::math::real_number_t &b = q[d];
+                mcut::math::real_number_t &c = vertices[i][d];
+                c = a - b;
             }
         }
 
@@ -356,7 +362,7 @@ namespace geom {
         for (int i = 0; i < polygon_vertex_count; i++) {
 
             /* First check if q = (0, 0) is a vertex. */
-            if (vertices[i].x() == 0 && vertices[i].y() == 0) {
+            if (vertices[i].x() == mcut::math::real_number_t(0.) && vertices[i].y() == mcut::math::real_number_t(0.)) {
                 return 'v';
             }
 
@@ -365,8 +371,8 @@ namespace geom {
             // Check if e straddles x axis, with bias above/below.
 
             // Rstrad is TRUE iff one endpoint of e is strictly above the x axis and the other is not (i.e., the other is on or below)
-            bool Rstrad = (vertices[i].y() > 0) != (vertices[il].y() > 0);
-            bool Lstrad = (vertices[i].y() < 0) != (vertices[il].y() < 0);
+            bool Rstrad = (vertices[i].y() > mcut::math::real_number_t(0.)) != (vertices[il].y() > mcut::math::real_number_t(0.));
+            bool Lstrad = (vertices[i].y() < mcut::math::real_number_t(0.)) != (vertices[il].y() < mcut::math::real_number_t(0.));
 
             if (Rstrad || Lstrad) {
                 /* Compute intersection of e with x axis. */
@@ -375,10 +381,10 @@ namespace geom {
                 // only excludes edges passing through q = (0, 0) (and incidentally protects against division by 0).
                 math::real_number_t x = (vertices[i].x() * vertices[il].y() - vertices[il].x() * vertices[i].y())
                     / (vertices[il].y() - vertices[i].y());
-                if (Rstrad && x > 0) {
+                if (Rstrad && x > mcut::math::real_number_t(0.)) {
                     Rcross++;
                 }
-                if (Lstrad && x < 0) {
+                if (Lstrad && x < mcut::math::real_number_t(0.)) {
                     Lcross++;
                 }
             } /* end straddle computation*/
@@ -399,10 +405,10 @@ namespace geom {
 
     void project2D(
         std::vector<math::vec2>& out,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
         const int polygon_plane_normal_largest_component)
     {
+        const int polygon_vertex_count = (int)polygon_vertices.size();
         out.clear();
         out.resize(polygon_vertex_count);
         for (int i = 0; i < polygon_vertex_count; ++i) { // for each vertex
@@ -421,10 +427,10 @@ namespace geom {
     // TODO: update this function to use "project2D" for projection step
     char compute_point_in_polygon_test(
         const math::vec3& p,
-        const math::vec3* polygon_vertices,
-        const int polygon_vertex_count,
+        const std::vector<math::vec3>& polygon_vertices,
         const int polygon_plane_normal_largest_component)
     {
+        const int polygon_vertex_count = (int)polygon_vertices.size();
         /* Project out coordinate m in both p and the triangular face */
 
         int k = 0;
@@ -450,7 +456,7 @@ namespace geom {
             }
         }
 
-        return compute_point_in_polygon_test(pp, polygon_vertices2d.data(), (int)polygon_vertices2d.size());
+        return compute_point_in_polygon_test(pp, polygon_vertices2d);
     }
 
     inline bool Between(const math::vec2& a, const math::vec2& b, const math::vec2& c)
@@ -468,12 +474,12 @@ namespace geom {
     bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c, math::real_number_t& predResult)
     {
         predResult = mcut::geom::orient2d(a, b, c);
-        return predResult == 0;
+        return predResult == mcut::math::real_number_t(0.);
     }
 
     bool collinear(const math::vec2& a, const math::vec2& b, const math::vec2& c)
     {
-        return mcut::geom::orient2d(a, b, c) == 0;
+        return mcut::geom::orient2d(a, b, c) == mcut::math::real_number_t(0.);
     }
 
     char Parallellnt(const math::vec2& a, const math::vec2& b, const math::vec2& c, const math::vec2& d, math::vec2& p)

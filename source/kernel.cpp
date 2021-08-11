@@ -1939,7 +1939,18 @@ namespace mcut
         } // end of parallel code
 #else
         {
-
+#ifndef NDEBUG
+        auto m = *input.ps_face_to_potentially_intersecting_others;
+        for( auto kv : (*input.ps_face_to_potentially_intersecting_others))
+        {
+            auto v = kv.second;
+            for(auto i : v)
+            {
+                auto vo = m.at(i);
+                MCUT_ASSERT(std::find(vo.cbegin(), vo.cend(), kv.first) != vo.cend());
+            }
+        }
+#endif
             std::vector<mcut::fd_t> unvisited_ps_ifaces; //= *input.ps_face_to_potentially_intersecting_others;
             unvisited_ps_ifaces.reserve(input.ps_face_to_potentially_intersecting_others->size());
             // NOTE: the elements of "unvisited_ps_ifaces" are already sorted because they come directly from
@@ -2055,7 +2066,7 @@ namespace mcut
                             {
                                 std::vector<fd_t>::const_iterator iter = std::lower_bound(existing_edge_ifaces.cbegin(), existing_edge_ifaces.cend(), *i);
 
-                                bool found = (*iter == *i);
+                                bool found = iter != existing_edge_ifaces.cend() && (*iter == *i);
                                 if (!found)
                                 {
                                     existing_edge_ifaces.insert(iter, *i); // insert into sorted list (i.e. possibly shifts some elements forward)
@@ -2076,6 +2087,7 @@ namespace mcut
 
             } while (next_ps_cc_face != input.ps_face_to_potentially_intersecting_others->cend());
         }
+        //std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 #endif // #if defined(MCUT_MULTI_THREADED)
         TIME_PROFILE_END();
 
@@ -2138,6 +2150,7 @@ namespace mcut
              iedge_iter != ps_edge_face_intersection_pairs.cend();
              iedge_iter++)
         {
+            MCUT_ASSERT(iedge_iter->second.size() >= 1);
             const ed_t edge = iedge_iter->first;
             const vd_t v0 = ps.vertex(edge, 0);
             const vd_t v1 = ps.vertex(edge, 1);
@@ -3052,8 +3065,7 @@ namespace mcut
                 char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
                     tested_edge_h0_source_vertex,
                     tested_edge_h0_target_vertex,
-                    tested_face_vertices.data(),
-                    (int)tested_face_vertices.size(),
+                    tested_face_vertices,
                     tested_face_plane_normal_max_comp);
 #endif
                 bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
@@ -3093,8 +3105,8 @@ namespace mcut
                             const math::vec3 &point = (*(*i));
                             char result = geom::compute_point_in_polygon_test(
                                 point,
-                                tested_face_vertices.data(),
-                                (int)tested_face_vertices.size());
+                                tested_face_vertices,
+                                tested_face_plane_normal_max_comp);
                             if (
                                 // the touching point is inside, which implies cutting through a vertex (of "tested_edge")
                                 result == 'i' ||
@@ -3148,8 +3160,7 @@ namespace mcut
                     // is our intersection point in the polygon?
                     char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                         intersection_point,
-                        tested_face_vertices.data(),
-                        (int)tested_face_vertices.size(),
+                        tested_face_vertices,
                         tested_face_plane_normal_max_comp);
 
                     if (
@@ -3227,6 +3238,7 @@ namespace mcut
                         new_vertex_incident_ps_faces.push_back(face_xyz);
                     }
 #endif
+
                         vd_t new_vertex_descr = m0.add_vertex(intersection_point);
 #if 0
                     DEBUG_CODE_MASK(lg << "add vertex" << std::endl;);
@@ -3261,19 +3273,27 @@ namespace mcut
 
                             // NOTE: std::pair format/order is {source-mesh-face, cut-mesh-face}
                             cutpath_edge_creation_info[mcut::make_pair(tested_face, face_pqr)].push_back(new_vertex_descr);
+
+                            
+
                             if (face_pqs != mesh_t::null_face())
                             {
+
                                 cutpath_edge_creation_info[mcut::make_pair(tested_face, face_pqs)].push_back(new_vertex_descr);
                             }
+
+                            
                         }
                         else
                         {
-
+                            
                             cutpath_edge_creation_info[mcut::make_pair(tested_edge_face, tested_face)].push_back(new_vertex_descr);
+                            
                             const fd_t tested_edge_face_other = (tested_edge_face == tested_edge_h0_face) ? tested_edge_h1_face : tested_edge_h0_face;
 
                             if (tested_edge_face_other != mesh_t::null_face())
                             {
+                                
                                 cutpath_edge_creation_info[mcut::make_pair(tested_edge_face_other, tested_face)].push_back(new_vertex_descr);
                             }
                         }
@@ -3611,8 +3631,7 @@ namespace mcut
 
                             char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                                 midpoint,
-                                shared_face_vertices.data(),
-                                (int)shared_face_vertices.size(),
+                                shared_face_vertices,
                                 shared_face_normal_max_comp);
 
                             if (in_poly_test_intersection_type == 'i')
