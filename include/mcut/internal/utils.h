@@ -52,156 +52,219 @@
 //
 // MCUT_ASSERT
 //
-#define MCUT_ASSERT(a)                   \
-    do {                                 \
-        if (0 == (a)) {                  \
-            std::fprintf(stderr,         \
-                "Assertion failed: %s, " \
-                "%d at \'%s\'\n",        \
-                __FILE__,                \
-                __LINE__,                \
-                MCUT_MAKE_STRING_(a));   \
-            MCUT_DEBUG_BREAKPOINT_();    \
-        }                                \
+#define MCUT_ASSERT(a)                            \
+    do                                            \
+    {                                             \
+        if (0 == (a))                             \
+        {                                         \
+            std::fprintf(stderr,                  \
+                         "Assertion failed: %s, " \
+                         "%d at \'%s\'\n",        \
+                         __FILE__,                \
+                         __LINE__,                \
+                         MCUT_MAKE_STRING_(a));   \
+            MCUT_DEBUG_BREAKPOINT_();             \
+        }                                         \
     } while (0)
 
-# define DEBUG_CODE_MASK(code) code
-#else // #if defined(MCUT_DEBUG_BUILD)
+#define DEBUG_CODE_MASK(code) code
+#else                         // #if defined(MCUT_DEBUG_BUILD)
 //
 // MCUT_ASSERT
 //
-#define MCUT_ASSERT(a) // do nothing
-# define DEBUG_CODE_MASK(code) // do nothing
-#endif // #if defined(MCUT_DEBUG_BUILD)
+#define MCUT_ASSERT(a)        // do nothing
+#define DEBUG_CODE_MASK(code) // do nothing
+#endif                        // #if defined(MCUT_DEBUG_BUILD)
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
 
-namespace mcut {
+#define PROFILING_BUILD
 
-class logger_t {
+#if defined(PROFILING_BUILD)
+#include <chrono>
+#include <stack>
+#include <memory>
 
-    std::stringstream m_buffer;
-    bool m_verbose;
-    std::string m_prepend;
-    std::string m_reason_for_failure;
-
-public:
-    typedef std::ostream& (*ManipFn)(std::ostream&);
-    typedef std::ios_base& (*FlagsFn)(std::ios_base&);
-
-    logger_t() : m_buffer(), m_verbose(false), m_prepend(), m_reason_for_failure(){}
-    logger_t(const logger_t& other)=delete;
-    logger_t& operator=(const logger_t& other)= delete;
-
-    ~logger_t()
-    {
+#define TIMESTACK_PUSH(name) \
+    mcut::g_timestack.push(std::unique_ptr<mcut::mini_timer>(new mcut::mini_timer(name)))
+#define TIMESTACK_POP() \
+    mcut::g_timestack.pop()
+#define TIMESTACK_RESET()                       \
+    while (!mcut::g_timestack.empty())          \
+    {                                           \
+        mcut::g_timestack.top()->set_invalid(); \
+        mcut::g_timestack.pop();                \
     }
 
-    std::string get_log_string()
-    {
-        return m_buffer.str();
-    }
+#else
+#define TIMESTACK_PUSH(name)
+#define TIMESTACK_POP()
+#endif
 
-    void set_reason_for_failure(const std::string& msg)
+namespace mcut
+{
+    class mini_timer
     {
-        if(m_reason_for_failure.empty()) // NOTE
-            m_reason_for_failure = msg;
-    }
+        std::chrono::time_point<std::chrono::steady_clock> m_start;
+        const std::string m_name;
+        bool m_valid = true;
 
-    std::string get_reason_for_failure()
-    {
-        std::string s(m_reason_for_failure);  // copy
-        return s;
-    }
-
-    inline bool verbose()
-    {
-        return m_verbose;
-    }
-
-    inline void set_verbose(bool b)
-    {
-        m_verbose = b;
-    }
-
-    inline void reset()
-    {
-        m_prepend.clear();
-    }
-
-    inline void indent()
-    {
-        if (!verbose()) {
-            return;
+    public:
+        mini_timer(const std::string &name) : m_start(std::chrono::steady_clock::now()), m_name(name)
+        {
         }
-        m_prepend.append("  ");
-    }
 
-    inline void unindent()
-    {
-        if (!verbose()) {
-            return;
-        }
-        m_prepend.pop_back();
-        m_prepend.pop_back();
-    }
-
-    template <class T> // int, double, strings, etc
-    inline logger_t& operator<<(const T& output)
-    {
-        if (verbose()) {
-            m_buffer << output;
-        }
-        return *this;
-    }
-
-    inline logger_t& operator<<(ManipFn manip) /// endl, flush, setw, setfill, etc.
-    {
-        if (verbose()) {
-            manip(m_buffer);
-
-            if (manip == static_cast<ManipFn>(std::flush) || manip == static_cast<ManipFn>(std::endl)) {
-                this->flush();
+        ~mini_timer()
+        {
+            if (m_valid)
+            {
+                const std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
+                const std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_start);
+                unsigned long long elapsed_ = elapsed.count();
+                printf("[PROFILE]: %s (%llums)\n", m_name.c_str(), elapsed_);
             }
         }
-        return *this;
-    }
-
-    inline logger_t& operator<<(FlagsFn manip) /// setiosflags, resetiosflags
-    {
-        if (verbose()) {
-            manip(m_buffer);
+        void set_invalid()
+        {
+            m_valid = false;
         }
-        return *this;
-    }
+    };
 
-    inline void flush()
+    class logger_t
     {
-        if (!(verbose())) {
-            return;
+
+        std::stringstream m_buffer;
+        bool m_verbose;
+        std::string m_prepend;
+        std::string m_reason_for_failure;
+
+    public:
+        typedef std::ostream &(*ManipFn)(std::ostream &);
+        typedef std::ios_base &(*FlagsFn)(std::ios_base &);
+
+        logger_t() : m_buffer(), m_verbose(false), m_prepend(), m_reason_for_failure() {}
+        logger_t(const logger_t &other) = delete;
+        logger_t &operator=(const logger_t &other) = delete;
+
+        ~logger_t()
+        {
         }
+
+        std::string get_log_string()
+        {
+            return m_buffer.str();
+        }
+
+        void set_reason_for_failure(const std::string &msg)
+        {
+            if (m_reason_for_failure.empty()) // NOTE
+                m_reason_for_failure = msg;
+        }
+
+        std::string get_reason_for_failure()
+        {
+            std::string s(m_reason_for_failure); // copy
+            return s;
+        }
+
+        inline bool verbose()
+        {
+            return m_verbose;
+        }
+
+        inline void set_verbose(bool b)
+        {
+            m_verbose = b;
+        }
+
+        inline void reset()
+        {
+            m_prepend.clear();
+        }
+
+        inline void indent()
+        {
+            if (!verbose())
+            {
+                return;
+            }
+            m_prepend.append("  ");
+        }
+
+        inline void unindent()
+        {
+            if (!verbose())
+            {
+                return;
+            }
+            m_prepend.pop_back();
+            m_prepend.pop_back();
+        }
+
+        template <class T> // int, double, strings, etc
+        inline logger_t &operator<<(const T &output)
+        {
+            if (verbose())
+            {
+                m_buffer << output;
+            }
+            return *this;
+        }
+
+        inline logger_t &operator<<(ManipFn manip) /// endl, flush, setw, setfill, etc.
+        {
+            if (verbose())
+            {
+                manip(m_buffer);
+
+                if (manip == static_cast<ManipFn>(std::flush) || manip == static_cast<ManipFn>(std::endl))
+                {
+                    this->flush();
+                }
+            }
+            return *this;
+        }
+
+        inline logger_t &operator<<(FlagsFn manip) /// setiosflags, resetiosflags
+        {
+            if (verbose())
+            {
+                manip(m_buffer);
+            }
+            return *this;
+        }
+
+        inline void flush()
+        {
+            if (!(verbose()))
+            {
+                return;
+            }
 
 #if 0 // dump log to terminal [immediately]
             std::cout << m_prepend << "::" << m_buffer.str();
             m_buffer.str(std::string());
             m_buffer.clear();
 #endif
-    }
-};
-    template<typename T>
+        }
+    };
+    template <typename T>
     struct pair : std::pair<T, T>
     {
-        pair(const  T a, const  T b): std::pair< T,  T>(a<b?a:b, a<b?b:a){}
+        pair(const T a, const T b) : std::pair<T, T>(a < b ? a : b, a < b ? b : a) {}
     };
 
     template <typename T>
-    pair<T> make_pair(const T a, const T b){
+    pair<T> make_pair(const T a, const T b)
+    {
         return pair<T>(a, b);
     }
-    
 
+#if defined(PROFILING_BUILD)
+    extern std::stack<std::unique_ptr<mcut::mini_timer>> g_timestack;
+#endif // #if defined(PROFILING_BUILD)
 } // namespace mcut
 
 #endif // MCUT_UTILS_H_

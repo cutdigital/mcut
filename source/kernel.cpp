@@ -36,7 +36,7 @@
 #include <unordered_map>
 #include <numeric> // std::iota
 
-#include <chrono>
+
 
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
@@ -46,24 +46,7 @@
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
 
-//#define DUMP_ELAPSED_TIME_INFO
 
-#if defined(DUMP_ELAPSED_TIME_INFO)
-std::map<std::string, std::chrono::time_point<std::chrono::steady_clock>> ptimes;
-std::string ptimeName;
-std::vector<double> elapsed_times;
-#define TIME_PROFILE_START(name)                     \
-    ptimes[name] = std::chrono::steady_clock::now(); \
-    ptimeName = name;
-
-#define TIME_PROFILE_END()                                                                                                                        \
-    elapsed_times.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - ptimes[ptimeName]).count()); \
-    std::cout << "[MCUT PROFILE]: " << ptimeName << " : " << elapsed_times.back() << "ms" << std::endl;
-
-#else
-#define TIME_PROFILE_START(name)
-#define TIME_PROFILE_END()
-#endif
 
 // This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
 // #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
@@ -494,7 +477,7 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "total polygons = " << mX_traced_polygons.size() << std::endl;);
 
-        TIME_PROFILE_START("Extract CC: Insert polygons");
+        TIMESTACK_PUSH("Extract CC: Insert polygons");
 
 #if defined(MCUT_MULTI_THREADED)
         {
@@ -602,7 +585,7 @@ namespace mcut
             MCUT_ASSERT(f != mesh_t::null_face());
         }
 #endif
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // find connected components in "mesh"
@@ -628,11 +611,11 @@ namespace mcut
         // here we create a map to tag each polygon in "mesh" with the connected component it belongs to.
         std::vector<int> fccmap;
 
-        TIME_PROFILE_START("Extract CC: find connected components");
+        TIMESTACK_PUSH("Extract CC: find connected components");
         std::vector<int> cc_to_vertex_count;
         std::vector<int> cc_to_face_count;
         const std::size_t num = find_connected_components(fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         DEBUG_CODE_MASK((*logger_ptr) << "connected components = " << num << std::endl;);
 
@@ -643,7 +626,7 @@ namespace mcut
         // NOTE: even if the number of connected components is one, we proceed anyway
         // because each connected connected excludes unused vertices in "mesh"
 
-        TIME_PROFILE_START("Extract CC: Map vertices");
+        TIMESTACK_PUSH("Extract CC: Map vertices");
 
         // for each face in the auxilliary mesh (i.e. traced polygon)
         for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
@@ -775,7 +758,7 @@ namespace mcut
             }
         } // for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         //bool extractingSeams = (m1_num_vertices_after_srcmesh_partitioning == -1);
 
@@ -813,7 +796,7 @@ namespace mcut
             ccID_to_cc_to_mX_face[it->first] = std::vector<fd_t>();
         }
 
-        TIME_PROFILE_START("Extract CC: Map faces");
+        TIMESTACK_PUSH("Extract CC: Map faces");
 #if defined(MCUT_MULTI_THREADED)
         {
             typedef std::tuple<
@@ -1015,7 +998,7 @@ namespace mcut
         }
 #endif
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         // Note: at this stage we have our connected components (meshes) with their
         // vertices and faces defined
@@ -1024,7 +1007,7 @@ namespace mcut
         // Save the output connected components marked with location
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Extract CC: save CCs with location properties");
+        TIMESTACK_PUSH("Extract CC: save CCs with location properties");
 
         // for each connected component
         for (std::map<std::size_t, mesh_t>::const_iterator cc_iter = ccID_to_mesh.cbegin();
@@ -1221,7 +1204,7 @@ namespace mcut
                 DEBUG_CODE_MASK((*logger_ptr).unindent(););
             }
         }
-        TIME_PROFILE_END()
+        TIMESTACK_POP();
 
         DEBUG_CODE_MASK((*logger_ptr).unindent(););
 
@@ -1680,11 +1663,7 @@ namespace mcut
     //
     void dispatch(output_t &output, const input_t &input)
     {
-#if defined(DUMP_ELAPSED_TIME_INFO)
-        ptimes.clear();
-        elapsed_times.clear();
-#endif
-        auto kernel_time_start = std::chrono::steady_clock::now();
+        TIMESTACK_PUSH(__FUNCTION__);
 
         logger_t &lg = output.logger;
         logger_ptr = &output.logger;
@@ -1708,15 +1687,15 @@ namespace mcut
         const int sm_face_count = sm.number_of_faces();
         const int cs_face_count = cs.number_of_faces();
 
-        TIME_PROFILE_START("Check source mesh is closed");
+        TIMESTACK_PUSH("Check source mesh is closed");
         const bool sm_is_watertight = mesh_is_closed(sm);
         DEBUG_CODE_MASK(lg << "src-mesh is watertight = " << sm_is_watertight << std::endl;);
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
-        TIME_PROFILE_START("Check cut mesh is closed");
+        TIMESTACK_PUSH("Check cut mesh is closed");
         const bool cm_is_watertight = mesh_is_closed(cs);
         DEBUG_CODE_MASK(lg << "cut-mesh is watertight = " << cm_is_watertight << std::endl;);
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // create polygon soup
@@ -1724,7 +1703,7 @@ namespace mcut
 
         DEBUG_CODE_MASK(lg << "create polygon soup (ps)" << std::endl;);
 
-        TIME_PROFILE_START("Create ps");
+        TIMESTACK_PUSH("Create ps");
         mesh_t ps = sm; // copy
 
         ps.reserve_for_additional_elements(cs.number_of_vertices()); // hint
@@ -1791,7 +1770,7 @@ namespace mcut
             ps_to_cm_face[f] = *i;
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         //cs_to_ps_vtx.clear();
 
@@ -1812,7 +1791,7 @@ namespace mcut
 
         DEBUG_CODE_MASK(lg << "create auxiliary mesh (`m0`)" << std::endl;);
 
-        TIME_PROFILE_START("Create m0");
+        TIMESTACK_PUSH("Create m0");
         // The auxilliary data structure stores:
         // 1) vertices of the polygon-soup, including new intersection points
         // 2) Non-intersecting edges of the polygon-soup
@@ -1836,7 +1815,7 @@ namespace mcut
             ps_to_m0_vtx[*i] = v;
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
         MCUT_ASSERT(m0.number_of_vertices() == ps.number_of_vertices()); // ... because we have only copied vertices
 
         ///////////////////////////////////////////////////////////////////////////
@@ -1847,7 +1826,7 @@ namespace mcut
 
         std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 
-        TIME_PROFILE_START("Prepare edge-to-face pairs");
+        TIMESTACK_PUSH("Prepare edge-to-face pairs");
 
 #if defined(MCUT_MULTI_THREADED)
         { // NOTE: parallel implementation is different from sequential one
@@ -2089,13 +2068,13 @@ namespace mcut
         }
         //std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 #endif // #if defined(MCUT_MULTI_THREADED)
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         //
         // build bounding boxes for each intersecting edge
         //
 
-        TIME_PROFILE_START("Build edge bounding boxes");
+        TIMESTACK_PUSH("Build edge bounding boxes");
 
         // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
         std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::fast_vec3>> ps_edge_to_bbox;
@@ -2160,12 +2139,12 @@ namespace mcut
         }
 #endif // #if defined(MCUT_MULTI_THREADED)
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         //
         // cull redundant edge to face pairs
         //
-        TIME_PROFILE_START("Cull redundant edge-face pairs");
+        TIMESTACK_PUSH("Cull redundant edge-face pairs");
 
 #if defined(MCUT_MULTI_THREADED)
         {
@@ -2267,14 +2246,14 @@ namespace mcut
             }
         }
 #endif // #if defined(MCUT_MULTI_THREADED)
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ps_edge_to_bbox.clear();
 
         // assuming each edge will produce a new vertex
         m0.reserve_for_additional_elements(ps_edge_face_intersection_pairs.size());
 
-        TIME_PROFILE_START("Compute intersecting face properties");
+        TIMESTACK_PUSH("Compute intersecting face properties");
         // compute/extract geometry properties of each tested face
         //--------------------------------------------------------
 
@@ -2408,7 +2387,7 @@ namespace mcut
                 (int)tested_face_vertices.size());
         }
 #endif
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         // edge-to-face intersection tests (narrow-phase)
         // -----------------------------------------
@@ -2467,7 +2446,7 @@ namespace mcut
         // whose registry has a halfedge from the cut-surface, where this halfedge is a border halfedge.
         bool partial_cut_detected = false;
 
-        TIME_PROFILE_START("Calculate intersection points (edge-to-face)");
+        TIMESTACK_PUSH("Calculate intersection points (edge-to-face)");
 
 #if defined(MCUT_MULTI_THREADED)
         {
@@ -3371,7 +3350,7 @@ namespace mcut
             return;
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         DEBUG_CODE_MASK(lg << "total intersection-points = " << m0_ivtx_to_intersection_registry_entry.size() << std::endl;);
 #if 0
@@ -3476,7 +3455,7 @@ namespace mcut
         // Create new edges along the intersection
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Create edges with intersection points "); // &&&&&
+        TIMESTACK_PUSH("Create edges with intersection points "); // &&&&&
 
         // A mapping from an intersecting ps-face to the new edges. These edges are those whose
         // src and tgt vertices contain the respective face in their registry entry
@@ -3679,7 +3658,7 @@ namespace mcut
             } // else if (new_ivertices_count > 2) {
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         // NOTE: at this stage we have all vertices and edges which are needed to clip
         // intersecting faces in the polygon-soup ("ps").
@@ -3696,7 +3675,7 @@ namespace mcut
         // Find cut-paths (the boundaries of the openings/holes in the source mesh)
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Find cut-paths ");
+        TIMESTACK_PUSH("Find cut-paths ");
         DEBUG_CODE_MASK(lg << "find cut-paths" << std::endl;);
 
         DEBUG_CODE_MASK(lg.indent(););
@@ -3934,7 +3913,7 @@ namespace mcut
         //m0_ivtx_to_cutpath_edges.clear();      // free
         //m0_cutpath_sequences.clear(); // free
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         DEBUG_CODE_MASK(lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;);
 
@@ -3952,7 +3931,7 @@ namespace mcut
 
         DEBUG_CODE_MASK(lg << "find border intersection points" << std::endl;);
 
-        TIME_PROFILE_START("Infer cutpath info");
+        TIMESTACK_PUSH("Infer cutpath info");
 
         //
         // MapKey=intersection point on a border halfedge of either the source-mesh or cut-mesh
@@ -4199,7 +4178,7 @@ namespace mcut
 
         DEBUG_CODE_MASK(lg.unindent();); // end of cutpath sequence detection code
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         // NOTE:    at this point we have all vertices, edges, and the lists of
         //          edge sequences identifying the cutpaths
@@ -4221,7 +4200,7 @@ namespace mcut
         }
 #endif
 
-        TIME_PROFILE_START("Detect floating polygons");
+        TIMESTACK_PUSH("Detect floating polygons");
 
         // Detect floating polygons
         // ::::::::::::::::::::::::
@@ -4443,13 +4422,13 @@ namespace mcut
         }
 #endif
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // Create new edges partitioning the intersecting ps edges (2-part process)
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Create polygon-exterior edges (w/ > 3 vertices)");
+        TIMESTACK_PUSH("Create polygon-exterior edges (w/ > 3 vertices)");
 
         DEBUG_CODE_MASK(lg << "create polygon-exterior edges" << std::endl;);
         DEBUG_CODE_MASK(lg.indent(););
@@ -4672,9 +4651,9 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
-        TIME_PROFILE_START("Create polygon-exterior edges (2 or 3 vertices)");
+        TIMESTACK_PUSH("Create polygon-exterior edges (2 or 3 vertices)");
 
         // Part 2
         //
@@ -5142,7 +5121,7 @@ namespace mcut
         DEBUG_CODE_MASK(lg.unindent(););
 #endif // #if defined(MCUT_MULTI_THREADED)
 
-        TIME_PROFILE_END(); // &&&&&
+        TIMESTACK_POP(); // &&&&&
 
         ps_intersecting_edges.clear();
         ps_edge_to_vertices.clear(); //free
@@ -5154,7 +5133,7 @@ namespace mcut
         // Now we start to clip every intersecting face
         // -----------------------------------------------
 
-        TIME_PROFILE_START("Clip polygons"); // &&&&&
+        TIMESTACK_PUSH("Clip polygons"); // &&&&&
         DEBUG_CODE_MASK(lg << "clip intersecting faces" << std::endl;);
 
         // Stores the all polygons, including new polygons that are produced after clipping
@@ -6690,7 +6669,7 @@ namespace mcut
 
 #endif // #if defined(MCUT_MULTI_THREADED)
 
-        TIME_PROFILE_END(); // &&&&&
+        TIMESTACK_POP(); // &&&&&
 
         // m0_ivtx_to_ps_faces.clear(); // free
         ps_iface_to_m0_edge_list.clear();       // free
@@ -6723,11 +6702,11 @@ namespace mcut
         const std::vector<traced_polygon_t>::const_iterator m0_traced_sm_polygons_iter_cend = m0_polygons.cbegin() + traced_sm_polygon_count;
         const std::vector<traced_polygon_t>::const_iterator &traced_cs_polygons_iter_cbegin = traced_sm_polygons_iter_end;
 
-        TIME_PROFILE_START("Mark seam edges *");
+        TIMESTACK_PUSH("Mark seam edges *");
         // extract the seam vertices
         std::vector<bool> m0_vertex_to_seam_flag;
         mark_seam_vertices(m0_vertex_to_seam_flag, m0, ps.number_of_vertices());
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         MCUT_ASSERT(!m0_vertex_to_seam_flag.empty());
 
@@ -6890,7 +6869,7 @@ namespace mcut
         // vector but the value (std::vector) is empty. We will use this information later, like to
         // stitch cut-mesh patches to src-mesh fragments.
 
-        TIME_PROFILE_START("Map halfedges to polygons");
+        TIMESTACK_PUSH("Map halfedges to polygons");
         //std::map<
         //    hd_t,            // a halfedge that is used to trace a polygon
         //   std::vector<int> // list of indices of  traced polygons that are traced with the halfedge
@@ -6950,11 +6929,11 @@ namespace mcut
     }
 #endif
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         // bool all_cutpaths_make_holes = ((int)explicit_cutpaths_making_holes.size() == num_explicit_cutpath_sequences);
 
-        TIME_PROFILE_START("Find exterior cut-mesh polygons");
+        TIMESTACK_PUSH("Find exterior cut-mesh polygons");
         ///////////////////////////////////////////////////////////////////////////
         // Find all cut-mesh polygons which are "exterior" relative to the source-mesh
         ///////////////////////////////////////////////////////////////////////////
@@ -7155,9 +7134,9 @@ namespace mcut
         //cm_nonborder_reentrant_ivtx_list.clear(); // free
         m0_ivtx_to_cutpath_sequence.clear(); // free
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
-        TIME_PROFILE_START("Find source mesh polygon above and below cm");
+        TIMESTACK_PUSH("Find source mesh polygon above and below cm");
         ///////////////////////////////////////////////////////////////////////////
         // Find the source-mesh polygons (next to cutpath) which are above and below
         ///////////////////////////////////////////////////////////////////////////
@@ -7361,7 +7340,7 @@ namespace mcut
         std::sort(sm_polygons_below_cs.begin(), sm_polygons_below_cs.end());
         std::sort(sm_polygons_above_cs.begin(), sm_polygons_above_cs.end());
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         //sm_nonborder_reentrant_ivtx_list.clear();
 
@@ -7377,7 +7356,7 @@ namespace mcut
         //    sm_polygons_below_cs.push_back(0);
         //}
 
-        TIME_PROFILE_START("Map source mesh ihalfedges to bool");
+        TIMESTACK_PUSH("Map source mesh ihalfedges to bool");
 
         ///////////////////////////////////////////////////////////////////////////
         // Map source-mesh intersection halfedges to a boolean value
@@ -7510,13 +7489,13 @@ namespace mcut
             }
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // create the second auxilliary halfedge data structure ("m1")
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Create m1");
+        TIMESTACK_PUSH("Create m1");
         //
         // At this point, we create another auxilliary halfedge data structure called "m1".
         // It will store the vertices and edges like "m0" but will also include the
@@ -7596,9 +7575,9 @@ namespace mcut
             }
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
-        TIME_PROFILE_START("m0 source mesh set next");
+        TIMESTACK_PUSH("m0 source mesh set next");
         //
         // For each src-mesh halfedge we store "next-halfedge" state for quick-lookup in "m0".
         // We store this information in "m0" because it allows for a more expedient state-lookup during
@@ -7632,13 +7611,13 @@ namespace mcut
             }
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // source-mesh partitioning
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Source mesh partitioning"); // &&&&&
+        TIMESTACK_PUSH("Source mesh partitioning"); // &&&&&
 
         //
         // Here we partition the traced source-mesh polygons into disjoint connected components
@@ -8159,7 +8138,7 @@ namespace mcut
     }
 #endif
 
-        TIME_PROFILE_END(); // &&&&&
+        TIMESTACK_POP(); // &&&&&
 
         //m0_to_ps_vtx.clear(); // free
         ivtx_to_incoming_hlist.clear(); // free
@@ -8187,7 +8166,7 @@ namespace mcut
         // Update the traced polygons to represent the partitioned src-mesh
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Update traced polygons");
+        TIMESTACK_PUSH("Update traced polygons");
 
         //
         // We are basically re-tracing the polygons that we traced earlier (in "m0").
@@ -8262,13 +8241,13 @@ namespace mcut
 
         m0_to_m1_he.clear();
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         //
         // NOTE: at this stage "m1_polygons" (and "m0_to_m1...") contains only source-mesh polygons.
         //
 
-        TIME_PROFILE_START("Mark seam edges");
+        TIMESTACK_PUSH("Mark seam edges");
         // extract the seam vertices
         // NOTE: the size of this vector include only ps vertices, intersection points, and
         // the duplicates of intersection points (for separating the source mesh).
@@ -8277,7 +8256,7 @@ namespace mcut
         std::vector<bool> m1_vertex_to_seam_flag;
         mark_seam_vertices(m1_vertex_to_seam_flag, m1, ps.number_of_vertices(), m1_num_vertices_after_srcmesh_partitioning);
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         MCUT_ASSERT(!m1_vertex_to_seam_flag.empty());
 
@@ -8408,7 +8387,7 @@ namespace mcut
         // and 2) the index of a halfedge (on a cut-path) in that polygon ("m0" version).
         //
 
-        TIME_PROFILE_START("Find primary halfedges for patch identification");
+        TIMESTACK_PUSH("Find primary halfedges for patch identification");
 
         std::vector<std::pair<int, int>> patch_discovery_seeds;
 
@@ -8471,7 +8450,7 @@ namespace mcut
 
         std::vector<std::pair<int, int>> primary_interior_ihalfedge_pool = patch_discovery_seeds; // copy because it gets modify
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         m0_cutpath_sequences.clear(); // free, no longer needed.
 
@@ -8481,7 +8460,7 @@ namespace mcut
         ///////////////////////////////////////////////////////////////////////////
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Build patch graphs"); // &&&&&
+        TIMESTACK_PUSH("Build patch graphs"); // &&&&&
 
         // Note that the built patches in this stage will have the same winding
         // order (e.g. counter-clock-wise ) as the input cut-mesh. The patches with
@@ -8873,7 +8852,7 @@ namespace mcut
             }
         }
 
-        TIME_PROFILE_END(); // &&&&&
+        TIMESTACK_POP(); // &&&&&
 
         // NOTE: at this stage, all strongly-connected-sets have been identified and colored (i.e via coloring, all nodes/patches have been associated with a side : interior or exterior)
 
@@ -8885,7 +8864,7 @@ namespace mcut
         // Find the cut-mesh vertices that must not be duplicated
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Find non-duplicated cut-mesh vertices");
+        TIMESTACK_PUSH("Find non-duplicated cut-mesh vertices");
         // In the case of a partial cut, the o-vertices of the cut-mesh are not duplicated
         // e.g. those which reside interior to the sm
         std::vector<vd_t> sm_interior_cs_border_vertices;
@@ -9168,7 +9147,7 @@ namespace mcut
 
         cm_border_reentrant_ivtx_list.clear(); // free
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // Infer patch location (inside/outside) based on graph coloring
@@ -9192,7 +9171,7 @@ namespace mcut
         // what location each color 'A' or 'B' pertains to.
         //
 
-        TIME_PROFILE_START("Infer patch color to location");
+        TIMESTACK_PUSH("Infer patch color to location");
 
         std::map<char, cut_surface_patch_location_t> patch_color_label_to_location;
 
@@ -9338,13 +9317,13 @@ namespace mcut
         }
         DEBUG_CODE_MASK(lg.unindent(););
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // Create reverse patches
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Create reversed patches");
+        TIMESTACK_PUSH("Create reversed patches");
 
         DEBUG_CODE_MASK(lg << "create reversed patches" << std::endl;);
 
@@ -9577,7 +9556,7 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         // number of reversed cut-mesh polygons
         const int cw_cs_poly_count = ((int)m0_polygons.size() - traced_polygon_count);
@@ -9590,7 +9569,7 @@ namespace mcut
 
         // merge the opposite color_to_patch data structure
 
-        TIME_PROFILE_START("merge opposite color to path data structures");
+        TIMESTACK_PUSH("merge opposite color to path data structures");
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_cw_patch_iter = color_to_cw_patch.cbegin();
@@ -9642,13 +9621,13 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // save the patches into the output
         ///////////////////////////////////////////////////////////////////////////
 
-        TIME_PROFILE_START("Save patches");
+        TIMESTACK_PUSH("Save patches");
 
         DEBUG_CODE_MASK(lg << "save patch meshes" << std::endl;);
 
@@ -9854,7 +9833,7 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         }
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         if (false == (input.keep_fragments_below_cutmesh ||                                                   //
                       input.keep_fragments_above_cutmesh ||                                                   //
@@ -9879,7 +9858,7 @@ namespace mcut
         //
         DEBUG_CODE_MASK(lg << "calculate reversed-patch seed variables" << std::endl;);
 
-        TIME_PROFILE_START("Create reversed-patch seed variables");
+        TIMESTACK_PUSH("Create reversed-patch seed variables");
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_cw_patch_iter = color_to_cw_patch.cbegin();
@@ -9994,7 +9973,7 @@ namespace mcut
         color_to_cw_patch.clear(); // free
         patch_to_opposite.clear(); // free
 
-        TIME_PROFILE_END();
+        TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // Stitch cut-mesh patches into connected components (fragments) of the source-mesh
@@ -10013,7 +9992,7 @@ namespace mcut
 
         DEBUG_CODE_MASK(lg << "stitch patches" << std::endl;);
 
-        TIME_PROFILE_START("Stitching"); // &&&&&
+        TIMESTACK_PUSH("Stitching"); // &&&&&
 
         std::map<
             char, // color tag
@@ -11234,7 +11213,7 @@ namespace mcut
             DEBUG_CODE_MASK(lg.unindent(););
         } // for each color
 
-        TIME_PROFILE_END(); // &&&&&
+        TIMESTACK_POP(); // &&&&&
 
         m0_cm_poly_to_patch_idx.clear();
         //m0_ivtx_to_ps_edge.clear(); // free
@@ -11385,20 +11364,8 @@ namespace mcut
 
         DEBUG_CODE_MASK(lg << "end" << std::endl;);
 
-        std::cout << "[MCUT PROFILE]: dispatch() actual : " << //
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - kernel_time_start).count()
-                  << "ms" << std::endl;
-
-#if defined(DUMP_ELAPSED_TIME_INFO)
-        double measured_time(0);
-        for (auto t : elapsed_times)
-        {
-            //std::cout << t << std::endl;
-            measured_time += t;
-        }
-
-        std::cout << "[MCUT PROFILE]: dispatch() measured : " << measured_time << std::endl;
-#endif
+        TIMESTACK_POP();
+        
         return;
     } // dispatch
 
