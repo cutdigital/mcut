@@ -26,7 +26,7 @@
 #include "mcut/internal/geom.h"
 #include "mcut/internal/math.h"
 
-//#define USE_OIBVH 1
+#define USE_OIBVH 1
 
 namespace mcut
 {

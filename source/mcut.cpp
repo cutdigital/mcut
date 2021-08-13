@@ -2161,7 +2161,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             // TODO: assume that re-adding elements (vertices and faces) is going to change the order
             // from the user-provided order. So we still need to fix the mapping, which may no longer
             // be one-to-one as in the case when things do not change.
-            cutMeshInternal.remove_elements();
+            cutMeshInternal.reset();
 
             // TODO: the number of cut-mesh faces and vertices may increase due to polygon partitioning
             // Therefore: we need to perturb [the updated cut-mesh] i.e. the one containing partitioned polygons
@@ -3173,7 +3173,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         {
             // Evaluate BVHs to find polygon pairs that will be tested for intersection
             // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-            anyBvhWasRebuilt = true;
+            anyBvhWasRebuilt = false;
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
             ps_face_to_potentially_intersecting_others.clear();
