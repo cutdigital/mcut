@@ -212,6 +212,8 @@ extern "C" void readOFF(
         indexOffset += n;
     }
 
+    free(lineBuf);
+
     fclose(file);
 }
 

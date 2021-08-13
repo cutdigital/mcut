@@ -1409,11 +1409,14 @@ McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
 }
 #endif
 
+#if defined(USE_OIBVH)
+
 void constructOIBVH(
     const mcut::mesh_t &mesh,
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &bvhAABBs,
     std::vector<mcut::fd_t> &bvhLeafNodeFaces,
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &face_bboxes)
+    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &face_bboxes,
+    const mcut::math::real_number_t &slightEnlargmentEps = 0.0)
 {
     TIMESTACK_PUSH(__FUNCTION__);
     const int meshFaceCount = mesh.number_of_faces();
@@ -1438,7 +1441,12 @@ void constructOIBVH(
             face_bboxes[faceIdx].expand(coords);
         }
 
-        const mcut::geom::bounding_box_t<mcut::math::fast_vec3> &bbox = face_bboxes[faceIdx];
+        mcut::geom::bounding_box_t<mcut::math::fast_vec3> &bbox = face_bboxes[faceIdx];
+
+        if (slightEnlargmentEps > 0)
+        {
+            bbox.enlarge(slightEnlargmentEps);
+        }
 
         // calculate bbox center
         face_bbox_centers[*f] = (bbox.minimum() + bbox.maximum()) / 2;
@@ -1755,7 +1763,7 @@ void intersectOIBVHs(
     } while (!traversalQueue.empty());
     TIMESTACK_POP();
 }
-
+#endif
 #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 std::vector<vd_t> insert_bounding_box_mesh(mesh_t &bvh_mesh, const geom::bounding_box_t<math::fast_vec3> &bbox)
 {
@@ -2056,11 +2064,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     // ::::::::::::::
 
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
+
+#if defined(USE_OIBVH)
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshBvhAABBs;
     std::vector<mcut::fd_t> srcMeshBvhLeafNodeFaces;
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshFaceBboxes;
     constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
-
+#else
+    mcut::bvh::BoundingVolumeHierarchy srcMeshBVH;
+    srcMeshBVH.build(srcMeshInternal);
+#endif
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
     std::map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputSrcMeshFace;
@@ -2076,12 +2089,28 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     mcut::mesh_t cutMeshInternal;
     mcut::math::real_number_t cutMeshBboxDiagonal(0.0);
+
+#if defined(USE_OIBVH)
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshBvhAABBs;
     std::vector<mcut::fd_t> cutMeshBvhLeafNodeFaces;
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> cutMeshFaceBboxes;
+#else
+    mcut::bvh::BoundingVolumeHierarchy cutMeshBVH; // built later (see below)
+#endif
+    bool anyBvhWasRebuilt = true; // used to determine whether we should retraverse BVHs
+
+    std::map<mcut::fd_t, std::vector<mcut::fd_t>> ps_face_to_potentially_intersecting_others; // result of BVH traversal
+
+#if defined(MCUT_MULTI_THREADED)
+    backendOutput.status.store(mcut::status_t::SUCCESS);
+#else
+    backendOutput.status = mcut::status_t::SUCCESS;
+#endif
 
     int perturbationIters = 0;
     int kernelDispatchCallCounter = -1;
+     mcut::math::real_number_t perturbation_const = 0.0;// = cutMeshBboxDiagonal * GENERAL_POSITION_ENFORCMENT_CONSTANT;
+
     do
     {
         kernelDispatchCallCounter++;
@@ -2102,7 +2131,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #endif
 
         mcut::math::vec3 perturbation;
-
+       
         if (general_position_assumption_was_violated)
         {
             MCUT_ASSERT(floating_polygon_was_detected == false); // cannot occur at same time!
@@ -2113,14 +2142,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 // use by the kernel track if the most-recent perturbation causes the cut-mesh and src-mesh to
                 // not intersect at all, which means we need to perturb again.
                 backendInput.general_position_enforcement_count = perturbationIters;
-                const mcut::math::real_number_t scalar = cutMeshBboxDiagonal * GENERAL_POSITION_ENFORCMENT_CONSTANT;
+
+                MCUT_ASSERT(perturbation_const != 0.0);
+
                 std::default_random_engine rd(perturbationIters);
                 std::mt19937 mt(rd());
                 std::uniform_real_distribution<double> dist(-1.0, 1.0);
                 perturbation = mcut::math::vec3(
-                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * scalar,
-                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * scalar,
-                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * scalar);
+                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * perturbation_const,
+                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * perturbation_const,
+                    mcut::math::real_number_t(static_cast<double>(dist(mt))) * perturbation_const);
             }
         } // if (general_position_assumption_was_violated) {
 
@@ -2148,6 +2179,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 numCutMeshFaces,
                 ((perturbationIters == 0) ? NULL : &perturbation));
 
+            perturbation_const = cutMeshBboxDiagonal * GENERAL_POSITION_ENFORCMENT_CONSTANT;
+
             if (result != McResult::MC_NO_ERROR)
             {
                 return result;
@@ -2155,10 +2188,17 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
             backendInput.cut_mesh = &cutMeshInternal;
 
-            cutMeshBvhAABBs.clear();
-            cutMeshBvhLeafNodeFaces.clear();
-
-            constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes);
+            if (perturbationIters == 0)
+            {
+#if defined(USE_OIBVH)
+                cutMeshBvhAABBs.clear();
+                cutMeshBvhLeafNodeFaces.clear();
+                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
+#else
+                cutMeshBVH.build(cutMeshInternal, perturbation_const);
+#endif
+                anyBvhWasRebuilt = true;
+            }
 
             //mcut::write_off("cutMeshInternal.off", cutMeshInternal);
             //mcut::write_off("srcMeshInternal.off", srcMeshInternal);
@@ -3017,16 +3057,27 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
             if (srcMeshIsUpdated)
             {
+#if defined(USE_OIBVH)
                 srcMeshBvhAABBs.clear();
                 srcMeshBvhLeafNodeFaces.clear();
                 constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
+#else
+                srcMeshBVH.build(srcMeshInternal);
+#endif
             }
             if (cutMeshIsUpdated)
             {
+#if defined(USE_OIBVH)
                 cutMeshBvhAABBs.clear();
                 cutMeshBvhLeafNodeFaces.clear();
-                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes);
+                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
+#else
+                cutMeshBVH.build(cutMeshInternal, perturbation_const);
+#endif
             }
+
+            anyBvhWasRebuilt = srcMeshIsUpdated || cutMeshIsUpdated;
+            MCUT_ASSERT(anyBvhWasRebuilt == true);
 
             backendOutput.detected_floating_polygons.clear();
         } // if (floating_polygon_was_detected) {
@@ -3118,46 +3169,62 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             return result;
         }
 
-        // Evaluate BVHs to find polygon pairs that will be tested for intersection
-        // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
-
-        std::map<mcut::fd_t, std::vector<mcut::fd_t>> ps_face_to_potentially_intersecting_others;
-        intersectOIBVHs(ps_face_to_potentially_intersecting_others, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
-
-        ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_OTHER,
-            0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
-            "Polygon-pairs found = " + std::to_string(ps_face_to_potentially_intersecting_others.size()));
-
-        if (ps_face_to_potentially_intersecting_others.empty())
+        if (anyBvhWasRebuilt)
         {
+            // Evaluate BVHs to find polygon pairs that will be tested for intersection
+            // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+            anyBvhWasRebuilt = true;
+            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
-            if (general_position_assumption_was_violated && perturbationIters > 0)
-            {
-                // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
-                // We need to perturb again. (The whole cut mesh)
-#if defined(MCUT_MULTI_THREADED)
-                backendOutput.status.store(mcut::status_t::GENERAL_POSITION_VIOLATION);
+            ps_face_to_potentially_intersecting_others.clear();
+#if defined(USE_OIBVH)
+            intersectOIBVHs(ps_face_to_potentially_intersecting_others, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 #else
-                backendOutput.status = mcut::status_t::GENERAL_POSITION_VIOLATION;
+            mcut::bvh::BoundingVolumeHierarchy::intersect(
+                ps_face_to_potentially_intersecting_others,
+                srcMeshBVH,
+                cutMeshBVH,
+                0,
+                srcMeshInternal.number_of_faces());
+            
 #endif
-                continue;
-            }
-            else
+            
+            ctxtPtr->log(
+                McDebugSource::MC_DEBUG_SOURCE_API,
+                McDebugType::MC_DEBUG_TYPE_OTHER,
+                0,
+                McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
+                "Polygon-pairs found = " + std::to_string(ps_face_to_potentially_intersecting_others.size()));
+
+            if (ps_face_to_potentially_intersecting_others.empty())
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
-                return result;
+                if (general_position_assumption_was_violated && perturbationIters > 0)
+                {
+                    // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
+                    // We need to perturb again. (The whole cut mesh)
+#if defined(MCUT_MULTI_THREADED)
+                    backendOutput.status.store(mcut::status_t::GENERAL_POSITION_VIOLATION);
+#else
+                    backendOutput.status = mcut::status_t::GENERAL_POSITION_VIOLATION;
+#endif
+                    continue;
+                }
+                else
+                {
+                    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+                    return result;
+                }
             }
         }
 
         backendInput.ps_face_to_potentially_intersecting_others = &ps_face_to_potentially_intersecting_others;
+#if defined(USE_OIBVH)
         backendInput.srcMeshFaceBboxes = &srcMeshFaceBboxes;
         backendInput.cutMeshFaceBboxes = &cutMeshFaceBboxes;
-
+#else
+        backendInput.srcMeshBVH = &srcMeshBVH;
+        backendInput.cutMeshBVH = &cutMeshBVH;
+#endif
         // Invokee the kernel by calling the mcut::internal dispatch function
         // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 

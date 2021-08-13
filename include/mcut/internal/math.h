@@ -52,6 +52,7 @@ namespace math {
     template <typename T = real_number_t>
     class vec2_ {
     public:
+        typedef T element_type;
         vec2_()
             : m_x(0.0)
             , m_y(0.0)

@@ -109,9 +109,13 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
                       utest_fixture->numCutMeshFaces),
             MC_NO_ERROR);
 
-        // TODO: free
-        // utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces
-        // utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces
+        free(utest_fixture->pSrcMeshVertices); 
+        free(utest_fixture->pSrcMeshFaceIndices); 
+        free(utest_fixture->pSrcMeshFaceSizes); 
+
+        free(utest_fixture->pCutMeshVertices); 
+        free(utest_fixture->pCutMeshFaceIndices); 
+        free(utest_fixture->pCutMeshFaceSizes); 
         
         uint32_t numConnComps = 0;
 

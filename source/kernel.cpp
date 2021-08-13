@@ -36,8 +36,6 @@
 #include <unordered_map>
 #include <numeric> // std::iota
 
-
-
 // keep around the intermediate meshes created during patch stitching (good for showing how code works)
 #define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
 
@@ -45,8 +43,6 @@
 #ifndef MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
-
-
 
 // This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
 // #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
@@ -1864,7 +1860,7 @@ namespace mcut
                                  ++iface_iter)
                             {
                                 std::vector<fd_t>::iterator fiter = std::lower_bound(edge_ifaces.begin(), edge_ifaces.end(), *iface_iter);
-                                bool exists = (*fiter == *iface_iter);
+                                bool exists = fiter != edge_ifaces.end() && (*fiter == *iface_iter);
                                 if (!exists)
                                 {
                                     edge_ifaces.insert(fiter, *iface_iter); // insert and maintain sorted order
@@ -1906,7 +1902,7 @@ namespace mcut
                         for (std::vector<fd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
                         {
                             std::vector<fd_t>::iterator lb_iter = std::lower_bound(fiter->second.begin(), fiter->second.end(), *j);
-                            bool exists = (*lb_iter == *j);
+                            bool exists = lb_iter != fiter->second.end() && (*lb_iter == *j);
                             if (!exists)
                             {
                                 fiter->second.insert(lb_iter, *j); // insert and maintain sorted order
@@ -1919,16 +1915,16 @@ namespace mcut
 #else
         {
 #ifndef NDEBUG
-        auto m = *input.ps_face_to_potentially_intersecting_others;
-        for( auto kv : (*input.ps_face_to_potentially_intersecting_others))
-        {
-            auto v = kv.second;
-            for(auto i : v)
+            auto m = *input.ps_face_to_potentially_intersecting_others;
+            for (auto kv : (*input.ps_face_to_potentially_intersecting_others))
             {
-                auto vo = m.at(i);
-                MCUT_ASSERT(std::find(vo.cbegin(), vo.cend(), kv.first) != vo.cend());
+                auto v = kv.second;
+                for (auto i : v)
+                {
+                    auto vo = m.at(i);
+                    MCUT_ASSERT(std::find(vo.cbegin(), vo.cend(), kv.first) != vo.cend());
+                }
             }
-        }
 #endif
             std::vector<mcut::fd_t> unvisited_ps_ifaces; //= *input.ps_face_to_potentially_intersecting_others;
             unvisited_ps_ifaces.reserve(input.ps_face_to_potentially_intersecting_others->size());
@@ -1972,6 +1968,7 @@ namespace mcut
                             unvisited_ps_ifaces.cbegin(),
                             unvisited_ps_ifaces.cend(),
                             cc_iface->first);
+                        MCUT_ASSERT(fiter != unvisited_ps_ifaces.cend());
                         unvisited_ps_ifaces.erase(fiter); // NOTE: list remains sorted
                     }
 
@@ -1980,6 +1977,8 @@ namespace mcut
                     {
                         std::sort(cur_ps_face_ifaces_sorted.begin(), cur_ps_face_ifaces_sorted.end()); // allows quick binary search
                     }
+                    //bool is_sm_face = cc_iface->first < sm_face_count;
+                   // const fd_t cc_iface_descr = is_sm_face ? cc_iface->first - sm_face_count : sm_face_count;
 
                     const std::vector<hd_t> &cur_ps_face_halfedges = ps.get_halfedges_around_face(cc_iface->first);
                     // all neighbours
@@ -2045,7 +2044,7 @@ namespace mcut
                             {
                                 std::vector<fd_t>::const_iterator iter = std::lower_bound(existing_edge_ifaces.cbegin(), existing_edge_ifaces.cend(), *i);
 
-                                bool found = iter != existing_edge_ifaces.cend() && (*iter == *i);
+                                bool found = iter != existing_edge_ifaces.cend() && iter != existing_edge_ifaces.cend() && (*iter == *i);
                                 if (!found)
                                 {
                                     existing_edge_ifaces.insert(iter, *i); // insert into sorted list (i.e. possibly shifts some elements forward)
@@ -2164,11 +2163,21 @@ namespace mcut
                         bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
                         if (is_sm_face)
                         {
+#if defined(USE_OIBVH)
                             iface_bbox = &((*input.srcMeshFaceBboxes).at(*iface_iter));
+
+#else
+                            iface_bbox = &input.srcMeshBVH->GetPrimitiveBBox(*iface_iter);                           // ((*input.srcMeshFaceBboxes).at(*iface_iter));
+#endif
                         }
                         else
                         {
+#if defined(USE_OIBVH)
                             iface_bbox = &((*input.cutMeshFaceBboxes).at(((size_t)(*iface_iter) - sm_face_count)));
+#else
+                            iface_bbox = &input.cutMeshBVH->GetPrimitiveBBox((size_t)(*iface_iter) - sm_face_count); // ((*input.cutMeshFaceBboxes).at(((size_t)(*iface_iter) - sm_face_count)));
+
+#endif
                         }
 
                         bool intersect = geom::intersect_bounding_boxes(edge_bbox, *iface_bbox);
@@ -2223,11 +2232,21 @@ namespace mcut
                 bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
                 if (is_sm_face)
                 {
+#if defined(USE_OIBVH)
                     iface_bbox = &((*input.srcMeshFaceBboxes).at(*iface_iter));
+
+#else
+                    iface_bbox = &input.srcMeshBVH->GetPrimitiveBBox(*iface_iter);                           // ((*input.srcMeshFaceBboxes).at(*iface_iter));
+#endif
                 }
                 else
                 {
+#if defined(USE_OIBVH)
                     iface_bbox = &((*input.cutMeshFaceBboxes).at(((size_t)(*iface_iter) - sm_face_count)));
+#else
+                    iface_bbox = &input.cutMeshBVH->GetPrimitiveBBox((size_t)(*iface_iter) - sm_face_count); // ((*input.cutMeshFaceBboxes).at(((size_t)(*iface_iter) - sm_face_count)));
+
+#endif
                 }
 
                 bool intersect = geom::intersect_bounding_boxes(edge_bbox, *iface_bbox);
@@ -2545,8 +2564,7 @@ namespace mcut
                         char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
                             tested_edge_h0_source_vertex,
                             tested_edge_h0_target_vertex,
-                            tested_face_vertices.data(),
-                            (int)tested_face_vertices.size(),
+                            tested_face_vertices,
                             tested_face_plane_normal_max_comp);
 
                         bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
@@ -2573,8 +2591,8 @@ namespace mcut
                                     const math::vec3 &point = (*(*i));
                                     char result = geom::compute_point_in_polygon_test(
                                         point,
-                                        tested_face_vertices.data(),
-                                        (int)tested_face_vertices.size());
+                                        tested_face_vertices,
+                                        tested_face_plane_normal_max_comp);
                                     if (result == 'i' || (result == 'v' || result == 'e'))
                                     {
                                         violatedGP = true;
@@ -2611,8 +2629,7 @@ namespace mcut
 
                             char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                                 intersection_point,
-                                tested_face_vertices.data(),
-                                (int)tested_face_vertices.size(),
+                                tested_face_vertices,
                                 tested_face_plane_normal_max_comp);
 
                             if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e')
@@ -3041,7 +3058,7 @@ namespace mcut
                 tested_face_plane_normal,
                 tested_face_plane_param_d);
 #else
-                char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
+                char segment_intersection_type = geom::compute_segment_plane_intersection_type(              // exact**
                     tested_edge_h0_source_vertex,
                     tested_edge_h0_target_vertex,
                     tested_face_vertices,
@@ -3253,26 +3270,22 @@ namespace mcut
                             // NOTE: std::pair format/order is {source-mesh-face, cut-mesh-face}
                             cutpath_edge_creation_info[mcut::make_pair(tested_face, face_pqr)].push_back(new_vertex_descr);
 
-                            
-
                             if (face_pqs != mesh_t::null_face())
                             {
 
                                 cutpath_edge_creation_info[mcut::make_pair(tested_face, face_pqs)].push_back(new_vertex_descr);
                             }
-
-                            
                         }
                         else
                         {
-                            
+
                             cutpath_edge_creation_info[mcut::make_pair(tested_edge_face, tested_face)].push_back(new_vertex_descr);
-                            
+
                             const fd_t tested_edge_face_other = (tested_edge_face == tested_edge_h0_face) ? tested_edge_h1_face : tested_edge_h0_face;
 
                             if (tested_edge_face_other != mesh_t::null_face())
                             {
-                                
+
                                 cutpath_edge_creation_info[mcut::make_pair(tested_edge_face_other, tested_face)].push_back(new_vertex_descr);
                             }
                         }
@@ -10213,7 +10226,7 @@ namespace mcut
                 // to be stitched into the inferred connected component
                 std::deque<std::tuple<hd_t /*m1*/, int /*m0 poly*/, int /*m0 he*/>> patch_poly_stitching_queue;
                 // enough space for cut-mesh polygons
-                std::vector<bool> m0_poly_already_enqueued(m0_polygons.size()-traced_sm_polygon_count, false); // i.e. in "patch_poly_stitching_queue"
+                std::vector<bool> m0_poly_already_enqueued(m0_polygons.size() - traced_sm_polygon_count, false); // i.e. in "patch_poly_stitching_queue"
                 // thus, the first element is the seed polygon and the seed halfedge
                 patch_poly_stitching_queue.push_back(
                     std::make_tuple(
@@ -11111,7 +11124,7 @@ namespace mcut
                             if (!poly_is_already_in_maqueued)
                             {
                                 patch_poly_stitching_queue_tmp.push_back(std::make_tuple(m1_next_poly_seed_he, m0_next_poly_idx, m0_next_poly_he_idx));
-                                m0_poly_already_enqueued[m0_next_poly_idx- traced_sm_polygon_count] = true;
+                                m0_poly_already_enqueued[m0_next_poly_idx - traced_sm_polygon_count] = true;
                             }
                         }
 
@@ -11365,7 +11378,7 @@ namespace mcut
         DEBUG_CODE_MASK(lg << "end" << std::endl;);
 
         TIMESTACK_POP();
-        
+
         return;
     } // dispatch
 

@@ -24,6 +24,7 @@
 #define MCUT_KERNEL_H
 #include <mcut/internal/halfedge_mesh.h>
 #include <mcut/internal/geom.h>
+#include <mcut/internal/bvh.h>
 #if defined(MCUT_MULTI_THREADED)
 #include <mcut/internal/scheduler.h>
 #endif
@@ -128,9 +129,13 @@ namespace mcut
         // NOTE: we use std::map because it is beneficial that keys are sorted when
         // extracting edge-face intersection pairs
         const std::map<mcut::fd_t, std::vector<mcut::fd_t>> *ps_face_to_potentially_intersecting_others = nullptr;
+#if defined(USE_OIBVH)
         const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *srcMeshFaceBboxes = nullptr;
         const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *cutMeshFaceBboxes = nullptr;
-
+#else
+        bvh::BoundingVolumeHierarchy *srcMeshBVH;
+        bvh::BoundingVolumeHierarchy *cutMeshBVH;
+#endif
         bool verbose = true;
         //bool keep_partially_sealed_connected_components = false;
         bool require_looped_cutpaths = false; // ... i.e. bail on partial cuts (any!)
@@ -152,7 +157,7 @@ namespace mcut
         bool keep_fragments_below_cutmesh = false;
         bool keep_fragments_above_cutmesh = false;
         //
-        bool keep_fragments_partially_cut = false;
+        bool keep_fragments_partially_cut = false; // TODO: remove
         bool keep_fragments_sealed_inside = false;
         bool keep_fragments_sealed_outside = false;
         // bool include_fragment_sealed_partial = false; // See: variable above "keep_partially_sealed_connected_components"

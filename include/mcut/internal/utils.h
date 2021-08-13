@@ -97,6 +97,9 @@
         mcut::g_timestack.top()->set_invalid(); \
         mcut::g_timestack.pop();                \
     }
+ #define SCOPED_TIMER(name) \
+     mcut::mini_timer _1mt(name) 
+
 
 #else
 #define TIMESTACK_PUSH(name)
