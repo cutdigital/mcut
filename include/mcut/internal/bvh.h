@@ -269,7 +269,7 @@ namespace mcut
             void build(const mesh_t &mesh_,
                        const math::fixed_precision_number_t &enlargementEps_ = math::fixed_precision_number_t(0.0),
                        uint32_t mp_ = 1,
-                       const SplitMethod &sm_ = SplitMethod::SPLIT_SAH);
+                       const SplitMethod &sm_ = SplitMethod::SPLIT_MIDDLE);
 
             const BBox &GetPrimitiveBBox(int primitiveIndex) const;
 

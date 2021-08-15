@@ -339,7 +339,7 @@ namespace mcut
         unsigned long const block_size = std::min(block_size_default, length);
         unsigned long const num_blocks = (length + block_size - 1) / block_size;
 
-        std::cout << "length=" << length << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
+        //std::cout << "length=" << length << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
 
         futures.resize(num_blocks - 1);
         InputStorageIteratorType block_start = first;

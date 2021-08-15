@@ -79,10 +79,15 @@ int main(int argc, char* argv[])
     std::vector<uint32_t> srcMeshFaceSizes;
     readMesh(srcMeshFilePath, srcMeshVertices, srcMeshFaceIndices, srcMeshFaceSizes);
 
+    printf("src-mesh vertices=%d faces=%d\n", (int)srcMeshVertices.size()/3, (int)srcMeshFaceSizes.size());
+
     std::vector<float> cutMeshVertices;
     std::vector<uint32_t> cutMeshFaceIndices;
     std::vector<uint32_t> cutMeshFaceSizes;
     readMesh(cutMeshFilePath, cutMeshVertices, cutMeshFaceIndices, cutMeshFaceSizes);
+
+    printf("cut-mesh vertices=%d faces=%d\n", (int)cutMeshVertices.size()/3, (int)cutMeshFaceSizes.size());
+
 
     // init dispatch context
     // ---------------------
