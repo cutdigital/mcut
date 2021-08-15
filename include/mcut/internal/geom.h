@@ -135,6 +135,8 @@ namespace mcut
             const std::vector<math::vec3> &polygon_vertices,
             const int polygon_plane_normal_largest_component);
 
+        bool coplaner(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc, const mcut::math::vec3 &pd);
+
         bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, math::real_number_t &predResult);
 
         bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c);

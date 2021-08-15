@@ -1868,8 +1868,46 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
             "Detected multiple connected components in mesh (N=" + std::to_string(n) + ")");
         result = false;
+    }
 
-        result = false;
+    // check that the vertices of each face are co-planar
+    for (mcut::mesh_t::face_iterator_t f = m.faces_begin(); f != m.faces_end(); ++f)
+    {
+        const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(*f);
+        const int nv = (int)vertices.size();
+        if (nv > 3) //non-triangle
+        {
+            for (int i = 0; i < (nv - 3); ++i)
+            {
+                int j = (i + 1) % nv;
+                int k = (i + 2) % nv;
+                int l = (i + 3) % nv;
+
+                const mcut::vd_t& vi = vertices[i];
+                const mcut::vd_t& vj = vertices[j];
+                const mcut::vd_t& vk = vertices[k];
+                const mcut::vd_t& vl = vertices[l];
+
+                const mcut::math::vec3 &vi_coords = m.vertex(vi);
+                const mcut::math::vec3 &vj_coords = m.vertex(vj);
+                const mcut::math::vec3 &vk_coords = m.vertex(vk);
+                const mcut::math::vec3 &vl_coords = m.vertex(vl);
+
+                bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, vl_coords);
+
+                if (!are_coplaner)
+                {
+                    ctxtPtr->log(
+                        McDebugSource::MC_DEBUG_SOURCE_API,
+                        McDebugType::MC_DEBUG_TYPE_ERROR,
+                        0,
+                        McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+                        "Vertices (" + std::to_string(nv) + ") of face " + std::to_string(*f) + " are not coplanar" );
+                    result = false;
+                    break;
+                }
+            }
+        }
     }
 
     return result ? MC_NO_ERROR : MC_INVALID_VALUE;
@@ -2109,7 +2147,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     int perturbationIters = 0;
     int kernelDispatchCallCounter = -1;
-     mcut::math::real_number_t perturbation_const = 0.0;// = cutMeshBboxDiagonal * GENERAL_POSITION_ENFORCMENT_CONSTANT;
+    mcut::math::real_number_t perturbation_const = 0.0; // = cutMeshBboxDiagonal * GENERAL_POSITION_ENFORCMENT_CONSTANT;
 
     do
     {
@@ -2131,7 +2169,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #endif
 
         mcut::math::vec3 perturbation;
-       
+
         if (general_position_assumption_was_violated)
         {
             MCUT_ASSERT(floating_polygon_was_detected == false); // cannot occur at same time!
@@ -3186,9 +3224,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 cutMeshBVH,
                 0,
                 srcMeshInternal.number_of_faces());
-            
+
 #endif
-            
+
             ctxtPtr->log(
                 McDebugSource::MC_DEBUG_SOURCE_API,
                 McDebugType::MC_DEBUG_TYPE_OTHER,

@@ -1914,18 +1914,26 @@ namespace mcut
         } // end of parallel code
 #else
         {
-#ifndef NDEBUG
-            auto m = *input.ps_face_to_potentially_intersecting_others;
-            for (auto kv : (*input.ps_face_to_potentially_intersecting_others))
+#if 1
+        //std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
+        for(auto kv : (*input.ps_face_to_potentially_intersecting_others))
+        {
+            auto f = kv.first;
+            auto v = kv.second;
+            for(auto i : v)
             {
-                auto v = kv.second;
-                for (auto i : v)
+                auto halfedges =  ps.get_halfedges_around_face(f);
+                for(auto h : halfedges)
                 {
-                    auto vo = m.at(i);
-                    MCUT_ASSERT(std::find(vo.cbegin(), vo.cend(), kv.first) != vo.cend());
+                    auto e = ps.edge(h);
+                    if(std::find(ps_edge_face_intersection_pairs[e].begin(), ps_edge_face_intersection_pairs[e].end(), i) == ps_edge_face_intersection_pairs[e].end())
+                    {
+                        ps_edge_face_intersection_pairs[e].push_back(i);
+                    }
                 }
             }
-#endif
+        }
+#else
             std::vector<mcut::fd_t> unvisited_ps_ifaces; //= *input.ps_face_to_potentially_intersecting_others;
             unvisited_ps_ifaces.reserve(input.ps_face_to_potentially_intersecting_others->size());
             // NOTE: the elements of "unvisited_ps_ifaces" are already sorted because they come directly from
@@ -2064,6 +2072,7 @@ namespace mcut
                 }
 
             } while (next_ps_cc_face != input.ps_face_to_potentially_intersecting_others->cend());
+#endif
         }
         //std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 #endif // #if defined(MCUT_MULTI_THREADED)
