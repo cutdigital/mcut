@@ -2322,7 +2322,7 @@ REAL permanent;
 
     return finnow[finlength - 1];
 }
-
+ 
 REAL orient3d(pa, pb, pc, pd)
     REAL* pa;
 REAL* pb;
@@ -2368,6 +2368,8 @@ REAL* pd;
     return orient3dadapt(pa, pb, pc, pd, permanent);
 }
 
+
+#if 0
 /*****************************************************************************/
 /*                                                                           */
 /*  incirclefast()   Approximate 2D incircle test.  Nonrobust.               */
@@ -4327,3 +4329,4 @@ REAL* pe;
 
     return insphereadapt(pa, pb, pc, pd, pe, permanent);
 }
+#endif

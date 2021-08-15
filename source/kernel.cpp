@@ -483,7 +483,7 @@ namespace mcut
                 OutputStorageTypesTuple;
             typedef std::vector<std::vector<hd_t>>::const_iterator InputStorageIteratorType;
 
-            auto fn_compute_inserted_faces = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple
+            auto fn_compute_inserted_faces = [&mesh](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple
             {
                 OutputStorageTypesTuple local_output;
                 std::vector<std::vector<vd_t>> &faces_LOCAL = std::get<0>(local_output);
@@ -501,7 +501,7 @@ namespace mcut
                          mX_traced_polygon_halfedge_iter != mX_traced_polygon.cend();
                          ++mX_traced_polygon_halfedge_iter)
                     {
-                        polygon_vertices.push_back(mesh.source(*mX_traced_polygon_halfedge_iter));
+                        polygon_vertices.push_back(mesh.target(*mX_traced_polygon_halfedge_iter));
                     }
                 }
 
@@ -522,7 +522,7 @@ namespace mcut
 
             const std::vector<std::vector<vd_t>> &faces_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
 
-            auto merge_local_faces = [](mesh_t &mesh, const std::vector<std::vector<vd_t>> &faces_)
+            auto merge_local_faces = [&mesh](const std::vector<std::vector<vd_t>> &faces_)
             {
                 for (std::vector<std::vector<vd_t>>::const_iterator face_iter = faces_.cbegin();
                      face_iter != faces_.cend();
@@ -533,8 +533,6 @@ namespace mcut
                 }
             };
 
-            merge_local_faces(mesh, faces_MASTER_THREAD_LOCAL);
-
             for (int i = 0; i < (int)futures.size(); ++i)
             {
                 std::future<OutputStorageTypesTuple> &f = futures[i];
@@ -543,8 +541,12 @@ namespace mcut
 
                 const std::vector<std::vector<vd_t>> &faces_FUTURE = std::get<0>(future_result);
 
-                merge_local_faces(mesh, faces_FUTURE);
+                merge_local_faces(faces_FUTURE);
             }
+
+            // merge faces computed by master thread at the end to maintain the same order
+            // of the traced polygons
+            merge_local_faces( faces_MASTER_THREAD_LOCAL);
         } // endif of parallel scope
 
 #else
@@ -569,7 +571,7 @@ namespace mcut
                  mX_traced_polygon_halfedge_iter != mX_traced_polygon.cend();
                  ++mX_traced_polygon_halfedge_iter)
             {
-                polygon_vertices.push_back(mesh.source(*mX_traced_polygon_halfedge_iter));
+                polygon_vertices.push_back(mesh.target(*mX_traced_polygon_halfedge_iter));
             }
 
             // insert face into halfedge data structure
@@ -1914,26 +1916,7 @@ namespace mcut
         } // end of parallel code
 #else
         {
-#if 1
-        //std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
-        for(auto kv : (*input.ps_face_to_potentially_intersecting_others))
-        {
-            auto f = kv.first;
-            auto v = kv.second;
-            for(auto i : v)
-            {
-                auto halfedges =  ps.get_halfedges_around_face(f);
-                for(auto h : halfedges)
-                {
-                    auto e = ps.edge(h);
-                    if(std::find(ps_edge_face_intersection_pairs[e].begin(), ps_edge_face_intersection_pairs[e].end(), i) == ps_edge_face_intersection_pairs[e].end())
-                    {
-                        ps_edge_face_intersection_pairs[e].push_back(i);
-                    }
-                }
-            }
-        }
-#else
+
             std::vector<mcut::fd_t> unvisited_ps_ifaces; //= *input.ps_face_to_potentially_intersecting_others;
             unvisited_ps_ifaces.reserve(input.ps_face_to_potentially_intersecting_others->size());
             // NOTE: the elements of "unvisited_ps_ifaces" are already sorted because they come directly from
@@ -1986,7 +1969,7 @@ namespace mcut
                         std::sort(cur_ps_face_ifaces_sorted.begin(), cur_ps_face_ifaces_sorted.end()); // allows quick binary search
                     }
                     //bool is_sm_face = cc_iface->first < sm_face_count;
-                   // const fd_t cc_iface_descr = is_sm_face ? cc_iface->first - sm_face_count : sm_face_count;
+                    // const fd_t cc_iface_descr = is_sm_face ? cc_iface->first - sm_face_count : sm_face_count;
 
                     const std::vector<hd_t> &cur_ps_face_halfedges = ps.get_halfedges_around_face(cc_iface->first);
                     // all neighbours
@@ -2072,7 +2055,6 @@ namespace mcut
                 }
 
             } while (next_ps_cc_face != input.ps_face_to_potentially_intersecting_others->cend());
-#endif
         }
         //std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 #endif // #if defined(MCUT_MULTI_THREADED)
