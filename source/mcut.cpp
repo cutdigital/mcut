@@ -2110,7 +2110,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
 #else
     mcut::bvh::BoundingVolumeHierarchy srcMeshBVH;
-    srcMeshBVH.build(srcMeshInternal);
+    srcMeshBVH.buildTree(srcMeshInternal);
 #endif
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
@@ -2233,7 +2233,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 cutMeshBvhLeafNodeFaces.clear();
                 constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
 #else
-                cutMeshBVH.build(cutMeshInternal, perturbation_const);
+                cutMeshBVH.buildTree(cutMeshInternal, perturbation_const);
 #endif
                 anyBvhWasRebuilt = true;
             }
@@ -3100,7 +3100,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 srcMeshBvhLeafNodeFaces.clear();
                 constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
 #else
-                srcMeshBVH.build(srcMeshInternal);
+                srcMeshBVH.buildTree(srcMeshInternal);
 #endif
             }
             if (cutMeshIsUpdated)
@@ -3110,7 +3110,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 cutMeshBvhLeafNodeFaces.clear();
                 constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
 #else
-                cutMeshBVH.build(cutMeshInternal, perturbation_const);
+                cutMeshBVH.buildTree(cutMeshInternal, perturbation_const);
 #endif
             }
 
@@ -3218,7 +3218,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #if defined(USE_OIBVH)
             intersectOIBVHs(ps_face_to_potentially_intersecting_others, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 #else
-            mcut::bvh::BoundingVolumeHierarchy::intersect(
+            mcut::bvh::BoundingVolumeHierarchy::intersectBVHTrees(
                 ps_face_to_potentially_intersecting_others,
                 srcMeshBVH,
                 cutMeshBVH,

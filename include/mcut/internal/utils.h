@@ -102,12 +102,16 @@
 
 
 #else
+#define SCOPED_TIMER(name)
 #define TIMESTACK_PUSH(name)
 #define TIMESTACK_POP()
+#define TIMESTACK_RESET()
 #endif
 
 namespace mcut
 {
+
+#if defined(PROFILING_BUILD)
     class mini_timer
     {
         std::chrono::time_point<std::chrono::steady_clock> m_start;
@@ -134,7 +138,7 @@ namespace mcut
             m_valid = false;
         }
     };
-
+#endif
     class logger_t
     {
 

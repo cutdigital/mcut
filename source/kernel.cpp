@@ -5757,7 +5757,7 @@ namespace mcut
                 *input.scheduler,
                 ps.faces_begin(),
                 ps.faces_end(),
-                (1 << 8),
+                (1 << 7),
                 fn_trace_polygons,
                 partial_res, // output computed by master thread
                 futures);

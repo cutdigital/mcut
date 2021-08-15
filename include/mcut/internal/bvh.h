@@ -266,7 +266,7 @@ namespace mcut
             ~BoundingVolumeHierarchy();
 
             // three stages to BVH construction
-            void build(const mesh_t &mesh_,
+            void buildTree(const mesh_t &mesh_,
                        const math::fixed_precision_number_t &enlargementEps_ = math::fixed_precision_number_t(0.0),
                        uint32_t mp_ = 1,
                        const SplitMethod &sm_ = SplitMethod::SPLIT_MIDDLE);
@@ -294,7 +294,7 @@ namespace mcut
 
             const fd_t& GetPrimitive(int index) const; 
 
-            static void intersect(
+            static void intersectBVHTrees(
                 std::map<mcut::fd_t, std::vector<mcut::fd_t>> &symmetric_intersecting_pairs,
                 const BoundingVolumeHierarchy &bvhA,
                 const BoundingVolumeHierarchy &bvhB,
