@@ -1416,7 +1416,7 @@ void constructOIBVH(
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &bvhAABBs,
     std::vector<mcut::fd_t> &bvhLeafNodeFaces,
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &face_bboxes,
-    const mcut::math::real_number_t &slightEnlargmentEps = 0.0)
+    const mcut::math::real_number_t &slightEnlargmentEps = mcut::math::real_number_t(0.0))
 {
     TIMESTACK_PUSH(__FUNCTION__);
     const int meshFaceCount = mesh.number_of_faces();
@@ -1443,7 +1443,7 @@ void constructOIBVH(
 
         mcut::geom::bounding_box_t<mcut::math::fast_vec3> &bbox = face_bboxes[faceIdx];
 
-        if (slightEnlargmentEps > 0)
+        if (slightEnlargmentEps > mcut::math::real_number_t(0.0))
         {
             bbox.enlarge(slightEnlargmentEps);
         }
@@ -2181,7 +2181,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 // not intersect at all, which means we need to perturb again.
                 backendInput.general_position_enforcement_count = perturbationIters;
 
-                MCUT_ASSERT(perturbation_const != 0.0);
+                MCUT_ASSERT(perturbation_const != mcut::math::real_number_t(0.0));
 
                 std::default_random_engine rd(perturbationIters);
                 std::mt19937 mt(rd());
