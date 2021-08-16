@@ -415,7 +415,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
 #if defined(MCUT_MULTI_THREADED)
     std::vector<uint32_t> partial_sums(numFaces, 0); // prefix sum result
-    std::partial_sum(pFaceSizes, pFaceSizes +numFaces, partial_sums.data());
+    std::partial_sum(pFaceSizes, pFaceSizes + numFaces, partial_sums.data());
     {
         typedef std::vector<uint32_t>::const_iterator InputStorageIteratorType;
         typedef std::pair<InputStorageIteratorType, InputStorageIteratorType> OutputStorageType; // range of faces
@@ -427,8 +427,7 @@ McResult indexArrayMeshToHalfedgeMesh(
         auto fn_create_faces = [&](
                                    InputStorageIteratorType block_start_,
                                    InputStorageIteratorType block_end_) -> OutputStorageType
-        {           
-
+        {
             for (InputStorageIteratorType i = block_start_; i != block_end_; i++)
             {
                 uint32_t faceID = std::distance(partial_sums.cbegin(), i);
@@ -441,10 +440,10 @@ McResult indexArrayMeshToHalfedgeMesh(
                     bool exchanged = atm_result.compare_exchange_strong(zero, 1);
                     if (exchanged) // first thread to detect error
                     {
-                        ctxtPtr->log(//
-                            McDebugSource::MC_DEBUG_SOURCE_API, //
-                            McDebugType::MC_DEBUG_TYPE_ERROR, //
-                            0, //
+                        ctxtPtr->log(                                //
+                            McDebugSource::MC_DEBUG_SOURCE_API,      //
+                            McDebugType::MC_DEBUG_TYPE_ERROR,        //
+                            0,                                       //
                             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
                             "invalid face-size for face - " + std::to_string(faceID) + " (size = " + std::to_string(numFaceVertices) + ")");
                     }
@@ -465,15 +464,14 @@ McResult indexArrayMeshToHalfedgeMesh(
                         bool exchanged = atm_result.compare_exchange_strong(zero, 1);
                         if (exchanged) // first thread to detect error
                         {
-                            ctxtPtr->log(//
-                                McDebugSource::MC_DEBUG_SOURCE_API, //
-                                McDebugType::MC_DEBUG_TYPE_ERROR, //
-                                0, //
+                            ctxtPtr->log(                                //
+                                McDebugSource::MC_DEBUG_SOURCE_API,      //
+                                McDebugType::MC_DEBUG_TYPE_ERROR,        //
+                                0,                                       //
                                 McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
                                 "invalid vertex index - " + std::to_string(idx));
                         }
                         break;
-
                     }
 
                     const mcut::vertex_descriptor_t descr = fIter->second; //vmap[*fIter.first];
@@ -486,11 +484,11 @@ McResult indexArrayMeshToHalfedgeMesh(
                         bool exchanged = atm_result.compare_exchange_strong(zero, 2);
                         if (exchanged) // first thread to detect error
                         {
-                            ctxtPtr->log(//
-                                McDebugSource::MC_DEBUG_SOURCE_API, //
-                                McDebugType::MC_DEBUG_TYPE_ERROR, //
-                                0, //
-                                McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,// 
+                            ctxtPtr->log(                                //
+                                McDebugSource::MC_DEBUG_SOURCE_API,      //
+                                McDebugType::MC_DEBUG_TYPE_ERROR,        //
+                                0,                                       //
+                                McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
                                 "found duplicate vertex in face - " + std::to_string(faceID));
                         }
                         break;
@@ -515,10 +513,10 @@ McResult indexArrayMeshToHalfedgeMesh(
             futures);
 
         auto add_faces = [&](InputStorageIteratorType block_start_,
-                                   InputStorageIteratorType block_end_) -> McResult
+                             InputStorageIteratorType block_end_) -> McResult
         {
-            for(InputStorageIteratorType face_iter = block_start_;
-                face_iter != block_end_; ++face_iter)
+            for (InputStorageIteratorType face_iter = block_start_;
+                 face_iter != block_end_; ++face_iter)
             {
                 uint32_t faceID = std::distance(partial_sums.cbegin(), face_iter);
                 const std::vector<mcut::vd_t> &faceVertices = faces.at(faceID);
@@ -529,10 +527,10 @@ McResult indexArrayMeshToHalfedgeMesh(
                     result = McResult::MC_INVALID_VALUE;
                     if (result != McResult::MC_NO_ERROR)
                     {
-                        ctxtPtr->log(//
-                            McDebugSource::MC_DEBUG_SOURCE_API, //
-                            McDebugType::MC_DEBUG_TYPE_ERROR, //
-                            0, //
+                        ctxtPtr->log(                                //
+                            McDebugSource::MC_DEBUG_SOURCE_API,      //
+                            McDebugType::MC_DEBUG_TYPE_ERROR,        //
+                            0,                                       //
                             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
                             "invalid vertices on face - " + std::to_string(faceID));
                         return result;
@@ -551,7 +549,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
             const int val = atm_result.load();
             okay = okay && val == 0;
-            if(!okay)
+            if (!okay)
             {
                 continue; // just go on to wait for all tasks to finish before we return to user
             }
@@ -560,20 +558,20 @@ McResult indexArrayMeshToHalfedgeMesh(
             okay = okay && result == McResult::MC_NO_ERROR;
         }
 
-        if(!okay)
+        if (!okay)
         {
             return McResult::MC_INVALID_VALUE;
         }
 
         //const std::vector<std::vector<mcut::vd_t>> &faces_MASTER_THREAD = std::get<0>(partial_res); // add last to maintain order
         result = add_faces(partial_res.first, partial_res.second);
-        if(result != McResult::MC_NO_ERROR)
+        if (result != McResult::MC_NO_ERROR)
         {
             return result;
         }
     }
 #else
-     int faceSizeOffset = 0;
+    int faceSizeOffset = 0;
     for (uint32_t i = 0; i < numFaces; ++i)
     {
 
@@ -767,6 +765,91 @@ McResult halfedgeMeshToIndexArrayMesh(
         indexArrayMesh.pVertexMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numVertices]);
     }
 
+#if defined(MCUT_MULTI_THREADED)
+    {
+        typedef mcut::mesh_t::vertex_iterator_t InputStorageIteratorType;
+        typedef int OutputStorageType;
+
+        auto fn_copy_vertices = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
+        {
+            for (InputStorageIteratorType viter = block_start_; viter != block_end_; ++viter)
+            {
+                const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(*viter);
+                const uint32_t i = std::distance(halfedgeMeshInfo.mesh.vertices_begin(), viter);
+                indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
+                indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
+                indexArrayMesh.pVertices[((size_t)i * 3u) + 2u] = point.z();
+
+                vmap[*viter] = i;
+
+                if (!halfedgeMeshInfo.data_maps.vertex_map.empty())
+                {
+                    MCUT_ASSERT((size_t)*viter < halfedgeMeshInfo.data_maps.vertex_map.size() /*halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1*/);
+
+                    uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(*viter);
+                    uint32_t userInputMeshVertexDescr = UINT32_MAX;
+                    bool internalInputMeshVertexDescrIsForIntersectionPoint = (internalInputMeshVertexDescr == UINT32_MAX);
+
+                    if (!internalInputMeshVertexDescrIsForIntersectionPoint)
+                    { // user-mesh vertex or vertex that is added due to face-partitioning
+                        bool vertexExistsDueToFacePartition = false;
+                        const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internalSrcMeshVertexCount);
+
+                        if (internalInputMeshVertexDescrIsForSrcMesh)
+                        {
+                            std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                            vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.cend());
+                        }
+                        else // internalInputMeshVertexDescrIsForCutMesh
+                        {
+                            std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputCutMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                            vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputCutMesh.cend());
+                        }
+
+                        if (!vertexExistsDueToFacePartition)
+                        { // user-mesh vertex
+
+                            MCUT_ASSERT(internalSrcMeshVertexCount > 0);
+
+                            if (!internalInputMeshVertexDescrIsForSrcMesh) // is it a cut-mesh vertex discriptor ..?
+                            {
+                                const uint32_t internalInputMeshVertexDescrNoOffset = (internalInputMeshVertexDescr - internalSrcMeshVertexCount);
+                                userInputMeshVertexDescr = (internalInputMeshVertexDescrNoOffset + userSrcMeshVertexCount); // ensure that we offset using number of [user-provided mesh] vertices
+                            }
+                            else
+                            {
+                                userInputMeshVertexDescr = internalInputMeshVertexDescr; // src-mesh vertices have no offset unlike cut-mesh vertices
+                            }
+                        }
+                    }
+
+                    indexArrayMesh.pVertexMapIndices[i] = userInputMeshVertexDescr;
+                }
+            }
+            return 0;
+        };
+
+        std::vector<std::future<int>> futures;
+        int _1;
+
+        parallel_fork_and_join(
+            ctxtPtr->scheduler,
+            halfedgeMeshInfo.mesh.vertices_begin(),
+            halfedgeMeshInfo.mesh.vertices_end(),
+            (1 << 8),
+            fn_copy_vertices,
+            _1, // out
+            futures);
+
+        for (int i = 0; i < (int)futures.size(); ++i)
+        {
+            std::future<int> &f = futures[i];
+            MCUT_ASSERT(f.valid());
+            f.wait(); // simply wait for result to be done
+        }
+    }
+#else
+
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i)
     {
 
@@ -847,7 +930,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             indexArrayMesh.pVertexMapIndices[i] = userInputMeshVertexDescr;
         }
     }
-
+#endif
     MCUT_ASSERT(!vmap.empty());
 
     TIMESTACK_POP();
@@ -867,7 +950,6 @@ McResult halfedgeMeshToIndexArrayMesh(
         }
     }
     TIMESTACK_POP();
-
 
     //
     // faces
@@ -921,7 +1003,6 @@ McResult halfedgeMeshToIndexArrayMesh(
         if (!halfedgeMeshInfo.data_maps.face_map.empty())
         {
             MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
-            //const size_t idx = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
             uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
             uint32_t userInputMeshFaceDescr = INT32_MAX;
@@ -948,9 +1029,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                 if (fiter != fpPartitionChildFaceToCorrespondingInputCutMeshFace.cend())
                 {
                     uint32_t unoffsettedDescr = (fiter->second - internalSrcMeshFaceCount);
-                    //if (unoffsettedDescr < userSrcMeshFaceCount) {
                     userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
-                    //}
                 }
                 else
                 {
@@ -961,41 +1040,9 @@ McResult halfedgeMeshToIndexArrayMesh(
 
             MCUT_ASSERT(userInputMeshFaceDescr != INT32_MAX);
 
-#if 0
-            if (!faceExistsDueToFacePartition) { // user-mesh vertex
-
-                MCUT_ASSERT(internalSrcMeshFaceCount > 0);
-
-                if ((int)internalInputMeshFaceDescr >= internalSrcMeshFaceCount) // is it a cut-mesh face discriptor ..?
-                {
-                    MCUT_ASSERT(internalSrcMeshFaceCount >= userSrcMeshFaceCount);
-                    const int offset_descrepancy = (internalSrcMeshFaceCount - userSrcMeshFaceCount);
-                    userInputMeshFaceDescr = (internalInputMeshFaceDescr - offset_descrepancy); // ensure that we offset using number of user mesh vertices
-                }
-            }
-#endif
-#if 0
-            std::unordered_map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputMeshFace.find(mcut::fd_t(value));
-
-            bool faceAddedDueToFacePartitioning = (fiter != fpPartitionChildFaceToCorrespondingInputMeshFace.cend());
-            if (faceAddedDueToFacePartitioning) {
-                value = fiter->second;
-            }
-
-            MCUT_ASSERT(value != UINT32_MAX);
-
-            MCUT_ASSERT(internalSrcMeshFaceCount > 0);
-            if ((int)value >= internalSrcMeshFaceCount) // cut-mesh face ..?
-            {
-                MCUT_ASSERT(internalSrcMeshFaceCount >= userSrcMeshFaceCount);
-                const int offset_descrepancy = (internalSrcMeshFaceCount - userSrcMeshFaceCount);
-                value = (value - offset_descrepancy); // ensure that we offset using number of user mesh faces
-            }
-#endif
             indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
         } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
     }
-    
 
     // sanity check
 
@@ -1049,18 +1096,70 @@ McResult halfedgeMeshToIndexArrayMesh(
     indexArrayMesh.numEdgeIndices = halfedgeMeshInfo.mesh.number_of_edges() * 2;
 
     MCUT_ASSERT(indexArrayMesh.numEdgeIndices > 0);
+    indexArrayMesh.pEdges = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numEdgeIndices]);
 
-    std::vector<std::pair<mcut::vd_t, mcut::vd_t>> gatheredEdges;
 
+   // std::vector<std::pair<mcut::vd_t, mcut::vd_t>> gatheredEdges;
+#if defined(MCUT_MULTI_THREADED)
+    {
+        typedef mcut::mesh_t::edge_iterator_t InputStorageIteratorType;
+        typedef int OutputStorageType;
+
+        auto fn_copy_edges = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
+        {
+            for (InputStorageIteratorType eiter = block_start_; eiter != block_end_; ++eiter)
+            {
+                mcut::vd_t v0 = halfedgeMeshInfo.mesh.vertex(*eiter, 0);
+                mcut::vd_t v1 = halfedgeMeshInfo.mesh.vertex(*eiter, 1);
+
+                uint32_t idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter);
+
+                //gatheredEdges.emplace_back(v0, v1);
+                MCUT_ASSERT((size_t)v0 < vmap.size());
+                indexArrayMesh.pEdges[((size_t)idx * 2u) + 0u] = vmap[v0];
+                MCUT_ASSERT((size_t)v1 < vmap.size());
+                indexArrayMesh.pEdges[((size_t)idx * 2u) + 1u] = vmap[v1];
+            }
+
+            return 0;
+        };
+
+        std::vector<std::future<int>> futures;
+        int _1;
+
+        parallel_fork_and_join(
+            ctxtPtr->scheduler,
+            halfedgeMeshInfo.mesh.edges_begin(),
+            halfedgeMeshInfo.mesh.edges_end(),
+            (1 << 7),
+            fn_copy_edges,
+            _1, // out
+            futures);
+
+        for (int i = 0; i < (int)futures.size(); ++i)
+        {
+            std::future<int> &f = futures[i];
+            MCUT_ASSERT(f.valid());
+            f.wait(); // simply wait for result to be done
+        }
+    }
+#else
     for (mcut::mesh_t::edge_iterator_t i = halfedgeMeshInfo.mesh.edges_begin(); i != halfedgeMeshInfo.mesh.edges_end(); ++i)
     {
 
         mcut::vd_t v0 = halfedgeMeshInfo.mesh.vertex(*i, 0);
         mcut::vd_t v1 = halfedgeMeshInfo.mesh.vertex(*i, 1);
 
-        gatheredEdges.emplace_back(v0, v1);
-    }
+        uint32_t idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), i);
 
+        //gatheredEdges.emplace_back(v0, v1);
+         MCUT_ASSERT((size_t)v0 < vmap.size());
+        indexArrayMesh.pEdges[((size_t)idx * 2u) + 0u] = vmap[v0];
+        MCUT_ASSERT((size_t)v1 < vmap.size());
+        indexArrayMesh.pEdges[((size_t)idx * 2u) + 1u] = vmap[v1];
+    }
+#endif
+#if 0
     // sanity check
 
     MCUT_ASSERT(gatheredEdges.size() == indexArrayMesh.numEdgeIndices / 2);
@@ -1078,7 +1177,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         MCUT_ASSERT((size_t)v1 < vmap.size());
         indexArrayMesh.pEdges[((size_t)i * 2u) + 1u] = vmap[v1];
     }
-
+#endif
     TIMESTACK_POP();
 
     return result;
