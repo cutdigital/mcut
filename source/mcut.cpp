@@ -956,7 +956,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     //
 
     TIMESTACK_PUSH("Create faces");
-    // NOTE: faces can be zero if mesh is a cut-path mesh
+
     indexArrayMesh.numFaces = halfedgeMeshInfo.mesh.number_of_faces();
 
     MCUT_ASSERT(indexArrayMesh.numFaces > 0);
@@ -967,38 +967,117 @@ McResult halfedgeMeshToIndexArrayMesh(
     {
         indexArrayMesh.pFaceMapIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
     }
-    indexArrayMesh.numFaceIndices = 0;
 
     indexArrayMesh.pFaceAdjFacesSizes = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaces]);
-    indexArrayMesh.numFaceAdjFaceIndices = 0;
 
-    std::vector<std::vector<mcut::vd_t>> gatheredFaces;
-    std::vector<std::vector<mcut::fd_t>> gatheredFacesAdjFaces;
+    //
+    // Here, we collect size information about faces
+    //
+    std::vector<std::vector<mcut::fd_t>> gatheredFacesAdjFaces(indexArrayMesh.numFaces);
+    std::vector<std::vector<mcut::vd_t>> gatheredFaces(indexArrayMesh.numFaces);
+
+#if defined(MCUT_MULTI_THREADED)
+    {
+        typedef mcut::mesh_t::face_iterator_t InputStorageIteratorType;
+        typedef int OutputStorageType;
+
+        auto fn_copy_face_info0 = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
+        {
+            for (InputStorageIteratorType i = block_start_; i != block_end_; ++i)
+            {
+                const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+
+                {
+                    std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
+                    indexArrayMesh.pFaceSizes[faceID] = (uint32_t)vertices_around_face.size();
+                    gatheredFaces[faceID] = std::move(vertices_around_face);
+                }
+
+                {
+                    std::vector<mcut::fd_t> adjFaces = halfedgeMeshInfo.mesh.get_faces_around_face(*i);
+                    indexArrayMesh.pFaceAdjFacesSizes[faceID] = (uint32_t)adjFaces.size();
+                    gatheredFacesAdjFaces[*i] = std::move(adjFaces);
+                }
+
+                if (!halfedgeMeshInfo.data_maps.face_map.empty())
+                {
+                    MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
+
+                    uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+                    uint32_t userInputMeshFaceDescr = INT32_MAX;
+                    const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
+
+                    if (internalInputMeshFaceDescrIsForSrcMesh)
+                    {
+                        std::unordered_map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputSrcMeshFace.find(mcut::fd_t(internalInputMeshFaceDescr));
+                        if (fiter != fpPartitionChildFaceToCorrespondingInputSrcMeshFace.cend())
+                        {
+                            userInputMeshFaceDescr = fiter->second;
+                        }
+                        else
+                        {
+                            userInputMeshFaceDescr = internalInputMeshFaceDescr;
+                        }
+                        MCUT_ASSERT((int)userInputMeshFaceDescr < (int)userSrcMeshFaceCount);
+                    }
+                    else // internalInputMeshVertexDescrIsForCutMesh
+                    {
+                        std::unordered_map<mcut::fd_t, mcut::fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(mcut::fd_t(internalInputMeshFaceDescr));
+                        if (fiter != fpPartitionChildFaceToCorrespondingInputCutMeshFace.cend())
+                        {
+                            uint32_t unoffsettedDescr = (fiter->second - internalSrcMeshFaceCount);
+                            userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                        }
+                        else
+                        {
+                            uint32_t unoffsettedDescr = (internalInputMeshFaceDescr - internalSrcMeshFaceCount);
+                            userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                        }
+                    }
+
+                    MCUT_ASSERT(userInputMeshFaceDescr != INT32_MAX);
+
+                    indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
+                } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
+            }
+            return 0;
+        };
+        std::vector<std::future<int>> futures;
+        int _1;
+
+        parallel_fork_and_join(
+            ctxtPtr->scheduler,
+            halfedgeMeshInfo.mesh.faces_begin(),
+            halfedgeMeshInfo.mesh.faces_end(),
+            (1 << 7),
+            fn_copy_face_info0,
+            _1, // out
+            futures);
+
+        for (int i = 0; i < (int)futures.size(); ++i)
+        {
+            std::future<int> &f = futures[i];
+            MCUT_ASSERT(f.valid());
+            f.wait(); // simply wait for result to be done
+        }
+    }
+#else
+
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
-        int faceIndex = (int)gatheredFaces.size(); // or "gatheredFacesAdjFaces.size()"
+        const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
-        std::vector<mcut::vd_t> face;
-        std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
-
-        for (std::vector<mcut::vd_t>::const_iterator iter = vertices_around_face.cbegin();
-             iter != vertices_around_face.cend();
-             ++iter)
         {
-            MCUT_ASSERT(*iter != mcut::mesh_t::null_vertex());
-
-            face.push_back(*iter);
+            std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
+            indexArrayMesh.pFaceSizes[faceID] = (uint32_t)vertices_around_face.size();
+            gatheredFaces[faceID] = std::move(vertices_around_face);
         }
 
-        gatheredFaces.emplace_back(face);
-
-        indexArrayMesh.numFaceIndices += (int)face.size();
-
-        std::vector<mcut::fd_t> adjFaces = halfedgeMeshInfo.mesh.get_faces_around_face(*i);
-        gatheredFacesAdjFaces.push_back(adjFaces);
-
-        indexArrayMesh.numFaceAdjFaceIndices += (uint32_t)adjFaces.size();
-        indexArrayMesh.pFaceAdjFacesSizes[faceIndex] = (uint32_t)adjFaces.size();
+        {
+            std::vector<mcut::fd_t> adjFaces = halfedgeMeshInfo.mesh.get_faces_around_face(*i);
+            indexArrayMesh.pFaceAdjFacesSizes[faceID] = (uint32_t)adjFaces.size();
+            gatheredFacesAdjFaces[*i] = std::move(adjFaces);
+        }
 
         if (!halfedgeMeshInfo.data_maps.face_map.empty())
         {
@@ -1006,8 +1085,6 @@ McResult halfedgeMeshToIndexArrayMesh(
 
             uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
             uint32_t userInputMeshFaceDescr = INT32_MAX;
-
-            //bool faceExistsDueToFacePartition = false;
             const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
 
             if (internalInputMeshFaceDescrIsForSrcMesh)
@@ -1043,49 +1120,118 @@ McResult halfedgeMeshToIndexArrayMesh(
             indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
         } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
     }
+#endif                                                                    //#if defined(MCUT_MULTI_THREADED)
+    MCUT_ASSERT(gatheredFacesAdjFaces.size() == indexArrayMesh.numFaces); // sanity check
 
-    // sanity check
+    //
+    // Here, we store information about faces (vertex indices, adjacent faces etc.)
+    //
 
-    MCUT_ASSERT(gatheredFaces.size() == indexArrayMesh.numFaces);
+    std::vector<uint32_t> adjFaceArrayPartialSums(indexArrayMesh.numFaces, 0);
+    std::partial_sum(                                                      //
+        indexArrayMesh.pFaceAdjFacesSizes.get(),                           //
+        indexArrayMesh.pFaceAdjFacesSizes.get() + indexArrayMesh.numFaces, //
+        adjFaceArrayPartialSums.data());
 
-    indexArrayMesh.pFaceIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaceIndices]);
+    indexArrayMesh.numFaceAdjFaceIndices = adjFaceArrayPartialSums.back();
     indexArrayMesh.pFaceAdjFaces = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaceAdjFaceIndices]);
 
-    int faceVertexIndexOffset = 0;
-    int faceAdjFaceIndexOffset = 0;
+    std::vector<uint32_t> faceIndicesArrayPartialSums(indexArrayMesh.numFaces, 0);
+    std::partial_sum(                                              //
+        indexArrayMesh.pFaceSizes.get(),                           //
+        indexArrayMesh.pFaceSizes.get() + indexArrayMesh.numFaces, //
+        faceIndicesArrayPartialSums.data());
 
-    for (int i = 0; i < (int)gatheredFaces.size(); ++i)
+    indexArrayMesh.numFaceIndices = faceIndicesArrayPartialSums.back();
+    indexArrayMesh.pFaceIndices = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numFaceIndices]);
+
+#if defined(MCUT_MULTI_THREADED)
     {
-        const std::vector<mcut::vd_t> &face = gatheredFaces[i];
-        if (static_cast<std::size_t>(std::numeric_limits<uint32_t>::max()) < face.size())
+        typedef mcut::mesh_t::face_iterator_t InputStorageIteratorType;
+        typedef int OutputStorageType;
+
+        auto fn_copy_face_info1 = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-                         std::string("number of vertices in face (") + std::to_string(face.size()) + ") exceeds maximum (" + std::to_string(std::numeric_limits<uint32_t>::max()) + ")");
-            result = McResult::MC_INVALID_VALUE;
-            return result;
-        }
+            for (InputStorageIteratorType i = block_start_; i != block_end_; ++i)
+            {
+                const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+                { // store face-vertex indices
+                    const std::vector<mcut::vd_t> &faceVertices = gatheredFaces[faceID];
+                    const uint32_t faceSize = (uint32_t)faceVertices.size();
+                    const int faceVertexIndexOffset = faceIndicesArrayPartialSums[faceID] - faceSize;
 
-        indexArrayMesh.pFaceSizes[i] = static_cast<uint32_t>(face.size());
+                    for (uint32_t j = 0; j < faceSize; ++j)
+                    {
+                        const mcut::vd_t vd = faceVertices[j];
+                        indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = vmap[vd];
+                    }
+                }
 
-        for (int j = 0; j < (int)face.size(); ++j)
+                { // store adjacent-face indices
+                    const std::vector<mcut::fd_t> &faceAdjFaces = gatheredFacesAdjFaces[faceID];
+                    const uint32_t adjFacesSize = (uint32_t)faceAdjFaces.size();
+                    const int faceAdjFaceIndexOffset = adjFaceArrayPartialSums[faceID] - adjFacesSize;
+
+                    for (uint32_t j = 0; j < adjFacesSize; ++j)
+                    {
+                        const mcut::fd_t adjFace = faceAdjFaces[j];
+                        indexArrayMesh.pFaceAdjFaces[(size_t)faceAdjFaceIndexOffset + j] = (uint32_t)adjFace;
+                    }
+                }
+            }
+            return 0;
+        };
+
+        std::vector<std::future<int>> futures;
+        int _1;
+
+        parallel_fork_and_join(
+            ctxtPtr->scheduler,
+            halfedgeMeshInfo.mesh.faces_begin(),
+            halfedgeMeshInfo.mesh.faces_end(),
+            (1 << 8),
+            fn_copy_face_info1,
+            _1, // out
+            futures);
+
+        for (int i = 0; i < (int)futures.size(); ++i)
         {
-            const mcut::vd_t vd = face[j];
-
-            indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = vmap[vd];
+            std::future<int> &f = futures[i];
+            MCUT_ASSERT(f.valid());
+            f.wait(); // simply wait for result to be done
         }
-        faceVertexIndexOffset += static_cast<int>(face.size());
-
-        const std::vector<mcut::fd_t> &adjFaces = gatheredFacesAdjFaces[i];
-
-        for (int j = 0; j < (int)adjFaces.size(); ++j)
-        {
-            const mcut::fd_t adjFace = adjFaces[j];
-            indexArrayMesh.pFaceAdjFaces[(size_t)faceAdjFaceIndexOffset + j] = (uint32_t)adjFace;
-        }
-
-        faceAdjFaceIndexOffset += (int)adjFaces.size();
     }
-    gatheredFaces.clear();
+#else
+    // for each face
+    for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
+    {
+        const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+
+        { // store face-vertex indices
+            const std::vector<mcut::vd_t> &faceVertices = gatheredFaces[faceID];
+            const uint32_t faceSize = (uint32_t)faceVertices.size();
+            const int faceVertexIndexOffset = faceIndicesArrayPartialSums[faceID] - faceSize;
+
+            for (uint32_t j = 0; j < faceSize; ++j)
+            {
+                const mcut::vd_t vd = faceVertices[j];
+                indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = vmap[vd];
+            }
+        }
+
+        { // store adjacent-face indices
+            const std::vector<mcut::fd_t> &faceAdjFaces = gatheredFacesAdjFaces[faceID];
+            const uint32_t adjFacesSize = (uint32_t)faceAdjFaces.size();
+            const int faceAdjFaceIndexOffset = adjFaceArrayPartialSums[faceID] - adjFacesSize;
+
+            for (uint32_t j = 0; j < adjFacesSize; ++j)
+            {
+                const mcut::fd_t adjFace = faceAdjFaces[j];
+                indexArrayMesh.pFaceAdjFaces[(size_t)faceAdjFaceIndexOffset + j] = (uint32_t)adjFace;
+            }
+        }
+    }
+#endif
     TIMESTACK_POP();
 
     //
@@ -1098,8 +1244,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     MCUT_ASSERT(indexArrayMesh.numEdgeIndices > 0);
     indexArrayMesh.pEdges = std::unique_ptr<uint32_t[]>(new uint32_t[indexArrayMesh.numEdgeIndices]);
 
-
-   // std::vector<std::pair<mcut::vd_t, mcut::vd_t>> gatheredEdges;
+    // std::vector<std::pair<mcut::vd_t, mcut::vd_t>> gatheredEdges;
 #if defined(MCUT_MULTI_THREADED)
     {
         typedef mcut::mesh_t::edge_iterator_t InputStorageIteratorType;
@@ -1114,7 +1259,6 @@ McResult halfedgeMeshToIndexArrayMesh(
 
                 uint32_t idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter);
 
-                //gatheredEdges.emplace_back(v0, v1);
                 MCUT_ASSERT((size_t)v0 < vmap.size());
                 indexArrayMesh.pEdges[((size_t)idx * 2u) + 0u] = vmap[v0];
                 MCUT_ASSERT((size_t)v1 < vmap.size());
@@ -1153,7 +1297,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         uint32_t idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), i);
 
         //gatheredEdges.emplace_back(v0, v1);
-         MCUT_ASSERT((size_t)v0 < vmap.size());
+        MCUT_ASSERT((size_t)v0 < vmap.size());
         indexArrayMesh.pEdges[((size_t)idx * 2u) + 0u] = vmap[v0];
         MCUT_ASSERT((size_t)v1 < vmap.size());
         indexArrayMesh.pEdges[((size_t)idx * 2u) + 1u] = vmap[v1];
