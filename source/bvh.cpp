@@ -218,6 +218,7 @@ namespace mcut
             primitiveOrderedBBoxes.resize(mesh->number_of_faces());
             primitives.resize(mesh->number_of_faces());
 
+            // TODO make this parallel
             // for each face in mesh
             for (mcut::mesh_t::face_iterator_t f = mesh->faces_begin(); f != mesh->faces_end(); ++f)
             {
@@ -313,7 +314,6 @@ namespace mcut
             uint32_t *totalNodes,
             std::vector<fd_t> &orderedPrims)
         {
-
             (*totalNodes)++;
 
             std::shared_ptr<BVHBuildNode> node = std::make_shared<BVHBuildNode>();
@@ -343,7 +343,6 @@ namespace mcut
             else
             {
                 //Compute bound of primitive centroids, choose split dimension dim
-
                 BBox centroidBounds;
                 for (uint32_t i = start; i < end; ++i)
                 {

@@ -27,7 +27,9 @@
 #include "mcut/internal/math.h"
 #include "mcut/internal/scheduler.h"
 
-//#define USE_OIBVH 1
+// OIBVH is over 2-3x faster than the alternative (classic) BVH approaches.
+// Our alternative BVH implementations follow: https://www.pbrt.org/chapters/pbrt-2ed-chap4.pdf 
+#define USE_OIBVH 1
 
 namespace mcut
 {
