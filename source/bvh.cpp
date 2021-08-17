@@ -192,9 +192,9 @@ namespace mcut
 
         // three stages to BVH construction
         void BoundingVolumeHierarchy::buildTree(const mesh_t &mesh_,
-                                            const math::fixed_precision_number_t &enlargementEps_,
-                                            uint32_t mp_,
-                                            const SplitMethod &sm_)
+                                                const math::fixed_precision_number_t &enlargementEps_,
+                                                uint32_t mp_,
+                                                const SplitMethod &sm_)
         {
             SCOPED_TIMER(__FUNCTION__);
             mesh = &(mesh_); ///
@@ -514,13 +514,16 @@ namespace mcut
             return nodes[idx];
         }
 
-        const fd_t &BoundingVolumeHierarchy::GetPrimitive(int index) const 
+        const fd_t &BoundingVolumeHierarchy::GetPrimitive(int index) const
         {
             MCUT_ASSERT(index < (int)primitives.size());
             return primitives[index];
         }
 
         void BoundingVolumeHierarchy::intersectBVHTrees(
+#if defined(MCUT_MULTI_THREADED)
+            thread_pool &scheduler,
+#endif
             std::map<mcut::fd_t, std::vector<mcut::fd_t>> &symmetric_intersecting_pairs,
             const BoundingVolumeHierarchy &bvhA,
             const BoundingVolumeHierarchy &bvhB,
@@ -530,85 +533,152 @@ namespace mcut
             SCOPED_TIMER(__FUNCTION__);
             MCUT_ASSERT(bvhA.GetNodeCount() > 0);
             MCUT_ASSERT(bvhB.GetNodeCount() > 0);
-
-            std::vector<std::pair<int, int>> todo;
-            todo.reserve((uint32_t)std::sqrt(bvhA.GetNodeCount() * bvhB.GetNodeCount()) * 2);
-
-            todo.emplace_back(0, 0); // root nodes
-
-            while (todo.empty() == false)
+            
+            auto fn_intersectBVHTrees = [&bvhA, &bvhB, &primitiveOffsetA, &primitiveOffsetB](
+                                            std::vector<std::pair<int, int>> &worklist_,
+                                            std::map<mcut::fd_t, std::vector<mcut::fd_t>> &symmetric_intersecting_pairs_,
+                                            const uint32_t maxWorklistSize)
             {
-                std::pair<int, int> cur = todo.back();
-                // TODO: try to keep an additional counter that allows us to minimize pushing and popping
-                // Might require a wrapper class over std::vector "lazy vector"
-                todo.pop_back();
-
-                const uint32_t nodeAIndex = cur.first;
-                const uint32_t nodeBIndex = cur.second;
-                const std::shared_ptr<LinearBVHNode> nodeA = bvhA.GetNode(nodeAIndex);
-                const std::shared_ptr<LinearBVHNode> nodeB = bvhB.GetNode(nodeBIndex);
-
-                if (!geom::intersect_bounding_boxes(nodeA->bounds, nodeB->bounds))
+                // Simultaneous DFS traversal
+                while (worklist_.size() > 0 && worklist_.size() < maxWorklistSize)
                 {
-                    continue;
-                }
+                    //maxTodoSz = std::max(maxTodoSz, (int)worklist_.size());
+                    //std::cout << "worklist_.size()="<<worklist_.size()<<std::endl;
+                    std::pair<int, int> cur = worklist_.back();
+                    // TODO: try to keep an additional counter that allows us to minimize pushing and popping
+                    // Might require a wrapper class over std::vector "lazy vector"
+                    worklist_.pop_back();
 
-                bool nodeAIsLeaf = nodeA->nPrimitives > 0;
-                bool nodeBIsLeaf = nodeB->nPrimitives > 0;
+                    const uint32_t nodeAIndex = cur.first;
+                    const uint32_t nodeBIndex = cur.second;
+                    const std::shared_ptr<LinearBVHNode> nodeA = bvhA.GetNode(nodeAIndex);
+                    const std::shared_ptr<LinearBVHNode> nodeB = bvhB.GetNode(nodeBIndex);
 
-                if (nodeAIsLeaf)
-                {
-                    if (nodeBIsLeaf)
+                    if (!geom::intersect_bounding_boxes(nodeA->bounds, nodeB->bounds))
                     {
-                        for (int i = 0; i < nodeA->nPrimitives; ++i)
+                        continue;
+                    }
+
+                    bool nodeAIsLeaf = nodeA->nPrimitives > 0;
+                    bool nodeBIsLeaf = nodeB->nPrimitives > 0;
+
+                    if (nodeAIsLeaf)
+                    {
+                        if (nodeBIsLeaf)
                         {
-                            const fd_t faceA = bvhA.GetPrimitive((uint32_t)(nodeA->primitivesOffset + i));
-                            const fd_t faceAOffsetted(primitiveOffsetA + faceA);
-
-                            for (int j = 0; j < nodeB->nPrimitives; ++j)
+                            for (int i = 0; i < nodeA->nPrimitives; ++i)
                             {
-                                const fd_t faceB = bvhB.GetPrimitive((uint32_t)(nodeB->primitivesOffset + j));
-                                const fd_t faceBOffsetted(primitiveOffsetB + faceB);
+                                const fd_t faceA = bvhA.GetPrimitive((uint32_t)(nodeA->primitivesOffset + i));
+                                const fd_t faceAOffsetted(primitiveOffsetA + faceA);
 
-                                symmetric_intersecting_pairs[faceAOffsetted].push_back(faceBOffsetted);
-                                symmetric_intersecting_pairs[faceBOffsetted].push_back(faceAOffsetted);
+                                for (int j = 0; j < nodeB->nPrimitives; ++j)
+                                {
+                                    const fd_t faceB = bvhB.GetPrimitive((uint32_t)(nodeB->primitivesOffset + j));
+                                    const fd_t faceBOffsetted(primitiveOffsetB + faceB);
+
+                                    symmetric_intersecting_pairs_[faceAOffsetted].push_back(faceBOffsetted);
+                                    symmetric_intersecting_pairs_[faceBOffsetted].push_back(faceAOffsetted);
+                                }
                             }
+                        }
+                        else
+                        {
+                            const uint32_t nodeBLeftChild = nodeBIndex + 1;
+                            const uint32_t nodeBRightChild = nodeB->secondChildOffset;
+                            worklist_.emplace_back(nodeAIndex, nodeBLeftChild);
+                            worklist_.emplace_back(nodeAIndex, nodeBRightChild);
                         }
                     }
                     else
                     {
-                        const uint32_t nodeBLeftChild = nodeBIndex + 1;
-                        const uint32_t nodeBRightChild = nodeB->secondChildOffset;
-                        todo.emplace_back(nodeAIndex, nodeBLeftChild);
-                        todo.emplace_back(nodeAIndex, nodeBRightChild);
+                        if (nodeBIsLeaf)
+                        {
+                            const uint32_t nodeALeftChild = nodeAIndex + 1;
+                            const uint32_t nodeARightChild = nodeA->secondChildOffset;
+                            worklist_.emplace_back(nodeALeftChild, nodeBIndex);
+                            worklist_.emplace_back(nodeARightChild, nodeBIndex);
+                        }
+                        else
+                        {
+                            const uint32_t nodeALeftChild = nodeAIndex + 1;
+                            const uint32_t nodeARightChild = nodeA->secondChildOffset;
+
+                            const uint32_t nodeBLeftChild = nodeBIndex + 1;
+                            const uint32_t nodeBRightChild = nodeB->secondChildOffset;
+
+                            worklist_.emplace_back(nodeALeftChild, nodeBLeftChild);
+                            worklist_.emplace_back(nodeALeftChild, nodeBRightChild);
+
+                            worklist_.emplace_back(nodeARightChild, nodeBLeftChild);
+                            worklist_.emplace_back(nodeARightChild, nodeBRightChild);
+                        }
                     }
                 }
-                else
-                {
-                    if (nodeBIsLeaf)
+            };
+
+            // start with pair of root nodes
+            std::vector<std::pair<int, int>> todo(1, std::make_pair(0,0));
+
+#if defined(MCUT_MULTI_THREADED)
+            {
+                // master thread intersects the BVHs until the number of node pairs
+                // reaches a threshold (or workload was small enough that traversal
+                // is finished)
+                const uint32_t threshold = scheduler.get_num_threads();
+                fn_intersectBVHTrees(todo, symmetric_intersecting_pairs, threshold);
+
+                uint32_t remainingWorkloadCount = (uint32_t)todo.size(); // how much work do we still have left
+
+                if (remainingWorkloadCount > 0)
+                { // do parallel traversal by distributing blocks of node-pairs across worker threads
+                // NOTE: we do not manage load-balancing (too complex for the perf gain)
+                    typedef std::vector<std::pair<int, int>>::const_iterator InputStorageIteratorType;
+                    typedef std::map<mcut::fd_t, std::vector<mcut::fd_t>> OutputStorageType; // symmetric_intersecting_pairs (local)
+
+                    auto fn_intersect = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
                     {
-                        const uint32_t nodeALeftChild = nodeAIndex + 1;
-                        const uint32_t nodeARightChild = nodeA->secondChildOffset;
-                        todo.emplace_back(nodeALeftChild, nodeBIndex);
-                        todo.emplace_back(nodeARightChild, nodeBIndex);
-                    }
-                    else
+                        OutputStorageType symmetric_intersecting_pairs_local;
+
+                        std::vector<std::pair<int, int>> todo_local(block_start_, block_end_);
+
+                        fn_intersectBVHTrees(
+                            todo_local,
+                            symmetric_intersecting_pairs_local,
+                            // traverse until leaves
+                            std::numeric_limits<uint32_t>::max());
+
+                        return symmetric_intersecting_pairs_local;
+                    };
+
+                    std::vector<std::future<OutputStorageType>> futures;
+                    OutputStorageType partial_res;
+
+                    parallel_fork_and_join(
+                        scheduler,
+                        todo.cbegin(),
+                        todo.cend(),
+                        (1 << 1),
+                        fn_intersect,
+                        partial_res, // output of master thread
+                        futures);
+
+                    symmetric_intersecting_pairs.insert(partial_res.cbegin(), partial_res.cend());
+
+                    for (int i = 0; i < (int)futures.size(); ++i)
                     {
-                        const uint32_t nodeALeftChild = nodeAIndex + 1;
-                        const uint32_t nodeARightChild = nodeA->secondChildOffset;
+                        std::future<OutputStorageType> &f = futures[i];
+                        MCUT_ASSERT(f.valid());
+                        OutputStorageType future_res = f.get();
 
-                        const uint32_t nodeBLeftChild = nodeBIndex + 1;
-                        const uint32_t nodeBRightChild = nodeB->secondChildOffset;
-
-                        todo.emplace_back(nodeALeftChild, nodeBLeftChild);
-                        todo.emplace_back(nodeALeftChild, nodeBRightChild);
-
-                        todo.emplace_back(nodeARightChild, nodeBLeftChild);
-                        todo.emplace_back(nodeARightChild, nodeBRightChild);
+                        symmetric_intersecting_pairs.insert(future_res.cbegin(), future_res.cend());
                     }
                 }
             }
+#else
+            fn_intersectBVHTrees(todo, symmetric_intersecting_pairs, std::numeric_limits<uint32_t>::max());
+#endif // #if defined(MCUT_MULTI_THREADED)
         }
+
 #endif
     } // namespace bvh {
 } // namespace mcut {

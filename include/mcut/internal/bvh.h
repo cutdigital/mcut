@@ -25,6 +25,7 @@
 #include "mcut/internal/halfedge_mesh.h"
 #include "mcut/internal/geom.h"
 #include "mcut/internal/math.h"
+#include "mcut/internal/scheduler.h"
 
 //#define USE_OIBVH 1
 
@@ -295,6 +296,9 @@ namespace mcut
             const fd_t& GetPrimitive(int index) const; 
 
             static void intersectBVHTrees(
+#if defined(MCUT_MULTI_THREADED)
+                thread_pool& scheduler,
+#endif
                 std::map<mcut::fd_t, std::vector<mcut::fd_t>> &symmetric_intersecting_pairs,
                 const BoundingVolumeHierarchy &bvhA,
                 const BoundingVolumeHierarchy &bvhB,

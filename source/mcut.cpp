@@ -3639,6 +3639,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             intersectOIBVHs(ps_face_to_potentially_intersecting_others, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 #else
             mcut::bvh::BoundingVolumeHierarchy::intersectBVHTrees(
+#if defined(MCUT_MULTI_THREADED)
+                ctxtPtr->scheduler,
+#endif
                 ps_face_to_potentially_intersecting_others,
                 srcMeshBVH,
                 cutMeshBVH,
