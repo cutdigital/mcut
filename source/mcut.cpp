@@ -2364,6 +2364,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
 
+#if defined(MCUT_MULTI_THREADED) && defined(USE_LOCKFREE_WORKQUEUE)
+    mcut::thread_pool::busy_wait_guard bwg(&ctxtPtr->scheduler);
+#endif
+    
     if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0)
     {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "dispatch floating-point type unspecified");
