@@ -352,7 +352,7 @@ McResult indexArrayMeshToHalfedgeMesh(
     ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
 
     McResult result = McResult::MC_NO_ERROR;
-    std::unordered_map<uint32_t, mcut::vd_t> vmap;
+    //std::unordered_map<uint32_t, mcut::vd_t> vmap;
 
     halfedgeMesh.reserve_for_additional_elements(numVertices);
 
@@ -365,10 +365,11 @@ McResult indexArrayMeshToHalfedgeMesh(
             const float &x = vptr[(i * 3) + 0];
             const float &y = vptr[(i * 3) + 1];
             const float &z = vptr[(i * 3) + 2];
-            vmap[i] = halfedgeMesh.add_vertex(
+            /*vmap[i]*/mcut::vd_t vd = halfedgeMesh.add_vertex(
                 mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
+                MCUT_ASSERT(vd != mcut::mesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
     }
     else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE)
@@ -379,10 +380,11 @@ McResult indexArrayMeshToHalfedgeMesh(
             const double &x = vptr[(i * 3) + 0];
             const double &y = vptr[(i * 3) + 1];
             const double &z = vptr[(i * 3) + 2];
-            vmap[i] = halfedgeMesh.add_vertex(
+            /*vmap[i]*/mcut::vd_t vd = halfedgeMesh.add_vertex(
                 mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
+            MCUT_ASSERT(vd != mcut::mesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
     }
     else
@@ -456,6 +458,8 @@ McResult indexArrayMeshToHalfedgeMesh(
                 for (int j = 0; j < numFaceVertices; ++j)
                 {
                     uint32_t idx = ((uint32_t *)pFaceIndices)[faceBaseOffset + j];
+                    MCUT_ASSERT(idx < numVertices);
+                    #if 0
                     std::unordered_map<uint32_t, mcut::vd_t>::const_iterator fIter = vmap.find(idx);
 
                     if (fIter == vmap.cend())
@@ -473,8 +477,8 @@ McResult indexArrayMeshToHalfedgeMesh(
                         }
                         break;
                     }
-
-                    const mcut::vertex_descriptor_t descr = fIter->second; //vmap[*fIter.first];
+#endif
+                    const mcut::vertex_descriptor_t descr(idx);// = fIter->second; //vmap[*fIter.first];
 
                     const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
@@ -598,6 +602,7 @@ McResult indexArrayMeshToHalfedgeMesh(
         {
 
             uint32_t idx = ((uint32_t *)pFaceIndices)[faceSizeOffset + j];
+            #if 0
             std::unordered_map<uint32_t, mcut::vd_t>::const_iterator fIter = vmap.find(idx);
 
             if (fIter == vmap.cend())
@@ -612,8 +617,8 @@ McResult indexArrayMeshToHalfedgeMesh(
                     return result;
                 }
             }
-
-            const mcut::vertex_descriptor_t descr = fIter->second; //vmap[*fIter.first];
+#endif
+            const mcut::vertex_descriptor_t descr(idx);// = fIter->second; //vmap[*fIter.first];
 
             const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
@@ -636,7 +641,6 @@ McResult indexArrayMeshToHalfedgeMesh(
 
         if (fd == mcut::mesh_t::null_face())
         {
-
             result = McResult::MC_INVALID_VALUE;
             if (result != McResult::MC_NO_ERROR)
             {
@@ -728,7 +732,9 @@ McFragmentLocation convert(const mcut::connected_component_location_t &v)
 }
 
 McResult halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
     const std::unique_ptr<McDispatchContextInternal> &ctxtPtr,
+#endif
     IndexArrayMesh &indexArrayMesh,
     const mcut::output_mesh_info_t &halfedgeMeshInfo,
     const std::unordered_map<mcut::vd_t, mcut::math::vec3> &addedFpPartitioningVerticesOnCorrespondingInputSrcMesh,
@@ -744,7 +750,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     McResult result = McResult::MC_NO_ERROR;
 
-    std::vector<uint32_t> vmap(halfedgeMeshInfo.mesh.number_of_vertices());
+    //std::vector<uint32_t> vmap(halfedgeMeshInfo.mesh.number_of_vertices());
     //
     // vertices
     //
@@ -780,7 +786,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 2u] = point.z();
 
-                vmap[*viter] = i;
+                //vmap[*viter] = i;
 
                 if (!halfedgeMeshInfo.data_maps.vertex_map.empty())
                 {
@@ -853,9 +859,10 @@ McResult halfedgeMeshToIndexArrayMesh(
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i)
     {
 
-        mcut::mesh_t::vertex_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
-        std::advance(vIter, i);
-        const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(*vIter);
+        //mcut::mesh_t::vertex_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
+        //std::advance(vIter, i);
+        mcut::vd_t vdescr(i);
+        const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(vdescr/**vIter*/);
 
         indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
         indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
@@ -863,15 +870,15 @@ McResult halfedgeMeshToIndexArrayMesh(
 
         //std::cout << indexArrayMesh.pVertices[(i * 3u) + 0u] << " " << indexArrayMesh.pVertices[(i * 3u) + 1u] << " " << indexArrayMesh.pVertices[(i * 3u) + 2u] << std::endl;
 
-        vmap[*vIter] = i;
+        //vmap[*vIter] = i;
 
         if (!halfedgeMeshInfo.data_maps.vertex_map.empty())
         {
-            MCUT_ASSERT((size_t)*vIter < halfedgeMeshInfo.data_maps.vertex_map.size() /*halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1*/);
+            MCUT_ASSERT((size_t)i < halfedgeMeshInfo.data_maps.vertex_map.size() /*halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1*/);
 
             // Here we use whatever value was assigned to the current vertex by the kernel.
             // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(*vIter);
+            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(vdescr/**vIter*/);
             // We use the same default value as that used by the kernel for intersection
             // points (intersection points at mapped to uint_max i.e. null_vertex())
             uint32_t userInputMeshVertexDescr = UINT32_MAX;
@@ -931,7 +938,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         }
     }
 #endif
-    MCUT_ASSERT(!vmap.empty());
+    //MCUT_ASSERT(!vmap.empty());
 
     TIMESTACK_POP();
 
@@ -942,7 +949,6 @@ McResult halfedgeMeshToIndexArrayMesh(
     indexArrayMesh.numSeamVertexIndices = numSeamVertexIndices;
     if (indexArrayMesh.numSeamVertexIndices > 0u)
     {
-
         indexArrayMesh.pSeamVertexIndices = std::unique_ptr<uint32_t[]>(new uint32_t[numSeamVertexIndices]);
         for (uint32_t i = 0; i < numSeamVertexIndices; ++i)
         {
@@ -1063,9 +1069,10 @@ McResult halfedgeMeshToIndexArrayMesh(
     }
 #else
 
+    int faceID = 0;//std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
-        const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+        //const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
         {
             std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
@@ -1119,6 +1126,8 @@ McResult halfedgeMeshToIndexArrayMesh(
 
             indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
         } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
+
+            faceID++;
     }
 #endif                                                                    //#if defined(MCUT_MULTI_THREADED)
     MCUT_ASSERT(gatheredFacesAdjFaces.size() == indexArrayMesh.numFaces); // sanity check
@@ -1163,7 +1172,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                     for (uint32_t j = 0; j < faceSize; ++j)
                     {
                         const mcut::vd_t vd = faceVertices[j];
-                        indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = vmap[vd];
+                        indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = (uint32_t)vd;// vmap[vd];
                     }
                 }
 
@@ -1202,10 +1211,11 @@ McResult halfedgeMeshToIndexArrayMesh(
         }
     }
 #else
+ faceID = 0;//std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     // for each face
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
-        const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+        
 
         { // store face-vertex indices
             const std::vector<mcut::vd_t> &faceVertices = gatheredFaces[faceID];
@@ -1215,7 +1225,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             for (uint32_t j = 0; j < faceSize; ++j)
             {
                 const mcut::vd_t vd = faceVertices[j];
-                indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = vmap[vd];
+                indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = (uint32_t)vd; // vmap[vd];
             }
         }
 
@@ -1230,6 +1240,8 @@ McResult halfedgeMeshToIndexArrayMesh(
                 indexArrayMesh.pFaceAdjFaces[(size_t)faceAdjFaceIndexOffset + j] = (uint32_t)adjFace;
             }
         }
+
+        faceID++;
     }
 #endif
     TIMESTACK_POP();
@@ -1257,12 +1269,15 @@ McResult halfedgeMeshToIndexArrayMesh(
                 mcut::vd_t v0 = halfedgeMeshInfo.mesh.vertex(*eiter, 0);
                 mcut::vd_t v1 = halfedgeMeshInfo.mesh.vertex(*eiter, 1);
 
-                uint32_t idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter);
+                uint32_t r = halfedgeMeshInfo.mesh.count_removed_elements_in_range(halfedgeMeshInfo.mesh.edges_begin(), eiter);
+                uint32_t edge_idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter) - r;
 
-                MCUT_ASSERT((size_t)v0 < vmap.size());
-                indexArrayMesh.pEdges[((size_t)idx * 2u) + 0u] = vmap[v0];
-                MCUT_ASSERT((size_t)v1 < vmap.size());
-                indexArrayMesh.pEdges[((size_t)idx * 2u) + 1u] = vmap[v1];
+                //MCUT_ASSERT((size_t)v0 < vmap.size());
+                MCUT_ASSERT(((size_t)edge_idx * 2u) + 0u < indexArrayMesh.numEdgeIndices);
+                indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 0u] = (uint32_t)v0; // vmap[v0];
+                //MCUT_ASSERT((size_t)v1 < vmap.size());
+                MCUT_ASSERT(((size_t)edge_idx * 2u) + 1u < indexArrayMesh.numEdgeIndices);
+                indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 1u] =(uint32_t)v1; //  vmap[v1];
             }
 
             return 0;
@@ -1288,19 +1303,25 @@ McResult halfedgeMeshToIndexArrayMesh(
         }
     }
 #else
+    // note: cannot use std::distance with halfedge mesh iterators
+    // not implemented because it'd be too slow
+    uint32_t edge_idx = 0; // std::distance(halfedgeMeshInfo.mesh.edges_begin(), i);
+
     for (mcut::mesh_t::edge_iterator_t i = halfedgeMeshInfo.mesh.edges_begin(); i != halfedgeMeshInfo.mesh.edges_end(); ++i)
     {
 
         mcut::vd_t v0 = halfedgeMeshInfo.mesh.vertex(*i, 0);
         mcut::vd_t v1 = halfedgeMeshInfo.mesh.vertex(*i, 1);
 
-        uint32_t idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), i);
-
         //gatheredEdges.emplace_back(v0, v1);
-        MCUT_ASSERT((size_t)v0 < vmap.size());
-        indexArrayMesh.pEdges[((size_t)idx * 2u) + 0u] = vmap[v0];
-        MCUT_ASSERT((size_t)v1 < vmap.size());
-        indexArrayMesh.pEdges[((size_t)idx * 2u) + 1u] = vmap[v1];
+        MCUT_ASSERT(((size_t)edge_idx * 2u) + 0u < indexArrayMesh.numEdgeIndices);
+        //MCUT_ASSERT((size_t)v0 < vmap.size());
+        indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 0u] = (uint32_t)v0; // vmap[v0];
+        MCUT_ASSERT(((size_t)edge_idx * 2u) + 1u < indexArrayMesh.numEdgeIndices);
+        //MCUT_ASSERT((size_t)v1 < vmap.size());
+        indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 1u] = (uint32_t)v1; // vmap[v1];
+
+        edge_idx++;
     }
 #endif
 #if 0
@@ -2367,7 +2388,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #if defined(MCUT_MULTI_THREADED) && defined(USE_LOCKFREE_WORKQUEUE)
     mcut::thread_pool::busy_wait_guard bwg(&ctxtPtr->scheduler);
 #endif
-    
+
     if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0)
     {
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "dispatch floating-point type unspecified");
@@ -3793,7 +3814,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
 
                 halfedgeMeshToIndexArrayMesh(
-                    ctxtPtr, asFragPtr->indexArrayMesh, *k,
+#if defined(MCUT_MULTI_THREADED)
+                    ctxtPtr,
+#endif
+                    asFragPtr->indexArrayMesh, *k,
                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
             }
@@ -3822,9 +3846,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             asFragPtr->patchLocation = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
             asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
 
-            halfedgeMeshToIndexArrayMesh(ctxtPtr, asFragPtr->indexArrayMesh, *j,
-                                         addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                         numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+            halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+                ctxtPtr,
+#endif
+                asFragPtr->indexArrayMesh, *j,
+                addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         }
     }
     TIMESTACK_POP();
@@ -3845,9 +3873,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_INSIDE;
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it,
-                                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+        halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+            ctxtPtr,
+#endif
+            asPatchPtr->indexArrayMesh, *it,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
     TIMESTACK_POP();
 
@@ -3865,9 +3897,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_OUTSIDE;
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asPatchPtr->indexArrayMesh, *it,
-                                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+        halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+            ctxtPtr,
+#endif
+            asPatchPtr->indexArrayMesh, *it,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
     }
     TIMESTACK_POP();
 
@@ -3887,9 +3923,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         McSeamConnComp *asSrcMeshSeamPtr = dynamic_cast<McSeamConnComp *>(ctxtPtr->connComps.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh,
-                                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+        halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+            ctxtPtr,
+#endif
+            asSrcMeshSeamPtr->indexArrayMesh, backendOutput.seamed_src_mesh,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         TIMESTACK_POP();
     }
 
@@ -3905,9 +3945,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh,
-                                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+        halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+            ctxtPtr,
+#endif
+            asCutMeshSeamPtr->indexArrayMesh, backendOutput.seamed_cut_mesh,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         TIMESTACK_POP();
     }
 
@@ -3951,9 +3995,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asCutMeshInputPtr->indexArrayMesh, omi,
-                                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+        halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+            ctxtPtr,
+#endif
+            asCutMeshInputPtr->indexArrayMesh, omi,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         TIMESTACK_POP();
     }
 
@@ -3989,9 +4037,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        halfedgeMeshToIndexArrayMesh(ctxtPtr, asSrcMeshInputPtr->indexArrayMesh, omi,
-                                     addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                                     numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
+        halfedgeMeshToIndexArrayMesh(
+#if defined(MCUT_MULTI_THREADED)
+            ctxtPtr,
+#endif
+            asSrcMeshInputPtr->indexArrayMesh, omi,
+            addedFpPartitioningVerticesOnSrcMesh, fpPartitionChildFaceToInputSrcMeshFace, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         TIMESTACK_POP();
     }
 

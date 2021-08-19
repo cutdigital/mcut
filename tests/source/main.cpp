@@ -235,8 +235,9 @@ extern "C" void writeOFF(
     }
 
     fprintf(file, "OFF\n");
-    numEdges;
-    pEdgeIndices;
+    printf("skipped .off file edges %d, %p\n", numEdges, pEdgeIndices);
+    //numEdges;
+    //pEdgeIndices;
     fprintf(file, "%d %d %d\n", numVertices, numFaces, 0 /*numEdges*/);
     int i;
     for (i = 0; i < (int)numVertices; ++i) {

@@ -191,7 +191,7 @@ namespace mcut
     public:
         lock_free_queue()
         {
-            counted_node_ptr cnp ;
+            counted_node_ptr cnp;
             cnp.external_count = 0;
             cnp.ptr = new node;
             head.store(cnp, std::memory_order_seq_cst);
@@ -286,7 +286,6 @@ namespace mcut
         std::mutex tail_mutex;
         node *tail;
         std::condition_variable data_cond;
-        const std::atomic_bool terminate;
 
         std::unique_ptr<node> try_pop_head()
         {
@@ -327,7 +326,7 @@ namespace mcut
         {
             std::unique_lock<std::mutex> head_lock(head_mutex);
             data_cond.wait(head_lock, [&]
-                           { return !terminate && head.get() != get_tail(); });
+                           { return head.get() != get_tail(); });
             return head_lock;
         }
         std::unique_ptr<node> wait_pop_head()
@@ -343,7 +342,7 @@ namespace mcut
         }
 
     public:
-        thread_safe_queue() : head(new node), tail(head.get()), terminate(false) {}
+        thread_safe_queue() : head(new node), tail(head.get()) {}
         thread_safe_queue(const thread_safe_queue &other) = delete;
         thread_safe_queue &operator=(const thread_safe_queue &other) = delete;
 
@@ -509,7 +508,8 @@ namespace mcut
 
                     // try to pop some work to do from my queue, or steal from some other worker-thread's queue.
                     if ((task = work_queues[worker_thread_id].pop()).get() != nullptr /*|| //
-                        (task = pop_from_other_thread_queue(worker_thread_id)).get() != nullptr*/)
+                        (task = pop_from_other_thread_queue(worker_thread_id)).get() != nullptr*/
+                    )
                     {
                         (*task)();
                     }
@@ -537,10 +537,16 @@ namespace mcut
                 }
                 task();
 #else
+
                 // if I can't pop any task from my queue, and I can't steal a task from
                 // another thread's queue, then I'll just wait until is added to my queue.
                 if (!(work_queues[worker_thread_id].try_pop(task) || try_pop_from_other_thread_queue(task, worker_thread_id)))
                 {
+                    if (terminate)
+                    {
+                        break; // finished (i.e. MCUT context was destroyed)
+                    }
+
                     work_queues[worker_thread_id].wait_and_pop(task);
                 }
 
@@ -622,6 +628,7 @@ namespace mcut
             catch (...)
             {
                 terminate = true;
+                wakeup_and_shutdown();
                 throw;
             }
         }
@@ -637,14 +644,19 @@ namespace mcut
 #if defined(USE_LOCKFREE_WORKQUEUE)
 #else  // #if defined(USE_LOCKFREE_WORKQUEUE)
 
-            // submit empty task so that worker threads can wake up
-            // with a valid (but redundant) task to then exit
+            wakeup_and_shutdown();
+#endif // #if defined(USE_LOCKFREE_WORKQUEUE)
+        }
+
+        // submit empty task so that worker threads can wake up
+        // with a valid (but redundant) task to then exit
+        void wakeup_and_shutdown()
+        {
             auto fn_wakeup_and_shutdown = []() {};
             for (unsigned i = 0; i < get_num_threads(); ++i)
             {
-                submit(fn_wakeup_and_shutdown).wait();
+                submit(fn_wakeup_and_shutdown);
             }
-#endif // #if defined(USE_LOCKFREE_WORKQUEUE)
         }
 
     public:

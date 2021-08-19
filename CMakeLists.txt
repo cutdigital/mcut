@@ -79,11 +79,11 @@ set (project_namespace_name MCUT)
 # User options
 #
 option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by default
-option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" OFF)
+option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" ON)
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
-option(MCUT_BUILD_AS_MULTI_THREADED_LIB "Configure to build MCUT as a multi-threaded library" ON)
-option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
+option(MCUT_BUILD_AS_MULTI_THREADED_LIB "Configure to build MCUT as a multi-threaded library" OFF)
+option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" OFF)
 
 #
 # machine-precision-numbers library targets
@@ -166,7 +166,7 @@ if (MCUT_BUILD_AS_MULTI_THREADED_LIB)
 endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-	list(APPEND compilation_flags -Wall -Wextra)
+	list(APPEND compilation_flags -Wall -Wextra -pg)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	list(APPEND compilation_flags w3 -diag-disable:remark)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

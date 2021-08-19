@@ -130,7 +130,7 @@ UTEST_F(BooleanOperation, differenceB_Not_A)
     uint32_t numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, 3);
+    ASSERT_EQ(numConnComps, uint32_t(3));
 }
 
 UTEST_F(BooleanOperation, unionOp)

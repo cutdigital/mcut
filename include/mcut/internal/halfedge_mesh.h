@@ -388,10 +388,17 @@ namespace mcut
 
 #endif
 
+        template <typename T>
+        struct identity
+        {
+            typedef T type;
+        };
+
         template <typename V>
         class array_iterator_t : public V::const_iterator
         {
             const mesh_t *mesh_ptr;
+            typedef typename V::const_iterator std_iterator_base_class;
             typedef typename V::value_type::descriptor_type element_descriptor_type;
             typename V::value_type *operator->() = delete;
 
@@ -402,6 +409,12 @@ namespace mcut
                 : V::const_iterator(it_), mesh_ptr(mesh)
             {
             }
+#if 0
+            const mcut::mesh_t * get_mesh_ptr() const
+            {
+                return mesh_ptr;
+            }
+#endif
 #if 0
         array_iterator_t<V>(array_iterator_t<V>&& v) : V::const_iterator{std::move(v)} 
         {
@@ -524,12 +537,6 @@ namespace mcut
             // reached the end of the respective std::map data structure over which we are
             // iterating.
 
-            template <typename T>
-            struct identity
-            {
-                typedef T type;
-            };
-
             template <typename I = array_iterator_t<V>>
             I cend()
             {
@@ -542,18 +549,6 @@ namespace mcut
                 return cbegin(account_for_removed_elems, identity<I>());
             }
 
-#if 0
-        static std::ptrdiff_t distance(const array_iterator_t<V>& beg, const array_iterator_t<V>& end, bool account_for_removed_elems)
-        {
-            array_iterator_t<V> it = beg;
-            //typename std::ptrdiff_t dist = (&end) - (&beg);
-            //while (it != end) {
-            //    dist++;
-            //    ++it;
-            }
-            return dist;
-        }
-#endif
         private:
             template <typename I = array_iterator_t<V>>
             I cend(identity<I>)
@@ -566,23 +561,6 @@ namespace mcut
             {
                 return I(); // unused
             }
-
-#if 0
-        array_iterator_t<face_map_t> cend(identity<array_iterator_t<face_map_t>>)
-        {
-            return mesh_ptr->faces_end();
-        }
-
-        array_iterator_t<edge_map_t> cend(identity<array_iterator_t<edge_map_t>>)
-        {
-            return mesh_ptr->edges_end();
-        }
-
-        array_iterator_t<halfedge_map_t> cend(identity<array_iterator_t<halfedge_map_t>>)
-        {
-            return mesh_ptr->halfedges_end();
-        }
-#endif
 
             array_iterator_t<vertex_array_t> cbegin(bool account_for_removed_elems, identity<array_iterator_t<vertex_array_t>> = {})
             {
@@ -999,6 +977,86 @@ namespace mcut
             reserve_for_additional_halfedges(nh);
         }
 
+        ///
+
+        template <typename I = int>
+        I get_removed_elements(identity<I>)
+        {
+            return I(); // unused
+        }
+
+        const std::vector<vertex_descriptor_t> &get_removed_elements(identity<array_iterator_t<vertex_array_t>>) const
+        {
+            return get_removed_vertices();
+        }
+
+        const std::vector<edge_descriptor_t> &get_removed_elements(identity<array_iterator_t<edge_array_t>>) const
+        {
+            return get_removed_edges();
+        }
+
+        const std::vector<halfedge_descriptor_t> &get_removed_elements(identity<array_iterator_t<halfedge_array_t>>) const
+        {
+            return get_removed_halfedges();
+        }
+
+        const std::vector<face_descriptor_t> &get_removed_elements(identity<array_iterator_t<face_array_t>>) const
+        {
+            return get_removed_faces();
+        }
+
+        //
+        template <typename I = int>
+        I elements_begin_(identity<I>)
+        {
+            return I(); // unused
+        }
+
+        const vertex_iterator_t elements_begin_(identity<array_iterator_t<vertex_array_t>>, bool account_for_removed_elems = true) const
+        {
+            return vertices_begin(account_for_removed_elems);
+        }
+
+        const edge_iterator_t elements_begin_(identity<array_iterator_t<edge_array_t>>, bool account_for_removed_elems = true) const
+        {
+            return edges_begin(account_for_removed_elems);
+        }
+
+        const halfedge_iterator_t elements_begin_(identity<array_iterator_t<halfedge_array_t>>, bool account_for_removed_elems = true) const
+        {
+            return halfedges_begin(account_for_removed_elems);
+        }
+
+        const face_iterator_t elements_begin_(identity<array_iterator_t<face_array_t>>, bool account_for_removed_elems = true) const
+        {
+            return faces_begin(account_for_removed_elems);
+        }
+
+        // returns the number of removed mesh elements (vertices, edges, faces or halfedges) between [start, end)
+        template <typename I>
+        uint32_t count_removed_elements_in_range(const array_iterator_t<I>& start, const array_iterator_t<I>& end) const
+        {
+            const long long N = (uint32_t)(end - start); // length including removed elements
+            MCUT_ASSERT(N >= 0);
+            if(N == 0)
+            {
+                return 0;
+            }
+            const uint32_t start_ = std::distance(elements_begin_(identity<array_iterator_t<I>>{}, false), start);
+            uint32_t n = 0;
+
+            for (auto elem_descr : get_removed_elements(identity<array_iterator_t<I>>{}))
+            {
+                const uint32_t descr = (uint32_t)elem_descr;
+
+                if (descr >= start_ && (descr <= (start_ + (uint32_t)(N - 1))))
+                {
+                    ++n;
+                }
+            }
+            return n;
+        }
+
         const math::vec3 &vertex(const vertex_descriptor_t &vd) const;
 
         // returns vector of halfedges which point to vertex (i.e. "v" is their target)
@@ -1029,6 +1087,26 @@ namespace mcut
         face_iterator_t faces_begin(bool account_for_removed_elems = true) const;
 
         face_iterator_t faces_end() const;
+
+        const std::vector<vertex_descriptor_t> &get_removed_vertices() const
+        {
+            return m_vertices_removed;
+        }
+
+        const std::vector<edge_descriptor_t> &get_removed_edges() const
+        {
+            return m_edges_removed;
+        }
+
+        const std::vector<halfedge_descriptor_t> &get_removed_halfedges() const
+        {
+            return m_halfedges_removed;
+        }
+
+        const std::vector<face_descriptor_t> &get_removed_faces() const
+        {
+            return m_faces_removed;
+        }
 
     private:
         // member variables
@@ -1062,6 +1140,7 @@ namespace mcut
 
 namespace std
 {
+
     template <>
     struct hash<mcut::vertex_descriptor_t>
     {

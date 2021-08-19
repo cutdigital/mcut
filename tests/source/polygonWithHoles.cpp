@@ -16,14 +16,14 @@ struct PolygonsWithHoles {
     float* pSrcMeshVertices = NULL;
     uint32_t* pSrcMeshFaceIndices = NULL;
     uint32_t* pSrcMeshFaceSizes = NULL;
-    uint32_t numSrcMeshVertices = NULL;
-    uint32_t numSrcMeshFaces = NULL;
+    uint32_t numSrcMeshVertices = 0;
+    uint32_t numSrcMeshFaces = 0;
 
     float* pCutMeshVertices = NULL;
     uint32_t* pCutMeshFaceIndices = NULL;
     uint32_t* pCutMeshFaceSizes = NULL;
-    uint32_t numCutMeshVertices = NULL;
-    uint32_t numCutMeshFaces = NULL;
+    uint32_t numCutMeshVertices = 0;
+    uint32_t numCutMeshFaces = 0;
 };
 
 UTEST_F_SETUP(PolygonsWithHoles)

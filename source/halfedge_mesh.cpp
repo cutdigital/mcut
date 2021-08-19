@@ -894,3 +894,21 @@ void read_off(mcut::mesh_t& mesh, const char* fpath)
 }
 
 } // namespace mcut
+
+#if 0
+namespace std
+{
+    template<>
+    typename mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type distance( mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> first,  mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> last)
+    {
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> it = first;
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type dist = 0;
+
+        while (it != last) {
+            ++dist;
+            ++it;
+        }
+        return dist;
+    }
+}
+#endif

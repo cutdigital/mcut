@@ -16,14 +16,14 @@ struct SeamConnectedComponent {
     float* pSrcMeshVertices = NULL;
     uint32_t* pSrcMeshFaceIndices = NULL;
     uint32_t* pSrcMeshFaceSizes = NULL;
-    uint32_t numSrcMeshVertices = NULL;
-    uint32_t numSrcMeshFaces = NULL;
+    uint32_t numSrcMeshVertices = 0;
+    uint32_t numSrcMeshFaces = 0;
 
     float* pCutMeshVertices = NULL;
     uint32_t* pCutMeshFaceIndices = NULL;
     uint32_t* pCutMeshFaceSizes = NULL;
-    uint32_t numCutMeshVertices = NULL;
-    uint32_t numCutMeshFaces = NULL;
+    uint32_t numCutMeshVertices = 0;
+    uint32_t numCutMeshFaces = 0;
 };
 
 UTEST_F_SETUP(SeamConnectedComponent)
@@ -121,7 +121,7 @@ UTEST_F(SeamConnectedComponent, queryVertices)
     // a seam conn-comp whose origin is the cut-mesh is guarranteed to exist if the src-mesh is water-tight.
     // More generally, a seamed mesh is guarranteed to exist if and only if discovered seams/cut-paths are either 1) "circular" (loop) or 2) "linear"
     // which means that they sever/partition the respective origin (src-mesh or cut-mesh)
-    ASSERT_EQ(numConnComps, 1);
+    ASSERT_EQ(numConnComps, uint32_t(1));
 
     utest_fixture->connComps_.resize(numConnComps);
 
@@ -147,7 +147,7 @@ UTEST_F(SeamConnectedComponent, queryVertices)
             ASSERT_LT((uint32_t)seamVertexIndices[i], numberOfVertices); // out of bounds vertex index
         }
 
-        ASSERT_EQ(seamVertexIndices.size(), 4u); // specifc to benchmark meshes used (see setup function).
+        ASSERT_EQ((uint32_t)seamVertexIndices.size(), 4u); // specifc to benchmark meshes used (see setup function).
     }
 }
 
