@@ -22,16 +22,17 @@
 #
 # You can configure MCUT with the following CMake options:
 #
-#	MCUT_BUILD_AS_SHARED_LIB - Build MCUT as a shared/dynamic library (.so/.dll).
-#	MCUT_BUILD_THE_DOCS - Build documentation (explicit dependancy on Doxygen) 
-#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS - Build using arbitrary precision numbers (BETA MODE ).
-#	MCUT_BUILD_TESTS - Build the tests (implicit dependancy on GoogleTest)
-#	MCUT_BUILD_TUTORIALS - Build tutorials
+#	MCUT_BUILD_AS_SHARED_LIB [default=ON] - Build MCUT as a shared/dynamic library (.so/.dll).
+#	MCUT_BUILD_DOCUMENTATION [default=OFF] - Build documentation (explicit dependancy on Doxygen) 
+#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS [default=OFF] - Build using arbitrary precision numbers.
+#	MCUT_BUILD_TESTS [default=OFF] - Build the tests (implicit dependancy on GoogleTest)
+#	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
+#	MCUT_BUILD_WITH_MULTITHREADING [default=ON] - Build as multi-threaded library
 #
 # This script will define the following cache variables:
 #
 #	MCUT_INCLUDE_DIR - the MCUT include directory
-# 	MCUT_LIB_PATH - path to the MCUT shared library 
+# 	MCUT_LIB_PATH - path to the MCUT library (.so/.dll || .a/.lib)
 
 cmake_minimum_required(VERSION 3.12...3.13 FATAL_ERROR)
 
@@ -53,9 +54,9 @@ endif()
 
 set (CMAKE_DEBUG_POSTFIX "d")
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -78,11 +79,11 @@ set (project_namespace_name MCUT)
 #
 # User options
 #
-option(MCUT_BUILD_THE_DOCS "Configure to build docs with Doxygen" OFF) # OFF by default
+option(MCUT_BUILD_DOCUMENTATION "Configure to build docs with Doxygen" OFF) # OFF by default
 option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" ON)
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
-option(MCUT_BUILD_AS_MULTI_THREADED_LIB "Configure to build MCUT as a multi-threaded library" OFF)
+option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" ON)
 option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" OFF)
 
 #
@@ -302,7 +303,7 @@ endif()
 #
 # documentation
 #
-if(MCUT_BUILD_THE_DOCS)
+if(MCUT_BUILD_DOCUMENTATION)
 	add_subdirectory(docs)
 endif()
 
