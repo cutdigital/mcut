@@ -3414,7 +3414,7 @@ namespace mcut
         // TODO: this is redundnat (remove)
         mesh_t::vertex_iterator_t m0_ivtx_iter_begin = m0.vertices_begin();
         std::advance(m0_ivtx_iter_begin, ps_vtx_cnt); // offset to start of intersection vertices in mesh_t (note: internal mesh data stored consecutively)
-
+#if 0
         //
         // check if at-least one source mesh edge intersects any face of the cut mesh.
         // ---------------------------------------------------------------------------
@@ -3447,7 +3447,7 @@ namespace mcut
                 break;
             }
         }
-#if 0
+
     if (!atleast_one_sm_edge_intersects_an_cs_face) {
         // NOTE: the sm must intersect at least one face of the cs to allow for an opening on the sm boundary.
         lg.set_reason_for_failure("found no edge in source mesh which intersects a cut mesh face.");
@@ -4075,18 +4075,18 @@ namespace mcut
                 const vd_t last_edge_vertex1 = m0.vertex(last_edge, 1);
                 bool last_edge_vertex0_is_terminal = m0_cutpath_terminal_vertices.find(last_edge_vertex0) != m0_cutpath_terminal_vertices.cend();
 
-                bool last_edge_is_terminal = last_edge_vertex0_is_terminal;
+                //bool last_edge_is_terminal = last_edge_vertex0_is_terminal;
 
                 if (last_edge_vertex0_is_terminal == false)
                 {
                     // check if vertex1 is terminal
                     bool last_edge_vertex1_is_terminal = m0_cutpath_terminal_vertices.find(last_edge_vertex1) != m0_cutpath_terminal_vertices.cend();
-                    last_edge_is_terminal = last_edge_vertex1_is_terminal;
+                    //last_edge_is_terminal = last_edge_vertex1_is_terminal;
                 }
 
                 bool last_vtx_is_from_src_mesh = first_vtx_is_from_src_mesh; // ... we will use this to determine whether we have a severing cutpath or not (the current one)
 
-                MCUT_ASSERT(last_edge_is_terminal); // i.e. we have a linear cut path
+                //MCUT_ASSERT(last_edge_is_terminal); // i.e. we have a linear cut path
                 vd_t last_edge_terminal_vertex = mesh_t::null_vertex();
 
                 if (last_edge == first_edge) // sequence has one edge
@@ -10344,7 +10344,7 @@ namespace mcut
                         vd_t m1_cs_cur_patch_polygon_he_tgt = m0_cur_patch_cur_poly_cur_he_tgt;
 
                         // flag whether to insert new edge into "m1_colored"
-                        bool create_new_edge = false;
+                        //bool create_new_edge = false;
 
                         hd_t m1_cur_patch_cur_poly_cur_he = mesh_t::null_halfedge();
 
@@ -10577,6 +10577,7 @@ namespace mcut
                                 MCUT_ASSERT(m0_h_to_ply.at(m0_cs_next_patch_polygon_he).size() > 0 /*m0_h_to_ply.find(m0_cs_next_patch_polygon_he) != m0_h_to_ply.cend()*/);
 
                                 const std::vector<int> &m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
+#ifndef NDEBUG
                                 const std::vector<int>::const_iterator find_iter = std::find_if( // points to src-mesh polygon
                                     m0_poly_he_coincident_polys.cbegin(),
                                     m0_poly_he_coincident_polys.cend(),
@@ -10587,7 +10588,7 @@ namespace mcut
 
                                 // "next" is always incident to an source-mesh polygon
                                 MCUT_ASSERT(find_iter != m0_poly_he_coincident_polys.cend());
-
+#endif
                                 const hd_t m0_cs_next_patch_polygon_he_opp = m0.opposite(m0_cs_next_patch_polygon_he);
 
                                 // Note: this is always true, even in the case of scoop cuts. This is because
@@ -10789,7 +10790,7 @@ namespace mcut
                                                     MCUT_ASSERT(m0_poly_he_tgt_dupl != mesh_t::null_halfedge());
 
                                                     m1_cs_cur_patch_polygon_he_tgt = m0_poly_he_tgt_dupl;
-                                                    create_new_edge = true;
+                                                    //create_new_edge = true;
                                                 }
                                             }
                                         } // if (next_is_transformed) {
@@ -10869,13 +10870,13 @@ namespace mcut
 
                         // stores the an "m1" instance of the current halfedge, for each patch
                         std::map<int, hd_t /*m1*/> &patch_to_m1_he = m0_to_m1_he_instances_find_iter->second;
-                        const std::map<int, hd_t /*m1*/>::const_iterator patch_idx_to_m1_he = patch_to_m1_he.find(cur_patch_idx);
+                        //const std::map<int, hd_t /*m1*/>::const_iterator patch_idx_to_m1_he = patch_to_m1_he.find(cur_patch_idx);
 
                         // In general, a halfedge may only be transformed once for each patch it is be associated
                         // with (i.e it will have two copies with one for each opposing patch). Note however that
                         // in the case that the current halfedge is a border halfedge (partial cut), its transformed
                         // copy is the same as its untransformed copy for each patch
-                        MCUT_ASSERT(patch_idx_to_m1_he == patch_to_m1_he.cend());
+                        MCUT_ASSERT(patch_to_m1_he.find(cur_patch_idx) == patch_to_m1_he.cend());
 
                         patch_to_m1_he.insert(std::make_pair(cur_patch_idx, m1_cur_patch_cur_poly_cur_he));
                         transformed_he_counter += 1; // next halfedge in m0_cur_patch_cur_poly
