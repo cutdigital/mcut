@@ -895,20 +895,49 @@ void read_off(mcut::mesh_t& mesh, const char* fpath)
 
 } // namespace mcut
 
-#if 0
+#if 1
 namespace std
 {
+    #if 1
     template<>
-    typename mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type distance( mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> first,  mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> last)
+    typename mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type distance( 
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> first,  
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> last)
     {
+        MCUT_ASSERT(first.get_mesh_ptr() == last.get_mesh_ptr());
         mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> it = first;
-        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type dist = 0;
-
-        while (it != last) {
-            ++dist;
-            ++it;
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type dist = last - first;
+        
+        uint32_t r = it.get_mesh_ptr()->count_removed_elements_in_range(first, last);
+        if(r > 0){
+            dist = dist - r;
         }
+        
+        MCUT_ASSERT(dist >= 0);
+        
+
         return dist;
     }
+#endif
+
+#if 0
+    template<>
+    void advance(
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>& iter, 
+        typename std::iterator_traits<mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>>::difference_type n){
+
+        const mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> it = iter;
+        iter += n; // raw ptr shift (i.e. ignoring that there may be removed elements)
+        #if 0
+        uint32_t r = iter.get_mesh_ptr()->count_removed_elements_in_range(it, iter);
+        uint32_t i =0;
+        while(i < r)
+        {
+            ++iter;
+            ++i;
+        }
+        #endif
+    }
+    #endif
 }
 #endif

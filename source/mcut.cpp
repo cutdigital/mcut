@@ -1264,14 +1264,21 @@ McResult halfedgeMeshToIndexArrayMesh(
 
         auto fn_copy_edges = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
         {
+            //uint32_t bs =*block_start_;
+            //uint32_t be =*block_end_;
+            
             for (InputStorageIteratorType eiter = block_start_; eiter != block_end_; ++eiter)
             {
+                //printf("block_start_=%u; block_end_=%u eiter=%u\n", (uint32_t)*block_start_,  (uint32_t)*block_end_, (uint32_t)*eiter);
+                //bool is_end = eiter == block_end_;
+                //uint32_t edge_id = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter);
                 mcut::vd_t v0 = halfedgeMeshInfo.mesh.vertex(*eiter, 0);
                 mcut::vd_t v1 = halfedgeMeshInfo.mesh.vertex(*eiter, 1);
 
-                uint32_t r = halfedgeMeshInfo.mesh.count_removed_elements_in_range(halfedgeMeshInfo.mesh.edges_begin(), eiter);
-                uint32_t edge_idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter) - r;
-
+                //uint32_t r = halfedgeMeshInfo.mesh.count_removed_elements_in_range(halfedgeMeshInfo.mesh.edges_begin(), eiter);
+                // NOTE: our override of std::distance accounts for removed elements
+                uint32_t edge_idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter);// - r;
+                //printf("edge_idx = %d (%u)\n",edge_idx, (uint32_t)*eiter );
                 //MCUT_ASSERT((size_t)v0 < vmap.size());
                 MCUT_ASSERT(((size_t)edge_idx * 2u) + 0u < indexArrayMesh.numEdgeIndices);
                 indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 0u] = (uint32_t)v0; // vmap[v0];
@@ -1290,7 +1297,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             ctxtPtr->scheduler,
             halfedgeMeshInfo.mesh.edges_begin(),
             halfedgeMeshInfo.mesh.edges_end(),
-            (1 << 7),
+            (1 << 3),
             fn_copy_edges,
             _1, // out
             futures);

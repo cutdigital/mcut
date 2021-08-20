@@ -409,63 +409,20 @@ namespace mcut
                 : V::const_iterator(it_), mesh_ptr(mesh)
             {
             }
-#if 0
-            const mcut::mesh_t * get_mesh_ptr() const
+#if 1
+            const mcut::mesh_t *get_mesh_ptr() const
             {
                 return mesh_ptr;
             }
 #endif
-#if 0
-        array_iterator_t<V>(array_iterator_t<V>&& v) : V::const_iterator{std::move(v)} 
-        {
-        }
 
-        array_iterator_t<V>& operator=(array_iterator_t<V>&& v)
-        {
-           V::const_iterator::operator=(std::move(v)); // Selects base class function
-            return *this;
-        }
-
-        // copy assignment
-        array_iterator_t<V>& operator=(const array_iterator_t<V>& other)
-        {
-            // Guard self assignment
-            if (this == &other)
-                return *this;
-        
-            *this = other;
-            return *this;
-        }
-#endif
             typename V::value_type::descriptor_type operator*() // TODO: test this, I think its broken
             {
-                size_t raw_index = std::distance(cbegin<>(false), (*this)); // account for remove elements too
+                size_t raw_index = (*this) - cbegin<>(false); //std::distance(cbegin<>(false), (*this)); // account for remove elements too
                 element_descriptor_type d = static_cast<element_descriptor_type>(raw_index);
                 return d;
             }
 
-            // postfix increment (i++)
-            // increment pointer to the next valid element (i.e. we skip removed elements).
-            array_iterator_t<V> operator++(int) // TODO:fix this its broken
-            {
-                bool old_elem_is_removed = false;
-
-                do
-                {
-                    array_iterator_t<V> old_elem = this->operator++(0); // (i++)
-                    element_descriptor_type raw_descriptor = (element_descriptor_type)std::distance(cbegin<>(false), old_elem);
-                    old_elem_is_removed = mesh_ptr->is_removed(raw_descriptor);
-                    if (!old_elem_is_removed)
-                    {
-                        return old_elem;
-                    }
-
-                    // keep iterating until the value returned by the (i++) operator returns a valid element
-                    // i.e. one that is not marked removed!
-                } while ((*this) != cend<>() && old_elem_is_removed);
-
-                return cend<>();
-            }
 #if 0
 // move assignment
         array_iterator_t<V>& operator=(array_iterator_t<V>&& other)
@@ -515,7 +472,7 @@ namespace mcut
 
                     if (!reached_end)
                     {
-                        size_t raw_descriptor = std::distance(cbegin<array_iterator_t<V>>(false), (*this)); // O(1) ??
+                        size_t raw_descriptor = (*this) - cbegin<array_iterator_t<V>>(false); //std::distance(cbegin<array_iterator_t<V>>(false), (*this)); // O(1) ??
                         cur_elem_is_removed = mesh_ptr->is_removed((element_descriptor_type)raw_descriptor);
                         if (!cur_elem_is_removed)
                         {
@@ -529,6 +486,30 @@ namespace mcut
                 } while (cur_elem_is_removed && !reached_end);
 
                 return (*this);
+            }
+
+            // we provide this overide to ensure that stl functions like std::advance, work properly
+            // by accounting for removed elements
+            array_iterator_t<V>& operator+=(typename array_iterator_t<V>::difference_type n)
+            {
+                V::const_iterator::operator+=(n); // raw ptr shift (i.e. ignoring that there may be removed elements)
+
+                bool cur_elem_is_removed = false;
+                bool reached_end = (*this) == cend<>();
+                cur_elem_is_removed = mesh_ptr->is_removed(*(*this));
+                while (!reached_end && cur_elem_is_removed)
+                {
+                    V::const_iterator::operator++();//++(*this);
+                    size_t raw_descriptor = *(*this);// (*this) - cbegin<array_iterator_t<V>>(false); //std::distance(cbegin<array_iterator_t<V>>(false), (*this)); // O(1) ??
+                    cur_elem_is_removed = mesh_ptr->is_removed((element_descriptor_type)raw_descriptor);
+                    if (!cur_elem_is_removed)
+                    {
+                        break;
+                    }
+
+                    reached_end = (*this) == cend<>();
+                }
+                return *this;
             }
 
             // The following are helper functions which are specialised (via type-deduction)
@@ -550,6 +531,32 @@ namespace mcut
             }
 
         private:
+            // postfix increment (i++)
+            // increment pointer to the next valid element (i.e. we skip removed elements).
+            // THIS FUNCTION IS MADE PRIVATE UNTIL NEEDED. (See: exact definition of  prefix increment to fix this, which
+            // is necessary to account for removed elements as we iterate)
+            array_iterator_t<V> operator++(int) // TODO:fix this its broken
+            {
+                MCUT_ASSERT(false);
+                bool old_elem_is_removed = false;
+
+                do
+                {
+                    array_iterator_t<V> old_elem = this->operator++(0); // (i++)
+                    element_descriptor_type raw_descriptor = (element_descriptor_type)std::distance(cbegin<>(false), old_elem);
+                    old_elem_is_removed = mesh_ptr->is_removed(raw_descriptor);
+                    if (!old_elem_is_removed)
+                    {
+                        return old_elem;
+                    }
+
+                    // keep iterating until the value returned by the (i++) operator returns a valid element
+                    // i.e. one that is not marked removed!
+                } while ((*this) != cend<>() && old_elem_is_removed);
+
+                return cend<>();
+            }
+
             template <typename I = array_iterator_t<V>>
             I cend(identity<I>)
             {
@@ -1034,15 +1041,16 @@ namespace mcut
 
         // returns the number of removed mesh elements (vertices, edges, faces or halfedges) between [start, end)
         template <typename I>
-        uint32_t count_removed_elements_in_range(const array_iterator_t<I>& start, const array_iterator_t<I>& end) const
+        uint32_t count_removed_elements_in_range(const array_iterator_t<I> &start, const array_iterator_t<I> &end) const
         {
             const long long N = (uint32_t)(end - start); // length including removed elements
             MCUT_ASSERT(N >= 0);
-            if(N == 0)
+            if (N == 0)
             {
                 return 0;
             }
-            const uint32_t start_ = std::distance(elements_begin_(identity<array_iterator_t<I>>{}, false), start);
+            // raw starting ptr offset
+            const uint32_t start_ = start - elements_begin_(identity<array_iterator_t<I>>{}, false); //std::distance(, );
             uint32_t n = 0;
 
             for (auto elem_descr : get_removed_elements(identity<array_iterator_t<I>>{}))
@@ -1140,7 +1148,18 @@ namespace mcut
 
 namespace std
 {
-
+#if 1
+    template <>
+    typename mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type distance(
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> first,
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> last);
+#endif
+#if 0
+    template <>
+    void advance(
+        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> &iter,
+        typename std::iterator_traits<mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>>::difference_type n);
+#endif
     template <>
     struct hash<mcut::vertex_descriptor_t>
     {
