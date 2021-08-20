@@ -382,6 +382,9 @@ void mcCheckError_(McResult err, const char* file, int line)
     case MC_NO_ERROR:
         error = "MC_NO_ERROR";
         break;
+        case MC_RESULT_MAX_ENUM:
+        error = "UNKNOWN";
+        break;
     }
     if (err) {
         std::cout << error << " | " << file << " (" << line << ")" << std::endl;

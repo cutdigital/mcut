@@ -1297,7 +1297,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             ctxtPtr->scheduler,
             halfedgeMeshInfo.mesh.edges_begin(),
             halfedgeMeshInfo.mesh.edges_end(),
-            (1 << 3),
+            (1 << 8),
             fn_copy_edges,
             _1, // out
             futures);

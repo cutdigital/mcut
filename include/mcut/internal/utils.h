@@ -80,7 +80,7 @@
 #include <iostream>
 #include <sstream>
 
-#define PROFILING_BUILD
+//#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
 #include <chrono>

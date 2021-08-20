@@ -286,16 +286,7 @@ namespace mcut
         std::mutex tail_mutex;
         node *tail;
         std::condition_variable data_cond;
-
-        std::unique_ptr<node> try_pop_head()
-        {
-            std::lock_guard<std::mutex> head_lock(head_mutex);
-            if (head.get() == get_tail())
-            {
-                return std::unique_ptr<node>(nullptr);
-            }
-            return pop_head();
-        }
+        std::atomic_bool can_wait_for_data;
 
         std::unique_ptr<node> try_pop_head(T &value)
         {
@@ -325,26 +316,36 @@ namespace mcut
         std::unique_lock<std::mutex> wait_for_data()
         {
             std::unique_lock<std::mutex> head_lock(head_mutex);
-            data_cond.wait(head_lock, [&]
-                           { return head.get() != get_tail(); });
+            auto until = [&]()
+            { return !can_wait_for_data || head.get() != get_tail(); };
+            data_cond.wait(head_lock, until);
             return head_lock;
         }
-        std::unique_ptr<node> wait_pop_head()
-        {
-            std::unique_lock<std::mutex> head_lock(wait_for_data());
-            return pop_head();
-        }
+
         std::unique_ptr<node> wait_pop_head(T &value)
         {
             std::unique_lock<std::mutex> head_lock(wait_for_data());
-            value = std::move(*head->data);
-            return pop_head();
+            if (can_wait_for_data)
+            {
+                value = std::move(*head->data);
+                return pop_head();
+            }
+            else
+            {
+                return std::unique_ptr<node>(nullptr);
+            }
         }
 
     public:
-        thread_safe_queue() : head(new node), tail(head.get()) {}
+        thread_safe_queue() : head(new node), tail(head.get()), can_wait_for_data(true) {}
         thread_safe_queue(const thread_safe_queue &other) = delete;
         thread_safe_queue &operator=(const thread_safe_queue &other) = delete;
+
+        void disrupt_wait_for_data()
+        {
+            can_wait_for_data = false;
+            data_cond.notify_one();
+        }
 
         void push(T new_value)
         {
@@ -360,20 +361,9 @@ namespace mcut
             data_cond.notify_one();
         }
 
-        std::shared_ptr<T> wait_and_pop()
-        {
-            std::unique_ptr<node> const old_head = wait_pop_head();
-            return old_head->data;
-        }
         void wait_and_pop(T &value)
         {
             std::unique_ptr<node> const old_head = wait_pop_head(value);
-        }
-
-        std::shared_ptr<T> try_pop()
-        {
-            std::unique_ptr<node> old_head = try_pop_head();
-            return old_head ? old_head->data : std::shared_ptr<T>();
         }
 
         bool try_pop(T &value)
@@ -542,11 +532,6 @@ namespace mcut
                 // another thread's queue, then I'll just wait until is added to my queue.
                 if (!(work_queues[worker_thread_id].try_pop(task) || try_pop_from_other_thread_queue(task, worker_thread_id)))
                 {
-                    if (terminate)
-                    {
-                        break; // finished (i.e. MCUT context was destroyed)
-                    }
-
                     work_queues[worker_thread_id].wait_and_pop(task);
                 }
 
@@ -611,17 +596,17 @@ namespace mcut
         {
             unsigned int const thread_count = std::thread::hardware_concurrency();
 
-            //printf("[MCUT]: thread count = %d\n", (int)thread_count);
-
             try
             {
 #if defined(USE_LOCKFREE_WORKQUEUE)
                 work_queues = std::vector<lock_free_queue<function_wrapper>>(thread_count);
 #else
-                work_queues = std::vector<thread_safe_queue<function_wrapper>>(thread_count);
+                work_queues = std::vector<thread_safe_queue<function_wrapper>>(
+                    thread_count);
 #endif
                 for (unsigned i = 0; i < thread_count; ++i)
                 {
+
                     threads.push_back(std::thread(&thread_pool::worker_thread, this, i));
                 }
             }
@@ -652,15 +637,11 @@ namespace mcut
         // with a valid (but redundant) task to then exit
         void wakeup_and_shutdown()
         {
-            auto fn_wakeup_and_shutdown = []() {};
             for (unsigned i = 0; i < get_num_threads(); ++i)
             {
-                submit(fn_wakeup_and_shutdown);
-                work_queues[i].notify_one();
+                work_queues[i].disrupt_wait_for_data();
             }
         }
-
-
 
     public:
         /*
