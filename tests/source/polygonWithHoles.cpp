@@ -10,7 +10,6 @@
 #endif // _WIN32
 
 struct PolygonsWithHoles {
-    std::vector<McConnectedComponent> connComps_ = {};
     McContext context_ = MC_NULL_HANDLE;
 
     float* pSrcMeshVertices = NULL;
@@ -47,14 +46,6 @@ UTEST_F_SETUP(PolygonsWithHoles)
 
 UTEST_F_TEARDOWN(PolygonsWithHoles)
 {
-    if (utest_fixture->connComps_.size() > 0) {
-        EXPECT_EQ(mcReleaseConnectedComponents(
-                      utest_fixture->context_,
-                      (uint32_t)utest_fixture->connComps_.size(),
-                      utest_fixture->connComps_.data()),
-            MC_NO_ERROR);
-    }
-
     EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
 
     if (utest_fixture->pSrcMeshVertices)
