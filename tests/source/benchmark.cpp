@@ -21,14 +21,14 @@ struct Benchmark {
     float* pSrcMeshVertices = NULL;
     uint32_t* pSrcMeshFaceIndices = NULL;
     uint32_t* pSrcMeshFaceSizes = NULL;
-    uint32_t numSrcMeshVertices = NULL;
-    uint32_t numSrcMeshFaces = NULL;
+    uint32_t numSrcMeshVertices = 0;
+    uint32_t numSrcMeshFaces = 0;
 
     float* pCutMeshVertices = NULL;
     uint32_t* pCutMeshFaceIndices = NULL;
     uint32_t* pCutMeshFaceSizes = NULL;
-    uint32_t numCutMeshVertices = NULL;
-    uint32_t numCutMeshFaces = NULL;
+    uint32_t numCutMeshVertices = 0;
+    uint32_t numCutMeshFaces = 0;
 };
 
 UTEST_I_SETUP(Benchmark)
@@ -137,18 +137,18 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
 
             uint64_t vertexCountBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes), MC_NO_ERROR);
-            ASSERT_EQ(vertexCountBytes, sizeof(uint32_t));
+            ASSERT_EQ(vertexCountBytes, uint64_t(sizeof(uint32_t)));
 
             // we can also directly query the number of vertices since we know the number of bytes, which is a constant 4 bytes.
             uint32_t numberOfVertices = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, vertexCountBytes, &numberOfVertices, NULL), MC_NO_ERROR);
-            ASSERT_GT((int)numberOfVertices, 0);
+            ASSERT_GT(numberOfVertices, uint32_t(0));
 
             // vertex array
             uint64_t connCompVerticesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
-            ASSERT_GT(connCompVerticesBytes, 0);
-            ASSERT_GE(connCompVerticesBytes, sizeof(float) * 9); // triangle
+            ASSERT_GT(connCompVerticesBytes, uint64_t(0));
+            ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
             std::vector<float> vertices;
             uint32_t nfloats = (uint32_t)(connCompVerticesBytes / sizeof(float));
             vertices.resize(nfloats);
@@ -160,8 +160,8 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             // face indices
             uint64_t connCompFaceIndicesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &connCompFaceIndicesBytes), MC_NO_ERROR);
-            ASSERT_GT(connCompFaceIndicesBytes, 0);
-            ASSERT_GE(connCompFaceIndicesBytes, sizeof(uint32_t) * 3); // triangle
+            ASSERT_GT(connCompFaceIndicesBytes, uint64_t(0));
+            ASSERT_GE(connCompFaceIndicesBytes, uint64_t(sizeof(uint32_t) * 3)); // triangle
             std::vector<uint32_t> faceIndices;
             faceIndices.resize(connCompFaceIndicesBytes / sizeof(uint32_t));
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE, connCompFaceIndicesBytes, faceIndices.data(), NULL), MC_NO_ERROR);
@@ -179,7 +179,7 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             faceSizes.resize(connCompFaceSizesBytes / sizeof(uint32_t));
 
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, connCompFaceSizesBytes, faceSizes.data(), NULL), MC_NO_ERROR);
-            ASSERT_GT(faceSizes.size(), 0); //  "there has to be at least one face in a connected component"
+            ASSERT_GT(faceSizes.size(), std::size_t(0)); //  "there has to be at least one face in a connected component"
 
             for (int v = 0; v < (int)faceSizes.size(); ++v) {
                 ASSERT_GE(faceSizes[v], (uint32_t)3); // "3 is the minimum possible number of vertices in a polygon, which is a triangle"
@@ -188,7 +188,7 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             // edge indices
             uint64_t connCompEdgesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_EDGE, 0, NULL, &connCompEdgesBytes), MC_NO_ERROR);
-            ASSERT_GE(connCompEdgesBytes, sizeof(uint32_t) * 6); // triangle
+            ASSERT_GE(connCompEdgesBytes, uint64_t(sizeof(uint32_t) * 6)); // triangle
 
             std::vector<uint32_t> edgeIndices;
             edgeIndices.resize(connCompEdgesBytes / sizeof(uint32_t));

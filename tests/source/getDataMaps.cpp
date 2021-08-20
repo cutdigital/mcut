@@ -275,9 +275,9 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
 
                         if (!vertexIsFromSrcMesh) {
                             imVertexIdx = (imVertexIdxRaw - srcMeshVertexCount); // account for offset
-                            ASSERT_LT((int)imVertexIdx, cutMeshVertexCount);
+                            ASSERT_LT((int)imVertexIdx, (int)cutMeshVertexCount);
                         } else {
-                            ASSERT_LT((int)imVertexIdx, srcMeshVertexCount);
+                            ASSERT_LT((int)imVertexIdx, (int)srcMeshVertexCount);
                         }
                     }
                 }
@@ -289,8 +289,8 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
                     const bool isIntersectionPoint = (correspondingCutMeshVertex == MC_UNDEFINED_VALUE);
                     if (!isIntersectionPoint) {
                         correspondingCutMeshVertex -= srcMeshVertexCount; // account for offset
-                        ASSERT_GE((int)correspondingCutMeshVertex, 0);
-                        ASSERT_LT((int)correspondingCutMeshVertex, cutMeshVertexCount);
+                        ASSERT_GE((int)correspondingCutMeshVertex, (int)0);
+                        ASSERT_LT((int)correspondingCutMeshVertex, (int)cutMeshVertexCount);
                     }
                 }
             };
@@ -326,6 +326,10 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
                     testPatchCC();
                 }
             } break;
+            case MC_CONNECTED_COMPONENT_TYPE_ALL:
+            printf("McConnectedComponentType = unknown\n");
+            ASSERT_TRUE(false);
+            break;
             }
         }
 
@@ -333,7 +337,7 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
             uint64_t numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes), MC_NO_ERROR);
             uint32_t ccFaceCount = (uint32_t)(numBytes / sizeof(uint32_t));
-            ASSERT_GT((int)ccFaceCount, 0);
+            ASSERT_GT((int)ccFaceCount, (int)0);
 
             numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
@@ -354,12 +358,9 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
 
                 if (!faceIsFromSrcMesh) {
                     imFaceIdx = (imFaceIdxRaw - srcMeshFaceCount); // account for offset
-                    if (imFaceIdx >= cutMeshFaceCount) {
-                        printf("imFaceIdx=%d cutMeshFaceCount=%d\n", imFaceIdx, cutMeshFaceCount);
-                    }
-                    ASSERT_LT((int)imFaceIdx, cutMeshFaceCount);
+                    ASSERT_LT((int)imFaceIdx, (int)cutMeshFaceCount);
                 } else {
-                    ASSERT_LT((int)imFaceIdx, srcMeshFaceCount);
+                    ASSERT_LT((int)imFaceIdx, (int)srcMeshFaceCount);
                 }
             }
         }

@@ -439,14 +439,14 @@ void readMesh(const std::string& path, std::vector<float>& V, std::vector<uint32
     }
 
     for (int i = 0; i < (int)Vmat.rows(); ++i) {
-        const Eigen::Vector3d& v = Vmat.row(i);
+        const Eigen::VectorXd v = Vmat.row(i);
         V.push_back((float)v(0));
         V.push_back((float)v(1));
         V.push_back((float)v(2));
     }
 
     for (int i = 0; i < (int)Fmat.rows(); ++i) {
-        const Eigen::VectorXi& f = Fmat.row(i);
+        const Eigen::VectorXi f = Fmat.row(i);
         for (int j = 0; j < (int)f.rows(); ++j) {
             F.push_back((uint32_t)f(j));
         }

@@ -115,7 +115,7 @@ UTEST_F(DispatchFilterFlags, noFiltering)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 12); // including sealed, partially, unsealed, above, below, patches & seams
+    ASSERT_EQ(uint32_t(12), numConnectedComponents); // including sealed, partially, unsealed, above, below, patches & seams
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -164,7 +164,7 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 4); // one completely filled (from the inside) fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(4)); // one completely filled (from the inside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -234,7 +234,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one completely filled (from the inside) fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one completely filled (from the inside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -304,7 +304,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one completely filled (from the outside) fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one completely filled (from the outside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -371,7 +371,7 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one unsealed fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one unsealed fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -437,7 +437,7 @@ UTEST_F(DispatchFilterFlags, patchInside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -495,7 +495,7 @@ UTEST_F(DispatchFilterFlags, patchOutside)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -555,7 +555,7 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus input
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus input
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
@@ -614,7 +614,7 @@ UTEST_F(DispatchFilterFlags, seamFromCutMesh)
 
     uint32_t numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, 3); // one interior patch plus inputs
+    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 

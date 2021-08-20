@@ -166,7 +166,7 @@ if (MCUT_BUILD_AS_MULTI_THREADED_LIB)
 endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-	list(APPEND compilation_flags -Wall -Wextra -pg)
+	list(APPEND compilation_flags -Wall -Wextra)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	list(APPEND compilation_flags w3 -diag-disable:remark)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -180,7 +180,7 @@ message(STATUS "[MCUT] extra_libs=${extra_libs}")
 
 # disable redandant warnings for kernel.cpp
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-	set(kernel_source_file_flags "-Wno-unused-but-set-variable -Wno-unused-variable")
+	set(kernel_source_file_flags "-Wno-unused-variable")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	# pass
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

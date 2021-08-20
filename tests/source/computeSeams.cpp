@@ -191,7 +191,7 @@ UTEST_F(SeamConnectedComponent, queryOriginPartialCut)
     uint32_t numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, 0, NULL, &numConnComps), MC_NO_ERROR);
-    ASSERT_EQ(numConnComps, 1);
+    ASSERT_EQ(uint32_t(1), numConnComps);
 
     utest_fixture->connComps_.resize(numConnComps);
 

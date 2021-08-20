@@ -255,138 +255,6 @@ namespace mcut
         typedef std::vector<edge_data_t> edge_array_t;
         typedef std::vector<halfedge_data_t> halfedge_array_t;
         typedef std::vector<face_data_t> face_array_t;
-#if 0
-    // iterator over the keys of a map (base class)
-    template <typename M>
-    class key_iterator_t : public M::const_iterator {
-        const mesh_t* const mesh_ptr;
-
-    public:
-        key_iterator_t()
-            : M::const_iterator()
-            , mesh_ptr(nullptr) {};
-        explicit key_iterator_t(typename M::const_iterator it_, const mesh_t* const mesh)
-            : M::const_iterator(it_)
-            , mesh_ptr(mesh)
-        {
-        }
-
-        typename M::key_type* operator->()
-        {
-            return (typename M::key_type* const)&(M::const_iterator::operator->()->first);
-        }
-
-        typename M::key_type& operator*()
-        {
-            return *this->operator->();
-        }
-
-        // postfix increment (i++)
-        // increment pointer to the next valid element (i.e. we skip removed elements).
-        typename M::key_type operator++(int)
-        {
-            bool old_elem_is_removed = false;
-
-            do {
-                typename M::const_iterator old_elem = M::const_iterator::operator++(0); // (i++)
-                old_elem_is_removed = mesh_ptr->is_removed(old_elem->first);
-                if (!old_elem_is_removed) {
-                    return old_elem->first;
-                }
-
-                // keep iterating until the value returned by the (i++) operator returns a valid element
-                // i.e. one that is not marked removed!
-            } while ((*this) != cend<std::remove_reference<decltype(*this)>::type>() && old_elem_is_removed);
-
-            return M::key_type();
-        }
-
-        // prefix increment (++i)
-        // increment pointer to the next valid element (i.e. we skip removed elements).
-        typename M::key_type& operator++()
-        {
-            bool cur_elem_is_removed = false;
-            bool reached_end = false;
-            do {
-                M::const_iterator::operator++(); // (++i)
-                reached_end = (*this) == cend<typename std::remove_reference<decltype(*this)>::type>();
-                cur_elem_is_removed = false;
-
-                if (!reached_end) {
-                    cur_elem_is_removed = mesh_ptr->is_removed(this->operator*());
-                    if (!cur_elem_is_removed) {
-                        break;
-                    }
-                }
-
-                // keep iterating until the value pointed to after the (++i) operator is a valid element
-                // i.e. one that is not marked removed!
-
-            } while (cur_elem_is_removed);
-            static typename M::key_type garbage;
-
-            return !reached_end ? this->operator*() : garbage;
-        }
-
-        // The following are helper functions which are specialised (via type-deduction)
-        // for the type of mesh elements that *this* iterator walks over in "mesh_ptr"
-        // e.g. faces. These functions are used to determine when *this* iterator has
-        // reached the end of the respective std::map data structure over which we are
-        // iterating.
-
-        template <typename T>
-        struct identity {
-            typedef T type;
-        };
-
-        template <typename I>
-        I cend()
-        {
-            return cend(identity<I>()); // https://stackoverflow.com/questions/3052579/explicit-specialization-in-non-namespace-scope
-        }
-
-        static std::ptrdiff_t distance(const key_iterator_t<M>& beg, const key_iterator_t<M>& end)
-        {
-            key_iterator_t<M> it = beg;
-            typename std::ptrdiff_t dist = 0;
-            while (it != end) {
-                dist++;
-                ++it;
-            }
-            return dist;
-        }
-
-    private:
-        template <typename I>
-        I cend(identity<I>)
-        {
-            return I(); // unused
-        }
-
-        key_iterator_t<face_map_t> cend(identity<key_iterator_t<face_map_t>>)
-        {
-            return mesh_ptr->faces_end();
-        }
-
-#if 0
-        key_iterator_t<halfedge_map_t> cend(identity<key_iterator_t<halfedge_map_t>>)
-        {
-            return mesh_ptr->halfedges_end();
-        }
-
-        key_iterator_t<edge_map_t> cend(identity<key_iterator_t<edge_map_t>>)
-        {
-            return mesh_ptr->edges_end();
-        }
-
-        key_iterator_t<vertex_array_t> cend(identity<key_iterator_t<vertex_array_t>>)
-        {
-            return mesh_ptr->vertices_end();
-        }
-#endif
-    };
-
-#endif
 
         template <typename T>
         struct identity
@@ -566,7 +434,7 @@ namespace mcut
             template <typename I = array_iterator_t<V>>
             I cbegin(bool account_for_removed_elems, identity<I>)
             {
-                return I(); // unused
+                return I(account_for_removed_elems); // unused
             }
 
             array_iterator_t<vertex_array_t> cbegin(bool account_for_removed_elems, identity<array_iterator_t<vertex_array_t>> = {})
