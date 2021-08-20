@@ -656,8 +656,11 @@ namespace mcut
             for (unsigned i = 0; i < get_num_threads(); ++i)
             {
                 submit(fn_wakeup_and_shutdown);
+                work_queues[i].notify_one();
             }
         }
+
+
 
     public:
         /*
