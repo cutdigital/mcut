@@ -34,6 +34,7 @@
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 #include <algorithm>
+#include <numeric>
 #include <queue>
 #include <fstream>
 #include <memory>
