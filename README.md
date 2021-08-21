@@ -1,6 +1,6 @@
 # MCUT
 
-**Gist:** A cross-platform C++ library for mesh cutting ([site](https://cutdigital.github.io/mcut.github.io/.))
+_A cross-platform C++ library for mesh cutting ([site](https://cutdigital.github.io/mcut.github.io/.))_
 
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/liontorus/setup.jpg?raw=true)
 
