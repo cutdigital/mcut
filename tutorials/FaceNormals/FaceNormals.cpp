@@ -293,13 +293,13 @@ int main()
             // to distinguish between source-mesh and cut-mesh faces).
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh face index (we don't know yet)
             // ** This is how we infer which mapped indices belong to the source-mesh or the cut-mesh.
-            const bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.size());
+            const bool faceIsFromSrcMesh = (imFaceIdxRaw < (uint32_t)srcMesh.F.size());
             bool flipNormalsOnFace = false;
             // Now compute the actual input mesh face index (accounting for offset)
             uint32_t imFaceIdx = imFaceIdxRaw;
 
             if (!faceIsFromSrcMesh) { // if the current face is from the cut-mesh
-                imFaceIdx = (imFaceIdxRaw - srcMesh.F.size()); // accounting for offset
+                imFaceIdx = (imFaceIdxRaw - (uint32_t)srcMesh.F.size()); // accounting for offset
                 // check if we need to flip normals on the face
                 flipNormalsOnFace = (isFragment && fragmentLocation == MC_FRAGMENT_LOCATION_ABOVE);
             }
@@ -316,7 +316,7 @@ int main()
                 uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                 if (!vertexIsFromSrcMesh) {
-                    imVertexIdx = (imVertexIdxRaw - srcMesh.V.size()); // account for offset
+                    imVertexIdx = (imVertexIdxRaw - (std::uint32_t)srcMesh.V.size()); // account for offset
                 }
 
                 const InputMesh* inputMeshPtr = faceIsFromSrcMesh ? &srcMesh : &cutMesh;

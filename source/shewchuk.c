@@ -113,6 +113,11 @@
 /*                                                                           */
 /*****************************************************************************/
 
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable: 4131)
+#endif // ifdef _WIN32
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2368,6 +2373,9 @@ REAL* pd;
     return orient3dadapt(pa, pb, pc, pd, permanent);
 }
 
+#ifdef _WIN32
+#pragma warning(pop) // #pragma warning(disable: 4131)
+#endif // _WIN32
 
 #if 0
 /*****************************************************************************/

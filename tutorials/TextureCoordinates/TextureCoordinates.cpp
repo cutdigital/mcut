@@ -320,7 +320,7 @@ int main()
                 uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                 if (!vertexIsFromSrcMesh) {
-                    imVertexIdx = (imVertexIdxRaw - srcMesh.V.rows()); // account for offset
+                    imVertexIdx = (imVertexIdxRaw - (uint32_t)srcMesh.V.rows()); // account for offset
                 }
 
                 const InputMesh* inputMeshPtr = &srcMesh; // assume origin face is from source mesh

@@ -51,16 +51,28 @@ extern "C"
 #endif // __cplusplus
 
 #if defined(_WIN32)
+    
+#ifdef MCUT_SHARED_LIB
+
+#if defined(MCUT_EXPORT_SHARED_LIB_SYMBOLS)
+    #define MCAPI_ATTR __declspec(dllexport)
+#else
+    #define MCAPI_ATTR __declspec(dllimport)
+#endif
+
+#else // MCUT_SHARED_LIB
+#define MCAPI_ATTR
+#endif // MCUT_SHARED_LIB
+
     // On Windows, mcut commands use the stdcall convention
-    #define MCAPI_ATTR
     #define MCAPI_CALL __stdcall
     #define MCAPI_PTR  MCAPI_CALL
-#else
+#else // #if defined(_WIN32)
     // On other platforms, use the default calling convention
-    #define MCAPI_ATTR
+    #define MCAPI_ATTR __attribute__((visibility("default")))
     #define MCAPI_CALL
     #define MCAPI_PTR
-#endif
+#endif // #if defined(_WIN32)
 
 #include <stddef.h> // standard type definitions
 

@@ -80,12 +80,15 @@ set (project_namespace_name MCUT)
 # User options
 #
 option(MCUT_BUILD_DOCUMENTATION "Configure to build docs with Doxygen" OFF) # OFF by default
-option(MCUT_BUILD_TESTS "Configure to build tests with GoogleTest" ON)
+if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TESTS)
+	option(MCUT_BUILD_TESTS "Configure to build tests" ON)
+endif()
 option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
-option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" OFF)
+option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
 option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" ON)
-option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" OFF)
-
+if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS)
+	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
+endif()
 #
 # machine-precision-numbers library targets
 #
@@ -119,6 +122,9 @@ message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 
 list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
 list(APPEND compilation_flags "")
+if(MCUT_BUILD_AS_SHARED_LIB)
+	list(APPEND preprocessor_defs -DMCUT_SHARED_LIB=1)
+endif()
 
 if (MCUT_BUILD_AS_MULTI_THREADED_LIB)
 	find_package(Threads REQUIRED)
@@ -171,20 +177,6 @@ message(STATUS "[MCUT] compilation_flags=${compilation_flags}")
 message(STATUS "[MCUT] preprocessor_defs=${preprocessor_defs}")
 message(STATUS "[MCUT] extra_libs=${extra_libs}")
 
-# disable redandant warnings for kernel.cpp
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-	set(kernel_source_file_flags "-Wno-unused-variable")
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-	# pass
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	set(kernel_source_file_flags "/wd4100 /wd26812")
-endif()
-
-set_source_files_properties(
-	SOURCE 
-	${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp 
-	PROPERTY COMPILE_FLAGS ${kernel_source_file_flags})
-
 set (	project_source_files  
 		${CMAKE_CURRENT_SOURCE_DIR}/source/mcut.cpp 
 		${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp 
@@ -210,6 +202,11 @@ function(create_library_target LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF)
 	target_link_libraries(${target_name} PRIVATE ${extra_libs})
 	target_compile_options(${target_name} PRIVATE ${compilation_flags})
 	target_compile_definitions(${target_name} PRIVATE ${preprocessor_defs} ${ARBITRARY_PRECISION_NUMBERS_DEF})
+	
+	if (MCUT_BUILD_AS_SHARED_LIB AND WIN32)
+		# add macro to export .dll symbols
+		target_compile_definitions(${target_name} PRIVATE -DMCUT_EXPORT_SHARED_LIB_SYMBOLS=1)
+	endif()
 
 	set_property(TARGET ${target_name} PROPERTY VERSION ${project_build_version_string})
 	set_property(TARGET ${target_name} PROPERTY SOVERSION ${project_API_version_string})

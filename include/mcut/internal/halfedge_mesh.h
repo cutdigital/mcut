@@ -287,7 +287,7 @@ namespace mcut
             typename V::value_type::descriptor_type operator*() // TODO: test this, I think its broken
             {
                 size_t raw_index = (*this) - cbegin<>(false); //std::distance(cbegin<>(false), (*this)); // account for remove elements too
-                element_descriptor_type d = static_cast<element_descriptor_type>(raw_index);
+                element_descriptor_type d((std::uint32_t)raw_index);
                 return d;
             }
 
@@ -340,8 +340,9 @@ namespace mcut
 
                     if (!reached_end)
                     {
-                        size_t raw_descriptor = (*this) - cbegin<array_iterator_t<V>>(false); //std::distance(cbegin<array_iterator_t<V>>(false), (*this)); // O(1) ??
-                        cur_elem_is_removed = mesh_ptr->is_removed((element_descriptor_type)raw_descriptor);
+                        const std::size_t diff = ((*this) - cbegin<array_iterator_t<V>>(false));
+                        element_descriptor_type raw_descriptor((std::uint32_t)diff); //std::distance(cbegin<array_iterator_t<V>>(false), (*this)); // O(1) ??
+                        cur_elem_is_removed = mesh_ptr->is_removed(raw_descriptor);
                         if (!cur_elem_is_removed)
                         {
                             break;
@@ -369,7 +370,7 @@ namespace mcut
                 {
                     V::const_iterator::operator++();//++(*this);
                     size_t raw_descriptor = *(*this);// (*this) - cbegin<array_iterator_t<V>>(false); //std::distance(cbegin<array_iterator_t<V>>(false), (*this)); // O(1) ??
-                    cur_elem_is_removed = mesh_ptr->is_removed((element_descriptor_type)raw_descriptor);
+                    cur_elem_is_removed = mesh_ptr->is_removed(element_descriptor_type((std::uint32_t)raw_descriptor));
                     if (!cur_elem_is_removed)
                     {
                         break;
@@ -846,7 +847,7 @@ namespace mcut
             reserve_for_additional_vertices(nv);
             const std::uint32_t nf = nv * 2;
             reserve_for_additional_faces(nf);
-            const std::uint32_t ne = (3.0 / 2.0) * nf;
+            const std::uint32_t ne = std::uint32_t((3.0 / 2.0) * (double)nf);
             reserve_for_additional_edges(ne);
             const std::uint32_t nh = ne * 2;
             reserve_for_additional_halfedges(nh);
@@ -918,7 +919,7 @@ namespace mcut
                 return 0;
             }
             // raw starting ptr offset
-            const uint32_t start_ = start - elements_begin_(identity<array_iterator_t<I>>{}, false); //std::distance(, );
+            const uint32_t start_ = (std::uint32_t)(start - elements_begin_(identity<array_iterator_t<I>>{}, false)); //std::distance(, );
             uint32_t n = 0;
 
             for (auto elem_descr : get_removed_elements(identity<array_iterator_t<I>>{}))
