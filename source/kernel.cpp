@@ -215,7 +215,7 @@ namespace mcut
         DEBUG_CODE_MASK((*logger_ptr) << "save " << name << std::endl;);
 
 #if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-        bool verb = logger_ptr->verbose();
+        //bool verb = logger_ptr->verbose();
         logger_ptr->set_verbose(false);
 #endif
 
@@ -257,8 +257,8 @@ namespace mcut
 
             DEBUG_CODE_MASK((*logger_ptr).indent(););
 
-            int num_halfedges = (int)halfedges_around_face.size();
-            MCUT_ASSERT(num_halfedges >= 3);
+            //int num_halfedges = ;
+            MCUT_ASSERT((int)halfedges_around_face.size());
 
             DEBUG_CODE_MASK((*logger_ptr).indent(););
             DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << num_halfedges << std::endl;);
@@ -465,7 +465,7 @@ namespace mcut
 
         // the auxilliary halfedge mesh containing vertices and edges referenced by the traced polygons
         mesh_t mesh = in; // copy
-        mesh.reserve_for_additional_elements(mX_traced_polygons.size() / 2);
+        mesh.reserve_for_additional_elements((std::uint32_t)mX_traced_polygons.size() / 2);
 
         ///////////////////////////////////////////////////////////////////////////
         // Insert traced polygons into the auxilliary mesh
@@ -2261,7 +2261,7 @@ namespace mcut
         ps_edge_to_bbox.clear();
 
         // assuming each edge will produce a new vertex
-        m0.reserve_for_additional_elements(ps_edge_face_intersection_pairs.size());
+        m0.reserve_for_additional_elements((std::uint32_t)ps_edge_face_intersection_pairs.size());
 
         TIMESTACK_PUSH("Compute intersecting face properties");
         // compute/extract geometry properties of each tested face
@@ -3947,7 +3947,7 @@ namespace mcut
              ++iter)
         {
             DEBUG_CODE_MASK(lg.indent(););
-            const vd_t &ivtx = vd_t(std::distance(m0_ivtx_to_intersection_registry_entry.cbegin(), iter) + ps.number_of_vertices()); //iter->first;
+            const vd_t &ivtx = vd_t((std::uint32_t)std::distance(m0_ivtx_to_intersection_registry_entry.cbegin(), iter) + ps.number_of_vertices()); //iter->first;
 
             const ed_t edge_of_ivtx_ps_he = iter->first; //iter->second.first; // ps.edge(ivtx_ps_he);
             // check that "ivtx_ps_he" is a border halfedge
@@ -4077,12 +4077,12 @@ namespace mcut
 
                 //bool last_edge_is_terminal = last_edge_vertex0_is_terminal;
 
-                if (last_edge_vertex0_is_terminal == false)
-                {
+                //if (last_edge_vertex0_is_terminal == false)
+                //{
                     // check if vertex1 is terminal
-                    bool last_edge_vertex1_is_terminal = m0_cutpath_terminal_vertices.find(last_edge_vertex1) != m0_cutpath_terminal_vertices.cend();
+                    //bool last_edge_vertex1_is_terminal = m0_cutpath_terminal_vertices.find(last_edge_vertex1) != m0_cutpath_terminal_vertices.cend();
                     //last_edge_is_terminal = last_edge_vertex1_is_terminal;
-                }
+                //}
 
                 bool last_vtx_is_from_src_mesh = first_vtx_is_from_src_mesh; // ... we will use this to determine whether we have a severing cutpath or not (the current one)
 
@@ -7770,7 +7770,7 @@ namespace mcut
         // At this point we also introduce the notion of a so-called "strongly connected border set" (SCBS).
         // An SCBS is set of adjacent source-mesh polygons along the partitioned cut-path ("partitioned" implies that the
         // source-mesh polygons along the cut-path are no longer "topologically connected").
-        int strongly_connected_sm_boundary_seq_iter_id = -1;
+       // int strongly_connected_sm_boundary_seq_iter_id = -1;
 
         // for each strongly-connected set of sm-boundary sequences.
         // one iteration pertains to a transformation of a set of sm-boundary sequences which all belong to the same connected ccsponent.
@@ -8553,7 +8553,7 @@ namespace mcut
             // Associate cut-mesh polygons with patches of the graph
             ///////////////////////////////////////////////////////////////////////////
 
-            int graph_cur_patch_idx = patches.size();
+            int graph_cur_patch_idx = (int)patches.size();
             ;
             // counter to keep track of the number of patches discovered for
             // the current SCS
@@ -8713,7 +8713,7 @@ namespace mcut
 
         MCUT_ASSERT(patches.size() >= 1);
 
-        total_ccw_patch_count = patches.size();
+        total_ccw_patch_count = (int)patches.size();
 
         std::map<
             int,             // patch index
@@ -8753,7 +8753,7 @@ namespace mcut
         // adjacency between patches (sharing a cut path).
         //
 
-        math::matrix_t scs_adj_matrix(patches.size(), patches.size()); // square
+        math::matrix_t scs_adj_matrix((int)patches.size(), (int)patches.size()); // square
 
         for (std::map<int, std::vector<int>>::const_iterator patch_iter = graph_patch_to_adj_list.cbegin();
              patch_iter != graph_patch_to_adj_list.cend();
@@ -10576,8 +10576,9 @@ namespace mcut
                                 MCUT_ASSERT(m0_is_intersection_point(m0_cs_next_patch_polygon_he_src, ps_vtx_cnt) && m0_is_intersection_point(m0_cs_next_patch_polygon_he_tgt, ps_vtx_cnt));
                                 MCUT_ASSERT(m0_h_to_ply.at(m0_cs_next_patch_polygon_he).size() > 0 /*m0_h_to_ply.find(m0_cs_next_patch_polygon_he) != m0_h_to_ply.cend()*/);
 
-                                const std::vector<int> &m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
+                                
 #ifndef NDEBUG
+                                const std::vector<int>& m0_poly_he_coincident_polys = m0_h_to_ply.at(m0_cs_next_patch_polygon_he);
                                 const std::vector<int>::const_iterator find_iter = std::find_if( // points to src-mesh polygon
                                     m0_poly_he_coincident_polys.cbegin(),
                                     m0_poly_he_coincident_polys.cend(),

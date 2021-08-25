@@ -34,7 +34,7 @@
 
 void mcCheckError_(McResult err, const char* file, int line);
 
-MCAPI_ATTR void MCAPI_CALL mcDebugOutput(McDebugSource source,
+void mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
     McDebugSeverity severity,
@@ -305,7 +305,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-MCAPI_ATTR void MCAPI_CALL mcDebugOutput(McDebugSource source,
+void mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
     McDebugSeverity severity,
