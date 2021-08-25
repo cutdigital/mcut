@@ -284,15 +284,15 @@ int main()
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
             // input mesh face index (actual index value, accounting for offset)
             uint32_t imFaceIdx = imFaceIdxRaw;
-            bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMesh.F.size());
+            bool faceIsFromSrcMesh = (imFaceIdxRaw < (std::uint32_t)srcMesh.F.size());
             bool flipNormalsOnFace = false;
 
             if (!faceIsFromSrcMesh) {
-                imFaceIdx = imFaceIdxRaw - srcMesh.F.size(); // accounting for offset
+                imFaceIdx = imFaceIdxRaw - (std::uint32_t)srcMesh.F.size(); // accounting for offset
                 flipNormalsOnFace = (isFragment && fragmentLocation == MC_FRAGMENT_LOCATION_ABOVE);
             }
 
-            int faceSize = faceSizes.at(f);
+            int faceSize = (int)faceSizes.at(f);
 
             // for each vertex in face
             for (int v = 0; v < faceSize; ++v) {
@@ -300,12 +300,12 @@ int main()
                 const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
                 // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
                 const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
-                bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMesh.V.size());
+                bool vertexIsFromSrcMesh = (imVertexIdxRaw < (std::uint32_t)srcMesh.V.size());
                 const bool isSeamVertex = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
                 uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                 if (!vertexIsFromSrcMesh) {
-                    imVertexIdx = (imVertexIdxRaw - srcMesh.V.size()); // account for offset
+                    imVertexIdx = (imVertexIdxRaw - (std::uint32_t)srcMesh.V.size()); // account for offset
                 }
 
                 const InputMesh* inputMeshPtr = &srcMesh; // assume origin face is from source mesh
