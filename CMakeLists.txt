@@ -24,7 +24,7 @@
 #
 #	MCUT_BUILD_AS_SHARED_LIB [default=ON] - Build MCUT as a shared/dynamic library (.so/.dll).
 #	MCUT_BUILD_DOCUMENTATION [default=OFF] - Build documentation (explicit dependancy on Doxygen) 
-#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS [default=OFF] - Build using arbitrary precision numbers.
+#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS [default=OFF] - Build using arbitrary precision numbers, which introduces a dependency on MPFR (version 4.0.2).
 #	MCUT_BUILD_TESTS [default=OFF] - Build the tests (implicit dependancy on GoogleTest)
 #	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
 #	MCUT_BUILD_WITH_MULTITHREADING [default=ON] - Build as multi-threaded library
