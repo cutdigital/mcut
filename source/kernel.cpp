@@ -261,7 +261,7 @@ namespace mcut
             MCUT_ASSERT((int)halfedges_around_face.size());
 
             DEBUG_CODE_MASK((*logger_ptr).indent(););
-            DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << num_halfedges << std::endl;);
+            //DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << num_halfedges << std::endl;);
             for (std::vector<halfedge_descriptor_t>::const_iterator h = halfedges_around_face.cbegin();
                  h != halfedges_around_face.cend();
                  ++h)
@@ -277,7 +277,7 @@ namespace mcut
         }
 
 #if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-        DEBUG_CODE_MASK((*logger_ptr).set_verbose(verb););
+       // DEBUG_CODE_MASK((*logger_ptr).set_verbose(verb););
 #endif
 
         write_off(name.c_str(), mesh);
@@ -612,10 +612,10 @@ namespace mcut
         TIMESTACK_PUSH("Extract CC: find connected components");
         std::vector<int> cc_to_vertex_count;
         std::vector<int> cc_to_face_count;
-        const std::size_t num = find_connected_components(fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
+        find_connected_components(fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
         TIMESTACK_POP();
 
-        DEBUG_CODE_MASK((*logger_ptr) << "connected components = " << num << std::endl;);
+        //DEBUG_CODE_MASK((*logger_ptr) << "connected components = " << num << std::endl;);
 
         ///////////////////////////////////////////////////////////////////////////
         // Map vertex descriptors to each connected component
@@ -1778,10 +1778,10 @@ namespace mcut
         }
 
         const int ps_vtx_cnt = ps.number_of_vertices();
-        const int ps_face_cnt = ps.number_of_faces();
+        //const int ps_face_cnt = ps.number_of_faces();
 
         DEBUG_CODE_MASK(lg << "polygon-soup vertices = " << ps_vtx_cnt << std::endl;);
-        DEBUG_CODE_MASK(lg << "polygon-soup faces = " << ps_face_cnt << std::endl;);
+        //DEBUG_CODE_MASK(lg << "polygon-soup faces = " << ps_face_cnt << std::endl;);
 
         ///////////////////////////////////////////////////////////////////////////
         // create the first auxilliary halfedge data structure ("m0")
@@ -3722,8 +3722,8 @@ namespace mcut
         do
         { // an iteration will build a cut-path sequence
 
-            const int diff = (int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size();
-            MCUT_ASSERT(diff >= 2); // need a minimum of 2 intersection points (one edge) to form a sequence
+            //const int diff = (int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size();
+            MCUT_ASSERT((int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size() >= 2); // need a minimum of 2 intersection points (one edge) to form a sequence
             DEBUG_CODE_MASK(lg.indent(););
             int cur_cutpath_sequence_index = (int)m0_cutpath_sequences.size();
 
@@ -6076,7 +6076,7 @@ namespace mcut
 
                 MCUT_ASSERT(incident_boundary_edge_count >= 3); // minimum is 3 edge which is for a triangle
 
-                const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
+                //const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
 
                 //
                 // We have the essential set of edges which will be used for clipping, the next step
@@ -7778,7 +7778,7 @@ namespace mcut
 
         do
         {
-            DEBUG_CODE_MASK(lg << "SCBS iteration: " << ++strongly_connected_sm_boundary_seq_iter_id << std::endl;);
+            //DEBUG_CODE_MASK(lg << "SCBS iteration: " << ++strongly_connected_sm_boundary_seq_iter_id << std::endl;);
 
             MCUT_ASSERT((m0_1st_sm_ihe_fiter != m0_sm_ihe_to_flag.end())); // their must be at least one halfedge from which we can start walking!
 
@@ -7894,7 +7894,7 @@ namespace mcut
                     //
 
                     // bool m1_cur_h_exists = false;
-                    const bool m0_cur_h_is_xx = m0_cur_h_src_is_ivtx && m0_cur_h_tgt_is_ivtx;
+                    //const bool m0_cur_h_is_xx = m0_cur_h_src_is_ivtx && m0_cur_h_tgt_is_ivtx;
                     //std::map<vd_t, std::vector<std::pair<vd_t, hd_t> > >::iterator fiter = m1_ivtx_to_h.end();
 
                     const bool is_boundary_halfedge = m0_is_polygon_boundary_halfedge(m0_cur_h, m0_num_cutpath_halfedges);
@@ -9308,19 +9308,19 @@ namespace mcut
 
         known_exterior_cm_polygons.clear();
         //m0_cm_poly_to_patch_idx.clear();
-
+#if 0
         // dump
         DEBUG_CODE_MASK(lg << "color label values (dye)" << std::endl;);
         DEBUG_CODE_MASK(lg.indent(););
         for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin(); color_to_ccw_patches_iter != color_to_patch.cend(); ++color_to_ccw_patches_iter)
         {
             const char color_label = color_to_ccw_patches_iter->first;
-            const cut_surface_patch_location_t color_label_dye = patch_color_label_to_location.at(color_label);
+            //const cut_surface_patch_location_t color_label_dye = patch_color_label_to_location.at(color_label);
 
-            DEBUG_CODE_MASK(lg << (char)color_label << "=" << (color_label_dye == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << std::endl;);
+            DEBUG_CODE_MASK(lg << (char)color_label << "=" << (patch_color_label_to_location.at(color_label) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << std::endl;);
         }
         DEBUG_CODE_MASK(lg.unindent(););
-
+#endif
         TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
@@ -9356,9 +9356,9 @@ namespace mcut
         {
             DEBUG_CODE_MASK(lg.indent(););
 
-            const char color_id = color_to_ccw_patches_iter->first;
+            //const char color_id = color_to_ccw_patches_iter->first;
 
-            DEBUG_CODE_MASK(lg << "color = " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
+            //DEBUG_CODE_MASK(lg << "color = " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
 
             // add entry
             MCUT_ASSERT(color_to_cw_patch.count(color_to_ccw_patches_iter->first) == 0);
@@ -9563,9 +9563,9 @@ namespace mcut
         TIMESTACK_POP();
 
         // number of reversed cut-mesh polygons
-        const int cw_cs_poly_count = ((int)m0_polygons.size() - traced_polygon_count);
+        //const int cw_cs_poly_count = ((int)m0_polygons.size() - traced_polygon_count);
 
-        DEBUG_CODE_MASK(lg << "reversed cut-mesh polygons = " << cw_cs_poly_count << std::endl;);
+        //DEBUG_CODE_MASK(lg << "reversed cut-mesh polygons = " << cw_cs_poly_count << std::endl;);
 
         // NOTE: at this stage, all patch polygons (ccw/normal) also have an opposite (cw/reversed)
 
@@ -9606,9 +9606,9 @@ namespace mcut
 
                     const int patch_idx = *colored_patch_iter;
                     const std::vector<int> &patch = patches.at(patch_idx);
-                    const int is_ccw = (int)(std::distance(colored_patches.cbegin(), colored_patch_iter) < (int)(patch.size() / 2));
+                    //const int is_ccw = (int)(std::distance(colored_patches.cbegin(), colored_patch_iter) < (int)(patch.size() / 2));
 
-                    DEBUG_CODE_MASK(lg << "patch = " << patch_idx << " (" << (is_ccw ? "normal" : "reversed") << ")" << std::endl;);
+                    //DEBUG_CODE_MASK(lg << "patch = " << patch_idx << " (" << (is_ccw ? "normal" : "reversed") << ")" << std::endl;);
 
                     DEBUG_CODE_MASK(lg.indent(););
                     DEBUG_CODE_MASK(lg << "polygons=" << patch.size() << " :";);
@@ -9871,9 +9871,9 @@ namespace mcut
         {
             DEBUG_CODE_MASK(lg.indent(););
 
-            const char color_value = color_to_cw_patch_iter->first;
+            //const char color_value = color_to_cw_patch_iter->first;
 
-            DEBUG_CODE_MASK(lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
+            //DEBUG_CODE_MASK(lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
 
             // get the reversed patch of the current color
             const std::vector<int> &colored_cw_patches = color_to_cw_patch_iter->second;
