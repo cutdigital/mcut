@@ -10,13 +10,18 @@ Input meshes are defined in-source but output meshes are saved as .off files
 
 #include <vector>
 
-#define my_assert(cond) if(!(cond)){fprintf(stderr, "MCUT error: %s\n", #cond );std::exit(1);}
+#define my_assert(cond)                             \
+    if (!(cond))                                    \
+    {                                               \
+        fprintf(stderr, "MCUT error: %s\n", #cond); \
+        std::exit(1);                               \
+    }
 
 void writeOFF(
-    const char* fpath,
-    float* pVertices,
-    uint32_t* pFaceIndices,
-    uint32_t* pFaceSizes,
+    const char *fpath,
+    float *pVertices,
+    uint32_t *pFaceIndices,
+    uint32_t *pFaceSizes,
     uint32_t numVertices,
     uint32_t numFaces);
 
@@ -28,14 +33,14 @@ int main()
     // the cube
     // --------
     float cubeVertices[] = {
-        -5, -5, 5, // 0
-        5, -5, 5, // 1
-        5, 5, 5, //2
-        -5, 5, 5, //3
+        -5, -5, 5,  // 0
+        5, -5, 5,   // 1
+        5, 5, 5,    //2
+        -5, 5, 5,   //3
         -5, -5, -5, //4
-        5, -5, -5, //5
-        5, 5, -5, //6
-        -5, 5, -5 //7
+        5, -5, -5,  //5
+        5, 5, -5,   //6
+        -5, 5, -5   //7
     };
     uint32_t cubeFaces[] = {
         0, 1, 2, 3, //0
@@ -43,11 +48,10 @@ int main()
         1, 5, 6, 2, //2
         0, 3, 7, 4, //3
         3, 2, 6, 7, //4
-        4, 5, 1, 0 //5
+        4, 5, 1, 0  //5
     };
     uint32_t cubeFaceSizes[] = {
-        4, 4, 4, 4, 4, 4
-    };
+        4, 4, 4, 4, 4, 4};
     uint32_t numCubeVertices = 8;
     uint32_t numCubeFaces = 6;
 
@@ -55,17 +59,16 @@ int main()
     // ---------
     float cutMeshVertices[] = {
         -20, -4, 0, //0
-        0, 20, 20, //1
-        20, -4, 0, //2
-        0, 20, -20 //3
+        0, 20, 20,  //1
+        20, -4, 0,  //2
+        0, 20, -20  //3
     };
     uint32_t cutMeshFaces[] = {
         0, 1, 2, //0
-        0, 2, 3 //1
+        0, 2, 3  //1
     };
     uint32_t cutMeshFaceSizes[] = {
-        3, 3
-    };
+        3, 3};
     uint32_t numCutMeshVertices = 4;
     uint32_t numCutMeshFaces = 2;
 
@@ -74,7 +77,8 @@ int main()
     McContext context = MC_NULL_HANDLE;
     McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
 
-    if (err != MC_NO_ERROR) {
+    if (err != MC_NO_ERROR)
+    {
         fprintf(stderr, "could not create context (err=%d)\n", (int)err);
         exit(1);
     }
@@ -95,7 +99,8 @@ int main()
         numCutMeshVertices,
         numCutMeshFaces);
 
-    if (err != MC_NO_ERROR) {
+    if (err != MC_NO_ERROR)
+    {
         fprintf(stderr, "dispatch call failed (err=%d)\n", (int)err);
         exit(1);
     }
@@ -107,12 +112,14 @@ int main()
 
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
 
-    if (err != MC_NO_ERROR) {
+    if (err != MC_NO_ERROR)
+    {
         fprintf(stderr, "1:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
         exit(1);
     }
 
-    if (numConnComps == 0) {
+    if (numConnComps == 0)
+    {
         fprintf(stdout, "no connected components found\n");
         exit(0);
     }
@@ -121,7 +128,8 @@ int main()
 
     err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connComps.size(), connComps.data(), NULL);
 
-    if (err != MC_NO_ERROR) {
+    if (err != MC_NO_ERROR)
+    {
         fprintf(stderr, "2:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (err=%d)\n", (int)err);
         exit(1);
     }
@@ -129,56 +137,44 @@ int main()
     // 5. query the data of each connected component from MCUT
     // -------------------------------------------------------
 
-    for (int i = 0; i < (int)connComps.size(); ++i) {
+    for (int i = 0; i < (int)connComps.size(); ++i)
+    {
         McConnectedComponent connComp = connComps[i]; // connected compoenent id
 
         uint64_t numBytes = 0;
 
-        // 5.1 query the number of vertices
-        // ----------------------------....
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        uint32_t numberOfVertices = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &numberOfVertices, NULL);
-
-        if (err != MC_NO_ERROR) {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        // 5.2 query the vertices
+        // query the vertices
         // ----------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes);
 
-        if (err != MC_NO_ERROR) {
+        if (err != MC_NO_ERROR)
+        {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
             exit(1);
         }
 
-        std::vector<float> vertices;
-        vertices.resize(numberOfVertices * 3u);
+        uint32_t numberOfVertices = (uint32_t)(numBytes / (sizeof(float) * 3));
 
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (void*)vertices.data(), NULL);
+        std::vector<float> vertices(numberOfVertices * 3u);
 
-        if (err != MC_NO_ERROR) {
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (void *)vertices.data(), NULL);
+
+        if (err != MC_NO_ERROR)
+        {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT) failed (err=%d)\n", (int)err);
             exit(1);
         }
 
-        // 5.3 query the faces
+        // query the faces
         // -------------------
 
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
 
-        if (err != MC_NO_ERROR) {
+        if (err != MC_NO_ERROR)
+        {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
             exit(1);
         }
@@ -188,16 +184,18 @@ int main()
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, faceIndices.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
+        if (err != MC_NO_ERROR)
+        {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
             exit(1);
         }
 
-        // 5.4 query the face sizes
+        // query the face sizes
         // ------------------------
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
-        if (err != MC_NO_ERROR) {
+        if (err != MC_NO_ERROR)
+        {
             fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
             exit(1);
         }
@@ -207,7 +205,8 @@ int main()
 
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
 
-        if (err != MC_NO_ERROR) {
+        if (err != MC_NO_ERROR)
+        {
             fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
             exit(1);
         }
@@ -215,21 +214,22 @@ int main()
         char fnameBuf[32];
         sprintf(fnameBuf, "conncomp%d.off", i);
 
-        // 5.5 save to mesh file (.off)
+        // save to mesh file (.off)
         // ------------------------
         writeOFF(fnameBuf,
-            (float*)vertices.data(),
-            (uint32_t*)faceIndices.data(),
-            (uint32_t*)faceSizes.data(),
-            (uint32_t)vertices.size() / 3,
-            (uint32_t)faceSizes.size());
+                 (float *)vertices.data(),
+                 (uint32_t *)faceIndices.data(),
+                 (uint32_t *)faceSizes.data(),
+                 (uint32_t)vertices.size() / 3,
+                 (uint32_t)faceSizes.size());
     }
 
     // 6. free connected component data
     // --------------------------------
     err = mcReleaseConnectedComponents(context, 0, NULL);
 
-    if (err != MC_NO_ERROR) {
+    if (err != MC_NO_ERROR)
+    {
         fprintf(stderr, "mcReleaseConnectedComponents failed (err=%d)\n", (int)err);
         exit(1);
     }
@@ -238,7 +238,8 @@ int main()
     // ------------------
     err = mcReleaseContext(context);
 
-    if (err != MC_NO_ERROR) {
+    if (err != MC_NO_ERROR)
+    {
         fprintf(stderr, "mcReleaseContext failed (err=%d)\n", (int)err);
         exit(1);
     }
@@ -248,16 +249,17 @@ int main()
 
 // write mesh to .off file
 void writeOFF(
-    const char* fpath,
-    float* pVertices,
-    uint32_t* pFaceIndices,
-    uint32_t* pFaceSizes,
+    const char *fpath,
+    float *pVertices,
+    uint32_t *pFaceIndices,
+    uint32_t *pFaceSizes,
     uint32_t numVertices,
     uint32_t numFaces)
 {
-    FILE* file = fopen(fpath, "w");
+    FILE *file = fopen(fpath, "w");
 
-    if (file == NULL) {
+    if (file == NULL)
+    {
         fprintf(stderr, "error: failed to open `%s`", fpath);
         exit(1);
     }
@@ -265,18 +267,21 @@ void writeOFF(
     fprintf(file, "OFF\n");
     fprintf(file, "%d %d %d\n", numVertices, numFaces, 0 /*numEdges*/);
     int i;
-    for (i = 0; i < (int)numVertices; ++i) {
-        float* vptr = pVertices + (i * 3);
+    for (i = 0; i < (int)numVertices; ++i)
+    {
+        float *vptr = pVertices + (i * 3);
         fprintf(file, "%f %f %f\n", vptr[0], vptr[1], vptr[2]);
     }
 
     int faceBaseOffset = 0;
-    for (i = 0; i < (int)numFaces; ++i) {
+    for (i = 0; i < (int)numFaces; ++i)
+    {
         uint32_t faceVertexCount = pFaceSizes[i];
         fprintf(file, "%d", (int)faceVertexCount);
         int j;
-        for (j = 0; j < (int)faceVertexCount; ++j) {
-            uint32_t* fptr = pFaceIndices + faceBaseOffset + j;
+        for (j = 0; j < (int)faceVertexCount; ++j)
+        {
+            uint32_t *fptr = pFaceIndices + faceBaseOffset + j;
             fprintf(file, " %d", *fptr);
         }
         fprintf(file, "\n");

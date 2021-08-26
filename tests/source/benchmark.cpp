@@ -135,27 +135,15 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
         for (int c = 0; c < (int)connComps.size(); ++c) {
             McConnectedComponent cc = connComps[c]; // connected compoenent id
 
-            uint64_t vertexCountBytes = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &vertexCountBytes), MC_NO_ERROR);
-            ASSERT_EQ(vertexCountBytes, uint64_t(sizeof(uint32_t)));
-
-            // we can also directly query the number of vertices since we know the number of bytes, which is a constant 4 bytes.
-            uint32_t numberOfVertices = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, vertexCountBytes, &numberOfVertices, NULL), MC_NO_ERROR);
-            ASSERT_GT(numberOfVertices, uint32_t(0));
-
             // vertex array
             uint64_t connCompVerticesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
             ASSERT_GT(connCompVerticesBytes, uint64_t(0));
             ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
-            std::vector<float> vertices;
-            uint32_t nfloats = (uint32_t)(connCompVerticesBytes / sizeof(float));
-            vertices.resize(nfloats);
+            const uint32_t numberOfVertices = (uint32_t)(connCompVerticesBytes / (sizeof(float) * 3));
 
+            std::vector<float> vertices(numberOfVertices*3);
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
-
-            ASSERT_EQ((uint64_t)numberOfVertices, (uint64_t)(connCompVerticesBytes / (sizeof(float) * 3)));
 
             // face indices
             uint64_t connCompFaceIndicesBytes = 0;

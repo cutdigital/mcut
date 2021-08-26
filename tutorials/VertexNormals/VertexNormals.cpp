@@ -16,19 +16,25 @@ connected components after cutting
 #include <igl/readOBJ.h>
 #include <igl/writeOBJ.h>
 
-#define my_assert(cond) if(!(cond)){fprintf(stderr, "MCUT error: %s\n", #cond );std::exit(1);}
+#define my_assert(cond)                             \
+    if (!(cond))                                    \
+    {                                               \
+        fprintf(stderr, "MCUT error: %s\n", #cond); \
+        std::exit(1);                               \
+    }
 
-struct InputMesh {
+struct InputMesh
+{
     // variables for reading .obj file data with libigl
     std::vector<std::vector<double>> V, TC, N;
     std::vector<std::vector<int>> F, FTC, FN;
     std::vector<std::tuple<std::string, unsigned, unsigned>> FM;
 
     // variables for mesh data in a format suited for MCUT
-    std::string fpath; // path to mesh file
-    std::vector<uint32_t> faceSizesArray; // vertices per face
+    std::string fpath;                      // path to mesh file
+    std::vector<uint32_t> faceSizesArray;   // vertices per face
     std::vector<uint32_t> faceIndicesArray; // face indices
-    std::vector<double> vertexCoordsArray; // vertex coords
+    std::vector<double> vertexCoordsArray;  // vertex coords
 };
 
 int main()
@@ -41,14 +47,16 @@ int main()
     srcMesh.fpath = DATA_DIR "/cube.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.TC, srcMesh.N, srcMesh.F, srcMesh.FTC, srcMesh.FN);
 
-    if (!srcMeshLoaded) {
+    if (!srcMeshLoaded)
+    {
         std::fprintf(stderr, "error: could not load source mesh --> %s\n", srcMesh.fpath.c_str());
         std::exit(1);
     }
 
     // copy vertices
-    for (int i = 0; i < (int)srcMesh.V.size(); ++i) {
-        const std::vector<double>& v = srcMesh.V[i];
+    for (int i = 0; i < (int)srcMesh.V.size(); ++i)
+    {
+        const std::vector<double> &v = srcMesh.V[i];
         my_assert(v.size() == 3);
         srcMesh.vertexCoordsArray.push_back(v[0]);
         srcMesh.vertexCoordsArray.push_back(v[1]);
@@ -56,10 +64,12 @@ int main()
     }
 
     // copy faces
-    for (int i = 0; i < (int)srcMesh.F.size(); ++i) {
-        const std::vector<int>& f = srcMesh.F[i];
+    for (int i = 0; i < (int)srcMesh.F.size(); ++i)
+    {
+        const std::vector<int> &f = srcMesh.F[i];
         my_assert(f.size() == 3); // we assume triangle meshes for simplicity
-        for (int j = 0; j < (int)f.size(); ++j) {
+        for (int j = 0; j < (int)f.size(); ++j)
+        {
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
@@ -74,14 +84,16 @@ int main()
     cutMesh.fpath = DATA_DIR "/plane.obj";
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.TC, cutMesh.N, cutMesh.F, cutMesh.FTC, cutMesh.FN);
 
-    if (!cutMeshLoaded) {
+    if (!cutMeshLoaded)
+    {
         std::fprintf(stderr, "error: could not load source mesh --> %s\n", cutMesh.fpath.c_str());
         std::exit(1);
     }
 
     // copy vertices
-    for (int i = 0; i < (int)cutMesh.V.size(); ++i) {
-        const std::vector<double>& v = cutMesh.V[i];
+    for (int i = 0; i < (int)cutMesh.V.size(); ++i)
+    {
+        const std::vector<double> &v = cutMesh.V[i];
         my_assert((int)v.size() == 3);
         cutMesh.vertexCoordsArray.push_back(v[0]);
         cutMesh.vertexCoordsArray.push_back(v[1]);
@@ -89,10 +101,12 @@ int main()
     }
 
     // copy faces
-    for (int i = 0; i < (int)cutMesh.F.size(); ++i) {
-        const std::vector<int>& f = cutMesh.F[i];
+    for (int i = 0; i < (int)cutMesh.F.size(); ++i)
+    {
+        const std::vector<int> &f = cutMesh.F[i];
         my_assert(f.size() == 3);
-        for (int j = 0; j < (int)f.size(); ++j) {
+        for (int j = 0; j < (int)f.size(); ++j)
+        {
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
 
@@ -114,13 +128,13 @@ int main()
         context,
         MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, // We need vertex and face maps to propagate normals
         // source mesh
-        reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
-        reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
+        reinterpret_cast<const void *>(srcMesh.vertexCoordsArray.data()),
+        reinterpret_cast<const uint32_t *>(srcMesh.faceIndicesArray.data()),
         srcMesh.faceSizesArray.data(),
         static_cast<uint32_t>(srcMesh.vertexCoordsArray.size() / 3),
         static_cast<uint32_t>(srcMesh.faceSizesArray.size()),
         // cut mesh
-        reinterpret_cast<const void*>(cutMesh.vertexCoordsArray.data()),
+        reinterpret_cast<const void *>(cutMesh.vertexCoordsArray.data()),
         cutMesh.faceIndicesArray.data(),
         cutMesh.faceSizesArray.data(),
         static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
@@ -144,28 +158,20 @@ int main()
     //  query the data of each connected component from MCUT
     // -------------------------------------------------------
 
-    for (int ci = 0; ci < (int)connComps.size(); ++ci) {
+    for (int ci = 0; ci < (int)connComps.size(); ++ci)
+    {
         McConnectedComponent connComp = connComps[ci]; // connected component id
-        uint64_t numBytes = 0;
-
-        //  query the number of ccVertices
-        // --------------------------------
-
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-
-        uint32_t ccVertexCount = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
-        my_assert(err == MC_NO_ERROR);
 
         //  query the ccVertices
         // ----------------------
 
-        numBytes = 0;
+        uint64_t numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
+        uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
+
         std::vector<double> ccVertices((size_t)ccVertexCount * 3u, 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void *)ccVertices.data(), NULL);
         my_assert(err == MC_NO_ERROR);
 
         //  query the faces
@@ -221,11 +227,16 @@ int main()
         McPatchLocation patchLocation = (McPatchLocation)0;
         bool isFragment = false;
 
-        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
+        if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM)
+        {
             name += "seam";
-        } else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+        }
+        else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT)
+        {
             name += "input";
-        } else {
+        }
+        else
+        {
             isFragment = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
             name += isFragment ? "frag" : "patch";
 
@@ -233,7 +244,8 @@ int main()
             my_assert(err == MC_NO_ERROR);
             name += patchLocation == MC_PATCH_LOCATION_INSIDE ? ".inside" : (patchLocation == MC_PATCH_LOCATION_OUTSIDE ? ".outside" : ".undefined");
 
-            if (isFragment) {
+            if (isFragment)
+            {
 
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &fragmentLocation, NULL);
                 my_assert(err == MC_NO_ERROR);
@@ -249,16 +261,19 @@ int main()
         bool ccIsFromSrcMesh = (ccType == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
         // connected-components is not a fragment && it is a seam
-        if (!ccIsFromSrcMesh) {
-            if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
+        if (!ccIsFromSrcMesh)
+        {
+            if (ccType == MC_CONNECTED_COMPONENT_TYPE_SEAM)
+            {
                 // get origin
                 McSeamOrigin ccOrig = (McSeamOrigin)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &ccOrig, NULL);
                 my_assert(err == MC_NO_ERROR);
 
                 ccIsFromSrcMesh = (ccOrig == McSeamOrigin::MC_SEAM_ORIGIN_SRCMESH);
-
-            } else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
+            }
+            else if (ccType == MC_CONNECTED_COMPONENT_TYPE_INPUT)
+            {
                 McInputOrigin ccOrig = (McInputOrigin)0;
                 err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &ccOrig, NULL);
                 my_assert(err == MC_NO_ERROR);
@@ -278,7 +293,8 @@ int main()
         std::vector<int> ccReversedFaces;
 
         // for each face in CC
-        for (int f = 0; f < (int)ccFaceCount; ++f) {
+        for (int f = 0; f < (int)ccFaceCount; ++f)
+        {
 
             // input mesh face index (which may be offsetted!)
             const uint32_t imFaceIdxRaw = ccFaceMap.at(f); // source- or cut-mesh
@@ -287,7 +303,8 @@ int main()
             bool faceIsFromSrcMesh = (imFaceIdxRaw < (std::uint32_t)srcMesh.F.size());
             bool flipNormalsOnFace = false;
 
-            if (!faceIsFromSrcMesh) {
+            if (!faceIsFromSrcMesh)
+            {
                 imFaceIdx = imFaceIdxRaw - (std::uint32_t)srcMesh.F.size(); // accounting for offset
                 flipNormalsOnFace = (isFragment && fragmentLocation == MC_FRAGMENT_LOCATION_ABOVE);
             }
@@ -295,7 +312,8 @@ int main()
             int faceSize = (int)faceSizes.at(f);
 
             // for each vertex in face
-            for (int v = 0; v < faceSize; ++v) {
+            for (int v = 0; v < faceSize; ++v)
+            {
 
                 const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
                 // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
@@ -304,20 +322,23 @@ int main()
                 const bool isSeamVertex = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
                 uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
-                if (!vertexIsFromSrcMesh) {
+                if (!vertexIsFromSrcMesh)
+                {
                     imVertexIdx = (imVertexIdxRaw - (std::uint32_t)srcMesh.V.size()); // account for offset
                 }
 
-                const InputMesh* inputMeshPtr = &srcMesh; // assume origin face is from source mesh
+                const InputMesh *inputMeshPtr = &srcMesh; // assume origin face is from source mesh
 
-                if (!faceIsFromSrcMesh) {
+                if (!faceIsFromSrcMesh)
+                {
                     inputMeshPtr = &cutMesh;
                 }
 
                 // the face on which the current cc face came from
-                const std::vector<int>& imFace = inputMeshPtr->F[imFaceIdx];
+                const std::vector<int> &imFace = inputMeshPtr->F[imFaceIdx];
 
-                if (isSeamVertex) { // normal is unknown and must be computed
+                if (isSeamVertex)
+                { // normal is unknown and must be computed
 
                     // interpolate texture coords from source-mesh values
 
@@ -328,9 +349,9 @@ int main()
                     double z(ccVertices[((uint64_t)ccVertexIdx * 3u) + 2u]);
 
                     // vertices of the origin face
-                    const std::vector<double>& a = inputMeshPtr->V[imFace[0]];
-                    const std::vector<double>& b = inputMeshPtr->V[imFace[1]];
-                    const std::vector<double>& c = inputMeshPtr->V[imFace[2]];
+                    const std::vector<double> &a = inputMeshPtr->V[imFace[0]];
+                    const std::vector<double> &b = inputMeshPtr->V[imFace[1]];
+                    const std::vector<double> &c = inputMeshPtr->V[imFace[2]];
 
                     // barycentric coords of our intersection point on the origin face
                     Eigen::MatrixXd P;
@@ -353,13 +374,13 @@ int main()
                     // -------------------------------------------------------------
 
                     // indices of the normals that are used by "imFaceIdx"
-                    const std::vector<int>& imFaceNormalIndices = inputMeshPtr->FN[imFaceIdx];
+                    const std::vector<int> &imFaceNormalIndices = inputMeshPtr->FN[imFaceIdx];
                     my_assert(imFaceNormalIndices.size() == 3);
 
                     // normals of vertices in origin face
-                    const std::vector<double>& Na_ = inputMeshPtr->N[imFaceNormalIndices[0]];
-                    const std::vector<double>& Nb_ = inputMeshPtr->N[imFaceNormalIndices[1]];
-                    const std::vector<double>& Nc_ = inputMeshPtr->N[imFaceNormalIndices[2]];
+                    const std::vector<double> &Na_ = inputMeshPtr->N[imFaceNormalIndices[0]];
+                    const std::vector<double> &Nb_ = inputMeshPtr->N[imFaceNormalIndices[1]];
+                    const std::vector<double> &Nc_ = inputMeshPtr->N[imFaceNormalIndices[2]];
 
                     const Eigen::Vector3d Na(Na_[0], Na_[1], Na_[2]);
                     const Eigen::Vector3d Nb(Nb_[0], Nb_[1], Nb_[2]);
@@ -371,19 +392,26 @@ int main()
 
                     ccVertexNormals[ccVertexIdx] += normal;
 
-                    if (ccSeamVertexToRefCount.find(ccVertexIdx) == ccSeamVertexToRefCount.cend()) {
+                    if (ccSeamVertexToRefCount.find(ccVertexIdx) == ccSeamVertexToRefCount.cend())
+                    {
                         ccSeamVertexToRefCount[ccVertexIdx] = 1;
-                    } else {
+                    }
+                    else
+                    {
                         ccSeamVertexToRefCount[ccVertexIdx] += 1;
                     }
+                }
+                else
+                { // normal must be inferred from input mesh
 
-                } else { // normal must be inferred from input mesh
-
-                    if (ccVertexNormals[ccVertexIdx].norm() == 0) {
+                    if (ccVertexNormals[ccVertexIdx].norm() == 0)
+                    {
                         int faceVertexOffset = -1;
                         // for each vertex index in face
-                        for (int i = 0; i < (int)imFace.size(); ++i) {
-                            if ((int)imFace[i] == (int)imVertexIdx) {
+                        for (int i = 0; i < (int)imFace.size(); ++i)
+                        {
+                            if ((int)imFace[i] == (int)imVertexIdx)
+                            {
                                 faceVertexOffset = i;
                                 break;
                             }
@@ -392,7 +420,7 @@ int main()
                         my_assert(faceVertexOffset != -1);
 
                         int imNormalIdx = inputMeshPtr->FN[imFaceIdx][faceVertexOffset];
-                        const std::vector<double>& n = inputMeshPtr->N[imNormalIdx];
+                        const std::vector<double> &n = inputMeshPtr->N[imNormalIdx];
                         my_assert(n.size() == 3);
                         Eigen::Vector3d normal = Eigen::Vector3d(n[0], n[1], n[2]) * (flipNormalsOnFace ? -1.0 : 1.0);
 
@@ -404,7 +432,8 @@ int main()
             faceVertexOffsetBase += faceSize;
         } // for (int f = 0; f < ccFaceCount; ++f) {
 
-        for (std::map<int, int>::const_iterator it = ccSeamVertexToRefCount.cbegin(); it != ccSeamVertexToRefCount.cend(); ++it) {
+        for (std::map<int, int>::const_iterator it = ccSeamVertexToRefCount.cbegin(); it != ccSeamVertexToRefCount.cend(); ++it)
+        {
             const int ccSeamVertexIndex = it->first;
             const int refCount = it->second;
             my_assert(refCount >= 1);
@@ -424,7 +453,8 @@ int main()
 
         // write vertices and normals
 
-        for (int i = 0; i < (int)ccVertexCount; ++i) {
+        for (int i = 0; i < (int)ccVertexCount; ++i)
+        {
             double x = ccVertices[(uint64_t)i * 3 + 0];
             double y = ccVertices[(uint64_t)i * 3 + 1];
             double z = ccVertices[(uint64_t)i * 3 + 2];
@@ -437,11 +467,13 @@ int main()
         // write faces (with normal indices)
 
         faceVertexOffsetBase = 0;
-        for (int i = 0; i < (int)ccFaceCount; ++i) {
+        for (int i = 0; i < (int)ccFaceCount; ++i)
+        {
             int faceSize = faceSizes.at(i);
 
             file << "f ";
-            for (int j = 0; j < faceSize; ++j) {
+            for (int j = 0; j < faceSize; ++j)
+            {
                 const int idx = faceVertexOffsetBase + j;
                 const int ccVertexIdx = ccFaceIndices[idx];
                 file << (ccVertexIdx + 1) << "//" << (ccVertexIdx + 1) << " ";

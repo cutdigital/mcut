@@ -212,13 +212,13 @@ typedef enum McInputOrigin {
  * This enum structure defines the different types of data that are associated with a connected component and can be queried from the API after a dispatch call.
  */
 typedef enum McConnectedComponentData {
-    MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT = (1 << 0), /**< Number of vertices. */
+    //MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT = (1 << 0), /**< Number of vertices. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
-    MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
+    //MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
     MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
-    MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
+    //MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
     MC_CONNECTED_COMPONENT_DATA_EDGE = (1 << 8), /**< List of edges as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_TYPE = (1 << 9), /**< The type of a connected component (See also: ::McConnectedComponentType.). */
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION = (1 << 10), /**< The location of a fragment connected component with respect to the cut mesh (See also: ::McFragmentLocation). */

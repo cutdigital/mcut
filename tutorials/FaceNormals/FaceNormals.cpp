@@ -157,24 +157,16 @@ int main()
     // -------------------------------------------------------
 
     for (int i = 0; i < (int)connectedComponents.size(); ++i) {
-        McConnectedComponent connComp = connectedComponents[i]; // connected compoenent id
-        uint64_t numBytes = 0;
-
-        //  query the number of vertices
-        // --------------------------------
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        uint32_t ccVertexCount = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
-        my_assert(err == MC_NO_ERROR);
+        McConnectedComponent connComp = connectedComponents[i]; // connected compoene
 
         //  query the vertices
         // ----------------------
 
-        numBytes = 0;
+        uint64_t numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
 
+        uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
         std::vector<double> ccVertices((size_t)ccVertexCount * 3u, 0.0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         my_assert(err == MC_NO_ERROR);

@@ -238,7 +238,7 @@ struct McDispatchContextInternal
     McFlags debugSource = 0;
     McFlags debugType = 0;
     McFlags debugSeverity = 0;
-    std::string lastLoggedDebugDetail = "";
+    //std::string lastLoggedDebugDetail = "";
 
     void log(McDebugSource source,
              McDebugType type,
@@ -366,11 +366,11 @@ McResult indexArrayMeshToHalfedgeMesh(
             const float &x = vptr[(i * 3) + 0];
             const float &y = vptr[(i * 3) + 1];
             const float &z = vptr[(i * 3) + 2];
-            /*vmap[i]*/mcut::vd_t vd = halfedgeMesh.add_vertex(
+            /*vmap[i]*/ mcut::vd_t vd = halfedgeMesh.add_vertex(
                 mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
-                MCUT_ASSERT(vd != mcut::mesh_t::null_vertex() && (uint32_t)vd < numVertices);
+            MCUT_ASSERT(vd != mcut::mesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
     }
     else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE)
@@ -381,7 +381,7 @@ McResult indexArrayMeshToHalfedgeMesh(
             const double &x = vptr[(i * 3) + 0];
             const double &y = vptr[(i * 3) + 1];
             const double &z = vptr[(i * 3) + 2];
-            /*vmap[i]*/mcut::vd_t vd = halfedgeMesh.add_vertex(
+            /*vmap[i]*/ mcut::vd_t vd = halfedgeMesh.add_vertex(
                 mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
@@ -460,7 +460,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                 {
                     uint32_t idx = ((uint32_t *)pFaceIndices)[faceBaseOffset + j];
                     MCUT_ASSERT(idx < numVertices);
-                    #if 0
+#if 0
                     std::unordered_map<uint32_t, mcut::vd_t>::const_iterator fIter = vmap.find(idx);
 
                     if (fIter == vmap.cend())
@@ -479,7 +479,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                         break;
                     }
 #endif
-                    const mcut::vertex_descriptor_t descr(idx);// = fIter->second; //vmap[*fIter.first];
+                    const mcut::vertex_descriptor_t descr(idx); // = fIter->second; //vmap[*fIter.first];
 
                     const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
@@ -603,7 +603,7 @@ McResult indexArrayMeshToHalfedgeMesh(
         {
 
             uint32_t idx = ((uint32_t *)pFaceIndices)[faceSizeOffset + j];
-            #if 0
+#if 0
             std::unordered_map<uint32_t, mcut::vd_t>::const_iterator fIter = vmap.find(idx);
 
             if (fIter == vmap.cend())
@@ -619,7 +619,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                 }
             }
 #endif
-            const mcut::vertex_descriptor_t descr(idx);// = fIter->second; //vmap[*fIter.first];
+            const mcut::vertex_descriptor_t descr(idx); // = fIter->second; //vmap[*fIter.first];
 
             const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
@@ -863,7 +863,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         //mcut::mesh_t::vertex_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
         //std::advance(vIter, i);
         mcut::vd_t vdescr(i);
-        const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(vdescr/**vIter*/);
+        const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(vdescr /**vIter*/);
 
         indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
         indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
@@ -879,7 +879,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
             // Here we use whatever value was assigned to the current vertex by the kernel.
             // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(vdescr/**vIter*/);
+            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(vdescr /**vIter*/);
             // We use the same default value as that used by the kernel for intersection
             // points (intersection points at mapped to uint_max i.e. null_vertex())
             uint32_t userInputMeshVertexDescr = UINT32_MAX;
@@ -1070,7 +1070,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     }
 #else
 
-    int faceID = 0;//std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+    int faceID = 0; //std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
         //const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
@@ -1128,7 +1128,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
         } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
 
-            faceID++;
+        faceID++;
     }
 #endif                                                                    //#if defined(MCUT_MULTI_THREADED)
     MCUT_ASSERT(gatheredFacesAdjFaces.size() == indexArrayMesh.numFaces); // sanity check
@@ -1173,7 +1173,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                     for (uint32_t j = 0; j < faceSize; ++j)
                     {
                         const mcut::vd_t vd = faceVertices[j];
-                        indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = (uint32_t)vd;// vmap[vd];
+                        indexArrayMesh.pFaceIndices[(size_t)faceVertexIndexOffset + j] = (uint32_t)vd; // vmap[vd];
                     }
                 }
 
@@ -1212,11 +1212,10 @@ McResult halfedgeMeshToIndexArrayMesh(
         }
     }
 #else
- faceID = 0;//std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+    faceID = 0; //std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     // for each face
     for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
-        
 
         { // store face-vertex indices
             const std::vector<mcut::vd_t> &faceVertices = gatheredFaces[faceID];
@@ -1267,7 +1266,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         {
             //uint32_t bs =*block_start_;
             //uint32_t be =*block_end_;
-            
+
             for (InputStorageIteratorType eiter = block_start_; eiter != block_end_; ++eiter)
             {
                 //printf("block_start_=%u; block_end_=%u eiter=%u\n", (uint32_t)*block_start_,  (uint32_t)*block_end_, (uint32_t)*eiter);
@@ -1278,14 +1277,14 @@ McResult halfedgeMeshToIndexArrayMesh(
 
                 //uint32_t r = halfedgeMeshInfo.mesh.count_removed_elements_in_range(halfedgeMeshInfo.mesh.edges_begin(), eiter);
                 // NOTE: our override of std::distance accounts for removed elements
-                uint32_t edge_idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter);// - r;
+                uint32_t edge_idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter); // - r;
                 //printf("edge_idx = %d (%u)\n",edge_idx, (uint32_t)*eiter );
                 //MCUT_ASSERT((size_t)v0 < vmap.size());
                 MCUT_ASSERT(((size_t)edge_idx * 2u) + 0u < indexArrayMesh.numEdgeIndices);
                 indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 0u] = (uint32_t)v0; // vmap[v0];
                 //MCUT_ASSERT((size_t)v1 < vmap.size());
                 MCUT_ASSERT(((size_t)edge_idx * 2u) + 1u < indexArrayMesh.numEdgeIndices);
-                indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 1u] =(uint32_t)v1; //  vmap[v1];
+                indexArrayMesh.pEdges[((size_t)edge_idx * 2u) + 1u] = (uint32_t)v1; //  vmap[v1];
             }
 
             return 0;
@@ -1762,6 +1761,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
             memcpy(pMem, reinterpret_cast<const void *>(&McDispatchContextInternal::minPrecision), bytes);
         }
         break;
+#if 0
     case MC_DEBUG_KERNEL_TRACE:
         if (pMem == nullptr)
         {
@@ -1779,6 +1779,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         }
         break;
         break;
+#endif
     default:
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "unknown info parameter");
         result = McResult::MC_INVALID_VALUE;
@@ -3760,7 +3761,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
             mcut::to_string(backendOutput.status) + " : " + backendOutput.logger.get_reason_for_failure());
 
-        ctxtPtr->lastLoggedDebugDetail = backendOutput.logger.get_log_string();
+        //ctxtPtr->lastLoggedDebugDetail = backendOutput.logger.get_log_string();
 
         return result;
     }
@@ -4177,6 +4178,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
     switch (queryFlags)
     {
+#if 0
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT:
     {
         if (pMem == nullptr)
@@ -4195,6 +4197,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     }
     break;
+#endif
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT:
     {
         const uint64_t allocatedBytes = ccData->indexArrayMesh.numVertices * sizeof(float) * 3;
@@ -4286,6 +4289,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     }
     break;
+#if 0
     case MC_CONNECTED_COMPONENT_DATA_FACE_COUNT:
     {
         if (pMem == nullptr)
@@ -4311,6 +4315,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     }
     break;
+#endif
     case MC_CONNECTED_COMPONENT_DATA_FACE:
     {
         if (pMem == nullptr)
@@ -4417,6 +4422,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     }
     break;
+#if 0
     case MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT:
     {
         if (pMem == nullptr)
@@ -4443,6 +4449,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     }
     break;
+#endif
     case MC_CONNECTED_COMPONENT_DATA_EDGE:
     {
         if (pMem == nullptr)

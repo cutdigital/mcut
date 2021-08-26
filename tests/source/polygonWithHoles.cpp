@@ -9,20 +9,20 @@
 #pragma warning(disable : 26812) // Unscoped enums from mcut.h
 #endif // _WIN32
 
-struct PolygonsWithHoles {
-    McContext context_ = MC_NULL_HANDLE;
+struct PolygonsWithHoles { 
+    McContext context_ {};
 
-    float* pSrcMeshVertices = NULL;
-    uint32_t* pSrcMeshFaceIndices = NULL;
-    uint32_t* pSrcMeshFaceSizes = NULL;
-    uint32_t numSrcMeshVertices = 0;
-    uint32_t numSrcMeshFaces = 0;
+    float* pSrcMeshVertices {};
+    uint32_t* pSrcMeshFaceIndices {};
+    uint32_t* pSrcMeshFaceSizes {};
+    uint32_t numSrcMeshVertices{};
+    uint32_t numSrcMeshFaces {};
 
-    float* pCutMeshVertices = NULL;
-    uint32_t* pCutMeshFaceIndices = NULL;
-    uint32_t* pCutMeshFaceSizes = NULL;
-    uint32_t numCutMeshVertices = 0;
-    uint32_t numCutMeshFaces = 0;
+    float* pCutMeshVertices {};
+    uint32_t* pCutMeshFaceIndices {};
+    uint32_t* pCutMeshFaceSizes {};
+    uint32_t numCutMeshVertices {};
+    uint32_t numCutMeshFaces {};
 };
 
 UTEST_F_SETUP(PolygonsWithHoles)

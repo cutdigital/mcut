@@ -228,27 +228,13 @@ int main(int argc, char* argv[])
 
         printf("connected component: %d\n", i);
 
-        numBytes = 0;
-        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-        mcCheckError(err);
-
-        ASSERT(sizeof(uint32_t) == numBytes);
-
-        uint32_t numberOfVertices = 0;
-        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &numberOfVertices, NULL);
-        mcCheckError(err);
-
-        ASSERT((int)numberOfVertices > 0);
-
         // vertex array
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes);
         mcCheckError(err);
-
-        ASSERT(numBytes / (sizeof(float) * 3) == numberOfVertices);
-
-        std::vector<float> vertices;
-        vertices.resize((size_t)numberOfVertices * 3u);
+        uint32_t numberOfVertices = numBytes / (sizeof(float)*3);
+        ASSERT(numberOfVertices >= 3);
+        std::vector<float> vertices((size_t)numberOfVertices * 3u);
 
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (void*)vertices.data(), NULL);
         mcCheckError(err);

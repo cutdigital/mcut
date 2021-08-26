@@ -249,11 +249,13 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
 
         if (utest_fixture->dispatchflags & MC_DISPATCH_INCLUDE_VERTEX_MAP) {
-            uint32_t ccVertexCount = 0;
-            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &ccVertexCount, NULL), MC_NO_ERROR);
-            ASSERT_GT((int)ccVertexCount, 0);
-
             uint64_t numBytes = 0;
+
+            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes), MC_NO_ERROR);
+            ASSERT_GT((int)numBytes, 0);
+            uint32_t ccVertexCount = numBytes / (sizeof(float)*3);
+
+            numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
             ASSERT_EQ(numBytes / sizeof(uint32_t), ccVertexCount);
 

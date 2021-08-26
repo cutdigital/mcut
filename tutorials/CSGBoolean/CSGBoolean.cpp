@@ -3,10 +3,15 @@
 
 #ifdef _WIN32
 #pragma warning(disable : 26812) // Unscoped enums from mcut.h
-#endif // _WIN32
+#endif                           // _WIN32
 #endif
 
-#define my_assert(cond) if(!(cond)){fprintf(stderr, "MCUT error: %s\n", #cond );std::exit(1);}
+#define my_assert(cond)                             \
+    if (!(cond))                                    \
+    {                                               \
+        fprintf(stderr, "MCUT error: %s\n", #cond); \
+        std::exit(1);                               \
+    }
 
 /*
 This tutorial shows how to compute boolean operations using MCUT.
@@ -25,17 +30,18 @@ This tutorial shows how to compute boolean operations using MCUT.
 #include <igl/readOBJ.h>
 #include <igl/writeOBJ.h>
 
-struct InputMesh {
+struct InputMesh
+{
     // variables for reading .obj file data with libigl
     std::vector<std::vector<double>> V, TC, N;
     std::vector<std::vector<int>> F, FTC, FN;
     std::vector<std::tuple<std::string, unsigned, unsigned>> FM;
 
     // variables for mesh data in a format suited for MCUT
-    std::string fpath; // path to mesh file
-    std::vector<uint32_t> faceSizesArray; // vertices per face
+    std::string fpath;                      // path to mesh file
+    std::vector<uint32_t> faceSizesArray;   // vertices per face
     std::vector<uint32_t> faceIndicesArray; // face indices
-    std::vector<double> vertexCoordsArray; // vertex coords
+    std::vector<double> vertexCoordsArray;  // vertex coords
 };
 
 int main()
@@ -47,14 +53,16 @@ int main()
     srcMesh.fpath = DATA_DIR "/cube.obj";
     bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.TC, srcMesh.N, srcMesh.F, srcMesh.FTC, srcMesh.FN);
 
-    if (!srcMeshLoaded) {
+    if (!srcMeshLoaded)
+    {
         std::fprintf(stderr, "error: could not load source mesh --> %s\n", srcMesh.fpath.c_str());
         std::exit(1);
     }
 
     // copy vertices
-    for (int i = 0; i < (int)srcMesh.V.size(); ++i) {
-        const std::vector<double>& v = srcMesh.V[i];
+    for (int i = 0; i < (int)srcMesh.V.size(); ++i)
+    {
+        const std::vector<double> &v = srcMesh.V[i];
         my_assert(v.size() == 3);
         srcMesh.vertexCoordsArray.push_back(v[0]);
         srcMesh.vertexCoordsArray.push_back(v[1]);
@@ -62,9 +70,11 @@ int main()
     }
 
     // copy faces
-    for (int i = 0; i < (int)srcMesh.F.size(); ++i) {
-        const std::vector<int>& f = srcMesh.F[i];
-        for (int j = 0; j < (int)f.size(); ++j) {
+    for (int i = 0; i < (int)srcMesh.F.size(); ++i)
+    {
+        const std::vector<int> &f = srcMesh.F[i];
+        for (int j = 0; j < (int)f.size(); ++j)
+        {
             srcMesh.faceIndicesArray.push_back(f[j]);
         }
 
@@ -77,14 +87,16 @@ int main()
     cutMesh.fpath = DATA_DIR "/torus.obj";
     bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.TC, cutMesh.N, cutMesh.F, cutMesh.FTC, cutMesh.FN);
 
-    if (!cutMeshLoaded) {
+    if (!cutMeshLoaded)
+    {
         std::fprintf(stderr, "error: could not load source mesh --> %s\n", cutMesh.fpath.c_str());
         std::exit(1);
     }
 
     // copy vertices
-    for (int i = 0; i < (int)cutMesh.V.size(); ++i) {
-        const std::vector<double>& v = cutMesh.V[i];
+    for (int i = 0; i < (int)cutMesh.V.size(); ++i)
+    {
+        const std::vector<double> &v = cutMesh.V[i];
         my_assert(v.size() == 3);
         cutMesh.vertexCoordsArray.push_back(v[0]);
         cutMesh.vertexCoordsArray.push_back(v[1]);
@@ -92,9 +104,11 @@ int main()
     }
 
     // copy faces
-    for (int i = 0; i < (int)cutMesh.F.size(); ++i) {
-        const std::vector<int>& f = cutMesh.F[i];
-        for (int j = 0; j < (int)f.size(); ++j) {
+    for (int i = 0; i < (int)cutMesh.F.size(); ++i)
+    {
+        const std::vector<int> &f = cutMesh.F[i];
+        for (int j = 0; j < (int)f.size(); ++j)
+        {
             cutMesh.faceIndicesArray.push_back(f[j]);
         }
 
@@ -118,13 +132,13 @@ int main()
     // is done with the following flags.
     // NOTE: you can extend these flags by bitwise ORing with additional flags (see `McDispatchFlags' in mcut.h)
     const std::map<std::string, McFlags> booleanOps = {
-        { "A_NOT_B", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE },
-        { "B_NOT_A", MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW },
-        { "UNION", MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE },
-        { "INTERSECTION", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW }
-    };
+        {"A_NOT_B", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE},
+        {"B_NOT_A", MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW},
+        {"UNION", MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE},
+        {"INTERSECTION", MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW}};
 
-    for (std::map<std::string, McFlags>::const_iterator boolOpIter = booleanOps.cbegin(); boolOpIter != booleanOps.cend(); ++boolOpIter) {
+    for (std::map<std::string, McFlags>::const_iterator boolOpIter = booleanOps.cbegin(); boolOpIter != booleanOps.cend(); ++boolOpIter)
+    {
         const McFlags boolOpFlags = boolOpIter->second;
         const std::string boolOpName = boolOpIter->first;
 
@@ -132,17 +146,17 @@ int main()
 
         err = mcDispatch(
             context,
-            MC_DISPATCH_VERTEX_ARRAY_DOUBLE | // vertices are in array of doubles
-                MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessary 
-                boolOpFlags, // filter flags which specify the type of output we want
+            MC_DISPATCH_VERTEX_ARRAY_DOUBLE |          // vertices are in array of doubles
+                MC_DISPATCH_ENFORCE_GENERAL_POSITION | // perturb if necessary
+                boolOpFlags,                           // filter flags which specify the type of output we want
             // source mesh
-            reinterpret_cast<const void*>(srcMesh.vertexCoordsArray.data()),
-            reinterpret_cast<const uint32_t*>(srcMesh.faceIndicesArray.data()),
+            reinterpret_cast<const void *>(srcMesh.vertexCoordsArray.data()),
+            reinterpret_cast<const uint32_t *>(srcMesh.faceIndicesArray.data()),
             srcMesh.faceSizesArray.data(),
             static_cast<uint32_t>(srcMesh.vertexCoordsArray.size() / 3),
             static_cast<uint32_t>(srcMesh.faceSizesArray.size()),
             // cut mesh
-            reinterpret_cast<const void*>(cutMesh.vertexCoordsArray.data()),
+            reinterpret_cast<const void *>(cutMesh.vertexCoordsArray.data()),
             cutMesh.faceIndicesArray.data(),
             cutMesh.faceSizesArray.data(),
             static_cast<uint32_t>(cutMesh.vertexCoordsArray.size() / 3),
@@ -158,7 +172,8 @@ int main()
 
         printf("connected components: %d\n", (int)numConnComps);
 
-        if (numConnComps == 0) {
+        if (numConnComps == 0)
+        {
             fprintf(stdout, "no connected components found\n");
             exit(0);
         }
@@ -175,25 +190,16 @@ int main()
         // -------------------------------------------------------
 
         McConnectedComponent connComp = connectedComponents[0];
-        uint64_t numBytes = 0;
-
-        // query the number of vertices
-        // --------------------------------
-
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        uint32_t ccVertexCount = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, numBytes, &ccVertexCount, NULL);
-        my_assert(err == MC_NO_ERROR);
 
         // query the vertices
         // ----------------------
 
-        numBytes = 0;
+        uint64_t numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
+        uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
         std::vector<double> ccVertices((uint64_t)ccVertexCount * 3u, 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void *)ccVertices.data(), NULL);
         my_assert(err == MC_NO_ERROR);
 
         // query the faces
@@ -232,9 +238,6 @@ int main()
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION, sizeof(McFragmentLocation), &fragmentLocation, NULL);
         my_assert(err == MC_NO_ERROR);
 
-        uint32_t ccEdgeCount = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT, sizeof(uint32_t), &ccEdgeCount, NULL);
-
         // save cc mesh to .obj file
         // -------------------------
 
@@ -245,7 +248,8 @@ int main()
         std::ofstream file(fpath);
 
         // write vertices and normals
-        for (uint32_t i = 0; i < ccVertexCount; ++i) {
+        for (uint32_t i = 0; i < ccVertexCount; ++i)
+        {
             double x = ccVertices[(uint64_t)i * 3 + 0];
             double y = ccVertices[(uint64_t)i * 3 + 1];
             double z = ccVertices[(uint64_t)i * 3 + 2];
@@ -255,14 +259,16 @@ int main()
         int faceVertexOffsetBase = 0;
 
         // for each face in CC
-        for (uint32_t f = 0; f < ccFaceCount; ++f) {
+        for (uint32_t f = 0; f < ccFaceCount; ++f)
+        {
             bool reverseWindingOrder = (fragmentLocation == MC_FRAGMENT_LOCATION_BELOW) && (patchLocation == MC_PATCH_LOCATION_OUTSIDE);
             int faceSize = faceSizes.at(f);
             file << "f ";
             // for each vertex in face
             for (int v = (reverseWindingOrder ? (faceSize - 1) : 0);
                  (reverseWindingOrder ? (v >= 0) : (v < faceSize));
-                 v += (reverseWindingOrder ? -1 : 1)) {
+                 v += (reverseWindingOrder ? -1 : 1))
+            {
                 const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
                 file << (ccVertexIdx + 1) << " ";
             } // for (int v = 0; v < faceSize; ++v) {

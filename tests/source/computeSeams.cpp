@@ -130,10 +130,6 @@ UTEST_F(SeamConnectedComponent, queryVertices)
     for (int c = 0; c < (int)utest_fixture->connComps_.size(); ++c) {
         McConnectedComponent cc = utest_fixture->connComps_[c]; // connected compoenent id
 
-        uint32_t numberOfVertices = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
-        ASSERT_GT((int)numberOfVertices, 0);
-
         // indices of the vertices which define the seam
         uint64_t connCompSeamVertexIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, 0, NULL, &connCompSeamVertexIndicesBytes), MC_NO_ERROR);
@@ -144,7 +140,6 @@ UTEST_F(SeamConnectedComponent, queryVertices)
 
         for (int i = 0; i < (int)seamVertexIndices.size(); ++i) {
             ASSERT_GE((uint32_t)seamVertexIndices[i], (uint32_t)0);
-            ASSERT_LT((uint32_t)seamVertexIndices[i], numberOfVertices); // out of bounds vertex index
         }
 
         ASSERT_EQ((uint32_t)seamVertexIndices.size(), 4u); // specifc to benchmark meshes used (see setup function).
@@ -199,16 +194,10 @@ UTEST_F(SeamConnectedComponent, queryOriginPartialCut)
 
     McConnectedComponent cc = utest_fixture->connComps_[0]; // connected compoenent id
 
-    uint32_t numberOfVertices = 0;
-    ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
-    ASSERT_GT((int)numberOfVertices, 0);
-
     McSeamOrigin orig = (McSeamOrigin)(0);
     ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
 
     ASSERT_TRUE(orig == MC_SEAM_ORIGIN_CUTMESH);
-
-    ASSERT_TRUE(numberOfVertices > utest_fixture->numCutMeshVertices);
 }
 
 UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
@@ -265,10 +254,6 @@ UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
     for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
-        uint32_t numberOfVertices = 0;
-        ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT, sizeof(uint32_t), &numberOfVertices, NULL), MC_NO_ERROR);
-        ASSERT_GT((int)numberOfVertices, 0);
-
         McSeamOrigin orig = McSeamOrigin::MC_SEAM_ORIGIN_ALL;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McSeamOrigin), &orig, NULL), MC_NO_ERROR);
 
@@ -276,11 +261,8 @@ UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
 
         if (orig == MC_SEAM_ORIGIN_SRCMESH) {
             foundSeamedMeshFromSrcMesh = true;
-            ASSERT_TRUE(numberOfVertices > utest_fixture->numSrcMeshVertices);
-
         } else {
             foundSeamedMeshFromCutMesh = true;
-            ASSERT_TRUE(numberOfVertices > utest_fixture->numCutMeshVertices);
         }
     }
 
