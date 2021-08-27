@@ -438,7 +438,7 @@ void mergeAdjacentMeshFacesByProperty(
                             if (!alreadyAddedToAdjFaceQueue) {
                                 adjFaceQueue.push_back(adjFaceID); // add it!
 
-                                std::vector<uint32_t>::const_iterator facesWithSharedTagIter = std::find(meshFacesWithSameTag.cbegin(), meshFacesWithSameTag.cend(), adjFaceID);
+                                std::vector<uint32_t>::iterator facesWithSharedTagIter = std::find(meshFacesWithSameTag.begin(), meshFacesWithSameTag.end(), adjFaceID);
                                 if (facesWithSharedTagIter != meshFacesWithSameTag.cend()) {
                                     meshFacesWithSameTag.erase(facesWithSharedTagIter); // remove since we have now associated with patch.
                                 }
@@ -473,9 +473,9 @@ void mergeAdjacentMeshFacesByProperty(
                     const uint32_t srcVertexIdx = meshFaces[(size_t)baseIdx + srcIdx];
                     const uint32_t tgtVertexIdx = meshFaces[(size_t)baseIdx + tgtIdx];
 
-                    std::vector<std::pair<int, int>>::const_iterator fiter = std::find_if(
-                        halfedgePool.cbegin(),
-                        halfedgePool.cend(),
+                    std::vector<std::pair<int, int>>::iterator fiter = std::find_if(
+                        halfedgePool.begin(),
+                        halfedgePool.end(),
                         [&](const std::pair<int, int>& elem) {
                             return ((uint32_t)elem.first == srcVertexIdx && (uint32_t)elem.second == tgtVertexIdx) || //
                                 ((uint32_t)elem.second == srcVertexIdx && (uint32_t)elem.first == tgtVertexIdx);

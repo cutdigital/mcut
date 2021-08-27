@@ -1313,8 +1313,8 @@ namespace mcut
         std::vector<hd_t> halfedges_across_cut_path = incoming;
 
         // for each halfedge across the cut-path
-        for (std::vector<hd_t>::const_iterator halfedge_across_cut_path_iter = halfedges_across_cut_path.cbegin();
-             halfedge_across_cut_path_iter != halfedges_across_cut_path.cend();)
+        for (std::vector<hd_t>::iterator halfedge_across_cut_path_iter = halfedges_across_cut_path.begin();
+             halfedge_across_cut_path_iter != halfedges_across_cut_path.end();)
         {
 
             const vd_t s = m0.source(*halfedge_across_cut_path_iter);
@@ -1416,7 +1416,7 @@ namespace mcut
                 { // is halfedge processed
                     halfedges_on_same_side.push_back(prv_opp);
                     // prv_opp is guarranteed to be in halfedges_on_same_side becz halfedges_across_cut_path is simply a vec of all incoming hes
-                    halfedges_across_cut_path.erase(std::find(halfedges_across_cut_path.cbegin(), halfedges_across_cut_path.cend(), prv_opp));
+                    halfedges_across_cut_path.erase(std::find(halfedges_across_cut_path.begin(), halfedges_across_cut_path.end(), prv_opp));
                 }
             }
         }
@@ -1472,7 +1472,7 @@ namespace mcut
                 if (on_same_side)
                 {
                     halfedges_on_same_side.push_back(opp_nxt);
-                    halfedges_across_cut_path.erase(std::find(halfedges_across_cut_path.cbegin(), halfedges_across_cut_path.cend(), opp_nxt));
+                    halfedges_across_cut_path.erase(std::find(halfedges_across_cut_path.begin(), halfedges_across_cut_path.end(), opp_nxt));
                 }
             }
         }
@@ -1955,9 +1955,9 @@ namespace mcut
                     adj_ps_face_queue.pop();
 
                     { // face is now visisted so we remove it
-                        std::vector<mcut::fd_t>::const_iterator fiter = std::lower_bound(
-                            unvisited_ps_ifaces.cbegin(),
-                            unvisited_ps_ifaces.cend(),
+                        std::vector<mcut::fd_t>::iterator fiter = std::lower_bound(
+                            unvisited_ps_ifaces.begin(),
+                            unvisited_ps_ifaces.end(),
                             cc_iface->first);
                         MCUT_ASSERT(fiter != unvisited_ps_ifaces.cend());
                         unvisited_ps_ifaces.erase(fiter); // NOTE: list remains sorted
@@ -2217,7 +2217,7 @@ namespace mcut
             const geom::bounding_box_t<mcut::math::fast_vec3> &edge_bbox = ps_edge_to_bbox[edge];
             std::vector<fd_t> &edge_ifaces = iedge_iter->second;
 
-            for (std::vector<fd_t>::const_iterator iface_iter = edge_ifaces.cbegin(); iface_iter != edge_ifaces.cend(); /*increment inside loop*/)
+            for (std::vector<fd_t>::iterator iface_iter = edge_ifaces.begin(); iface_iter != edge_ifaces.end(); /*increment inside loop*/)
             {
                 const geom::bounding_box_t<mcut::math::fast_vec3> *iface_bbox = nullptr;
                 bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
@@ -5589,7 +5589,7 @@ namespace mcut
                                 next_halfedge = mesh_t::null_halfedge(); // reset
 
                                 {
-                                    std::vector<hd_t>::const_iterator find_iter = std::find(incident_halfedges_to_be_walked.cbegin(), incident_halfedges_to_be_walked.cend(), current_halfedge);
+                                    std::vector<hd_t>::iterator find_iter = std::find(incident_halfedges_to_be_walked.begin(), incident_halfedges_to_be_walked.end(), current_halfedge);
                                     MCUT_ASSERT(find_iter != incident_halfedges_to_be_walked.cend());
                                     incident_halfedges_to_be_walked.erase(find_iter); // remove
                                 }
@@ -6490,8 +6490,8 @@ namespace mcut
 
                         // remove next halfedge so that we dont walk it again
                         {
-                            std::vector<hd_t>::const_iterator find_iter = std::find(incident_halfedges_to_be_walked.cbegin(), incident_halfedges_to_be_walked.cend(), current_halfedge);
-                            MCUT_ASSERT(find_iter != incident_halfedges_to_be_walked.cend());
+                            std::vector<hd_t>::iterator find_iter = std::find(incident_halfedges_to_be_walked.begin(), incident_halfedges_to_be_walked.end(), current_halfedge);
+                            MCUT_ASSERT(find_iter != incident_halfedges_to_be_walked.end());
                             incident_halfedges_to_be_walked.erase(find_iter); // remove
                         }
 
@@ -8570,7 +8570,7 @@ namespace mcut
             { // while seeds are not found
 
                 // pull an interior intersection-halfedge from the queue
-                std::vector<std::pair<int, int>>::const_iterator primary_interior_ihalfedge_pool_citer = primary_interior_ihalfedge_pool.cend() - 1; // last element
+                std::vector<std::pair<int, int>>::iterator primary_interior_ihalfedge_pool_citer = primary_interior_ihalfedge_pool.end() - 1; // last element
                 // halfedge polygon index
                 const int potential_seed_poly_idx = primary_interior_ihalfedge_pool_citer->first;
                 // halfedge index in polygon

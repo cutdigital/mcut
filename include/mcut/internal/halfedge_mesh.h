@@ -668,7 +668,7 @@ namespace mcut
 
             // disassociate target vertex
             vertex_data_t &htd = m_vertices.at(hd.t);
-            std::vector<halfedge_descriptor_t>::const_iterator hIter = std::find(htd.m_halfedges.cbegin(), htd.m_halfedges.cend(), h);
+            std::vector<halfedge_descriptor_t>::iterator hIter = std::find(htd.m_halfedges.begin(), htd.m_halfedges.end(), h);
 
             MCUT_ASSERT(hIter != htd.m_halfedges.cend()); // because not yet removed h
 

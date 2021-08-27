@@ -320,7 +320,7 @@ vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t& x, const math:
 
     if (reusing_removed_descr) // can we re-use a slot?
     {
-        std::vector<vertex_descriptor_t>::const_iterator it = m_vertices_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
+        std::vector<vertex_descriptor_t>::iterator it = m_vertices_removed.begin(); // take the oldest unused slot (NOTE: important for user data mapping)
         vd = *it;
         m_vertices_removed.erase(it);
         MCUT_ASSERT((size_t)vd < m_vertices.size()); // MCUT_ASSERT(m_vertices.find(vd) != m_vertices.cend());
@@ -363,7 +363,7 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
 
     if (reusing_removed_h0_descr) // can we re-use a slot?
     {
-        std::vector<halfedge_descriptor_t>::const_iterator hIter = m_halfedges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
+        std::vector<halfedge_descriptor_t>::iterator hIter = m_halfedges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
         h0_idx = *hIter;
         m_halfedges_removed.erase(hIter);
         MCUT_ASSERT((size_t)h0_idx < m_halfedges.size() /*m_halfedges.find(h0_idx) != m_halfedges.cend()*/);
@@ -387,7 +387,7 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
 
     if (reusing_removed_h1_descr) // can we re-use a slot?
     {
-        std::vector<halfedge_descriptor_t>::const_iterator hIter = m_halfedges_removed.cbegin() /*+ (m_halfedges_removed.size() - 1)*/; // take the most recently removed
+        std::vector<halfedge_descriptor_t>::iterator hIter = m_halfedges_removed.cbegin() /*+ (m_halfedges_removed.size() - 1)*/; // take the most recently removed
         h1_idx = *hIter;
         m_halfedges_removed.erase(hIter);
         MCUT_ASSERT((size_t)h1_idx < m_halfedges.size() /*m_halfedges.find(h1_idx) != m_halfedges.cend()*/);
@@ -415,7 +415,7 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
 
     if (reusing_removed_edge_descr) // can we re-use a slot?
     {
-        std::vector<edge_descriptor_t>::const_iterator eIter = m_edges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
+        std::vector<edge_descriptor_t>::iterator eIter = m_edges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
         e_idx = *eIter;
         m_edges_removed.erase(eIter);
         MCUT_ASSERT((size_t)e_idx < m_edges.size()/*m_edges.find(e_idx) != m_edges.cend()*/);
@@ -482,7 +482,7 @@ face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 
     if (reusing_removed_face_descr) // can we re-use a slot?
     {
-        std::vector<face_descriptor_t>::const_iterator fIter = m_faces_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
+        std::vector<face_descriptor_t>::iterator fIter = m_faces_removed.begin(); // take the oldest unused slot (NOTE: important for user data mapping)
         new_face_idx = *fIter;
         m_faces_removed.erase(fIter); // slot is going to be used again
 
