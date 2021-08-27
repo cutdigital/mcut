@@ -53,5 +53,5 @@ jobs:
         cmake --build . --config ${{matrix.build_type}} --parallel $threads
 
     - name: Test
-      working-directory: ${{runner.workspace}}/build/${{matrix.build_type}}
+      working-directory: ${{runner.workspace}}/build/bin/${{matrix.build_type}}
       run: ./mcut_tests
