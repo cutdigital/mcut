@@ -363,7 +363,7 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
 
     if (reusing_removed_h0_descr) // can we re-use a slot?
     {
-        std::vector<halfedge_descriptor_t>::iterator hIter = m_halfedges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
+        std::vector<halfedge_descriptor_t>::iterator hIter = m_halfedges_removed.begin(); // take the oldest unused slot (NOTE: important for user data mapping)
         h0_idx = *hIter;
         m_halfedges_removed.erase(hIter);
         MCUT_ASSERT((size_t)h0_idx < m_halfedges.size() /*m_halfedges.find(h0_idx) != m_halfedges.cend()*/);
