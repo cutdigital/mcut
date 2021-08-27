@@ -2,7 +2,7 @@
 
 A cross-platform C++ library for mesh cutting ([site](https://cutdigital.github.io/mcut.github.io/.))
 
-![example workflow](https://github.com/cutdigital/mcut/workflows/linux.yaml/badge.svg)
+[![linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
 
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true)
 
