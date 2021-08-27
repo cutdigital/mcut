@@ -3201,8 +3201,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     // and that they are technically not usable (i.e. they are outside "origin_face").
 
                     std::sort(originFaceIntersectedEdgeInfo.begin(), originFaceIntersectedEdgeInfo.end(),
-                              [&](std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>> &a, //
-                                  std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>> &b)
+                              [&](const std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>> &a, //
+                                  const std::pair<int, std::pair<mcut::math::vec2, mcut::math::real_number_t>> &b)
                               {
                                   mcut::math::real_number_t aDist(std::numeric_limits<double>::max()); // bias toward points inside polygon
                                   //char aOnEdge = mcut::geom::compute_point_in_polygon_test(

@@ -2033,9 +2033,9 @@ namespace mcut
 
                             for (std::vector<fd_t>::const_iterator i = cur_ps_face_ifaces_sorted.cbegin(); i != cur_ps_face_ifaces_sorted.cend(); ++i)
                             {
-                                std::vector<fd_t>::const_iterator iter = std::lower_bound(existing_edge_ifaces.cbegin(), existing_edge_ifaces.cend(), *i);
+                                std::vector<fd_t>::iterator iter = std::lower_bound(existing_edge_ifaces.begin(), existing_edge_ifaces.end(), *i);
 
-                                bool found = iter != existing_edge_ifaces.cend() && iter != existing_edge_ifaces.cend() && (*iter == *i);
+                                bool found = iter != existing_edge_ifaces.end() && iter != existing_edge_ifaces.end() && (*iter == *i);
                                 if (!found)
                                 {
                                     existing_edge_ifaces.insert(iter, *i); // insert into sorted list (i.e. possibly shifts some elements forward)
