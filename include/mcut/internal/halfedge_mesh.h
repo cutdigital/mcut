@@ -612,7 +612,7 @@ namespace mcut
                 vertex_descriptor_t face_vertex = *it;
                 vertex_data_t &vd = m_vertices.at(face_vertex);
 
-                std::vector<face_descriptor_t>::const_iterator fIter = std::find(vd.m_faces.cbegin(), vd.m_faces.cend(), f);
+                std::vector<face_descriptor_t>::iterator fIter = std::find(vd.m_faces.begin(), vd.m_faces.end(), f);
 
                 if (fIter != vd.m_faces.cend())
                 {
