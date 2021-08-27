@@ -415,7 +415,7 @@ halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const verte
 
     if (reusing_removed_edge_descr) // can we re-use a slot?
     {
-        std::vector<edge_descriptor_t>::iterator eIter = m_edges_removed.cbegin(); // take the oldest unused slot (NOTE: important for user data mapping)
+        std::vector<edge_descriptor_t>::iterator eIter = m_edges_removed.begin(); // take the oldest unused slot (NOTE: important for user data mapping)
         e_idx = *eIter;
         m_edges_removed.erase(eIter);
         MCUT_ASSERT((size_t)e_idx < m_edges.size()/*m_edges.find(e_idx) != m_edges.cend()*/);
