@@ -1,6 +1,9 @@
 # MCUT
 
-_A cross-platform C++ library for mesh cutting ([site](https://cutdigital.github.io/mcut.github.io/.))_
+A cross-platform C++ library for mesh cutting ([site](https://cutdigital.github.io/mcut.github.io/.))
+
+.. image:: https://github.com/cutdigital/mcut/workflows/linux/badge.svg
+   :target: https://github.com/cutdigital/mcut/actions?query=workflow%3Alinux
 
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true)
 
