@@ -42,7 +42,7 @@ void mcDebugOutput(McDebugSource source,
     const char* message,
     const void* userParam);
 
-void readMesh(const std::string& path, std::vector<float>& V, std::vector<uint32_t>& F, std::vector<uint32_t>& Fsizes);
+void readMesh(const std::string& path, std::vector<double>& V, std::vector<uint32_t>& F, std::vector<uint32_t>& Fsizes);
 void writeOBJ(
     const std::string& path,
     const float* ccVertices,
@@ -74,14 +74,14 @@ int main(int argc, char* argv[])
 
     // load meshes
     // -----------
-    std::vector<float> srcMeshVertices;
+    std::vector<double> srcMeshVertices;
     std::vector<uint32_t> srcMeshFaceIndices;
     std::vector<uint32_t> srcMeshFaceSizes;
     readMesh(srcMeshFilePath, srcMeshVertices, srcMeshFaceIndices, srcMeshFaceSizes);
 
     printf("src-mesh vertices=%d faces=%d\n", (int)srcMeshVertices.size()/3, (int)srcMeshFaceSizes.size());
 
-    std::vector<float> cutMeshVertices;
+    std::vector<double> cutMeshVertices;
     std::vector<uint32_t> cutMeshFaceIndices;
     std::vector<uint32_t> cutMeshFaceSizes;
     readMesh(cutMeshFilePath, cutMeshVertices, cutMeshFaceIndices, cutMeshFaceSizes);
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
     // --------------
     err = mcDispatch(
         context,
-        MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
+        MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
         // source mesh
         srcMeshVertices.data(),
         srcMeshFaceIndices.data(),
@@ -415,7 +415,7 @@ void writeOBJ(
         faceVertexOffsetBase += faceSize;
     }
 }
-void readMesh(const std::string& path, std::vector<float>& V, std::vector<uint32_t>& F, std::vector<uint32_t>& Fsizes)
+void readMesh(const std::string& path, std::vector<double>& V, std::vector<uint32_t>& F, std::vector<uint32_t>& Fsizes)
 {
     printf("read: %s\n", path.c_str());
     Eigen::MatrixXd Vmat;
@@ -426,9 +426,9 @@ void readMesh(const std::string& path, std::vector<float>& V, std::vector<uint32
 
     for (int i = 0; i < (int)Vmat.rows(); ++i) {
         const Eigen::VectorXd v = Vmat.row(i);
-        V.push_back((float)v(0));
-        V.push_back((float)v(1));
-        V.push_back((float)v(2));
+        V.push_back((double)v(0));
+        V.push_back((double)v(1));
+        V.push_back((double)v(2));
     }
 
     for (int i = 0; i < (int)Fmat.rows(); ++i) {
