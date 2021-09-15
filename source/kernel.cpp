@@ -221,7 +221,7 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "vertices = " << mesh.number_of_vertices() << std::endl;);
 
-        for (mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
+        for (vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
         {
             DEBUG_CODE_MASK((*logger_ptr).indent(););
             DEBUG_CODE_MASK((*logger_ptr) << vstr(*v) << " (" << mesh.vertex(*v).x() << ", " << mesh.vertex(*v).y() << ", " << mesh.vertex(*v).z() << ")" << std::endl;);
@@ -230,7 +230,7 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "edges = " << mesh.number_of_edges() << std::endl;);
 
-        for (mesh_t::edge_iterator_t e = mesh.edges_begin(); e != mesh.edges_end(); ++e)
+        for (edge_array_iterator_t e = mesh.edges_begin(); e != mesh.edges_end(); ++e)
         {
             DEBUG_CODE_MASK((*logger_ptr).indent(););
             DEBUG_CODE_MASK((*logger_ptr) << estr(mesh, *e) << std::endl;);
@@ -239,7 +239,7 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << mesh.number_of_halfedges() << std::endl;);
 
-        for (mesh_t::halfedge_iterator_t h = mesh.halfedges_begin(); h != mesh.halfedges_end(); ++h)
+        for (halfedge_array_iterator_t h = mesh.halfedges_begin(); h != mesh.halfedges_end(); ++h)
         {
             DEBUG_CODE_MASK((*logger_ptr).indent(););
             DEBUG_CODE_MASK((*logger_ptr) << hstr(mesh, *h) << std::endl;);
@@ -248,7 +248,7 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "faces = " << mesh.number_of_faces() << std::endl;);
 
-        for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
+        for (face_array_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
             DEBUG_CODE_MASK((*logger_ptr).indent(););
             DEBUG_CODE_MASK((*logger_ptr) << "face " << *face_iter << std::endl;);
@@ -323,7 +323,7 @@ namespace mcut
         int connected_component_id = -1;
         std::vector<bool> queued(mesh.number_of_vertices(), false);
 
-        for (mesh_t::vertex_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u)
+        for (vertex_array_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u)
         {
             if (visited[*u] == -1)
             {
@@ -380,7 +380,7 @@ namespace mcut
         }
 
         // map each face to a connected component
-        for (mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
+        for (face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
         {
             const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f);
 
@@ -413,7 +413,7 @@ namespace mcut
         const int m1_num_vertices_after_srcmesh_partitioning = std::numeric_limits<int>::max())
     {
         mesh_seam_vertices.resize(mesh.number_of_vertices());
-        for (mesh_t::vertex_iterator_t i = mesh.vertices_begin();
+        for (vertex_array_iterator_t i = mesh.vertices_begin();
              i != mesh.vertices_end();
              ++i)
         {
@@ -627,7 +627,7 @@ namespace mcut
         TIMESTACK_PUSH("Extract CC: Map vertices");
 
         // for each face in the auxilliary mesh (i.e. traced polygon)
-        for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
+        for (face_array_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
 
             face_descriptor_t fd = *face_iter;
@@ -754,7 +754,7 @@ namespace mcut
                     }
                 }
             }
-        } // for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
+        } // for (face_array_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
 
         TIMESTACK_POP();
 
@@ -803,7 +803,7 @@ namespace mcut
                 std::vector<fd_t>               // the mX mesh i.e. the halfedge data structure we call "mesh" that is remapped
                 >
                 OutputStorageTypesTuple;
-            typedef mesh_t::face_iterator_t InputStorageIteratorType;
+            typedef face_array_iterator_t InputStorageIteratorType;
 
             auto fn_compute_remapped_cc_faces = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple
             {
@@ -811,7 +811,7 @@ namespace mcut
                 std::vector<std::vector<vd_t>> &remapped_faces_LOCAL = std::get<0>(local_output);
                 std::vector<int> &local_remapped_face_to_ccID = std::get<1>(local_output);
                 std::vector<fd_t> &local_remapped_face_to_mX_face = std::get<2>(local_output);
-                for (mesh_t::face_iterator_t face_iter = block_start_; face_iter != block_end_; ++face_iter)
+                for (face_array_iterator_t face_iter = block_start_; face_iter != block_end_; ++face_iter)
                 {
                     face_descriptor_t fd = *face_iter;
                     const size_t cc_id = fccmap[fd]; // the connected component which contains the current face
@@ -941,7 +941,7 @@ namespace mcut
         } // end of parallel scope
 #else
         // for each face in the auxilliary data structure "mesh" (traced polygon)
-        for (mesh_t::face_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
+        for (face_array_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
             face_descriptor_t fd = *face_iter;
             const size_t cc_id = fccmap.at(fd); // the connected component which contains the current face
@@ -1069,7 +1069,7 @@ namespace mcut
                     // map cc vertices to original input mesh
                     // -----------------------------------
                     ccinfo.data_maps.vertex_map.resize(cc.number_of_vertices());
-                    for (mesh_t::vertex_iterator_t i = cc.vertices_begin(); i != cc.vertices_end(); ++i)
+                    for (vertex_array_iterator_t i = cc.vertices_begin(); i != cc.vertices_end(); ++i)
                     {
                         const vd_t cc_descr = *i;
                         MCUT_ASSERT((size_t)cc_descr < cc_to_mX_vertex.size() /*cc_to_mX_vertex.count(cc_descr) == 1*/);
@@ -1145,7 +1145,7 @@ namespace mcut
 
                     std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face.at(cc_id);
                     ccinfo.data_maps.face_map.resize(cc.number_of_faces());
-                    for (mesh_t::face_iterator_t f = cc.faces_begin(); f != cc.faces_end(); ++f)
+                    for (face_array_iterator_t f = cc.faces_begin(); f != cc.faces_end(); ++f)
                     {
                         const fd_t cc_descr = *f;
                         // account for the fact that the parameter "mX_traced_polygons" may contain only a subset of traced polygons
@@ -1602,7 +1602,7 @@ namespace mcut
     bool mesh_is_closed(const mesh_t &mesh)
     {
         bool all_halfedges_incident_to_face = true;
-        for (mesh_t::halfedge_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter)
+        for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter)
         {
             const fd_t f = mesh.face(*iter);
             if (f == mesh_t::null_face())
@@ -1711,7 +1711,7 @@ namespace mcut
 #if 1
         std::iota(std::begin(ps_to_sm_vtx), std::end(ps_to_sm_vtx), vd_t(0));
 #else
-        for (mesh_t::vertex_iterator_t v = sm.vertices_begin(); v != sm.vertices_end(); ++v)
+        for (vertex_array_iterator_t v = sm.vertices_begin(); v != sm.vertices_end(); ++v)
         {
             ps_to_sm_vtx[*v] = *v; // one to one mapping since ps is initially a copy of sm!
         }
@@ -1721,7 +1721,7 @@ namespace mcut
 #if 1
         std::iota(std::begin(ps_to_sm_face), std::end(ps_to_sm_face), fd_t(0));
 #else
-        for (mesh_t::face_iterator_t f = sm.faces_begin(); f != sm.faces_end(); ++f)
+        for (face_array_iterator_t f = sm.faces_begin(); f != sm.faces_end(); ++f)
         {
             ps_to_sm_face[*f] = *f; // one to one mapping since ps is initially a copy of sm!
         }
@@ -1747,7 +1747,7 @@ namespace mcut
         std::vector<fd_t> ps_to_cm_face(sm_face_count + cs_face_count);
 
         // merge cm faces
-        for (mesh_t::face_iterator_t i = cs.faces_begin(); i != cs.faces_end(); ++i)
+        for (face_array_iterator_t i = cs.faces_begin(); i != cs.faces_end(); ++i)
         {
             //std::vector<vd_t> fv = get_vertices_on_face(cs, *i);
 #if 1
@@ -3412,7 +3412,7 @@ namespace mcut
         DEBUG_CODE_MASK(lg << "detect degeneracies" << std::endl;);
 
         // TODO: this is redundnat (remove)
-        mesh_t::vertex_iterator_t m0_ivtx_iter_begin = m0.vertices_begin();
+        vertex_array_iterator_t m0_ivtx_iter_begin = m0.vertices_begin();
         std::advance(m0_ivtx_iter_begin, ps_vtx_cnt); // offset to start of intersection vertices in mesh_t (note: internal mesh data stored consecutively)
 #if 0
         //
@@ -3434,7 +3434,7 @@ namespace mcut
         bool atleast_one_sm_edge_intersects_an_cs_face = false;
 
         // TODO: just loop over m0_ivtx_to_intersection_registry_entry
-        for (mesh_t::vertex_iterator_t i = m0_ivtx_iter_begin; i != m0.vertices_end(); ++i)
+        for (vertex_array_iterator_t i = m0_ivtx_iter_begin; i != m0.vertices_end(); ++i)
         {
 
             const ed_t &ps_edge = m0_ivtx_to_intersection_registry_entry.at((*i) - ps.number_of_vertices()).first;
@@ -4680,7 +4680,7 @@ namespace mcut
 
 #if defined(MCUT_MULTI_THREADED)
         {
-            typedef mesh_t::edge_iterator_t InputStorageIteratorType;
+            typedef edge_array_iterator_t InputStorageIteratorType;
             typedef std::tuple<
                 std::unordered_map<ed_t, ed_t>,              // ps_to_m0_non_intersecting_edge
                 std::unordered_map<fd_t, std::vector<ed_t>>, // ps_iface_to_m0_edge_list
@@ -4704,7 +4704,7 @@ namespace mcut
                 const int rough_number_of_edges = std::distance(block_start_, block_end_);
                 edges_LOCAL.reserve(rough_number_of_edges * 1.2); // most edges are original
 
-                for (mesh_t::edge_iterator_t iter_ps_edge = block_start_; iter_ps_edge != block_end_; ++iter_ps_edge)
+                for (edge_array_iterator_t iter_ps_edge = block_start_; iter_ps_edge != block_end_; ++iter_ps_edge)
                 {
                     //std::cout << (uint32_t)(*iter_ps_edge) << std::endl;
                     if (ps_edge_to_vertices.find(*iter_ps_edge) != ps_edge_to_vertices.end())
@@ -4984,7 +4984,7 @@ namespace mcut
 #else
 
         // for each ps-edge
-        for (mesh_t::edge_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge)
+        for (edge_array_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge)
         {
             DEBUG_CODE_MASK(lg.indent(););
 
@@ -5160,7 +5160,7 @@ namespace mcut
 
 #if defined(MCUT_MULTI_THREADED)
         {
-            typedef mesh_t::face_iterator_t InputStorageIteratorType;
+            typedef face_array_iterator_t InputStorageIteratorType;
             typedef std::tuple<
                 std::vector<traced_polygon_t>, // m0_polygons;
                 std::vector<int>,              // m0_sm_cutpath_adjacent_polygons
@@ -5183,7 +5183,7 @@ namespace mcut
 
                 traced_sm_polygon_count_LOCAL = 0;
 
-                for (mesh_t::face_iterator_t ps_face_iter = block_start_; ps_face_iter != block_end_; ++ps_face_iter)
+                for (face_array_iterator_t ps_face_iter = block_start_; ps_face_iter != block_end_; ++ps_face_iter)
                 {
                     const fd_t &ps_face = *ps_face_iter;
 
@@ -5855,7 +5855,7 @@ namespace mcut
         } // end of parallel scope
 #else
         // for each face in the polygon-soup mesh
-        for (mesh_t::face_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter)
+        for (face_array_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter)
         {
             DEBUG_CODE_MASK(lg.indent(););
 
@@ -7382,7 +7382,7 @@ namespace mcut
             >
             m0_sm_ihe_to_flag;
 
-        //for (mesh_t::edge_iterator_t edge_iter = m0.edges_begin(); edge_iter != m0.edges_end(); ++edge_iter) {
+        //for (edge_array_iterator_t edge_iter = m0.edges_begin(); edge_iter != m0.edges_end(); ++edge_iter) {
         for (std::unordered_map<vd_t, std::vector<hd_t>>::const_iterator ivtx_iter = ivtx_to_incoming_hlist.cbegin(); ivtx_iter != ivtx_to_incoming_hlist.cend(); ++ivtx_iter)
         {
             for (std::vector<hd_t>::const_iterator halfedge_iter = ivtx_iter->second.cbegin(); halfedge_iter != ivtx_iter->second.cend(); ++halfedge_iter)
@@ -7519,7 +7519,7 @@ namespace mcut
         // and cut-mesh (used as data for client tex coord mapping usage)
         std::vector<vd_t> m0_to_m1_vtx(m0.number_of_vertices());
         std::vector<vd_t> m1_to_m0_ovtx(m0.number_of_vertices());
-        for (mesh_t::vertex_iterator_t v = m0.vertices_begin(); v != m0.vertices_end(); ++v)
+        for (vertex_array_iterator_t v = m0.vertices_begin(); v != m0.vertices_end(); ++v)
         {
             const vd_t m1_vd = m1.add_vertex(m0.vertex(*v));
             MCUT_ASSERT(m1_vd != mesh_t::null_vertex());
@@ -7546,7 +7546,7 @@ namespace mcut
 
         std::unordered_map<hd_t, hd_t> m0_to_m1_he;
 
-        for (mesh_t::edge_iterator_t e = m0.edges_begin(); e != m0.edges_end(); ++e)
+        for (edge_array_iterator_t e = m0.edges_begin(); e != m0.edges_end(); ++e)
         {
             const ed_t &m0_edge = (*e);
             const vd_t m0_v0 = m0.vertex(m0_edge, 0);
@@ -9777,7 +9777,7 @@ namespace mcut
                     // ----------------------
 
                     omi.data_maps.vertex_map.resize(patch_mesh.number_of_vertices());
-                    for (mesh_t::vertex_iterator_t v = patch_mesh.vertices_begin(); v != patch_mesh.vertices_end(); ++v)
+                    for (vertex_array_iterator_t v = patch_mesh.vertices_begin(); v != patch_mesh.vertices_end(); ++v)
                     {
                         MCUT_ASSERT(patch_to_m0_vertex.count(*v) == 1);
                         const vd_t as_m0_descr = patch_to_m0_vertex.at(*v);
@@ -9805,7 +9805,7 @@ namespace mcut
                     // ----------------------
 
                     omi.data_maps.face_map.resize(patch_mesh.number_of_faces());
-                    for (mesh_t::face_iterator_t f = patch_mesh.faces_begin(); f != patch_mesh.faces_end(); ++f)
+                    for (face_array_iterator_t f = patch_mesh.faces_begin(); f != patch_mesh.faces_end(); ++f)
                     {
                         MCUT_ASSERT(patch_to_m0_face.count(*f) == 1);
                         const int as_m0_descr = patch_to_m0_face.at(*f);

@@ -198,8 +198,50 @@ namespace mcut
         typedef T type;
     };
 
-    template<typename V>
+    template <typename V>
     class array_iterator_t;
+
+    struct halfedge_data_t : id_<halfedge_descriptor_t>
+    {
+        halfedge_descriptor_t o; // opposite halfedge
+        halfedge_descriptor_t n; // next halfedge
+        halfedge_descriptor_t p; // previous halfedge
+        vertex_descriptor_t t;   // target vertex
+        edge_descriptor_t e;     // edge
+        face_descriptor_t f;     // face
+
+        halfedge_data_t()
+            //: o(null_halfedge()), n(null_halfedge()), p(null_halfedge()), t(null_vertex()), e(null_edge()), f(null_face())
+        {
+        }
+    };
+
+    struct edge_data_t : id_<edge_descriptor_t>
+    {
+        halfedge_descriptor_t h; // primary halfedge (even idx)
+    };
+
+    struct face_data_t : id_<face_descriptor_t>
+    {
+        std::vector<halfedge_descriptor_t> m_halfedges;
+    };
+
+    struct vertex_data_t : id_<vertex_descriptor_t>
+    {
+        mcut::math::vec3 p;                             // geometry coordinates
+        std::vector<face_descriptor_t> m_faces;         // ... incident to vertex
+        std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
+    };
+
+    typedef std::vector<vertex_data_t> vertex_array_t;
+    typedef std::vector<edge_data_t> edge_array_t;
+    typedef std::vector<halfedge_data_t> halfedge_array_t;
+    typedef std::vector<face_data_t> face_array_t;
+
+    typedef array_iterator_t<vertex_array_t> vertex_array_iterator_t;
+    typedef array_iterator_t<edge_array_t> edge_array_iterator_t;
+    typedef array_iterator_t<halfedge_array_t> halfedge_array_iterator_t;
+    typedef array_iterator_t<face_array_t> face_array_iterator_t;
 
     /*
         Internal mesh data structure used for cutting meshes
@@ -220,56 +262,7 @@ namespace mcut
     */
     class mesh_t
     {
-
     public:
-        template <typename T>
-        struct mesh_data_t
-        {
-            typedef T descriptor_type;
-        };
-
-        struct halfedge_data_t : mesh_data_t<halfedge_descriptor_t>
-        {
-            halfedge_descriptor_t o; // opposite halfedge
-            halfedge_descriptor_t n; // next halfedge
-            halfedge_descriptor_t p; // previous halfedge
-            vertex_descriptor_t t;   // target vertex
-            edge_descriptor_t e;     // edge
-            face_descriptor_t f;     // face
-
-            halfedge_data_t()
-                : o(null_halfedge()), n(null_halfedge()), p(null_halfedge()), t(null_vertex()), e(null_edge()), f(null_face())
-            {
-            }
-        };
-
-        struct edge_data_t : mesh_data_t<edge_descriptor_t>
-        {
-            halfedge_descriptor_t h; // primary halfedge (even idx)
-        };
-
-        struct face_data_t : mesh_data_t<face_descriptor_t>
-        {
-            std::vector<halfedge_descriptor_t> m_halfedges;
-        };
-
-        struct vertex_data_t : mesh_data_t<vertex_descriptor_t>
-        {
-            mcut::math::vec3 p;                             // geometry coordinates
-            std::vector<face_descriptor_t> m_faces;         // ... incident to vertex
-            std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
-        };
-
-        typedef std::vector<vertex_data_t> vertex_array_t;
-        typedef std::vector<edge_data_t> edge_array_t;
-        typedef std::vector<halfedge_data_t> halfedge_array_t;
-        typedef std::vector<face_data_t> face_array_t;
-
-        typedef array_iterator_t<vertex_array_t> vertex_iterator_t;
-        typedef array_iterator_t<edge_array_t> edge_iterator_t;
-        typedef array_iterator_t<halfedge_array_t> halfedge_iterator_t;
-        typedef array_iterator_t<face_array_t> face_iterator_t;
-
         mesh_t();
         ~mesh_t();
 
@@ -377,10 +370,10 @@ namespace mcut
             return I(); // unused
         }
 
-        const vertex_iterator_t elements_begin_(id_<array_iterator_t<vertex_array_t>>, bool account_for_removed_elems = true) const;
-        const edge_iterator_t elements_begin_(id_<array_iterator_t<edge_array_t>>, bool account_for_removed_elems = true) const;
-        const halfedge_iterator_t elements_begin_(id_<array_iterator_t<halfedge_array_t>>, bool account_for_removed_elems = true) const;
-        const face_iterator_t elements_begin_(id_<array_iterator_t<face_array_t>>, bool account_for_removed_elems = true) const;
+        const vertex_array_iterator_t elements_begin_(id_<vertex_array_iterator_t>, bool account_for_removed_elems = true) const;
+        const edge_array_iterator_t elements_begin_(id_<edge_array_iterator_t>, bool account_for_removed_elems = true) const;
+        const halfedge_array_iterator_t elements_begin_(id_<halfedge_array_iterator_t>, bool account_for_removed_elems = true) const;
+        const face_array_iterator_t elements_begin_(id_<face_array_iterator_t>, bool account_for_removed_elems = true) const;
 
         // returns the number of removed mesh elements (vertices, edges, faces or halfedges) between [start, end)
         template <typename I>
@@ -420,14 +413,14 @@ namespace mcut
         // iterators
         // ---------
 
-        vertex_iterator_t vertices_begin(bool account_for_removed_elems = true) const;
-        vertex_iterator_t vertices_end() const;
-        edge_iterator_t edges_begin(bool account_for_removed_elems = true) const;
-        edge_iterator_t edges_end() const;
-        halfedge_iterator_t halfedges_begin(bool account_for_removed_elems = true) const;
-        halfedge_iterator_t halfedges_end() const;
-        face_iterator_t faces_begin(bool account_for_removed_elems = true) const;
-        face_iterator_t faces_end() const;
+        vertex_array_iterator_t vertices_begin(bool account_for_removed_elems = true) const;
+        vertex_array_iterator_t vertices_end() const;
+        edge_array_iterator_t edges_begin(bool account_for_removed_elems = true) const;
+        edge_array_iterator_t edges_end() const;
+        halfedge_array_iterator_t halfedges_begin(bool account_for_removed_elems = true) const;
+        halfedge_array_iterator_t halfedges_end() const;
+        face_array_iterator_t faces_begin(bool account_for_removed_elems = true) const;
+        face_array_iterator_t faces_end() const;
 
         const std::vector<vertex_descriptor_t> &get_removed_vertices() const;
         const std::vector<edge_descriptor_t> &get_removed_edges() const;
@@ -462,17 +455,12 @@ namespace mcut
     void write_off(const char *fpath, const mcut::mesh_t &mesh);
     void read_off(mcut::mesh_t &mesh, const char *fpath);
 
-    typedef array_iterator_t<mesh_t::vertex_array_t> vertex_array_iterator_t;
-    typedef array_iterator_t<mesh_t::edge_array_t> edge_array_iterator_t;
-    typedef array_iterator_t<mesh_t::halfedge_array_t> halfedge_array_iterator_t;
-    typedef array_iterator_t<mesh_t::face_array_t> face_array_iterator_t;
-
     template <typename V>
     class array_iterator_t : public V::const_iterator
     {
         const mesh_t *mesh_ptr;
         typedef typename V::const_iterator std_iterator_base_class;
-        typedef typename V::value_type::descriptor_type element_descriptor_type;
+        typedef typename V::value_type::type element_descriptor_type;
         typename V::value_type *operator->() = delete;
 
     public:
@@ -488,7 +476,7 @@ namespace mcut
             return mesh_ptr;
         }
 
-        typename V::value_type::descriptor_type operator*() 
+        typename V::value_type::type operator*()
         {
             size_t raw_index = (*this) - cbegin<>(false);
             element_descriptor_type d((std::uint32_t)raw_index);
@@ -571,7 +559,7 @@ namespace mcut
     private:
         // postfix increment (i++)
         // NOTE: This overide is private to simplify implementation, and we don't need it
-        array_iterator_t<V> operator++(int) 
+        array_iterator_t<V> operator++(int)
         {
             MCUT_ASSERT(false);
             return cend<>();
@@ -602,17 +590,15 @@ namespace mcut
         face_array_iterator_t cend(id_<face_array_iterator_t>);
     }; // class array_iterator_t : public V::const_iterator
 
-    
-
 } // namespace mcut
 
 namespace std
 {
 #if 1
     template <>
-    typename mcut::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type distance(
-        mcut::array_iterator_t<mcut::mesh_t::edge_array_t> first,
-        mcut::array_iterator_t<mcut::mesh_t::edge_array_t> last);
+    typename mcut::edge_array_iterator_t::difference_type distance(
+        mcut::edge_array_iterator_t first,
+        mcut::edge_array_iterator_t last);
 #endif
 #if 0
     template <>

@@ -405,7 +405,7 @@ McResult indexArrayMeshToHalfedgeMesh(
     mcut::math::vec3 bboxMax(-1e10);
 
     TIMESTACK_PUSH("create bbox");
-    for (mcut::mesh_t::vertex_iterator_t i = halfedgeMesh.vertices_begin(); i != halfedgeMesh.vertices_end(); ++i)
+    for (mcut::vertex_array_iterator_t i = halfedgeMesh.vertices_begin(); i != halfedgeMesh.vertices_end(); ++i)
     {
         const mcut::math::vec3 &coords = halfedgeMesh.vertex(*i);
         bboxMin = mcut::math::compwise_min(bboxMin, coords);
@@ -774,7 +774,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
 #if defined(MCUT_MULTI_THREADED)
     {
-        typedef mcut::mesh_t::vertex_iterator_t InputStorageIteratorType;
+        typedef mcut::vertex_array_iterator_t InputStorageIteratorType;
         typedef int OutputStorageType;
 
         auto fn_copy_vertices = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
@@ -860,7 +860,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i)
     {
 
-        //mcut::mesh_t::vertex_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
+        //mcut::vertex_array_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
         //std::advance(vIter, i);
         mcut::vd_t vdescr(i);
         const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(vdescr /**vIter*/);
@@ -985,7 +985,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
 #if defined(MCUT_MULTI_THREADED)
     {
-        typedef mcut::mesh_t::face_iterator_t InputStorageIteratorType;
+        typedef mcut::face_array_iterator_t InputStorageIteratorType;
         typedef int OutputStorageType;
 
         auto fn_copy_face_info0 = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
@@ -1071,7 +1071,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 #else
 
     int faceID = 0; //std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
-    for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
+    for (mcut::face_array_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
         //const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
@@ -1157,7 +1157,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
 #if defined(MCUT_MULTI_THREADED)
     {
-        typedef mcut::mesh_t::face_iterator_t InputStorageIteratorType;
+        typedef mcut::face_array_iterator_t InputStorageIteratorType;
         typedef int OutputStorageType;
 
         auto fn_copy_face_info1 = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
@@ -1214,7 +1214,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 #else
     faceID = 0; //std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     // for each face
-    for (mcut::mesh_t::face_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
+    for (mcut::face_array_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
     {
 
         { // store face-vertex indices
@@ -1259,7 +1259,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     // std::vector<std::pair<mcut::vd_t, mcut::vd_t>> gatheredEdges;
 #if defined(MCUT_MULTI_THREADED)
     {
-        typedef mcut::mesh_t::edge_iterator_t InputStorageIteratorType;
+        typedef mcut::edge_array_iterator_t InputStorageIteratorType;
         typedef int OutputStorageType;
 
         auto fn_copy_edges = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType
@@ -1314,7 +1314,7 @@ McResult halfedgeMeshToIndexArrayMesh(
     // not implemented because it'd be too slow
     uint32_t edge_idx = 0; // std::distance(halfedgeMeshInfo.mesh.edges_begin(), i);
 
-    for (mcut::mesh_t::edge_iterator_t i = halfedgeMeshInfo.mesh.edges_begin(); i != halfedgeMeshInfo.mesh.edges_end(); ++i)
+    for (mcut::edge_array_iterator_t i = halfedgeMeshInfo.mesh.edges_begin(); i != halfedgeMeshInfo.mesh.edges_end(); ++i)
     {
 
         mcut::vd_t v0 = halfedgeMeshInfo.mesh.vertex(*i, 0);
@@ -1839,9 +1839,9 @@ McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr,
     MCUT_ASSERT(cutMesh.number_of_vertices() >= 3);
 
     McResult result = McResult::MC_NO_ERROR;
-    for (mcut::mesh_t::vertex_iterator_t i = srcMesh.vertices_begin(); i != srcMesh.vertices_end(); ++i) {
+    for (mcut::vertex_array_iterator_t i = srcMesh.vertices_begin(); i != srcMesh.vertices_end(); ++i) {
         const mcut::math::vec3& srcMeshVertex = srcMesh.vertex(*i);
-        for (mcut::mesh_t::vertex_iterator_t j = cutMesh.vertices_begin(); j != cutMesh.vertices_end(); ++j) {
+        for (mcut::vertex_array_iterator_t j = cutMesh.vertices_begin(); j != cutMesh.vertices_end(); ++j) {
             const mcut::math::vec3& cutMeshVertex = cutMesh.vertex(*j);
             if (srcMeshVertex.x() == cutMeshVertex.x() && srcMeshVertex.y() == cutMeshVertex.y() && srcMeshVertex.z() == cutMeshVertex.z()) {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
@@ -1879,7 +1879,7 @@ void constructOIBVH(
     std::vector<mcut::math::fast_vec3> face_bbox_centers(meshFaceCount, mcut::math::fast_vec3());
 
     // for each face in mesh
-    for (mcut::mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
+    for (mcut::face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
     {
         const int faceIdx = static_cast<int>(*f);
         const std::vector<mcut::vd_t> vertices_on_face = mesh.get_vertices_around_face(*f);
@@ -1909,7 +1909,7 @@ void constructOIBVH(
     mcut::geom::bounding_box_t<mcut::math::fast_vec3> &meshBbox = bvhAABBs.front(); // root bounding box
 
     // for each vertex in mesh
-    for (mcut::mesh_t::vertex_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
+    for (mcut::vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
     {
         const mcut::math::vec3 &coords = mesh.vertex(*v);
         meshBbox.expand(coords);
@@ -1920,7 +1920,7 @@ void constructOIBVH(
 
     std::vector<std::pair<mcut::fd_t, uint32_t>> bvhLeafNodeDescriptors(meshFaceCount, std::pair<mcut::fd_t, uint32_t>());
 
-    for (mcut::mesh_t::face_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
+    for (mcut::face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
     {
         const uint32_t faceIdx = static_cast<uint32_t>(*f);
 
@@ -2321,7 +2321,7 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
     }
 
     // check that the vertices of each face are co-planar
-    for (mcut::mesh_t::face_iterator_t f = m.faces_begin(); f != m.faces_end(); ++f)
+    for (mcut::face_array_iterator_t f = m.faces_begin(); f != m.faces_end(); ++f)
     {
         const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(*f);
         const int nv = (int)vertices.size();
@@ -3987,7 +3987,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         if (backendInput.populate_vertex_maps)
         {
             omi.data_maps.vertex_map.resize(cutMeshInternal.number_of_vertices());
-            for (mcut::mesh_t::vertex_iterator_t i = cutMeshInternal.vertices_begin(); i != cutMeshInternal.vertices_end(); ++i)
+            for (mcut::vertex_array_iterator_t i = cutMeshInternal.vertices_begin(); i != cutMeshInternal.vertices_end(); ++i)
             {
                 omi.data_maps.vertex_map[*i] = mcut::vd_t((*i) + srcMeshInternal.number_of_vertices()); // apply offset like kernel does
             }
@@ -3996,7 +3996,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         if (backendInput.populate_face_maps)
         {
             omi.data_maps.face_map.resize(cutMeshInternal.number_of_faces());
-            for (mcut::mesh_t::face_iterator_t i = cutMeshInternal.faces_begin(); i != cutMeshInternal.faces_end(); ++i)
+            for (mcut::face_array_iterator_t i = cutMeshInternal.faces_begin(); i != cutMeshInternal.faces_end(); ++i)
             {
                 omi.data_maps.face_map[*i] = mcut::fd_t((*i) + srcMeshInternal.number_of_faces()); // apply offset like kernel does
             }
@@ -4029,7 +4029,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         if (backendInput.populate_vertex_maps)
         {
             omi.data_maps.vertex_map.resize(srcMeshInternal.number_of_vertices());
-            for (mcut::mesh_t::vertex_iterator_t i = srcMeshInternal.vertices_begin(); i != srcMeshInternal.vertices_end(); ++i)
+            for (mcut::vertex_array_iterator_t i = srcMeshInternal.vertices_begin(); i != srcMeshInternal.vertices_end(); ++i)
             {
                 omi.data_maps.vertex_map[*i] = *i; // one to one mapping
             }
@@ -4038,7 +4038,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         if (backendInput.populate_face_maps)
         {
             omi.data_maps.face_map.resize(srcMeshInternal.number_of_faces());
-            for (mcut::mesh_t::face_iterator_t i = srcMeshInternal.faces_begin(); i != srcMeshInternal.faces_end(); ++i)
+            for (mcut::face_array_iterator_t i = srcMeshInternal.faces_begin(); i != srcMeshInternal.faces_end(); ++i)
             {
                 omi.data_maps.face_map[*i] = *i; // one to one mapping
             }

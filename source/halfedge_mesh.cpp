@@ -708,7 +708,7 @@ namespace mcut
         return incoming_halfedges;
     }
 
-    mesh_t::vertex_iterator_t mesh_t::vertices_begin(bool account_for_removed_elems) const
+    vertex_array_iterator_t mesh_t::vertices_begin(bool account_for_removed_elems) const
     {
         vertex_array_t::const_iterator it = m_vertices.cbegin();
         if (account_for_removed_elems)
@@ -719,15 +719,15 @@ namespace mcut
                 ++it; // shift the pointer to the first valid mesh element
             }
         }
-        return vertex_iterator_t(it, this);
+        return vertex_array_iterator_t(it, this);
     }
 
-    mesh_t::vertex_iterator_t mesh_t::vertices_end() const
+    vertex_array_iterator_t mesh_t::vertices_end() const
     {
-        return vertex_iterator_t(m_vertices.cend(), this);
+        return vertex_array_iterator_t(m_vertices.cend(), this);
     }
 
-    mesh_t::edge_iterator_t mesh_t::edges_begin(bool account_for_removed_elems) const
+    edge_array_iterator_t mesh_t::edges_begin(bool account_for_removed_elems) const
     {
         edge_array_t::const_iterator it = m_edges.cbegin();
         if (account_for_removed_elems)
@@ -738,15 +738,15 @@ namespace mcut
                 ++it; // shift the pointer to the first valid mesh element
             }
         }
-        return edge_iterator_t(it, this);
+        return edge_array_iterator_t(it, this);
     }
 
-    mesh_t::edge_iterator_t mesh_t::edges_end() const
+    edge_array_iterator_t mesh_t::edges_end() const
     {
-        return edge_iterator_t(m_edges.cend(), this);
+        return edge_array_iterator_t(m_edges.cend(), this);
     }
 
-    mesh_t::halfedge_iterator_t mesh_t::halfedges_begin(bool account_for_removed_elems) const
+    halfedge_array_iterator_t mesh_t::halfedges_begin(bool account_for_removed_elems) const
     {
         halfedge_array_t::const_iterator it = m_halfedges.cbegin();
         if (account_for_removed_elems)
@@ -757,15 +757,15 @@ namespace mcut
                 ++it; // shift the pointer to the first valid mesh element
             }
         }
-        return halfedge_iterator_t(it, this);
+        return halfedge_array_iterator_t(it, this);
     }
 
-    mesh_t::halfedge_iterator_t mesh_t::halfedges_end() const
+    halfedge_array_iterator_t mesh_t::halfedges_end() const
     {
-        return halfedge_iterator_t(m_halfedges.cend(), this);
+        return halfedge_array_iterator_t(m_halfedges.cend(), this);
     }
 
-    mesh_t::face_iterator_t mesh_t::faces_begin(bool account_for_removed_elems) const
+    face_array_iterator_t mesh_t::faces_begin(bool account_for_removed_elems) const
     {
         face_array_t::const_iterator it = m_faces.cbegin();
         if (account_for_removed_elems)
@@ -776,12 +776,12 @@ namespace mcut
                 ++it; // shift the pointer to the first valid mesh element
             }
         }
-        return face_iterator_t(it, this);
+        return face_array_iterator_t(it, this);
     }
 
-    mesh_t::face_iterator_t mesh_t::faces_end() const
+    face_array_iterator_t mesh_t::faces_end() const
     {
-        return face_iterator_t(m_faces.cend(), this);
+        return face_array_iterator_t(m_faces.cend(), this);
     }
 
     // also disassociates (not remove) any halfedges(s) and vertices incident to face
@@ -943,22 +943,22 @@ namespace mcut
 
     void mesh_t::remove_elements()
     {
-        for (face_iterator_t i = faces_begin(); i != faces_end(); ++i)
+        for (face_array_iterator_t i = faces_begin(); i != faces_end(); ++i)
         {
             remove_face(*i);
         }
 
-        for (edge_iterator_t i = edges_begin(); i != edges_end(); ++i)
+        for (edge_array_iterator_t i = edges_begin(); i != edges_end(); ++i)
         {
             remove_edge(*i);
         }
 
-        for (halfedge_iterator_t i = halfedges_begin(); i != halfedges_end(); ++i)
+        for (halfedge_array_iterator_t i = halfedges_begin(); i != halfedges_end(); ++i)
         {
             remove_halfedge(*i);
         }
 
-        for (vertex_iterator_t i = vertices_begin(); i != vertices_end(); ++i)
+        for (vertex_array_iterator_t i = vertices_begin(); i != vertices_end(); ++i)
         {
             remove_vertex(*i);
         }
@@ -1117,22 +1117,22 @@ namespace mcut
         return m_faces_removed;
     }
 
-    const mesh_t::vertex_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<vertex_array_t>>, bool account_for_removed_elems) const
+    const vertex_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<vertex_array_t>>, bool account_for_removed_elems) const
     {
         return vertices_begin(account_for_removed_elems);
     }
 
-    const mesh_t::edge_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<edge_array_t>>, bool account_for_removed_elems) const
+    const edge_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<edge_array_t>>, bool account_for_removed_elems) const
     {
         return edges_begin(account_for_removed_elems);
     }
 
-    const mesh_t::halfedge_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<halfedge_array_t>>, bool account_for_removed_elems) const
+    const halfedge_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<halfedge_array_t>>, bool account_for_removed_elems) const
     {
         return halfedges_begin(account_for_removed_elems);
     }
 
-    const mesh_t::face_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<face_array_t>>, bool account_for_removed_elems) const
+    const face_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<face_array_t>>, bool account_for_removed_elems) const
     {
         return faces_begin(account_for_removed_elems);
     }
@@ -1161,7 +1161,7 @@ namespace mcut
         //
         // vertices
         //
-        for (mcut::mesh_t::vertex_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter)
+        for (mcut::vertex_array_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter)
         {
             //const vertex_data_t& vdata = iter.second;
             const math::vec3 &point = mesh.vertex(*iter);
@@ -1184,7 +1184,7 @@ namespace mcut
         //
         // faces
         //
-        for (mcut::mesh_t::face_iterator_t iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter)
+        for (mcut::face_array_iterator_t iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter)
         {
             //const typename mesh_t::face_descriptor_t& fd = iter.first;
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(*iter);
@@ -1329,13 +1329,13 @@ namespace std
 {
 #if 1
     template <>
-    typename mcut::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type distance(
-        mcut::array_iterator_t<mcut::mesh_t::edge_array_t> first,
-        mcut::array_iterator_t<mcut::mesh_t::edge_array_t> last)
+    typename mcut::edge_array_iterator_t::difference_type distance(
+        mcut::edge_array_iterator_t first,
+        mcut::edge_array_iterator_t last)
     {
         MCUT_ASSERT(first.get_mesh_ptr() == last.get_mesh_ptr());
-        mcut::array_iterator_t<mcut::mesh_t::edge_array_t> it = first;
-        mcut::array_iterator_t<mcut::mesh_t::edge_array_t>::difference_type dist = last - first;
+        mcut::edge_array_iterator_t it = first;
+        mcut::edge_array_iterator_t::difference_type dist = last - first;
 
         uint32_t r = it.get_mesh_ptr()->count_removed_elements_in_range(first, last);
         if (r > 0)
