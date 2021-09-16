@@ -39,42 +39,42 @@ namespace mcut
     }
     
     template <>
-    vertex_array_iterator_t vertex_array_iterator_t::cend<vertex_array_iterator_t>(id_<vertex_array_iterator_t>)
+    vertex_array_iterator_t vertex_array_iterator_t::cend(id_<vertex_array_iterator_t>)
     {
         return mesh_ptr->vertices_end();
     }
 
     template <>
-    edge_array_iterator_t edge_array_iterator_t::cbegin<edge_array_iterator_t>(bool account_for_removed_elems, id_<edge_array_iterator_t>)
+    edge_array_iterator_t edge_array_iterator_t::cbegin(bool account_for_removed_elems, id_<edge_array_iterator_t>)
     {
         return mesh_ptr->edges_begin(account_for_removed_elems);
     }
 
     template <>
-    edge_array_iterator_t edge_array_iterator_t::cend<edge_array_iterator_t>(id_<edge_array_iterator_t>)
+    edge_array_iterator_t edge_array_iterator_t::cend(id_<edge_array_iterator_t>)
     {
         return mesh_ptr->edges_end();
     }
 
     template <>
-    halfedge_array_iterator_t halfedge_array_iterator_t::cbegin<halfedge_array_iterator_t>(bool account_for_removed_elems, id_<halfedge_array_iterator_t>)
+    halfedge_array_iterator_t halfedge_array_iterator_t::cbegin(bool account_for_removed_elems, id_<halfedge_array_iterator_t>)
     {
         return mesh_ptr->halfedges_begin(account_for_removed_elems);
     }
 
     template <>
-    halfedge_array_iterator_t halfedge_array_iterator_t::cend<halfedge_array_iterator_t>(id_<halfedge_array_iterator_t>)
+    halfedge_array_iterator_t halfedge_array_iterator_t::cend(id_<halfedge_array_iterator_t>)
     {
         return mesh_ptr->halfedges_end();
     }
 
     template <>
-    face_array_iterator_t face_array_iterator_t::cbegin<face_array_iterator_t>(bool account_for_removed_elems, id_<face_array_iterator_t>)
+    face_array_iterator_t face_array_iterator_t::cbegin(bool account_for_removed_elems, id_<face_array_iterator_t>)
     {
         return mesh_ptr->faces_begin(account_for_removed_elems);
     }
     template <>
-    face_array_iterator_t face_array_iterator_t::cend<face_array_iterator_t>(id_<face_array_iterator_t>)
+    face_array_iterator_t face_array_iterator_t::cend(id_<face_array_iterator_t>)
     {
         return mesh_ptr->faces_end();
     }
