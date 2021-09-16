@@ -599,7 +599,10 @@ namespace mcut
                 v1_hd_ptr = &m_halfedges.at(v1_h); // add to vertex list since v1 is the target of h
             }
 
-            MCUT_ASSERT(v1_hd_ptr->f == null_face());
+            if(v1_hd_ptr->f != null_face())
+            {
+                return null_face(); // face is incident to a non-manifold edge
+            }
 
             v1_hd_ptr->f = new_face_idx; // associate halfedge with face
             face_data_ptr->m_halfedges.push_back(v1_h);

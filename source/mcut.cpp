@@ -645,7 +645,7 @@ McResult indexArrayMeshToHalfedgeMesh(
             result = McResult::MC_INVALID_VALUE;
             if (result != McResult::MC_NO_ERROR)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid vertices on face - " + std::to_string(i));
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
 
                 return result;
             }
