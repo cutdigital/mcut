@@ -585,7 +585,7 @@ namespace mcut
 
         halfedge_array_iterator_t cbegin(bool account_for_removed_elems, id_<halfedge_array_iterator_t> = {});
         halfedge_array_iterator_t cend(id_<halfedge_array_iterator_t>);
-
+    
         face_array_iterator_t cbegin(bool account_for_removed_elems, id_<face_array_iterator_t> = {});
         face_array_iterator_t cend(id_<face_array_iterator_t>);
     }; // class array_iterator_t : public V::const_iterator

@@ -45,7 +45,7 @@ namespace mcut
     }
 
     template <>
-    edge_array_iterator_t edge_array_iterator_t::cbegin<edge_array_iterator_t>(bool account_for_removed_elems, id_<edge_array_iterator_t>)
+    edge_array_iterator_t edge_array_iterator_t::cbegin<>(bool account_for_removed_elems, id_<edge_array_iterator_t>)
     {
         return mesh_ptr->edges_begin(account_for_removed_elems);
     }
