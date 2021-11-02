@@ -44,6 +44,11 @@
 #define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
 #endif
 
+#ifndef LICENSE_PURCHASED
+#define lmsg() printf("WARNING: MCUT is copyrighted and may not be sold or included in commercial products without a license.")
+#else
+#define lmsg()
+#endif // #ifndef LICENSE_PURCHASED
 // This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
 // #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
 
@@ -1661,6 +1666,7 @@ namespace mcut
     //
     void dispatch(output_t &output, const input_t &input)
     {
+        lmsg()
         TIMESTACK_PUSH(__FUNCTION__);
 
         logger_t &lg = output.logger;

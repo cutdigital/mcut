@@ -103,7 +103,7 @@
 
 #else
 #define SCOPED_TIMER(name)
-#define TIMESTACK_PUSH(name)
+#define TIMESTACK_PUSH(name) 
 #define TIMESTACK_POP()
 #define TIMESTACK_RESET()
 #endif
