@@ -3,7 +3,7 @@
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true)
 
 <p align="center">
-C++ library for mesh cutting.
+C++ library for mesh booleans and cutting.
 </p>
 
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
