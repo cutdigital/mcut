@@ -579,7 +579,6 @@ McResult indexArrayMeshToHalfedgeMesh(
     int faceSizeOffset = 0;
     for (uint32_t i = 0; i < numFaces; ++i)
     {
-
         std::vector<mcut::vd_t> faceVertices;
         int numFaceVertices = 3; // triangle
 
