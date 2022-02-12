@@ -445,6 +445,10 @@ void readMesh(const std::string& path, std::vector<double>& V, std::vector<uint3
     if (path.find(".obj") != std::string::npos) {
         igl::readOBJ(path, Vmat, Fmat);
     }
+    else{
+        printf("error: expected .obj file\n");
+        std::exit(1);
+    }
 
     for (int i = 0; i < (int)Vmat.rows(); ++i) {
         const Eigen::VectorXd v = Vmat.row(i);

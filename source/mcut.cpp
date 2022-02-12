@@ -3090,7 +3090,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         bool haveGPOnOriginFace = !anyPointIsOnLine(fpEdge0Midpoint, fpEdge1Midpoint, originFaceVertexCoords2D);
                         bool haveGP = haveGPOnFP && haveGPOnOriginFace;
 
-                        if (haveGP)
+                        if (haveGP /*|| true*/)
                         {
                             haveSegmentOnFP = true;
                             fpSegment.first = fpEdge1Midpoint;
