@@ -1,6 +1,6 @@
 # MCUT
 
-_Simple and fast C++ library for mesh cutting and CSG (boolean) operations._
+_Simple fast library for mesh cutting and CSG (boolean) operations._
 
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
 [![MacOS](https://github.com/cutdigital/mcut/actions/workflows/macos.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/macos.yml) [![Linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
