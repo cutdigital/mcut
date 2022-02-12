@@ -7,17 +7,25 @@ _Simple fast library for mesh cutting and CSG (boolean) operations._
 
 ## General cutting
 
-![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true)
+<p align="center">
+  <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true">
+</p>
 
 ## Boolean operation
 
-![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2.png?raw=true)
+<p align="center">
+  <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2.png?raw=true">
+</p>
 
 ## Misc & auxiliary output
 
-![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2-aux-edgepng.png?raw=true)
+<p align="center">
+  <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2-aux-edgepng.png?raw=true">
+</p>
 
-![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2-seams.png?raw=true)
+<p align="center">
+  <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2-seams.png?raw=true">
+</p>
 
 |:warning: Software may not be sold or included in commercial products without a license. |
 | --- |
