@@ -2,9 +2,15 @@
 
 _Simple and fast C++ library for mesh cutting and CSG (boolean) operations._
 
+## General cutting
+
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true)
 
+## Boolean operation
+
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2.png?raw=true)
+
+## Auxiliary output
 
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2-aux-edgepng.png?raw=true)
 
