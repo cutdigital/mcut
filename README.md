@@ -1,5 +1,6 @@
 # MCUT
-_C++ library for mesh cutting and CSG (boolean) operations._
+
+_Simple and fast C++ library for mesh cutting and CSG (boolean) operations._
 
 ![](https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true)
 
