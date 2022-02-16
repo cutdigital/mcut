@@ -2348,11 +2348,19 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
                 {
                     ctxtPtr->log(
                         McDebugSource::MC_DEBUG_SOURCE_API,
-                        McDebugType::MC_DEBUG_TYPE_ERROR,
+                        McDebugType::MC_DEBUG_TYPE_OTHER,
                         0,
-                        McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-                        "Vertices (" + std::to_string(nv) + ") of face " + std::to_string(*f) + " are not coplanar");
-                    result = false;
+                        McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
+                        "Vertices (" + std::to_string(nv) + ") on face " + std::to_string(*f) + " not coplanar");
+                    // No need to return false, simply warn. It is difficult to 
+                    // know whether the non-coplanarity is severe enough to cause
+                    // confusion when computing intersection points between two
+                    // polygons (min=2 but sometimes can get 1 due to non-coplanarity 
+                    // of face vertices).
+                    // In general, the more vertices on a face, the less likely 
+                    // they are to be co-planar. Faces with a low number of polygons
+                    // are ideal (3 vertices being the best)
+                    //result = false;
                     break;
                 }
             }
@@ -3650,7 +3658,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
 
-        result = check_input_mesh(ctxtPtr, srcMeshInternal);
+        result = check_input_mesh(ctxtPtr, cutMeshInternal);
         if (result != McResult::MC_NO_ERROR)
         {
             return result;

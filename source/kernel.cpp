@@ -36,13 +36,6 @@
 #include <unordered_map>
 #include <numeric> // std::iota
 
-// keep around the intermediate meshes created during patch stitching (good for showing how code works)
-#define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
-
-// This macro enables dumping data about meshes to the log when "dump_mesh(...)" is called
-#ifndef MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-#define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
-#endif
 
 #ifndef LICENSE_PURCHASED
 #define lmsg() printf("WARNING: MCUT is copyrighted and may not be sold or included in commercial products without a license.")
@@ -219,11 +212,6 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "save " << name << std::endl;);
 
-#if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-        //bool verb = logger_ptr->verbose();
-        logger_ptr->set_verbose(false);
-#endif
-
         DEBUG_CODE_MASK((*logger_ptr) << "vertices = " << mesh.number_of_vertices() << std::endl;);
 
         for (vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
@@ -280,10 +268,6 @@ namespace mcut
             DEBUG_CODE_MASK((*logger_ptr).unindent(););
             DEBUG_CODE_MASK((*logger_ptr).unindent(););
         }
-
-#if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-       // DEBUG_CODE_MASK((*logger_ptr).set_verbose(verb););
-#endif
 
         write_off(name.c_str(), mesh);
     }

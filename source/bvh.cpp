@@ -242,7 +242,7 @@ namespace mcut
 
             // TODO make this parallel
             // for each face in mesh
-            for (mcut::mesh_t::face_iterator_t f = mesh->faces_begin(); f != mesh->faces_end(); ++f)
+            for (mcut::face_array_iterator_t f = mesh->faces_begin(); f != mesh->faces_end(); ++f)
             {
                 const int i = static_cast<int>(*f);
                 primitives[i] = *f;
