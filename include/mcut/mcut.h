@@ -229,8 +229,8 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 16), /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces. The input connected component (source-mesh or cut-mesh) that is referred to must be one stored internally by MCUT (i.e. a connected component queried from the API via ::McInputOrigin), to ensure consistency with any modification done internally by MCUT. */
     // incidence and adjacency information
     MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE = (1 << 17), /**< List of adjacent faces (their indices) per face.*/
-    MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18) /**< List of adjacent-face-list sizes (number of adjacent faces per face).*/
-
+    MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18), /**< List of adjacent-face-list sizes (number of adjacent faces per face).*/
+    MC_CONNECTED_COMPONENT_DATA_TRIANGULATION = (1 << 19) /**< TODO: add documentation*/
 } McConnectedComponentData;
 
 /**

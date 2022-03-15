@@ -48,6 +48,7 @@
 
 #include "mcut/internal/bvh.h"
 #include "mcut/internal/geom.h"
+#include "mcut/internal/triangulate.h"
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
@@ -175,6 +176,7 @@ struct IndexArrayMesh
     std::unique_ptr<uint32_t[]> pEdges;
     std::unique_ptr<uint32_t[]> pFaceAdjFaces;
     std::unique_ptr<uint32_t[]> pFaceAdjFacesSizes;
+    std::unique_ptr<uint32_t[]> pTriangleIndices; // same as "pFaceIndices" but guaranteed to be only triangles
 
     uint32_t numVertices = 0;
     uint32_t numSeamVertexIndices = 0;
@@ -182,6 +184,8 @@ struct IndexArrayMesh
     uint32_t numFaceIndices = 0;
     uint32_t numEdgeIndices = 0;
     uint32_t numFaceAdjFaceIndices = 0;
+    uint32_t numFaceAdjFaceIndices = 0;
+    uint32_t numTriangleIndices = 0;
 };
 
 struct McConnCompBase
@@ -644,6 +648,8 @@ McResult indexArrayMeshToHalfedgeMesh(
             result = McResult::MC_INVALID_VALUE;
             if (result != McResult::MC_NO_ERROR)
             {
+                // Hint: this can happen when the mesh does not have a consistent 
+                // winding order i.e. some faces are CCW and others are CW
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
 
                 return result;
@@ -2277,6 +2283,68 @@ std::vector<vd_t> insert_bounding_box_mesh(mesh_t &bvh_mesh, const geom::boundin
 }
 #endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
+bool is_coplanar(const mcut::mesh_t &m, const mcut::fd_t &f, int &fv_count)
+{
+    const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
+    fv_count = (int)vertices.size();
+    if (fv_count > 3) //non-triangle
+    {
+        for (int i = 0; i < (fv_count - 3); ++i)
+        {
+            const int j = (i + 1) % fv_count;
+            const int k = (i + 2) % fv_count;
+            const int l = (i + 3) % fv_count;
+
+            const mcut::vd_t &vi = vertices[i];
+            const mcut::vd_t &vj = vertices[j];
+            const mcut::vd_t &vk = vertices[k];
+            const mcut::vd_t &vl = vertices[l];
+
+            const mcut::math::vec3 &vi_coords = m.vertex(vi);
+            const mcut::math::vec3 &vj_coords = m.vertex(vj);
+            const mcut::math::vec3 &vk_coords = m.vertex(vk);
+            const mcut::math::vec3 &vl_coords = m.vertex(vl);
+
+            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, vl_coords);
+
+            if (!are_coplaner)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count)
+{
+    const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
+    fv_count = (int)vertices.size();
+    {
+        for (int i = 0; i < fv_count; ++i)
+        {
+            const int j = (i + 1) % fv_count;
+            const int k = (i + 2) % fv_count;
+
+            const mcut::vd_t &vi = vertices[i];
+            const mcut::vd_t &vj = vertices[j];
+            const mcut::vd_t &vk = vertices[k];
+
+            const mcut::math::vec3 &vi_coords = m.vertex(vi);
+            const mcut::math::vec3 &vj_coords = m.vertex(vj);
+            const mcut::math::vec3 &vk_coords = m.vertex(vk);
+
+            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, p);
+
+            if (!are_coplaner)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, const mcut::mesh_t &m)
 {
 
@@ -2322,6 +2390,28 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
     // check that the vertices of each face are co-planar
     for (mcut::face_array_iterator_t f = m.faces_begin(); f != m.faces_end(); ++f)
     {
+        int fv_count = 0;
+        const bool face_is_coplanar = is_coplanar(m, *f, fv_count);
+        if(!face_is_coplanar)
+        {
+            ctxtPtr->log(
+                        McDebugSource::MC_DEBUG_SOURCE_API,
+                        McDebugType::MC_DEBUG_TYPE_OTHER,
+                        0,
+                        McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
+                        "Vertices (" + std::to_string(fv_count) + ") on face " + std::to_string(*f) + " not coplanar");
+                    // No need to return false, simply warn. It is difficult to 
+                    // know whether the non-coplanarity is severe enough to cause
+                    // confusion when computing intersection points between two
+                    // polygons (min=2 but sometimes can get 1 due to non-coplanarity 
+                    // of face vertices).
+                    // In general, the more vertices on a face, the less likely 
+                    // they are to be co-planar. Faces with a low number of polygons
+                    // are ideal (3 vertices being the best)
+                    //result = false;
+                    break;
+        }
+        #if 0
         const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(*f);
         const int nv = (int)vertices.size();
         if (nv > 3) //non-triangle
@@ -2346,25 +2436,11 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
 
                 if (!are_coplaner)
                 {
-                    ctxtPtr->log(
-                        McDebugSource::MC_DEBUG_SOURCE_API,
-                        McDebugType::MC_DEBUG_TYPE_OTHER,
-                        0,
-                        McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
-                        "Vertices (" + std::to_string(nv) + ") on face " + std::to_string(*f) + " not coplanar");
-                    // No need to return false, simply warn. It is difficult to 
-                    // know whether the non-coplanarity is severe enough to cause
-                    // confusion when computing intersection points between two
-                    // polygons (min=2 but sometimes can get 1 due to non-coplanarity 
-                    // of face vertices).
-                    // In general, the more vertices on a face, the less likely 
-                    // they are to be co-planar. Faces with a low number of polygons
-                    // are ideal (3 vertices being the best)
-                    //result = false;
-                    break;
+                    
                 }
             }
         }
+        #endif
     }
 
     return result ? MC_NO_ERROR : MC_INVALID_VALUE;
@@ -3287,7 +3363,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     // infer 3D intersection point along edge using "origFaceEdge0IntPointEqnParam"
                     const mcut::math::vec3 origFaceEdge0Vec = (origFaceEdge0HalfedgeTgt - origFaceEdge0HalfedgeSrc);
                     const mcut::math::vec3 origFaceEdge0IntPoint3d = origFaceEdge0HalfedgeSrc + (origFaceEdge0Vec * origFaceEdge0IntPointEqnParam);
-
+                    // TODO: ensure that "origFaceEdge0IntPoint3d" lies on the plane of "origFace", this is a source of many problems"""
                     const mcut::hd_t origFaceEdge0HalfedgeOpp = fpOriginInputMesh->opposite(origFaceEdge0Halfedge);
                     const mcut::fd_t origFaceEdge0HalfedgeOppFace = fpOriginInputMesh->face(origFaceEdge0HalfedgeOpp);
 
@@ -3326,6 +3402,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     const mcut::hd_t origFaceEdge1HalfedgeOpp = fpOriginInputMesh->opposite(origFaceEdge1Halfedge);
                     const mcut::fd_t origFaceEdge1HalfedgeOppFace = fpOriginInputMesh->face(origFaceEdge1HalfedgeOpp);
+
 
                     if (origFaceEdge1HalfedgeOppFace != mcut::mesh_t::null_face())
                     { // exists
@@ -4751,6 +4828,65 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                 return result;
             }
             memcpy(pMem, reinterpret_cast<void *>(ccData->indexArrayMesh.pFaceMapIndices.get()), bytes);
+        }
+    }
+    break;
+    case MC_CONNECTED_COMPONENT_DATA_TRIANGULATION:
+    {
+        if (pMem == nullptr) // client pointer is null (asking for size)
+        {
+            uint32_t numOutputTriangles = 0;
+
+            // TODO: compute triangulation here and 'cache' result
+            {
+                uint32_t faceOffset = 0;
+
+                // for each face
+                for (uint32_t f =0; f < ccData->indexArrayMesh.numFaces; ++f)
+                {
+                    const uint32_t faceSize = ccData->indexArrayMesh.pFaceSizes[f];
+                    std::vector<uint32_t> faceVertexIndices(faceSize);
+                    std::vector<mcut::math::vec3> faceVertexCoords3d(faceSize);
+
+                    for(uint32_t v = 0; v < faceSize; ++v)
+                    {
+                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
+                        faceVertexIndices[v] = vertexId;
+                        const mcut::math::real_number_t* const vptr = ccData->indexArrayMesh.pVertices.get() + (vertexId * 3);
+                        faceVertexCoords3d[v] = mcut::math::vec3(vptr[0], vptr[1], vptr[2]);
+                    }
+
+                    //TODO: project vertices to 2D
+                    // convert into format acceptable by earcut
+                    // triangulate 
+                    // remap triangle indices and save
+                    
+                    //mapbox::earcut()
+
+                    faceOffset += faceSize;
+                }
+            }
+
+            ccData->indexArrayMesh.numTriangleIndices = numOutputTriangles * 3;
+            *pNumBytes = ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+        }
+        else
+        {
+            if (bytes > ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t))
+            {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            if (bytes % (sizeof(uint32_t)) != 0 || (bytes / sizeof(uint32_t)) % 3 != 0)
+            {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            memcpy(pMem, reinterpret_cast<void *>(ccData->indexArrayMesh.pTriangleIndices.get()), bytes);
         }
     }
     break;

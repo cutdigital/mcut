@@ -65,7 +65,7 @@ namespace mcut
         {
             // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
             normal = math::vec3(0.0);
-            for (int i = 1; i < polygon_vertex_count - 1; ++i)
+            for (int i = 0; i < polygon_vertex_count - 1; ++i)
             {
                 normal = normal + cross_product(polygon_vertices[i] - polygon_vertices[0], polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0]);
             }
@@ -631,6 +631,7 @@ namespace mcut
 
             //double d = 3.14159265358979;
             std::cout.precision(dbl::max_digits10);
+            std::cout << "value=" <<(double)val << std::endl;
             
             // NOTE: thresholds are chosen based on benchmark meshes that are used for testing.
             // It is extremely difficult to get this right because of intermediate conversions 

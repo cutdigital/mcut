@@ -236,6 +236,9 @@ namespace mcut
     int find_connected_components(std::vector<int> &fccmap, const mesh_t &mesh, std::vector<int> &cc_to_vertex_count,
                                   std::vector<int> &cc_to_face_count);
 
+    // return true if point p lies on the plane of every three vertices of f
+    bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count);
+
 } // namespace mcut
 
 #endif // #ifndef MCUT_KERNEL_H
