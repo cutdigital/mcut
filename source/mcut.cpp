@@ -4833,41 +4833,116 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     break;
     case MC_CONNECTED_COMPONENT_DATA_TRIANGULATION:
     {
-        if (pMem == nullptr) // client pointer is null (asking for size)
+        if(ccData->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not available
         {
-            uint32_t numOutputTriangles = 0;
+            uint32_t faceOffset = 0;
+            std::vector<uint32_t> ccTriangleIndices;
+            ccTriangleIndices.reserve(ccData->indexArrayMesh.numFaces);
 
-            // TODO: compute triangulation here and 'cache' result
+            // for each face (TODO: make parallel)
+            for (uint32_t f =0; f < ccData->indexArrayMesh.numFaces; ++f)
             {
-                uint32_t faceOffset = 0;
-
-                // for each face
-                for (uint32_t f =0; f < ccData->indexArrayMesh.numFaces; ++f)
+                const uint32_t faceSize = ccData->indexArrayMesh.pFaceSizes[f];
+                if (faceSize == 3)
                 {
-                    const uint32_t faceSize = ccData->indexArrayMesh.pFaceSizes[f];
+                    for(uint32_t v = 0; v < faceSize; ++v)
+                    {
+                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
+                        ccTriangleIndices.push_back(vertexId);
+                    }
+                }
+                else{
+                    // get face vertices (their coordinates) and compute local to global vertex index mapping
                     std::vector<uint32_t> faceVertexIndices(faceSize);
                     std::vector<mcut::math::vec3> faceVertexCoords3d(faceSize);
-
+                    std::unordered_map<uint32_t, uint32_t> faceLocalToGlobleVertexMap;
+                    
                     for(uint32_t v = 0; v < faceSize; ++v)
                     {
                         const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
                         faceVertexIndices[v] = vertexId;
                         const mcut::math::real_number_t* const vptr = ccData->indexArrayMesh.pVertices.get() + (vertexId * 3);
                         faceVertexCoords3d[v] = mcut::math::vec3(vptr[0], vptr[1], vptr[2]);
+                        faceLocalToGlobleVertexMap[v] = vertexId;
                     }
 
-                    //TODO: project vertices to 2D
-                    // convert into format acceptable by earcut
-                    // triangulate 
-                    // remap triangle indices and save
-                    
-                    //mapbox::earcut()
+                    // project vertices to 2D
+                    std::vector<mcut::math::vec2> faceVertexCoords2d;
+                    {
+                        mcut::math::vec3 faceNormal;
+                        mcut::math::real_number_t param_d;
+                        int largestNormalComp = mcut::geom::compute_polygon_plane_coefficients(
+                            faceNormal,
+                            param_d,
+                            faceVertexCoords3d.data(),
+                            (int)faceVertexCoords3d.size());
+                
+                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, largestNormalComp);
+                    }
 
-                    faceOffset += faceSize;
-                }
+                    // convert 2d vertices into format acceptable by earcut
+                    std::vector<std::pair<double, double>> faceVertexCoords2d_ec(faceVertexCoords2d.size());
+                    {
+                        for(int i = 0; i < (int)faceVertexCoords2d.size(); ++i)
+                        {
+                            const mcut::math::vec2& v = faceVertexCoords2d[i];
+                            faceVertexCoords2d_ec[i].first = static_cast<double>(v[0]);
+                            faceVertexCoords2d_ec[i].second = static_cast<double>(v[1]);
+                        }
+                    }
+
+                    // triangulate face
+                    std::vector<uint32_t> faceTriangleIndices = mapbox::earcut(faceVertexCoords2d_ec);
+
+                    if(faceTriangleIndices.empty())
+                    {
+                        ctxtPtr->log(
+                            McDebugSource::MC_DEBUG_SOURCE_KERNEL, 
+                            McDebugType::MC_DEBUG_TYPE_OTHER, 0, 
+                            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
+                    }
+
+                    // Output triangles are clockwise, so we reverse the list
+                    std::reverse(faceTriangleIndices.begin(), faceTriangleIndices.end());
+                    ccTriangleIndices.insert(ccTriangleIndices.end(), faceTriangleIndices.begin(), faceTriangleIndices.end());
+                    // used to check that all indices where used in the triangulation. if not, then there will be a hole
+                    std::vector<bool> usedVertexIndicators(faceLocalToGlobleVertexMap.size(), false); 
+                    // remap local triangle indices to global values and save
+                    for(int i =0; i < (int)faceTriangleIndices.size(); ++i)
+                    {
+                        const uint32_t triangleLocalVertexIndex = faceTriangleIndices[i]; // id local within the current face that we are triangulating
+                        const uint32_t triangleGlobalVertexIndex = faceLocalToGlobleVertexMap.at(triangleLocalVertexIndex);
+                        faceTriangleIndices[i] = triangleGlobalVertexIndex; // id in the mesh
+                        usedVertexIndicators[triangleLocalVertexIndex] = true;
+                    }
+
+                    for(int i =0; i < (int)usedVertexIndicators.size(); ++i)
+                    {
+                        if(usedVertexIndicators[i]==false)
+                        {
+                            ctxtPtr->log(
+                            McDebugSource::MC_DEBUG_SOURCE_KERNEL, 
+                            McDebugType::MC_DEBUG_TYPE_OTHER, 0, 
+                            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Found unused vertex on face " + std::to_string(f) + " for triangulation");
+                            break;
+                        }
+                    }
+
+                } //  if (faceSize == 3)
+
+                faceOffset += faceSize;
             }
 
-            ccData->indexArrayMesh.numTriangleIndices = numOutputTriangles * 3;
+            MCUT_ASSERT(ccTriangleIndices.size() >= 3);
+
+            ccData->indexArrayMesh.numTriangleIndices = (uint32_t)ccTriangleIndices.size();
+            ccData->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[ccTriangleIndices.size()]);
+
+            memcpy(reinterpret_cast<void *>(ccData->indexArrayMesh.pTriangleIndices.get()), ccTriangleIndices.data(), ccTriangleIndices.size() * sizeof(uint32_t));
+        }
+
+        if (pMem == nullptr) // client pointer is null (asking for size)
+        {
             *pNumBytes = ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
         }
         else
