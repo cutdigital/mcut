@@ -184,7 +184,6 @@ struct IndexArrayMesh
     uint32_t numFaceIndices = 0;
     uint32_t numEdgeIndices = 0;
     uint32_t numFaceAdjFaceIndices = 0;
-    uint32_t numFaceAdjFaceIndices = 0;
     uint32_t numTriangleIndices = 0;
 };
 
@@ -2839,7 +2838,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     std::vector<mcut::math::vec2> fpVertexCoords2D;
 
-                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.projection_component);
+                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.polygon_normal);
 
                     // face to be (potentially) partitioned
                     mcut::fd_t origin_face = fpOriginFace;
@@ -2911,7 +2910,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             // project face coords to 2D
                             std::vector<mcut::math::vec2> faceVertexCoords2D;
 
-                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.projection_component);
+                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.polygon_normal);
 
                             const int numFaceEdges = (int)faceVertexDescriptors.size(); // num edges == num verts
                             const int numFaceVertices = numFaceEdges;
@@ -3021,7 +3020,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         originFaceVertices3d.push_back(fpOriginInputMesh->vertex(src));
                     }
 
-                    MCUT_ASSERT(fpi.projection_component != -1); // should be defined when we identify the floating polygon in the kernel
+                    //MCUT_ASSERT(fpi.projection_component != -1); // should be defined when we identify the floating polygon in the kernel
 
                     // project the "origin_face" to 2D
                     // Since the geometry operations we are concerned about are inherently in 2d, here we project
@@ -3031,7 +3030,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     //
 
                     std::vector<mcut::math::vec2> originFaceVertexCoords2D;
-                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.projection_component);
+                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.polygon_normal);
 
                     // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
                     // 1. pick two edges in the floating polygon
@@ -4616,7 +4615,6 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     break;
     case MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION:
     {
-
         if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT && ccData->type != MC_CONNECTED_COMPONENT_TYPE_PATCH)
         {
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "connected component must be a patch or a fragment");
@@ -4833,7 +4831,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     break;
     case MC_CONNECTED_COMPONENT_DATA_TRIANGULATION:
     {
-        if(ccData->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not available
+        if(ccData->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not yet available
         {
             uint32_t faceOffset = 0;
             std::vector<uint32_t> ccTriangleIndices;
@@ -4852,7 +4850,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                     }
                 }
                 else{
-                    // get face vertices (their coordinates) and compute local to global vertex index mapping
+                    // get face vertices (their coordinates) and compute 
+                    // local (face) to global (cc) vertex index mapping
+                    // --------------------------------------------------
                     std::vector<uint32_t> faceVertexIndices(faceSize);
                     std::vector<mcut::math::vec3> faceVertexCoords3d(faceSize);
                     std::unordered_map<uint32_t, uint32_t> faceLocalToGlobleVertexMap;
@@ -4867,32 +4867,35 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                     }
 
                     // project vertices to 2D
+                    // ----------------------
                     std::vector<mcut::math::vec2> faceVertexCoords2d;
                     {
                         mcut::math::vec3 faceNormal;
                         mcut::math::real_number_t param_d;
-                        int largestNormalComp = mcut::geom::compute_polygon_plane_coefficients(
+                        /*int largestNormalComp = */mcut::geom::compute_polygon_plane_coefficients(
                             faceNormal,
                             param_d,
                             faceVertexCoords3d.data(),
                             (int)faceVertexCoords3d.size());
                 
-                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, largestNormalComp);
+                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal);
                     }
 
+                    std::vector<std::vector<std::array<double, 2>>> polygon(1);
+                    std::vector<std::array<double, 2>> &faceVertexCoords2d_ec = polygon.back();
                     // convert 2d vertices into format acceptable by earcut
-                    std::vector<std::pair<double, double>> faceVertexCoords2d_ec(faceVertexCoords2d.size());
+                    faceVertexCoords2d_ec.resize(faceVertexCoords2d.size());
                     {
                         for(int i = 0; i < (int)faceVertexCoords2d.size(); ++i)
                         {
                             const mcut::math::vec2& v = faceVertexCoords2d[i];
-                            faceVertexCoords2d_ec[i].first = static_cast<double>(v[0]);
-                            faceVertexCoords2d_ec[i].second = static_cast<double>(v[1]);
+                            faceVertexCoords2d_ec[i][0] = static_cast<double>(v[0]);
+                            faceVertexCoords2d_ec[i][1] = static_cast<double>(v[1]);
                         }
                     }
 
                     // triangulate face
-                    std::vector<uint32_t> faceTriangleIndices = mapbox::earcut(faceVertexCoords2d_ec);
+                    std::vector<uint32_t> faceTriangleIndices = mapbox::earcut(polygon);
 
                     if(faceTriangleIndices.empty())
                     {

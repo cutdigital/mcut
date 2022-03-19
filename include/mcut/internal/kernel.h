@@ -107,11 +107,8 @@ namespace mcut
 
     struct floating_polygon_info_t
     {
-        // the input mesh (source-mesh or cut-mesh) containing the face on which the floating polygon was discovered.
-        // This is a pointer to input_t::src_mesh or input_t::cut_mesh
-        // const mesh_t* origin_mesh = nullptr;
-        // largest component of the normal of the origin_face
-        int projection_component = -1;
+        // normal of polygon
+        math::vec3 polygon_normal;
         // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
         std::vector<math::vec3> polygon_vertices;
     };

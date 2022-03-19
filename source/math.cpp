@@ -77,16 +77,7 @@ namespace math {
         return os << static_cast<double>(v.x()) << ", " << static_cast<double>(v.y()) << ", " << static_cast<double>(v.z());
     }
 
-    std::ostream& operator<<(std::ostream& os, const matrix_t& m)
-    {
-        for (int i = 0; i < m.rows(); i++) {
-            for (int j = 0; j < m.cols(); j++) {
-                os << m(i, j) << ", ";
-            }
-            os << "\n";
-        }
-        return os;
-    }
+    
 
     bool operator==(const vec3& a, const vec3& b)
     {
