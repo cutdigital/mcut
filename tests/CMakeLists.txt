@@ -36,13 +36,19 @@ enable_testing()
 # 
 # Download and unpack utest at configure time
 #
-download_project(PROJ                utest
-                 GIT_REPOSITORY      https://github.com/sheredom/utest.h.git
-                 GIT_TAG             master
-                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+#download_project(PROJ                utest
+#                 GIT_REPOSITORY      https://github.com/sheredom/utest.h.git
+#                 GIT_TAG             master
+#                 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+#)
+FetchContent_Populate(
+    utest
+    GIT_REPOSITORY 			https://github.com/sheredom/utest.h.git
+    GIT_TAG       	master
+    GIT_PROGRESS TRUE
 )
 
-set(utest_include_dir ${CMAKE_BINARY_DIR}/utest-src)
+set(utest_include_dir ${utest_SOURCE_DIR})
 
 add_executable(
     mcut_tests 
