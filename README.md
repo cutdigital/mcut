@@ -1,6 +1,6 @@
-# MCUT
+# MCUT 
 
-_Simple fast library for mesh cutting and CSG (boolean) operations._
+_Simple and fast C++ library for mesh cutting and CSG (boolean) operations._ :star: :star: :star: :star: :star:
 
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
 [![MacOS](https://github.com/cutdigital/mcut/actions/workflows/macos.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/macos.yml) [![Linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
@@ -13,7 +13,13 @@ _Simple fast library for mesh cutting and CSG (boolean) operations._
 * `cmake ..` (see `CMakeLists.txt` for available build configuration options) 
 * run `make -j4` *IF* you are on Linux/MacOS terminal, *ELSE* open the generated `.sln` with e.g. Visual Studio
 
+Next, try out one of the tutorials! :wink:
+
+_For more information about this library, you can refer to the project page [here](https://cutdigital.github.io/mcut.site/) or send an email to the author_.
+
 ## Examples
+
+The following depictions show what MCUT can do for you. Images were rendered using Blender.
 
 ### General cutting
 
