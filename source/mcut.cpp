@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
+#include <array>
 #if defined(MCUT_BUILD_WINDOWS)
 #pragma warning(disable : 26812)
 #endif
@@ -4889,8 +4890,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                         for(int i = 0; i < (int)faceVertexCoords2d.size(); ++i)
                         {
                             const mcut::math::vec2& v = faceVertexCoords2d[i];
-                            faceVertexCoords2d_ec[i][0] = static_cast<double>(v[0]);
-                            faceVertexCoords2d_ec[i][1] = static_cast<double>(v[1]);
+                            std::array<double, 2> &a = faceVertexCoords2d_ec[i];
+                            a[0] = static_cast<double>(v[0]);
+                            a[1] = static_cast<double>(v[1]);
                         }
                     }
 
