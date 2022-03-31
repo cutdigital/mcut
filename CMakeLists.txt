@@ -1,8 +1,9 @@
-# Copyright (c) 2020-2021 CutDigital Ltd.
+#
+# Copyright (c) 2021-2022 Floyd M. Chitalu.
 # All rights reserved.
 # 
 # NOTE: This file is licensed under GPL-3.0-or-later (default). 
-# A commercial license can be purchased from CutDigital Ltd. 
+# A commercial license can be purchased from Floyd M. Chitalu. 
 #  
 # License details:
 # 
@@ -10,7 +11,7 @@
 #      recieved with this file.
 # 	    - see also: <http://www.gnu.org/licenses/>
 # (B)  Commercial license.
-#      - email: contact@cut-digital.com
+#      - email: floyd.m.chitalu@gmail.com
 # 
 # The commercial license options is for users that wish to use MCUT in 
 # their products for comercial purposes but do not wish to release their 
@@ -254,33 +255,66 @@ message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
 # We enable the code that is used to download those projects here:
 #
 if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
-	include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadProject.cmake)
+	#include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadProject.cmake)
 
-	if (CMAKE_VERSION VERSION_LESS 3.2)
-		set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
-	else()
-		set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
+	#if (CMAKE_VERSION VERSION_LESS 3.2)
+	#	set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
+	#else()
+	#	set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
+	#endif()
+
+	# FetchContent added in CMake 3.11, downloads during the configure step
+	include(FetchContent)
+	# FetchContent_MakeAvailable was not added until CMake 3.14; use our shim
+	if(${CMAKE_VERSION} VERSION_LESS 3.14)
+		include(cmake/add_FetchContent_MakeAvailable.cmake)
 	endif()
 
-	# used by tests & tutorials
-	download_project(PROJ                libigl
-					 GIT_REPOSITORY      https://github.com/libigl/libigl.git
-					 GIT_TAG             v2.3.0
-					 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+	FetchContent_Populate(
+		libigl
+		GIT_REPOSITORY 			https://github.com/libigl/libigl.git
+		GIT_TAG       	v2.3.0
+		GIT_PROGRESS TRUE
 	)
 
-	set(libigl_include_dir ${CMAKE_BINARY_DIR}/libigl-src/include)
+	# used by tests & tutorials
+	#download_project(PROJ                libigl
+	#				 GIT_REPOSITORY      https://github.com/libigl/libigl.git
+	#				 GIT_TAG             v2.3.0
+	#				 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+	#)
+
+	#set(libigl_include_dir ${CMAKE_BINARY_DIR}/libigl-src/include)
+	set(libigl_include_dir ${libigl_SOURCE_DIR}/include)
 
 	set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Default version of Eigen used by libigl.")
 
 	# used by tests & tutorials
-	download_project(PROJ                eigen
-					 GIT_REPOSITORY      https://gitlab.com/libeigen/eigen.git
-					 GIT_TAG             ${LIBIGL_EIGEN_VERSION}
-					 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+	#download_project(PROJ                eigen
+	#				 GIT_REPOSITORY      https://gitlab.com/libeigen/eigen.git
+	#				 GIT_TAG             ${LIBIGL_EIGEN_VERSION}
+	#				 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+	#)
+	FetchContent_Declare(
+		eigen
+		GIT_REPOSITORY 			https://gitlab.com/libeigen/eigen.git
+		GIT_TAG       	${LIBIGL_EIGEN_VERSION}
+		GIT_SHALLOW TRUE
+  		GIT_PROGRESS TRUE
 	)
 
-	set(eigen_include_dir ${CMAKE_BINARY_DIR}/eigen-src)
+	set(EIGEN_BUILD_DOC OFF)
+	# note: To disable eigen tests,
+	# you should put this code in a add_subdirectory to avoid to change
+	# BUILD_TESTING for your own project too since variables are directory
+	# scoped
+	set(BUILD_TESTING OFF)
+	set(EIGEN_BUILD_PKGCONFIG OFF)
+	set( OFF)
+	FetchContent_MakeAvailable(eigen)
+
+	#set(eigen_include_dir ${CMAKE_BINARY_DIR}/eigen-src)
+	set(eigen_include_dir ${eigen_SOURCE_DIR})
 endif()
 
 #

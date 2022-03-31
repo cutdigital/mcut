@@ -1,9 +1,9 @@
 /**
- * Copyright (c) 2020-2021 CutDigital Ltd.
+ * Copyright (c) 2021-2022 Floyd M. Chitalu.
  * All rights reserved.
  * 
  * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from CutDigital Ltd. 
+ * A commercial license can be purchased from Floyd M. Chitalu. 
  *  
  * License details:
  * 
@@ -11,7 +11,7 @@
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
  * (B)  Commercial license.
- *      - email: contact@cut-digital.com
+ *      - email: floyd.m.chitalu@gmail.com
  * 
  * The commercial license options is for users that wish to use MCUT in 
  * their products for comercial purposes but do not wish to release their 
@@ -75,17 +75,6 @@ namespace math {
     std::ostream& operator<<(std::ostream& os, const vec3& v)
     {
         return os << static_cast<double>(v.x()) << ", " << static_cast<double>(v.y()) << ", " << static_cast<double>(v.z());
-    }
-
-    std::ostream& operator<<(std::ostream& os, const matrix_t& m)
-    {
-        for (int i = 0; i < m.rows(); i++) {
-            for (int j = 0; j < m.cols(); j++) {
-                os << m(i, j) << ", ";
-            }
-            os << "\n";
-        }
-        return os;
     }
 
     bool operator==(const vec3& a, const vec3& b)

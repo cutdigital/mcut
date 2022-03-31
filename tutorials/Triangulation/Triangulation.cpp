@@ -21,7 +21,7 @@
  */
 
 /*
-Simple "hello world" program using MCUT.
+Simple "Triangulation" program using MCUT.
 Input meshes are defined in-source but output meshes are saved as .off files
 */
 
@@ -193,46 +193,27 @@ int main()
         // -------------------
 
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
 
         if (err != MC_NO_ERROR)
         {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
+            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION) failed (err=%d)\n", (int)err);
             exit(1);
         }
 
-        std::vector<uint32_t> faceIndices;
-        faceIndices.resize(numBytes / sizeof(uint32_t));
+        std::vector<uint32_t> triangulationIndices;
+        triangulationIndices.resize(numBytes / sizeof(uint32_t));
 
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, faceIndices.data(), NULL);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, numBytes, triangulationIndices.data(), NULL);
 
         if (err != MC_NO_ERROR)
         {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) failed (err=%d)\n", (int)err);
+            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION) failed (err=%d)\n", (int)err);
             exit(1);
         }
 
-        // query the face sizes
-        // ------------------------
-        numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
-        if (err != MC_NO_ERROR)
-        {
-            fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
-        std::vector<uint32_t> faceSizes;
-        faceSizes.resize(numBytes / sizeof(uint32_t));
-
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
-
-        if (err != MC_NO_ERROR)
-        {
-            fprintf(stderr, "2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) failed (err=%d)\n", (int)err);
-            exit(1);
-        }
-
+        std::vector<uint32_t> faceSizes(triangulationIndices.size()/3, 3);
+        
         char fnameBuf[32];
         sprintf(fnameBuf, "conncomp%d.off", i);
 
@@ -240,7 +221,7 @@ int main()
         // ------------------------
         writeOFF(fnameBuf,
                  (float *)vertices.data(),
-                 (uint32_t *)faceIndices.data(),
+                 (uint32_t *)triangulationIndices.data(),
                  (uint32_t *)faceSizes.data(),
                  (uint32_t)vertices.size() / 3,
                  (uint32_t)faceSizes.size());

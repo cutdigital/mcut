@@ -1,9 +1,9 @@
 /**
- * Copyright (c) 2020-2021 CutDigital Ltd.
+ * Copyright (c) 2021-2022 Floyd M. Chitalu.
  * All rights reserved.
  * 
  * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from CutDigital Ltd. 
+ * A commercial license can be purchased from Floyd M. Chitalu. 
  *  
  * License details:
  * 
@@ -11,7 +11,7 @@
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
  * (B)  Commercial license.
- *      - email: contact@cut-digital.com
+ *      - email: floyd.m.chitalu@gmail.com
  * 
  * The commercial license options is for users that wish to use MCUT in 
  * their products for comercial purposes but do not wish to release their 
@@ -107,11 +107,9 @@ namespace mcut
 
     struct floating_polygon_info_t
     {
-        // the input mesh (source-mesh or cut-mesh) containing the face on which the floating polygon was discovered.
-        // This is a pointer to input_t::src_mesh or input_t::cut_mesh
-        // const mesh_t* origin_mesh = nullptr;
-        // largest component of the normal of the origin_face
-        int projection_component = -1;
+        // normal of polygon
+        math::vec3 polygon_normal;
+        int polygon_normal_largest_component;
         // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
         std::vector<math::vec3> polygon_vertices;
     };
@@ -235,6 +233,9 @@ namespace mcut
 
     int find_connected_components(std::vector<int> &fccmap, const mesh_t &mesh, std::vector<int> &cc_to_vertex_count,
                                   std::vector<int> &cc_to_face_count);
+
+    // return true if point p lies on the plane of every three vertices of f
+    bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count);
 
 } // namespace mcut
 

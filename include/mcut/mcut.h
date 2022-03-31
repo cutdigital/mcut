@@ -1,24 +1,23 @@
-
 /**
- * Copyright (c) 2020-2021 CutDigital Ltd.
+ * Copyright (c) 2021-2022 Floyd M. Chitalu.
  * All rights reserved.
  * 
  * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from CutDigital Ltd. 
+ * A commercial license can be purchased from Floyd M. Chitalu. 
  *  
  * License details:
  * 
  * (A)  GNU General Public License ("GPL"); a copy of which you should have 
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
- * 
  * (B)  Commercial license.
- *      - email: contact@cut-digital.com
+ *      - email: floyd.m.chitalu@gmail.com
  * 
- * The commercial license option is for users that wish to use MCUT in 
+ * The commercial license options is for users that wish to use MCUT in 
  * their products for comercial purposes but do not wish to release their 
  * software products under the GPL license. 
  * 
+ * Author(s)     : Floyd M. Chitalu
  */
 
 /**
@@ -230,8 +229,9 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 16), /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces. The input connected component (source-mesh or cut-mesh) that is referred to must be one stored internally by MCUT (i.e. a connected component queried from the API via ::McInputOrigin), to ensure consistency with any modification done internally by MCUT. */
     // incidence and adjacency information
     MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE = (1 << 17), /**< List of adjacent faces (their indices) per face.*/
-    MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18) /**< List of adjacent-face-list sizes (number of adjacent faces per face).*/
-
+    MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18), /**< List of adjacent-face-list sizes (number of adjacent faces per face).*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION = (1 << 19) /**< List of 3*N triangulated face indices, where N is the number of triangles. */
+    
 } McConnectedComponentData;
 
 /**

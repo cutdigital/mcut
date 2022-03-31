@@ -1,9 +1,9 @@
 /**
- * Copyright (c) 2020-2021 CutDigital Ltd.
+ * Copyright (c) 2021-2022 Floyd M. Chitalu.
  * All rights reserved.
  * 
  * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from CutDigital Ltd. 
+ * A commercial license can be purchased from Floyd M. Chitalu. 
  *  
  * License details:
  * 
@@ -11,7 +11,7 @@
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
  * (B)  Commercial license.
- *      - email: contact@cut-digital.com
+ *      - email: floyd.m.chitalu@gmail.com
  * 
  * The commercial license options is for users that wish to use MCUT in 
  * their products for comercial purposes but do not wish to release their 
@@ -42,12 +42,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
+#include <array>
 #if defined(MCUT_BUILD_WINDOWS)
 #pragma warning(disable : 26812)
 #endif
 
 #include "mcut/internal/bvh.h"
 #include "mcut/internal/geom.h"
+#include "mcut/internal/tri/tri.h"
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
@@ -175,6 +177,7 @@ struct IndexArrayMesh
     std::unique_ptr<uint32_t[]> pEdges;
     std::unique_ptr<uint32_t[]> pFaceAdjFaces;
     std::unique_ptr<uint32_t[]> pFaceAdjFacesSizes;
+    std::unique_ptr<uint32_t[]> pTriangleIndices; // same as "pFaceIndices" but guaranteed to be only triangles
 
     uint32_t numVertices = 0;
     uint32_t numSeamVertexIndices = 0;
@@ -182,6 +185,7 @@ struct IndexArrayMesh
     uint32_t numFaceIndices = 0;
     uint32_t numEdgeIndices = 0;
     uint32_t numFaceAdjFaceIndices = 0;
+    uint32_t numTriangleIndices = 0;
 };
 
 struct McConnCompBase
@@ -579,7 +583,6 @@ McResult indexArrayMeshToHalfedgeMesh(
     int faceSizeOffset = 0;
     for (uint32_t i = 0; i < numFaces; ++i)
     {
-
         std::vector<mcut::vd_t> faceVertices;
         int numFaceVertices = 3; // triangle
 
@@ -645,6 +648,8 @@ McResult indexArrayMeshToHalfedgeMesh(
             result = McResult::MC_INVALID_VALUE;
             if (result != McResult::MC_NO_ERROR)
             {
+                // Hint: this can happen when the mesh does not have a consistent 
+                // winding order i.e. some faces are CCW and others are CW
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
 
                 return result;
@@ -2278,6 +2283,68 @@ std::vector<vd_t> insert_bounding_box_mesh(mesh_t &bvh_mesh, const geom::boundin
 }
 #endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
+bool is_coplanar(const mcut::mesh_t &m, const mcut::fd_t &f, int &fv_count)
+{
+    const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
+    fv_count = (int)vertices.size();
+    if (fv_count > 3) //non-triangle
+    {
+        for (int i = 0; i < (fv_count - 3); ++i)
+        {
+            const int j = (i + 1) % fv_count;
+            const int k = (i + 2) % fv_count;
+            const int l = (i + 3) % fv_count;
+
+            const mcut::vd_t &vi = vertices[i];
+            const mcut::vd_t &vj = vertices[j];
+            const mcut::vd_t &vk = vertices[k];
+            const mcut::vd_t &vl = vertices[l];
+
+            const mcut::math::vec3 &vi_coords = m.vertex(vi);
+            const mcut::math::vec3 &vj_coords = m.vertex(vj);
+            const mcut::math::vec3 &vk_coords = m.vertex(vk);
+            const mcut::math::vec3 &vl_coords = m.vertex(vl);
+
+            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, vl_coords);
+
+            if (!are_coplaner)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count)
+{
+    const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
+    fv_count = (int)vertices.size();
+    {
+        for (int i = 0; i < fv_count; ++i)
+        {
+            const int j = (i + 1) % fv_count;
+            const int k = (i + 2) % fv_count;
+
+            const mcut::vd_t &vi = vertices[i];
+            const mcut::vd_t &vj = vertices[j];
+            const mcut::vd_t &vk = vertices[k];
+
+            const mcut::math::vec3 &vi_coords = m.vertex(vi);
+            const mcut::math::vec3 &vj_coords = m.vertex(vj);
+            const mcut::math::vec3 &vk_coords = m.vertex(vk);
+
+            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, p);
+
+            if (!are_coplaner)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, const mcut::mesh_t &m)
 {
 
@@ -2323,6 +2390,28 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
     // check that the vertices of each face are co-planar
     for (mcut::face_array_iterator_t f = m.faces_begin(); f != m.faces_end(); ++f)
     {
+        int fv_count = 0;
+        const bool face_is_coplanar = is_coplanar(m, *f, fv_count);
+        if(!face_is_coplanar)
+        {
+            ctxtPtr->log(
+                        McDebugSource::MC_DEBUG_SOURCE_API,
+                        McDebugType::MC_DEBUG_TYPE_OTHER,
+                        0,
+                        McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
+                        "Vertices (" + std::to_string(fv_count) + ") on face " + std::to_string(*f) + " not coplanar");
+                    // No need to return false, simply warn. It is difficult to 
+                    // know whether the non-coplanarity is severe enough to cause
+                    // confusion when computing intersection points between two
+                    // polygons (min=2 but sometimes can get 1 due to non-coplanarity 
+                    // of face vertices).
+                    // In general, the more vertices on a face, the less likely 
+                    // they are to be co-planar. Faces with a low number of polygons
+                    // are ideal (3 vertices being the best)
+                    //result = false;
+                    break;
+        }
+        #if 0
         const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(*f);
         const int nv = (int)vertices.size();
         if (nv > 3) //non-triangle
@@ -2347,17 +2436,11 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
 
                 if (!are_coplaner)
                 {
-                    ctxtPtr->log(
-                        McDebugSource::MC_DEBUG_SOURCE_API,
-                        McDebugType::MC_DEBUG_TYPE_ERROR,
-                        0,
-                        McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-                        "Vertices (" + std::to_string(nv) + ") of face " + std::to_string(*f) + " are not coplanar");
-                    result = false;
-                    break;
+                    
                 }
             }
         }
+        #endif
     }
 
     return result ? MC_NO_ERROR : MC_INVALID_VALUE;
@@ -2393,10 +2476,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
-
-#if defined(MCUT_MULTI_THREADED) && defined(USE_LOCKFREE_WORKQUEUE)
-    mcut::thread_pool::busy_wait_guard bwg(&ctxtPtr->scheduler);
-#endif
 
     if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0)
     {
@@ -2760,7 +2839,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     std::vector<mcut::math::vec2> fpVertexCoords2D;
 
-                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.projection_component);
+                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                     // face to be (potentially) partitioned
                     mcut::fd_t origin_face = fpOriginFace;
@@ -2832,7 +2911,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             // project face coords to 2D
                             std::vector<mcut::math::vec2> faceVertexCoords2D;
 
-                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.projection_component);
+                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                             const int numFaceEdges = (int)faceVertexDescriptors.size(); // num edges == num verts
                             const int numFaceVertices = numFaceEdges;
@@ -2942,7 +3021,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         originFaceVertices3d.push_back(fpOriginInputMesh->vertex(src));
                     }
 
-                    MCUT_ASSERT(fpi.projection_component != -1); // should be defined when we identify the floating polygon in the kernel
+                    //MCUT_ASSERT(fpi.projection_component != -1); // should be defined when we identify the floating polygon in the kernel
 
                     // project the "origin_face" to 2D
                     // Since the geometry operations we are concerned about are inherently in 2d, here we project
@@ -2952,7 +3031,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     //
 
                     std::vector<mcut::math::vec2> originFaceVertexCoords2D;
-                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.projection_component);
+                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                     // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
                     // 1. pick two edges in the floating polygon
@@ -3095,7 +3174,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         bool haveGPOnOriginFace = !anyPointIsOnLine(fpEdge0Midpoint, fpEdge1Midpoint, originFaceVertexCoords2D);
                         bool haveGP = haveGPOnFP && haveGPOnOriginFace;
 
-                        if (haveGP)
+                        if (haveGP /*|| true*/)
                         {
                             haveSegmentOnFP = true;
                             fpSegment.first = fpEdge1Midpoint;
@@ -3284,7 +3363,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     // infer 3D intersection point along edge using "origFaceEdge0IntPointEqnParam"
                     const mcut::math::vec3 origFaceEdge0Vec = (origFaceEdge0HalfedgeTgt - origFaceEdge0HalfedgeSrc);
                     const mcut::math::vec3 origFaceEdge0IntPoint3d = origFaceEdge0HalfedgeSrc + (origFaceEdge0Vec * origFaceEdge0IntPointEqnParam);
-
+                    // TODO: ensure that "origFaceEdge0IntPoint3d" lies on the plane of "origFace", this is a source of many problems"""
                     const mcut::hd_t origFaceEdge0HalfedgeOpp = fpOriginInputMesh->opposite(origFaceEdge0Halfedge);
                     const mcut::fd_t origFaceEdge0HalfedgeOppFace = fpOriginInputMesh->face(origFaceEdge0HalfedgeOpp);
 
@@ -3323,6 +3402,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     const mcut::hd_t origFaceEdge1HalfedgeOpp = fpOriginInputMesh->opposite(origFaceEdge1Halfedge);
                     const mcut::fd_t origFaceEdge1HalfedgeOppFace = fpOriginInputMesh->face(origFaceEdge1HalfedgeOpp);
+
 
                     if (origFaceEdge1HalfedgeOppFace != mcut::mesh_t::null_face())
                     { // exists
@@ -3655,7 +3735,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
 
-        result = check_input_mesh(ctxtPtr, srcMeshInternal);
+        result = check_input_mesh(ctxtPtr, cutMeshInternal);
         if (result != McResult::MC_NO_ERROR)
         {
             return result;
@@ -4536,7 +4616,6 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     break;
     case MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION:
     {
-
         if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT && ccData->type != MC_CONNECTED_COMPONENT_TYPE_PATCH)
         {
             ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "connected component must be a patch or a fragment");
@@ -4748,6 +4827,181 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                 return result;
             }
             memcpy(pMem, reinterpret_cast<void *>(ccData->indexArrayMesh.pFaceMapIndices.get()), bytes);
+        }
+    }
+    break;
+    case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION:
+    {
+        if(ccData->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not yet available
+        {
+            uint32_t faceOffset = 0;
+            std::vector<uint32_t> ccTriangleIndices;
+            ccTriangleIndices.reserve(ccData->indexArrayMesh.numFaces);
+
+            // for each face (TODO: make parallel)
+            for (uint32_t f =0; f < ccData->indexArrayMesh.numFaces; ++f)
+            {
+                const uint32_t faceSize = ccData->indexArrayMesh.pFaceSizes[f];
+                if (faceSize == 3)
+                {
+                    for(uint32_t v = 0; v < faceSize; ++v)
+                    {
+                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
+                        ccTriangleIndices.push_back(vertexId);
+                    }
+                }
+                else{
+                    // get face vertices (their coordinates) and compute 
+                    // local (face) to global (cc) vertex index mapping
+                    // --------------------------------------------------
+                    std::vector<uint32_t> faceVertexIndices(faceSize);
+                    std::vector<mcut::math::vec3> faceVertexCoords3d(faceSize);
+                    std::unordered_map<uint32_t, uint32_t> faceLocalToGlobleVertexMap;
+                    
+                    for(uint32_t v = 0; v < faceSize; ++v)
+                    {
+                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
+                        faceVertexIndices[v] = vertexId;
+                        const mcut::math::real_number_t* const vptr = ccData->indexArrayMesh.pVertices.get() + (vertexId * 3);
+                        faceVertexCoords3d[v] = mcut::math::vec3(vptr[0], vptr[1], vptr[2]);
+                        faceLocalToGlobleVertexMap[v] = vertexId;
+                    }
+
+                    // project vertices to 2D
+                    // ----------------------
+                    std::vector<mcut::math::vec2> faceVertexCoords2d;
+                    {
+                        mcut::math::vec3 faceNormal;
+                        mcut::math::real_number_t param_d;
+                        int largestNormalComp = mcut::geom::compute_polygon_plane_coefficients(
+                            faceNormal,
+                            param_d,
+                            faceVertexCoords3d.data(),
+                            (int)faceVertexCoords3d.size());
+                
+                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
+                    }
+
+                    std::vector<std::vector<std::array<double, 2>>> polygon(1);
+                    std::vector<std::array<double, 2>> &faceVertexCoords2d_ec = polygon.back();
+                    // convert 2d vertices into format acceptable by earcut
+                    faceVertexCoords2d_ec.resize(faceVertexCoords2d.size());
+                    {
+                        for(int i = 0; i < (int)faceVertexCoords2d.size(); ++i)
+                        {
+                            const mcut::math::vec2& v = faceVertexCoords2d[i];
+                            std::array<double, 2> &a = faceVertexCoords2d_ec[i];
+                            a[0] = static_cast<double>(v[0]);
+                            a[1] = static_cast<double>(v[1]);
+                        }
+                    }
+
+                    // triangulate face
+                    std::vector<uint32_t> faceTriangleIndices = mapbox::earcut(polygon);
+
+                    if(faceTriangleIndices.empty())
+                    {
+                        ctxtPtr->log(
+                            McDebugSource::MC_DEBUG_SOURCE_KERNEL, 
+                            McDebugType::MC_DEBUG_TYPE_OTHER, 0, 
+                            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
+                    }
+
+                    // The winding order after triangulation is not consistent. 
+                    // So need to to check whether to reverse "faceTriangleIndices"
+                    // or not. There is a simple rule to know whether to reverse:
+                    // Whether or not an input polygon (to earcut) is CW or CCW, the local 
+                    // indexing of the input points follows 0, 1, 2 ... etc. (because that is how
+                    // they are recieved from the mesh, even if mesh has CCW faces)
+                    // Thus, to check whether we need to reverse the list, we just need to
+                    // check if any index in "faceTriangleIndices" has a larger value the next element,
+                    // where (faceTriangleIndices[i] - faceTriangleIndices[i+1 % N]) == 1
+                    bool is_ccw_triangulation = true;
+                    const int index_count = (int)faceTriangleIndices.size();
+
+                    for(int i =0; i < index_count; ++i)
+                    {
+                        const int cur = faceTriangleIndices[i];
+                        const int nxt = faceTriangleIndices[(i+1)%index_count];
+                        const bool is_consecutive = std::abs(nxt-cur) == 1; // implies along border/edge of triangulatd polygon
+                        if(is_consecutive)
+                        {
+                            const bool is_reversed = cur > nxt;
+                            if(is_reversed)
+                            {
+                                is_ccw_triangulation = false; 
+                                break;
+                            }
+                        }
+                    }  
+
+                    if(!is_ccw_triangulation)
+                    {
+                        // Output triangles are clockwise, so we reverse the list
+                        std::reverse(faceTriangleIndices.begin(), faceTriangleIndices.end());
+                    }
+
+                    // used to check that all indices where used in the triangulation. if not, then there will be a hole
+                    std::vector<bool> usedVertexIndicators(faceLocalToGlobleVertexMap.size(), false); 
+                    // remap local triangle indices to global values and save
+                    for(int i =0; i < (int)faceTriangleIndices.size(); ++i)
+                    {
+                        const uint32_t triangleLocalVertexIndex = faceTriangleIndices[i]; // id local within the current face that we are triangulating
+                        const uint32_t triangleGlobalVertexIndex = faceLocalToGlobleVertexMap.at(triangleLocalVertexIndex);
+                        faceTriangleIndices[i] = triangleGlobalVertexIndex; // id in the mesh
+                        usedVertexIndicators[triangleLocalVertexIndex] = true;
+                    }
+
+                    ccTriangleIndices.insert(ccTriangleIndices.end(), faceTriangleIndices.begin(), faceTriangleIndices.end());
+
+                    for(int i =0; i < (int)usedVertexIndicators.size(); ++i)
+                    {
+                        if(usedVertexIndicators[i]==false)
+                        {
+                            ctxtPtr->log(
+                            McDebugSource::MC_DEBUG_SOURCE_KERNEL, 
+                            McDebugType::MC_DEBUG_TYPE_OTHER, 0, 
+                            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Found unused vertex on face " + std::to_string(f) + " for triangulation");
+                            break;
+                        }
+                    }
+
+                } //  if (faceSize == 3)
+
+                faceOffset += faceSize;
+            }
+
+            MCUT_ASSERT(ccTriangleIndices.size() >= 3);
+
+            ccData->indexArrayMesh.numTriangleIndices = (uint32_t)ccTriangleIndices.size();
+            ccData->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[ccData->indexArrayMesh.numTriangleIndices]);
+
+            memcpy(reinterpret_cast<void *>(ccData->indexArrayMesh.pTriangleIndices.get()), ccTriangleIndices.data(), ccTriangleIndices.size() * sizeof(uint32_t));
+        } // if(ccData->indexArrayMesh.numTriangleIndices == 0)
+
+        if (pMem == nullptr) // client pointer is null (asking for size)
+        {
+            MCUT_ASSERT(ccData->indexArrayMesh.pTriangleIndices.get() != nullptr);
+            *pNumBytes = ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+        }
+        else
+        {
+            MCUT_ASSERT(ccData->indexArrayMesh.numTriangleIndices >= 3);
+            if (bytes > ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t))
+            {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            if (bytes % (sizeof(uint32_t)) != 0 || (bytes / sizeof(uint32_t)) % 3 != 0)
+            {
+                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                result = McResult::MC_INVALID_VALUE;
+                return result;
+            }
+
+            memcpy(pMem, reinterpret_cast<void *>(ccData->indexArrayMesh.pTriangleIndices.get()), bytes);
         }
     }
     break;

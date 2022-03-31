@@ -1,9 +1,9 @@
 /**
- * Copyright (c) 2020-2021 CutDigital Ltd.
+ * Copyright (c) 2021-2022 Floyd M. Chitalu.
  * All rights reserved.
  * 
  * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from CutDigital Ltd. 
+ * A commercial license can be purchased from Floyd M. Chitalu. 
  *  
  * License details:
  * 
@@ -11,7 +11,7 @@
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
  * (B)  Commercial license.
- *      - email: contact@cut-digital.com
+ *      - email: floyd.m.chitalu@gmail.com
  * 
  * The commercial license options is for users that wish to use MCUT in 
  * their products for comercial purposes but do not wish to release their 
@@ -36,13 +36,6 @@
 #include <unordered_map>
 #include <numeric> // std::iota
 
-// keep around the intermediate meshes created during patch stitching (good for showing how code works)
-#define MCUT_KEEP_TEMP_CCs_DURING_PATCH_STITCHING 1
-
-// This macro enables dumping data about meshes to the log when "dump_mesh(...)" is called
-#ifndef MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-#define MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO 0
-#endif
 
 #ifndef LICENSE_PURCHASED
 #define lmsg() printf("WARNING: MCUT is copyrighted and may not be sold or included in commercial products without a license.")
@@ -219,11 +212,6 @@ namespace mcut
 
         DEBUG_CODE_MASK((*logger_ptr) << "save " << name << std::endl;);
 
-#if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-        //bool verb = logger_ptr->verbose();
-        logger_ptr->set_verbose(false);
-#endif
-
         DEBUG_CODE_MASK((*logger_ptr) << "vertices = " << mesh.number_of_vertices() << std::endl;);
 
         for (vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
@@ -281,12 +269,39 @@ namespace mcut
             DEBUG_CODE_MASK((*logger_ptr).unindent(););
         }
 
-#if !MCUT_ENABLE_LOGGING_DUMPED_MESH_INFO
-       // DEBUG_CODE_MASK((*logger_ptr).set_verbose(verb););
-#endif
-
         write_off(name.c_str(), mesh);
     }
+
+
+bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count)
+{
+    const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
+    fv_count = (int)vertices.size();
+    {
+        for (int i = 0; i < fv_count; ++i)
+        {
+            const int j = (i + 1) % fv_count;
+            const int k = (i + 2) % fv_count;
+
+            const mcut::vd_t &vi = vertices[i];
+            const mcut::vd_t &vj = vertices[j];
+            const mcut::vd_t &vk = vertices[k];
+
+            const mcut::math::vec3 &vi_coords = m.vertex(vi);
+            const mcut::math::vec3 &vj_coords = m.vertex(vj);
+            const mcut::math::vec3 &vk_coords = m.vertex(vk);
+
+            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, p);
+
+            if (!are_coplaner)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
     /*
         dfs(node u)
             for each node v connected to u :
@@ -2627,7 +2642,12 @@ namespace mcut
                             char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                                 intersection_point,
                                 tested_face_vertices,
-                                tested_face_plane_normal_max_comp);
+                                #if 1
+                                tested_face_plane_normal
+                                #else
+                                tested_face_plane_normal_max_comp
+                                #endif
+                                );
 
                             if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e')
                             {
@@ -3021,7 +3041,8 @@ namespace mcut
                 //    DEBUG_CODE_MASK(lg << "v: " << vertex << std::endl;);
                 //    tested_face_vertices.push_back(vertex);
                 //}
-
+                // std::cout  << "faces = [" << fstr(tested_face) << ", " << fstr(tested_edge_h0_face) << ", " << fstr(tested_edge_h1_face) << "]" << std::endl;
+                   
                 // compute plane of tested_face
                 // -----------------------
 
@@ -3059,6 +3080,7 @@ namespace mcut
                     tested_edge_h0_source_vertex,
                     tested_edge_h0_target_vertex,
                     tested_face_vertices,
+                    tested_face_plane_normal,
                     tested_face_plane_normal_max_comp);
 #endif
                 bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
@@ -3099,7 +3121,9 @@ namespace mcut
                             char result = geom::compute_point_in_polygon_test(
                                 point,
                                 tested_face_vertices,
-                                tested_face_plane_normal_max_comp);
+                                tested_face_plane_normal,
+                                tested_face_plane_normal_max_comp
+                                );
                             if (
                                 // the touching point is inside, which implies cutting through a vertex (of "tested_edge")
                                 result == 'i' ||
@@ -3154,7 +3178,9 @@ namespace mcut
                     char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                         intersection_point,
                         tested_face_vertices,
-                        tested_face_plane_normal_max_comp);
+                                tested_face_plane_normal,
+                                tested_face_plane_normal_max_comp
+                                );
 
                     if (
                         // illegal on-edge and on-vertex intersections
@@ -3178,7 +3204,7 @@ namespace mcut
                     { // NOTE: point must be [inside] the polygon for us to consider it further
 #if 0
                     // Intersection point is now determined to be in side face-B (our polygon), now we must use the information
-                    // we computed from the segment-plane intersection test to find out if general position has been violated (i.e.
+                    // we computed from the segment-plane intersection test Check source-mesh for defectsto find out if general position has been violated (i.e.
                     // invalid case of cutting through a vertex)
                     if (segment_intersection_type == 'p' || segment_intersection_type == 'q' || segment_intersection_type == 'r') {
 
@@ -3204,8 +3230,6 @@ namespace mcut
                                                                                                                              //fd_t face_pqX = mesh_t::null_face(); // a virtual face pqX (where X denotes an unspecified auxiliary point)
 
 #if 0
-                    
-
                     // add vertex if it does not exist.
                     // --------------------------------
 
@@ -3231,19 +3255,36 @@ namespace mcut
                         new_vertex_incident_ps_faces.push_back(face_xyz);
                     }
 #endif
-
-                        vd_t new_vertex_descr = m0.add_vertex(intersection_point);
 #if 0
-                    DEBUG_CODE_MASK(lg << "add vertex" << std::endl;);
-                    DEBUG_CODE_MASK(lg.indent(););
-                    std::cout << "position = (" << intersection_point << ")" << std::endl;);
-                    DEBUG_CODE_MASK(lg << "descriptor = " << vstr(new_vertex_descr) << std::endl;);
-                    DEBUG_CODE_MASK(lg << "registry-entry" << std::endl;);
-                    DEBUG_CODE_MASK(lg.indent(););
-                    DEBUG_CODE_MASK(lg << "faces = [" << fstr(new_vertex_incident_ps_faces.at(0)) << ", " << fstr(new_vertex_incident_ps_faces.at(1)) << ", " << fstr(new_vertex_incident_ps_faces.at(2)) << "]" << std::endl;);
-                    DEBUG_CODE_MASK(lg << "halfedge = " << hstr(ps, halfedge_pq) << std::endl;);
-                    DEBUG_CODE_MASK(lg.unindent(););
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    int fv_count = 0;
+                    const bool on_face  = point_on_face_plane(ps, tested_face, intersection_point, fv_count);
+                    
+                    if (!on_face)
+                    { 
+                        const math::vec3 normal = math::normalize(tested_face_plane_normal);
+                        const math::real_number_t length = math::length(normal) ;
+
+                        //MCUT_ASSERT(length == math::real_number_t(1.0));
+                        const math::vec3& point_on_plane = tested_face_vertices.back(); // any vertex will do (assuming all vertices of face are coplanar)
+                        const math::vec3 vec = (intersection_point - point_on_plane);
+                        const math::real_number_t dot = math::dot_product(normal, vec);
+                        intersection_point = intersection_point - (normal * dot);
+                        point_on_face_plane(ps, tested_face, intersection_point, fv_count);
+                    }
+#endif
+                    vd_t new_vertex_descr = m0.add_vertex(intersection_point);
+
+#if 0
+
+                    //DEBUG_CODE_MASK_(lg << "add vertex" << std::endl;);
+                    //DEBUG_CODE_MASK_(lg.indent(););
+                    //DEBUG_CODE_MASK_(std::cout << "position = (" << intersection_point << ")" << std::endl;);
+                    //DEBUG_CODE_MASK_(std::cout  << "descriptor = " << vstr(new_vertex_descr) << std::endl;);
+                    //DEBUG_CODE_MASK_(std::cout  << "registry-entry" << std::endl;);
+                    //DEBUG_CODE_MASK_(lg.indent(););
+                    DEBUG_CODE_MASK_(std::cout  << "****faces = [" << fstr(tested_face) << ", " << fstr(tested_edge_h0_face) << ", " << fstr(tested_edge_h1_face) << "]" << std::endl;);
+                    //DEBUG_CODE_MASK_(lg << "halfedge = " << hstr(ps, halfedge_pq) << std::endl;);
+                   
 #endif
                         //m0_ivtx_to_ps_faces.insert(std::make_pair(new_vertex_descr, new_vertex_incident_ps_faces));
                         //m0_ivtx_to_ps_edge.insert(std::make_pair(new_vertex_descr, tested_edge));
@@ -3485,7 +3526,23 @@ namespace mcut
             std::vector<hd_t> // list of halfedges whose target is the intersection point
             >
             ivtx_to_incoming_hlist;
+#if 0
+            for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
+             cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
+             ++cutpath_edge_creation_info_iter)
+        {
 
+            const fd_t sm_face = cutpath_edge_creation_info_iter->first.first;
+            const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
+            MCUT_ASSERT(!ps_is_cutmesh_face(sm_face, sm_face_count));
+            const std::vector<vd_t> &intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
+            if((int)intersection_test_ivtx_list.size() < 2)
+            {
+                printf("sm_face=%d cm_face=%d\n", (int)sm_face, (int)cm_face);
+            }
+
+        }
+#endif
         for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
              cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
              ++cutpath_edge_creation_info_iter)
@@ -3493,6 +3550,7 @@ namespace mcut
 
             const fd_t sm_face = cutpath_edge_creation_info_iter->first.first;
             const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
+            MCUT_ASSERT(!ps_is_cutmesh_face(sm_face, sm_face_count));
             const std::vector<vd_t> &intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
             MCUT_ASSERT((int)intersection_test_ivtx_list.size() >= 2); // edge-case scenario: an edge intersects with another edge exactly
             const uint32_t new_ivertices_count = (uint32_t)intersection_test_ivtx_list.size();
@@ -3611,17 +3669,23 @@ namespace mcut
                         // for each shared face
                         for (std::vector<fd_t>::const_iterator sf_iter = shared_faces.cbegin(); sf_iter != shared_faces.cend(); ++sf_iter)
                         {
-
-                            fd_t shared_face = *sf_iter;
+                            const fd_t shared_face = *sf_iter;
+                            
+                            MCUT_ASSERT(ps_tested_face_to_plane_normal.find(shared_face) != ps_tested_face_to_plane_normal.cend());
+                            const math::vec3& shared_face_plane_normal = ps_tested_face_to_plane_normal.at(shared_face);
+                            
                             MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(shared_face) != ps_tested_face_to_plane_normal_max_comp.cend());
                             int shared_face_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(shared_face);
+                            
                             MCUT_ASSERT(ps_tested_face_to_vertices.find(shared_face) != ps_tested_face_to_vertices.cend());
                             const std::vector<math::vec3> &shared_face_vertices = ps_tested_face_to_vertices.at(shared_face);
 
                             char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                                 midpoint,
                                 shared_face_vertices,
-                                shared_face_normal_max_comp);
+                                shared_face_plane_normal,
+                                shared_face_normal_max_comp
+                                );
 
                             if (in_poly_test_intersection_type == 'i')
                             {
@@ -4333,8 +4397,11 @@ namespace mcut
 
                 } while (next != ivtx_to_cp_edges.cend());
 
+                MCUT_ASSERT(ps_tested_face_to_plane_normal.find(shared_registry_entry_intersected_face) != ps_tested_face_to_plane_normal.end());
+                fpi.polygon_normal = ps_tested_face_to_plane_normal.at(shared_registry_entry_intersected_face); // used for 2d project
+
                 MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(shared_registry_entry_intersected_face) != ps_tested_face_to_plane_normal_max_comp.end());
-                fpi.projection_component = ps_tested_face_to_plane_normal_max_comp.at(shared_registry_entry_intersected_face); // used for 2d project
+                fpi.polygon_normal_largest_component = ps_tested_face_to_plane_normal_max_comp.at(shared_registry_entry_intersected_face); 
             }
         }
 
@@ -8759,7 +8826,7 @@ namespace mcut
         // adjacency between patches (sharing a cut path).
         //
 
-        math::matrix_t scs_adj_matrix((int)patches.size(), (int)patches.size()); // square
+        math::matrix_t<> scs_adj_matrix((int)patches.size(), (int)patches.size()); // square
 
         for (std::map<int, std::vector<int>>::const_iterator patch_iter = graph_patch_to_adj_list.cbegin();
              patch_iter != graph_patch_to_adj_list.cend();
@@ -8789,7 +8856,7 @@ namespace mcut
         DEBUG_CODE_MASK(lg << "patch-graph adjacency matrix:\n"
                            << scs_adj_matrix << std::endl;);
 
-        const math::matrix_t scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
+        const math::matrix_t<> scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
 
         DEBUG_CODE_MASK(lg << "squared:\n"
                            << scs_adj_matrix_sqrd << std::endl;);
