@@ -230,7 +230,8 @@ typedef enum McConnectedComponentData {
     // incidence and adjacency information
     MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE = (1 << 17), /**< List of adjacent faces (their indices) per face.*/
     MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18), /**< List of adjacent-face-list sizes (number of adjacent faces per face).*/
-    MC_CONNECTED_COMPONENT_DATA_TRIANGULATION = (1 << 19) /**< TODO: add documentation*/
+    MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION = (1 << 19) /**< List of 3*N triangulated face indices, where N is the number of triangles. */
+    
 } McConnectedComponentData;
 
 /**

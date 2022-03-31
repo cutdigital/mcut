@@ -263,6 +263,15 @@ int main(int argc, char* argv[])
 
         printf("vertices: %d\n", (int)vertices.size() / 3);
 
+#if 1 // triangulated output
+        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
+        ASSERT(err == MC_NO_ERROR);
+        std::vector<uint32_t> faceIndices(numBytes / sizeof(uint32_t), 0);
+        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, numBytes, faceIndices.data(), NULL);
+        ASSERT(err == MC_NO_ERROR);
+
+        std::vector<uint32_t> faceSizes(faceIndices.size()/3, 3);
+#else // nontriangulated output
         // face indices
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
@@ -288,7 +297,7 @@ int main(int argc, char* argv[])
 
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
         mcCheckError(err);
-
+#endif
         printf("faces: %d\n", (int)faceSizes.size());
 
         char fnameBuf[512];

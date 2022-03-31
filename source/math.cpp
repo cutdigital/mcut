@@ -77,8 +77,6 @@ namespace math {
         return os << static_cast<double>(v.x()) << ", " << static_cast<double>(v.y()) << ", " << static_cast<double>(v.z());
     }
 
-    
-
     bool operator==(const vec3& a, const vec3& b)
     {
         return (a.x() == b.x()) && (a.y() == b.y()) && (a.z() == b.z());

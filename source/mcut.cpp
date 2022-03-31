@@ -48,7 +48,7 @@
 
 #include "mcut/internal/bvh.h"
 #include "mcut/internal/geom.h"
-#include "mcut/internal/triangulate.h"
+#include "mcut/internal/tri/tri.h"
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
@@ -2838,7 +2838,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
                     std::vector<mcut::math::vec2> fpVertexCoords2D;
 
-                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.polygon_normal);
+                    mcut::geom::project2D(fpVertexCoords2D, fpi.polygon_vertices, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                     // face to be (potentially) partitioned
                     mcut::fd_t origin_face = fpOriginFace;
@@ -2910,7 +2910,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             // project face coords to 2D
                             std::vector<mcut::math::vec2> faceVertexCoords2D;
 
-                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.polygon_normal);
+                            mcut::geom::project2D(faceVertexCoords2D, faceVertexCoords3D, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                             const int numFaceEdges = (int)faceVertexDescriptors.size(); // num edges == num verts
                             const int numFaceVertices = numFaceEdges;
@@ -3030,7 +3030,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     //
 
                     std::vector<mcut::math::vec2> originFaceVertexCoords2D;
-                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.polygon_normal);
+                    mcut::geom::project2D(originFaceVertexCoords2D, originFaceVertices3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                     // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
                     // 1. pick two edges in the floating polygon
@@ -4829,7 +4829,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         }
     }
     break;
-    case MC_CONNECTED_COMPONENT_DATA_TRIANGULATION:
+    case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION:
     {
         if(ccData->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not yet available
         {
@@ -4872,13 +4872,13 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                     {
                         mcut::math::vec3 faceNormal;
                         mcut::math::real_number_t param_d;
-                        /*int largestNormalComp = */mcut::geom::compute_polygon_plane_coefficients(
+                        int largestNormalComp = mcut::geom::compute_polygon_plane_coefficients(
                             faceNormal,
                             param_d,
                             faceVertexCoords3d.data(),
                             (int)faceVertexCoords3d.size());
                 
-                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal);
+                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
                     }
 
                     std::vector<std::vector<std::array<double, 2>>> polygon(1);
@@ -4905,9 +4905,40 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                             McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
                     }
 
-                    // Output triangles are clockwise, so we reverse the list
-                    std::reverse(faceTriangleIndices.begin(), faceTriangleIndices.end());
-                    ccTriangleIndices.insert(ccTriangleIndices.end(), faceTriangleIndices.begin(), faceTriangleIndices.end());
+                    // The winding order after triangulation is not consistent. 
+                    // So need to to check whether to reverse "faceTriangleIndices"
+                    // or not. There is a simple rule to know whether to reverse:
+                    // Whether or not an input polygon (to earcut) is CW or CCW, the local 
+                    // indexing of the input points follows 0, 1, 2 ... etc. (because that is how
+                    // they are recieved from the mesh, even if mesh has CCW faces)
+                    // Thus, to check whether we need to reverse the list, we just need to
+                    // check if any index in "faceTriangleIndices" has a larger value the next element,
+                    // where (faceTriangleIndices[i] - faceTriangleIndices[i+1 % N]) == 1
+                    bool is_ccw_triangulation = true;
+                    const int index_count = (int)faceTriangleIndices.size();
+
+                    for(int i =0; i < index_count; ++i)
+                    {
+                        const int cur = faceTriangleIndices[i];
+                        const int nxt = faceTriangleIndices[(i+1)%index_count];
+                        const bool is_consecutive = std::abs(nxt-cur) == 1; // implies along border/edge of triangulatd polygon
+                        if(is_consecutive)
+                        {
+                            const bool is_reversed = cur > nxt;
+                            if(is_reversed)
+                            {
+                                is_ccw_triangulation = false; 
+                                break;
+                            }
+                        }
+                    }  
+
+                    if(!is_ccw_triangulation)
+                    {
+                        // Output triangles are clockwise, so we reverse the list
+                        std::reverse(faceTriangleIndices.begin(), faceTriangleIndices.end());
+                    }
+
                     // used to check that all indices where used in the triangulation. if not, then there will be a hole
                     std::vector<bool> usedVertexIndicators(faceLocalToGlobleVertexMap.size(), false); 
                     // remap local triangle indices to global values and save
@@ -4918,6 +4949,8 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                         faceTriangleIndices[i] = triangleGlobalVertexIndex; // id in the mesh
                         usedVertexIndicators[triangleLocalVertexIndex] = true;
                     }
+
+                    ccTriangleIndices.insert(ccTriangleIndices.end(), faceTriangleIndices.begin(), faceTriangleIndices.end());
 
                     for(int i =0; i < (int)usedVertexIndicators.size(); ++i)
                     {
@@ -4939,17 +4972,19 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             MCUT_ASSERT(ccTriangleIndices.size() >= 3);
 
             ccData->indexArrayMesh.numTriangleIndices = (uint32_t)ccTriangleIndices.size();
-            ccData->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[ccTriangleIndices.size()]);
+            ccData->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[ccData->indexArrayMesh.numTriangleIndices]);
 
             memcpy(reinterpret_cast<void *>(ccData->indexArrayMesh.pTriangleIndices.get()), ccTriangleIndices.data(), ccTriangleIndices.size() * sizeof(uint32_t));
-        }
+        } // if(ccData->indexArrayMesh.numTriangleIndices == 0)
 
         if (pMem == nullptr) // client pointer is null (asking for size)
         {
+            MCUT_ASSERT(ccData->indexArrayMesh.pTriangleIndices.get() != nullptr);
             *pNumBytes = ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
         }
         else
         {
+            MCUT_ASSERT(ccData->indexArrayMesh.numTriangleIndices >= 3);
             if (bytes > ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t))
             {
                 ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");

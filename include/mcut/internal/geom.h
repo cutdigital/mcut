@@ -92,7 +92,7 @@ char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal,
 // '1': The segment intersects the plane, and none of {p, q, r} hold.
 char compute_segment_plane_intersection_type(const math::vec3 &q, const math::vec3 &r,
                                              const std::vector<math::vec3> &polygon_vertices,
-                                             const math::vec3& polygon_normal);
+                                             const math::vec3& polygon_normal, const int polygon_normal_largest_component);
 
 // Test if a point 'q' (in 2D) lies inside or outside a given polygon (count the number ray crossings).
 //
@@ -111,20 +111,13 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
 // 'e': q is on an edge, but not an endpoint.
 // 'v': q is a vertex.
 char compute_point_in_polygon_test(const math::vec3 &p, const std::vector<math::vec3> &polygon_vertices,
-#if 1
-                                   const math::vec3 &polygon_normal
-#else
-                                   const int polygon_plane_normal_largest_component
-#endif
+                                   const math::vec3 &polygon_normal, const int polygon_normal_largest_component
 );
 
 // project a 3d polygon to 3d by eliminating the largest component of its normal
 void project2D(std::vector<math::vec2> &out, const std::vector<math::vec3> &polygon_vertices,
-#if 1
                const math::vec3 &polygon_normal
-#else
-               const int polygon_plane_normal_largest_component
-#endif
+, const int polygon_normal_largest_component
 );
 
 bool coplaner(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,

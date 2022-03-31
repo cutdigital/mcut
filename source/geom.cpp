@@ -152,13 +152,13 @@ char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal,
 
 bool determine_three_noncollinear_vertices(int &i, int &j, int &k, const std::vector<math::vec3> &polygon_vertices,
 
-                                           const math::vec3 &polygon_normal)
+                                           const math::vec3 &polygon_normal, const int polygon_normal_largest_component)
 {
     const int polygon_vertex_count = (int)polygon_vertices.size();
     MCUT_ASSERT(polygon_vertex_count >= 3);
 
     std::vector<math::vec2> x;
-    project2D(x, polygon_vertices, polygon_normal);
+    project2D(x, polygon_vertices, polygon_normal, polygon_normal_largest_component);
     MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
 
     // get any three vertices that are not collinear
@@ -194,7 +194,8 @@ bool determine_three_noncollinear_vertices(int &i, int &j, int &k, const std::ve
 
 char compute_segment_plane_intersection_type(const math::vec3 &q, const math::vec3 &r,
                                              const std::vector<math::vec3> &polygon_vertices,
-                                             const math::vec3 &polygon_normal)
+                                             const math::vec3 &polygon_normal,
+                                             const int polygon_normal_largest_component)
 {
     const int polygon_vertex_count = (int)polygon_vertices.size();
     // ... any three vertices that are not collinear
@@ -203,7 +204,8 @@ char compute_segment_plane_intersection_type(const math::vec3 &q, const math::ve
     int k = 2;
     if (polygon_vertex_count > 3)
     { // case where we'd have the possibility of noncollinearity
-        bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal);
+        bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal,
+                                                       polygon_normal_largest_component);
 
         if (!b)
         {
@@ -250,7 +252,8 @@ char compute_segment_line_plane_intersection_type(const math::vec3 &q, const mat
     int k = 2;
     if (polygon_vertex_count > 3)
     { // case where we'd have the possibility of noncollinearity
-        bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal_max_comp);
+        bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_plane_normal,
+                                                       polygon_normal_max_comp);
 
         if (!b)
         {
@@ -321,7 +324,8 @@ char compute_line_plane_intersection(math::vec3 &p, // intersection point
     int k = 2;
     if (polygon_vertex_count > 3)
     { // case where we'd have the possibility of noncollinearity
-        bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal_max_comp);
+        bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_plane_normal,
+                                                       polygon_normal_max_comp);
 
         if (!b)
         {
@@ -540,44 +544,61 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
 #endif
 }
 
-void compute_KR_projection_matrices(const math::vec3 &polygon_normal, 
-                                    const int largest_polygon_normal_component,
-                                    math::matrix_t<math::real_number_t> &R, // 3x3 rotaton matrix
-                                    math::matrix_t<math::real_number_t> &K  // 2x3 component selector matrix
-)
+// given a normal vector (not necessarily normalized) and its largest component, calculate
+// a matrix P that will project any 3D vertex to 2D by removing the 3D component that
+// corresponds to the largest component of the normal..
+// https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d/2672702#2672702
+math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3 &polygon_normal,
+                                                                const int polygon_normal_largest_component)
 {
     MCUT_ASSERT(math::squared_length(polygon_normal) > 0);
-    MCUT_ASSERT(largest_polygon_normal_component >= 0);
-    MCUT_ASSERT(largest_polygon_normal_component <= 2);
+    MCUT_ASSERT(polygon_normal_largest_component >= 0);
+    MCUT_ASSERT(polygon_normal_largest_component <= 2);
 
+    // unit length normal vector of polygon
     const math::vec3 a = math::normalize(polygon_normal);
+    // unit length basis vector corresponding to the largest component of the normal vector
     const math::vec3 b = [&]() {
         math::vec3 x(math::real_number_t(0.0));
-        x[largest_polygon_normal_component] = math::real_number_t(1.0); // this is the component we will remove
+        const math::sign_t s = math::sign(polygon_normal[polygon_normal_largest_component]);
+        MCUT_ASSERT(s != math::sign_t::ZERO); // implies that the normal vector has a magnitude of zero
+        // The largest component of the normal is the one we will "remove"
+        // NOTE: we multiple by the sign here to ensure that "a_plus_b" below is not zero when a == b
+        x[polygon_normal_largest_component] = math::real_number_t(1.0) * static_cast<int>(s); 
         return x;
     }();
 
-    const math::vec3 a_plus_b = a + b;
-    const math::real_number_t a_dot_b = math::dot_product(a, b);
-
-    // this will never be zero because we set 'b' as the canonical basis vector
-    // that has the largest projection onto the normal
-    MCUT_ASSERT(a_dot_b != math::real_number_t(0.0));
-
-    const math::matrix_t<math::real_number_t> outer = math::outer_product(a_plus_b, a_plus_b);
-    math::matrix_t<math::real_number_t> I(3, 3); // identity
+    math::matrix_t<math::real_number_t> I(3, 3); // 3x3 identity
     I(0, 0) = 1.0;
     I(1, 1) = 1.0;
     I(2, 2) = 1.0;
 
-    // compute the rotation matrix R to orient the polygon into the canonical axes "i" and "j",
-    //  where "i" and "j" != "largest_polygon_normal_component"
-    R = ((outer / a_dot_b) * 2.0) - I; // rotation
-    // compute the selector matrix K to select the polygon-vertex components that correspond
-    // to canonical axes "i" and "j".
-    K = math::matrix_t<math::real_number_t>(2, 3);
+    math::matrix_t<math::real_number_t> R = I;
 
-    if (largest_polygon_normal_component == 0) // project by removing x-component
+    // NOTE: While this will map vectors a to b, it can add a lot of unnecessary "twist".
+    // For example, if a=b=e_{z} this formula will produce a 180-degree rotation about the z-axis rather
+    // than the identity one might expect.
+    if ((a[0] != b[0]) || (a[1] != b[1]) || (a[2] != b[2])) // a != b
+    {
+        const math::vec3 a_plus_b = a + b;
+        const math::real_number_t a_dot_b = math::dot_product(a, b);
+
+        // this will never be zero because we set 'b' as the canonical basis vector
+        // that has the largest projection onto the normal
+        MCUT_ASSERT(a_dot_b != math::real_number_t(0.0));
+
+        const math::matrix_t<math::real_number_t> outer = math::outer_product(a_plus_b, a_plus_b);
+
+        // compute the 3x3 rotation matrix R to orient the polygon into the canonical axes "i" and "j",
+        //  where "i" and "j" != "polygon_normal_largest_component"
+        R = ((outer / a_dot_b) * 2.0) - I; // rotation
+    }
+
+    // compute the 2x3 selector matrix K to select the polygon-vertex components that correspond
+    // to canonical axes "i" and "j".
+    math::matrix_t<math::real_number_t> K = math::matrix_t<math::real_number_t>(2, 3);
+
+    if (polygon_normal_largest_component == 0) // project by removing x-component
     {
         // 1st row
         K(0, 0) = 0.0; // col 0
@@ -588,7 +609,7 @@ void compute_KR_projection_matrices(const math::vec3 &polygon_normal,
         K(1, 1) = 0.0; // col 1
         K(1, 2) = 1.0; // col 2
     }
-    else if (largest_polygon_normal_component == 1) // project by removing y-component
+    else if (polygon_normal_largest_component == 1) // project by removing y-component
     {
         // 1st row
         K(0, 0) = 1.0; // col 0
@@ -599,7 +620,7 @@ void compute_KR_projection_matrices(const math::vec3 &polygon_normal,
         K(1, 1) = 0.0; // col 1
         K(1, 2) = 1.0; // col 2
     }
-    else if (largest_polygon_normal_component == 2) // project by removing z-component
+    else if (polygon_normal_largest_component == 2) // project by removing z-component
     {
         // 1st row
         K(0, 0) = 1.0; // col 0
@@ -610,29 +631,25 @@ void compute_KR_projection_matrices(const math::vec3 &polygon_normal,
         K(1, 1) = 1.0; // col 1
         K(1, 2) = 0.0; // col 2
     }
+
+    return K * R;
 }
 
 void project2D(std::vector<math::vec2> &out, const std::vector<math::vec3> &polygon_vertices,
-#if 1
-               const math::vec3 &polygon_normal
-#else
-               const int polygon_plane_normal_largest_component
-#endif
-)
+               const math::vec3 &polygon_normal, const int polygon_normal_largest_component)
 {
     const int polygon_vertex_count = (int)polygon_vertices.size();
     out.clear();
     out.resize(polygon_vertex_count);
 
 #if 1
-    math::matrix_t<math::real_number_t> R(1, 1);
-    math::matrix_t<math::real_number_t> K(1, 1);
-    compute_KR_projection_matrices(polygon_normal, R, K);
-
+    // 3x3 matrix for projecting a point to 2D
+    math::matrix_t<math::real_number_t> P =
+        calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
     for (int i = 0; i < polygon_vertex_count; ++i)
     { // for each vertex
         const math::vec3 &x = polygon_vertices[i];
-        out[i] = K * (R * x); // vertex in xz plane
+        out[i] = P * x; // vertex in xz plane
     }
 #else // This code is not reliable because it shadow-projects a polygons which can skew computations
     for (int i = 0; i < polygon_vertex_count; ++i)
@@ -654,12 +671,7 @@ void project2D(std::vector<math::vec2> &out, const std::vector<math::vec3> &poly
 
 // TODO: update this function to use "project2D" for projection step
 char compute_point_in_polygon_test(const math::vec3 &p, const std::vector<math::vec3> &polygon_vertices,
-#if 1
-                                   const math::vec3 &polygon_normal
-#else
-                                   const int polygon_plane_normal_largest_component
-#endif
-)
+                                   const math::vec3 &polygon_normal, const int polygon_normal_largest_component)
 {
     const int polygon_vertex_count = (int)polygon_vertices.size();
     /* Project out coordinate m in both p and the triangular face */
@@ -677,18 +689,17 @@ char compute_point_in_polygon_test(const math::vec3 &p, const std::vector<math::
     }
 #endif
 
-    math::matrix_t<math::real_number_t> R(1, 1);
-    math::matrix_t<math::real_number_t> K(1, 1);
-    compute_KR_projection_matrices(polygon_normal, R, K);
+    const math::matrix_t<math::real_number_t> P =
+        calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
 
-    pp = K * (R * p);
+    pp = P * p;
 
     std::vector<math::vec2> polygon_vertices2d(polygon_vertex_count, math::vec2());
 
     for (int i = 0; i < polygon_vertex_count; ++i)
     { // for each vertex
         const math::vec3 &x = polygon_vertices[i];
-        polygon_vertices2d[i] = K * (R * x); // vertex in xz plane
+        polygon_vertices2d[i] = P * x; // vertex in xz plane
     }
 
 #if 0
@@ -727,11 +738,11 @@ bool coplaner(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut
               const mcut::math::vec3 &pd)
 {
     const math::real_number_t val = orient3d(pa, pb, pc, pd);
-    typedef std::numeric_limits<double> dbl;
+    //typedef std::numeric_limits<double> dbl;
 
     // double d = 3.14159265358979;
-    std::cout.precision(dbl::max_digits10);
-    std::cout << "value=" << (double)val << std::endl;
+    //std::cout.precision(dbl::max_digits10);
+    //std::cout << "value=" << (double)val << std::endl;
 
     // NOTE: thresholds are chosen based on benchmark meshes that are used for testing.
     // It is extremely difficult to get this right because of intermediate conversions

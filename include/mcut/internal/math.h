@@ -234,25 +234,26 @@ typedef vec3_<fixed_precision_number_t> fast_vec3;
 template <typename T = int> class matrix_t
 {
   public:
-    matrix_t() : m_row_count(-1), m_column_count(-1)
+    matrix_t() : m_rows(-1), m_cols(-1)
     {
     }
 
-    matrix_t(int rows, int cols)
-        : m_row_count(rows), m_column_count(cols), m_entries(std::vector<T>((size_t)rows * cols, 0)) // zeroes
+    matrix_t(unsigned int rows, unsigned int cols)
+        : m_rows(rows), m_cols(cols), m_entries(std::vector<T>((size_t)rows * cols, 0)) // zeroes
     {
     }
 
-    T &operator()(int i, int j)
+    T &operator()(unsigned int row, unsigned int col)
     {
-        return m_entries[(size_t)j * m_row_count + i];
+        return m_entries[(size_t)row * m_cols + col];
     }
 
-    T operator()(int i, int j) const
+    T operator()(unsigned int row, unsigned int col) const
     {
-        return m_entries[(size_t)j * m_row_count + i];
+        return m_entries[(size_t)row * m_cols + col];
     }
 
+    // multiply
     matrix_t<T> operator*(const matrix_t<T> &other) const
     {
         matrix_t<T> result(this->rows(), other.cols());
@@ -273,11 +274,11 @@ template <typename T = int> class matrix_t
 
     matrix_t<T> operator*(const real_number_t &s) const
     {
-        matrix_t<T> result(m_row_count, m_column_count);
+        matrix_t<T> result(m_rows, m_cols);
 
-        for (int i = 0; i < m_row_count; ++i)
+        for (int i = 0; i < m_rows; ++i)
         {
-            for (int j = 0; j < m_column_count; ++j)
+            for (int j = 0; j < m_cols; ++j)
             {
                 result(i, j) = (*this)(i, j) * s;
             }
@@ -288,11 +289,11 @@ template <typename T = int> class matrix_t
 
     matrix_t<T> operator/(const real_number_t &s) const
     {
-        matrix_t<T> result(m_row_count, m_column_count);
+        matrix_t<T> result(m_rows, m_cols);
 
-        for (int i = 0; i < m_row_count; ++i)
+        for (int i = 0; i < m_rows; ++i)
         {
-            for (int j = 0; j < m_column_count; ++j)
+            for (int j = 0; j < m_cols; ++j)
             {
                 result(i, j) = (*this)(i, j) / s;
             }
@@ -306,11 +307,11 @@ template <typename T = int> class matrix_t
         MCUT_ASSERT(m.rows() == this->rows());
         MCUT_ASSERT(m.cols() == this->cols());
 
-        matrix_t<T> result(m_row_count, m_column_count);
+        matrix_t<T> result(m_rows, m_cols);
 
-        for (int i = 0; i < m_row_count; ++i)
+        for (int i = 0; i < m_rows; ++i)
         {
-            for (int j = 0; j < m_column_count; ++j)
+            for (int j = 0; j < m_cols; ++j)
             {
                 result(i, j) = (*this)(i, j) - m(i, j);
             }
@@ -335,17 +336,17 @@ template <typename T = int> class matrix_t
 
     inline int rows() const
     {
-        return m_row_count;
+        return m_rows;
     }
 
     inline int cols() const
     {
-        return m_column_count;
+        return m_cols;
     }
 
   private:
-    int m_row_count;
-    int m_column_count;
+    int m_rows;
+    int m_cols;
     std::vector<T> m_entries;
 };
 
@@ -354,17 +355,18 @@ extern real_number_t absolute_value(const real_number_t &number);
 extern sign_t sign(const real_number_t &number);
 extern std::ostream &operator<<(std::ostream &os, const vec3 &v);
 
-template<typename U>
-    std::ostream& operator<<(std::ostream& os, const matrix_t<U>& m)
+template <typename U> std::ostream &operator<<(std::ostream &os, const matrix_t<U> &m)
+{
+    for (int i = 0; i < m.rows(); i++)
     {
-        for (int i = 0; i < m.rows(); i++) {
-            for (int j = 0; j < m.cols(); j++) {
-                os << m(i, j) << ", ";
-            }
-            os << "\n";
+        for (int j = 0; j < m.cols(); j++)
+        {
+            os << m(i, j) << ", ";
         }
-        return os;
+        os << "\n";
     }
+    return os;
+}
 
 template <typename T> const T &min(const T &a, const T &b)
 {
@@ -414,34 +416,31 @@ template <typename vector_type>
 math::matrix_t<typename vector_type::element_type> outer_product(const vector_type &a, const vector_type &b)
 {
     math::matrix_t<typename vector_type::element_type> out(vector_type::cardinality(), vector_type::cardinality());
+    const vector_type c0 = a * b[0]; // colmuns
+    const vector_type c1 = a * b[1];
 
     if (vector_type::cardinality() == 3)
     {
-        const vector_type c0 = a * b[0]; // colmuns
-        const vector_type c1 = a * b[1];
         const vector_type c2 = a * b[2];
 
         out(0, 0) = c0[0];
-        out(0, 1) = c0[1];
-        out(0, 2) = c0[2];
+        out(1, 0) = c0[1];
+        out(2, 0) = c0[2];
 
-        out(1, 0) = c1[0];
+        out(0, 1) = c1[0];
         out(1, 1) = c1[1];
-        out(1, 2) = c1[2];
+        out(2, 1) = c1[2];
 
-        out(2, 0) = c2[0];
-        out(2, 1) = c2[1];
+        out(0, 2) = c2[0];
+        out(1, 2) = c2[1];
         out(2, 2) = c2[2];
     }
     else
     {
-        const vector_type c0 = a * b[0]; // colmuns
-        const vector_type c1 = a * b[1];
-
         out(0, 0) = c0[0];
-        out(0, 1) = c0[1];
+        out(1, 0) = c0[1];
 
-        out(1, 0) = c1[0];
+        out(0, 1) = c1[0];
         out(1, 1) = c1[1];
     }
 

@@ -226,8 +226,20 @@ int main()
 
         // query the faces
         // -------------------
-
         numBytes = 0;
+
+#if 1 // triangulated faces
+        
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
+        my_assert(err == MC_NO_ERROR);
+        std::vector<uint32_t> ccFaceIndices(numBytes / sizeof(uint32_t), 0);
+        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, numBytes, ccFaceIndices.data(), NULL);
+        my_assert(err == MC_NO_ERROR);
+
+        std::vector<uint32_t> faceSizes(ccFaceIndices.size()/3, 3);
+        
+#else // non-triangulated faces (i.e. N-gons) 
+        
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
         std::vector<uint32_t> ccFaceIndices(numBytes / sizeof(uint32_t), 0);
@@ -242,11 +254,10 @@ int main()
         std::vector<uint32_t> faceSizes(numBytes / sizeof(uint32_t), 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL);
         my_assert(err == MC_NO_ERROR);
+#endif
 
-        // query the face map
-        // ------------------------
         const uint32_t ccFaceCount = static_cast<uint32_t>(faceSizes.size());
-
+        
         /// ------------------------------------------------------------------------------------
 
         // Here we show, how to know when connected components, pertain particular boolean operations.
@@ -263,7 +274,7 @@ int main()
         // save cc mesh to .obj file
         // -------------------------
 
-        std::string fpath(DATA_DIR "/" + boolOpName + ".obj");
+        std::string fpath(OUTPUT_DIR "/" + boolOpName + ".obj");
 
         printf("write file: %s\n", fpath.c_str());
 
