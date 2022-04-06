@@ -320,17 +320,33 @@ template <typename T = int> class matrix_t
         return result;
     }
 
-    // matrix vector multiply
-    template <typename Vec> Vec operator*(const Vec &v) const
+    // 2x3 matrix time 3x1 vector
+    math::vec2 operator*(const math::vec3&v) const
     {
-        MCUT_ASSERT(this->cols() == Vec::cardinality());
+        MCUT_ASSERT(this->cols() == math::vec3::cardinality());
+        math::vec2 result(math::real_number_t(0.0));
+        MCUT_ASSERT(this->rows() == math::vec2::cardinality());
 
+        for (int col = 0; col < this->cols(); ++col)
+        {
+            for (int row = 0; row < math::vec2::cardinality(); ++row)
+            {
+                result[row] = result[row] + ((*this)(row, col) * v[col]);
+            }
+        }
+#if 0
         // columns
         const Vec c0((*this)(0, 0), (*this)(1, 0), (*this)(2, 0));
         const Vec c1((*this)(0, 1), (*this)(1, 1), (*this)(2, 1));
-        const Vec c2((*this)(0, 2), (*this)(1, 2), (*this)(2, 2));
-        const Vec result = c0 * v[0] + c1 * v[1] + c2 * v[2];
 
+        result = c0 * v[0] + c1 * v[1];
+
+        if (this->rows() == 3 && (this->cols() == 3)
+        {
+            const Vec c2((*this)(0, 2), (*this)(1, 2), (*this)(2, 2));
+            result = result + c2 * v[2];
+        }
+#endif
         return result;
     }
 
