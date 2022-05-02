@@ -564,7 +564,7 @@ math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3
         MCUT_ASSERT(s != math::sign_t::ZERO); // implies that the normal vector has a magnitude of zero
         // The largest component of the normal is the one we will "remove"
         // NOTE: we multiple by the sign here to ensure that "a_plus_b" below is not zero when a == b
-        x[polygon_normal_largest_component] = math::real_number_t(1.0) * static_cast<int>(s); 
+        x[polygon_normal_largest_component] = (1.0) * static_cast<long double>(s); 
         return x;
     }();
 

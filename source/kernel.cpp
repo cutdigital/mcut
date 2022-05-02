@@ -2577,7 +2577,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             tested_edge_h0_source_vertex,
                             tested_edge_h0_target_vertex,
                             tested_face_vertices,
-                            tested_face_plane_normal_max_comp);
+                            tested_face_plane_normal,
+                            tested_face_plane_normal_max_comp); 
 
                         bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
 
@@ -2604,6 +2605,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                     char result = geom::compute_point_in_polygon_test(
                                         point,
                                         tested_face_vertices,
+                                        tested_face_plane_normal,
                                         tested_face_plane_normal_max_comp);
                                     if (result == 'i' || (result == 'v' || result == 'e'))
                                     {
@@ -2642,11 +2644,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                                 intersection_point,
                                 tested_face_vertices,
-                                #if 1
-                                tested_face_plane_normal
-                                #else
+                                //#if 1
+                                tested_face_plane_normal,
+                                //#else
                                 tested_face_plane_normal_max_comp
-                                #endif
+                                //#endif
                                 );
 
                             if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e')

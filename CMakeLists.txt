@@ -127,7 +127,7 @@ if(MCUT_BUILD_AS_SHARED_LIB)
 	list(APPEND preprocessor_defs -DMCUT_SHARED_LIB=1)
 endif()
 
-if (MCUT_BUILD_AS_MULTI_THREADED_LIB)
+if (MCUT_BUILD_WITH_MULTITHREADING)
 	find_package(Threads REQUIRED)
 
 	list(APPEND extra_libs Threads::Threads) 
