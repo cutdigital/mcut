@@ -2878,7 +2878,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     // merge m0_ivtx_to_intersection_registry_entry_FUTURE
                     m0_ivtx_to_intersection_registry_entry.insert(
-                        m0_ivtx_to_intersection_registry_entry.cend(),
+                        m0_ivtx_to_intersection_registry_entry.end(),
                         m0_ivtx_to_intersection_registry_entry_FUTURE.cbegin(),
                         m0_ivtx_to_intersection_registry_entry_FUTURE.cend());
 
