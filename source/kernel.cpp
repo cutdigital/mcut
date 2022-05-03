@@ -45,6 +45,16 @@
 // This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
 // #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
 
+namespace std{
+    // need to declare partial and explicit specializations in every translation unit 
+    // that uses them (before any use that would implicitly instantiate that 
+    // specialization)
+    template <>
+    typename mcut::edge_array_iterator_t::difference_type distance(
+        mcut::edge_array_iterator_t first,
+        mcut::edge_array_iterator_t last);
+}
+
 namespace mcut
 {
 
@@ -848,10 +858,10 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     local_remapped_face_to_ccID.push_back(cc_id);
                     local_remapped_face_to_mX_face.push_back(fd);
 
-                    std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
+                    //std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
 
-                    MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
-                    std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
+                    MCUT_ASSERT(ccID_to_cc_to_mX_face.find(cc_id) != ccID_to_cc_to_mX_face.cend());
+                    //std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
                     //std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ;
                     MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.end());
@@ -5380,7 +5390,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                         MCUT_ASSERT(incident_boundary_edge_count >= 3); // minimum is 3 edge which is for a triangle
 
-                        const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
+                        //const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
                         std::vector<hd_t> incident_halfedges;
                         hd_t first_boundary_halfedge = mesh_t::null_halfedge();
 
