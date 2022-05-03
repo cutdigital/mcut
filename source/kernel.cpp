@@ -2142,7 +2142,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                 OutputStorageType future_res = f.get();
 
-                ps_edge_to_bbox.insert(future_res.cbegin(), future_res.cend());
+                ps_edge_to_bbox.insert(future_res.cbegin(), future_res.cend()); 
             }
         }
 #else
