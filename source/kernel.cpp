@@ -5863,7 +5863,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             {
                 int base_offset = (int)m0_polygons.size();
                 m0_polygons.reserve(m0_polygons.size() + m0_polygons_FUTURE.size());
-                m0_polygons.insert(m0_polygons.cend(), m0_polygons_FUTURE.cbegin(), m0_polygons_FUTURE.cend());
+                m0_polygons.insert(m0_polygons.end(), m0_polygons_FUTURE.cbegin(), m0_polygons_FUTURE.cend());
 
                 m0_sm_cutpath_adjacent_polygons.reserve(m0_sm_cutpath_adjacent_polygons.size() + m0_sm_cutpath_adjacent_polygons_FUTURE.size());
                 for (int i = 0; i < (int)m0_sm_cutpath_adjacent_polygons_FUTURE.size(); ++i)
