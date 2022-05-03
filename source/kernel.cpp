@@ -45,6 +45,16 @@
 // This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
 // #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
 
+namespace std{
+    // need to declare partial and explicit specializations in every translation unit 
+    // that uses them (before any use that would implicitly instantiate that 
+    // specialization)
+    template <>
+    typename mcut::edge_array_iterator_t::difference_type distance(
+        mcut::edge_array_iterator_t first,
+        mcut::edge_array_iterator_t last);
+}
+
 namespace mcut
 {
 
@@ -848,10 +858,10 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     local_remapped_face_to_ccID.push_back(cc_id);
                     local_remapped_face_to_mX_face.push_back(fd);
 
-                    std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
+                    //std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
 
-                    MCUT_ASSERT(ccID_to_cc_to_mX_face_fiter != ccID_to_cc_to_mX_face.cend());
-                    std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
+                    MCUT_ASSERT(ccID_to_cc_to_mX_face.find(cc_id) != ccID_to_cc_to_mX_face.cend());
+                    //std::vector<fd_t> &cc_to_mX_face = ccID_to_cc_to_mX_face_fiter->second;
 
                     //std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ;
                     MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.end());
@@ -2132,7 +2142,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                 OutputStorageType future_res = f.get();
 
-                ps_edge_to_bbox.insert(future_res.cbegin(), future_res.cend());
+                ps_edge_to_bbox.insert(future_res.cbegin(), future_res.cend()); 
             }
         }
 #else
@@ -2577,7 +2587,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             tested_edge_h0_source_vertex,
                             tested_edge_h0_target_vertex,
                             tested_face_vertices,
-                            tested_face_plane_normal_max_comp);
+                            tested_face_plane_normal,
+                            tested_face_plane_normal_max_comp); 
 
                         bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
 
@@ -2604,6 +2615,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                     char result = geom::compute_point_in_polygon_test(
                                         point,
                                         tested_face_vertices,
+                                        tested_face_plane_normal,
                                         tested_face_plane_normal_max_comp);
                                     if (result == 'i' || (result == 'v' || result == 'e'))
                                     {
@@ -2642,11 +2654,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
                                 intersection_point,
                                 tested_face_vertices,
-                                #if 1
-                                tested_face_plane_normal
-                                #else
+                                //#if 1
+                                tested_face_plane_normal,
+                                //#else
                                 tested_face_plane_normal_max_comp
-                                #endif
+                                //#endif
                                 );
 
                             if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e')
@@ -2866,7 +2878,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     // merge m0_ivtx_to_intersection_registry_entry_FUTURE
                     m0_ivtx_to_intersection_registry_entry.insert(
-                        m0_ivtx_to_intersection_registry_entry.cend(),
+                        m0_ivtx_to_intersection_registry_entry.end(),
                         m0_ivtx_to_intersection_registry_entry_FUTURE.cbegin(),
                         m0_ivtx_to_intersection_registry_entry_FUTURE.cend());
 
@@ -5378,7 +5390,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                         MCUT_ASSERT(incident_boundary_edge_count >= 3); // minimum is 3 edge which is for a triangle
 
-                        const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
+                        //const int interior_edges_on_face = (int)incident_edges.size() - incident_boundary_edge_count;
                         std::vector<hd_t> incident_halfedges;
                         hd_t first_boundary_halfedge = mesh_t::null_halfedge();
 
@@ -5851,7 +5863,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             {
                 int base_offset = (int)m0_polygons.size();
                 m0_polygons.reserve(m0_polygons.size() + m0_polygons_FUTURE.size());
-                m0_polygons.insert(m0_polygons.cend(), m0_polygons_FUTURE.cbegin(), m0_polygons_FUTURE.cend());
+                m0_polygons.insert(m0_polygons.end(), m0_polygons_FUTURE.cbegin(), m0_polygons_FUTURE.cend());
 
                 m0_sm_cutpath_adjacent_polygons.reserve(m0_sm_cutpath_adjacent_polygons.size() + m0_sm_cutpath_adjacent_polygons_FUTURE.size());
                 for (int i = 0; i < (int)m0_sm_cutpath_adjacent_polygons_FUTURE.size(); ++i)

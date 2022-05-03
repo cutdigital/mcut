@@ -239,7 +239,7 @@ template <typename T = int> class matrix_t
     }
 
     matrix_t(unsigned int rows, unsigned int cols)
-        : m_rows(rows), m_cols(cols), m_entries(std::vector<T>((size_t)rows * cols, 0)) // zeroes
+        : m_rows(rows), m_cols(cols), m_entries(std::vector<T>((size_t)rows * cols, T(0.0))) // zeroes
     {
     }
 

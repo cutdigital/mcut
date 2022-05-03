@@ -596,9 +596,24 @@ namespace std
 {
 #if 1
     template <>
-    typename mcut::edge_array_iterator_t::difference_type distance(
+    inline typename mcut::edge_array_iterator_t::difference_type distance(
         mcut::edge_array_iterator_t first,
-        mcut::edge_array_iterator_t last);
+        mcut::edge_array_iterator_t last)
+    {
+        MCUT_ASSERT(first.get_mesh_ptr() == last.get_mesh_ptr());
+        mcut::edge_array_iterator_t it = first;
+        mcut::edge_array_iterator_t::difference_type dist = last - first;
+
+        uint32_t r = it.get_mesh_ptr()->count_removed_elements_in_range(first, last);
+        if (r > 0)
+        {
+            dist = dist - r;
+        }
+
+        MCUT_ASSERT(dist >= 0);
+
+        return dist;
+    }
 #endif
 #if 0
     template <>
