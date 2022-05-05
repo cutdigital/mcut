@@ -516,7 +516,7 @@ namespace mcut
 
         // we provide this overide to ensure that stl functions like std::advance, work properly
         // by accounting for removed elements
-        array_iterator_t<V> &operator+=(typename array_iterator_t<V>::difference_type n)
+        array_iterator_t<V> operator+=(typename array_iterator_t<V>::difference_type n)
         {
             V::const_iterator::operator+=(n); // raw ptr shift (i.e. ignoring that there may be removed elements)
 

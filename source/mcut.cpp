@@ -435,7 +435,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                                    InputStorageIteratorType block_start_,
                                    InputStorageIteratorType block_end_) -> OutputStorageType
         {
-            for (InputStorageIteratorType i = block_start_; i != block_end_; i++)
+            for (InputStorageIteratorType i = block_start_; i != block_end_; ++i)
             {
                 uint32_t faceID = std::distance(partial_sums.cbegin(), i);
                 std::vector<mcut::vd_t> &faceVertices = faces[faceID];
