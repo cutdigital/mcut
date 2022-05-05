@@ -1057,6 +1057,9 @@ McResult halfedgeMeshToIndexArrayMesh(
         std::vector<std::future<int>> futures;
         int _1;
 
+        auto fff = halfedgeMeshInfo.mesh.faces_begin();
+        std::advance(fff, 1);
+
         parallel_fork_and_join(
             ctxtPtr->scheduler,
             halfedgeMeshInfo.mesh.faces_begin(),

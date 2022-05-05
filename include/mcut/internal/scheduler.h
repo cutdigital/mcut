@@ -366,7 +366,7 @@ namespace mcut
         for (typename InputStorageIteratorType::difference_type i = 0; i < (num_blocks - 1); ++i)
         {
             InputStorageIteratorType block_end = block_start;
-            std::next(block_end, block_size);
+            std::advance(block_end, block_size);
 
             futures[i] = pool.submit(
                 [&, block_start, block_end]() -> OutputStorageType
