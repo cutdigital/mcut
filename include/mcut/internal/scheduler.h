@@ -124,7 +124,7 @@ namespace mcut
         {
             std::unique_lock<std::mutex> head_lock(head_mutex);
             auto until = [&]()
-            { return !can_wait_for_data || head.get() != get_tail(); };
+            { return can_wait_for_data.load() == false || head.get() != get_tail(); };
             data_cond.wait(head_lock, until);
             return head_lock;
         }
@@ -132,7 +132,7 @@ namespace mcut
         std::unique_ptr<node> wait_pop_head(T &value)
         {
             std::unique_lock<std::mutex> head_lock(wait_for_data());
-            if (can_wait_for_data)
+            if (can_wait_for_data.load())
             {
                 value = std::move(*head->data);
                 return pop_head();
@@ -150,7 +150,7 @@ namespace mcut
 
         void disrupt_wait_for_data()
         {
-            can_wait_for_data = false;
+            can_wait_for_data.store(false);
             data_cond.notify_one();
         }
 
@@ -366,7 +366,7 @@ namespace mcut
         for (typename InputStorageIteratorType::difference_type i = 0; i < (num_blocks - 1); ++i)
         {
             InputStorageIteratorType block_end = block_start;
-            std::advance(block_end, block_size);
+            std::next(block_end, block_size);
 
             futures[i] = pool.submit(
                 [&, block_start, block_end]() -> OutputStorageType
