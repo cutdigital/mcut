@@ -51,6 +51,8 @@
 #include "mcut/internal/geom.h"
 #include "mcut/internal/tri/tri.h"
 
+std::atomic_bool mcut::thread_pool_terminate(false);
+
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-6;
@@ -770,7 +772,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     MCUT_ASSERT(indexArrayMesh.numVertices >= 3);
 
-    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[indexArrayMesh.numVertices * 3u]);
+    indexArrayMesh.pVertices = std::unique_ptr<mcut::math::real_number_t[]>(new mcut::math::real_number_t[(std::size_t)indexArrayMesh.numVertices * 3u]);
 
     if (!halfedgeMeshInfo.data_maps.vertex_map.empty())
     {
@@ -4855,7 +4857,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                 {
                     for(uint32_t v = 0; v < faceSize; ++v)
                     {
-                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
+                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[(std::size_t)faceOffset + v];
                         ccTriangleIndices.push_back(vertexId);
                     }
                 }
@@ -4869,9 +4871,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                     
                     for(uint32_t v = 0; v < faceSize; ++v)
                     {
-                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[faceOffset + v];
+                        const uint32_t vertexId = ccData->indexArrayMesh.pFaceIndices[(std::size_t)faceOffset + v];
                         faceVertexIndices[v] = vertexId;
-                        const mcut::math::real_number_t* const vptr = ccData->indexArrayMesh.pVertices.get() + (vertexId * 3);
+                        const mcut::math::real_number_t* const vptr = ccData->indexArrayMesh.pVertices.get() + ((std::size_t)vertexId * 3);
                         faceVertexCoords3d[v] = mcut::math::vec3(vptr[0], vptr[1], vptr[2]);
                         faceLocalToGlobleVertexMap[v] = vertexId;
                     }

@@ -78,6 +78,8 @@ namespace mcut
         function_wrapper &operator=(const function_wrapper &) = delete;
     };
 
+    extern std::atomic_bool thread_pool_terminate; // mcut.cpp
+
     template <typename T>
     class thread_safe_queue
     {
@@ -93,7 +95,7 @@ namespace mcut
         std::mutex tail_mutex;
         node *tail;
         std::condition_variable data_cond;
-        std::atomic_bool can_wait_for_data;
+        //std::atomic_bool can_wait_for_data;
 
         std::unique_ptr<node> try_pop_head(T &value)
         {
@@ -126,13 +128,13 @@ namespace mcut
         // via the construction of the unique_lock.
         // The warning is removed by annotating the function with "_Acquires_lock_(...)".
         // See here: https://developercommunity.visualstudio.com/t/unexpected-warning-c26115-for-returning-a-unique-l/1077322
-        _Acquires_lock_(head_lock)
+        _Acquires_lock_(return)
 #endif
         std::unique_lock<std::mutex> wait_for_data()
         {
             std::unique_lock<std::mutex> head_lock(head_mutex);
             auto until = [&]()
-            { return can_wait_for_data.load() == false || head.get() != get_tail(); };
+            { return thread_pool_terminate.load() || head.get() != get_tail(); };
             data_cond.wait(head_lock, until);
             return head_lock;
         }
@@ -140,7 +142,7 @@ namespace mcut
         std::unique_ptr<node> wait_pop_head(T &value)
         {
             std::unique_lock<std::mutex> head_lock(wait_for_data());
-            if (can_wait_for_data.load())
+            if (thread_pool_terminate.load() == false)
             {
                 value = std::move(*head->data);
                 return pop_head();
@@ -152,13 +154,13 @@ namespace mcut
         }
 
     public:
-        thread_safe_queue() : head(new node), tail(head.get()), can_wait_for_data(true) {}
+        thread_safe_queue() : head(new node), tail(head.get())/*, can_wait_for_data(true)*/ {}
         thread_safe_queue(const thread_safe_queue &other) = delete;
         thread_safe_queue &operator=(const thread_safe_queue &other) = delete;
 
         void disrupt_wait_for_data()
         {
-            can_wait_for_data.store(false);
+            //can_wait_for_data.store(false);
             data_cond.notify_one();
         }
 
@@ -214,11 +216,11 @@ namespace mcut
 
     class thread_pool
     {
-        std::atomic_bool terminate;
+        
 
         std::vector<thread_safe_queue<function_wrapper>> work_queues;
 
-        std::vector<std::thread> threads; // NOTE: must be declared after "terminate" and "work_queues"
+        std::vector<std::thread> threads; // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
         join_threads joiner;
         unsigned long long round_robin_scheduling_counter;
 
@@ -246,7 +248,7 @@ namespace mcut
                 function_wrapper task;
 #if 0
                 work_queues[worker_thread_id].wait_and_pop(task);
-                if(terminate) {
+                if(thread_pool_terminate) {
                    break; // finished (i.e. MCUT context was destroyed)
                 }
                 task();
@@ -259,7 +261,7 @@ namespace mcut
                     work_queues[worker_thread_id].wait_and_pop(task);
                 }
 
-                if (terminate)
+                if (thread_pool_terminate)
                 {
                     break; // finished (i.e. MCUT context was destroyed)
                 }
@@ -271,11 +273,12 @@ namespace mcut
 
     public:
 
-        thread_pool() : terminate(false),
+        thread_pool() : //thread_pool_terminate(false),
 
                         joiner(threads), round_robin_scheduling_counter(0)
         {
             unsigned int const thread_count = std::thread::hardware_concurrency();
+            thread_pool_terminate.store(false);
 
             try
             {
@@ -291,7 +294,7 @@ namespace mcut
             }
             catch (...)
             {
-                terminate = true;
+                thread_pool_terminate = true;
                 wakeup_and_shutdown();
                 throw;
             }
@@ -299,7 +302,7 @@ namespace mcut
 
         ~thread_pool()
         {
-            terminate = true;
+            thread_pool_terminate.store(true);
             wakeup_and_shutdown();
         }
 
