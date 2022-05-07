@@ -109,7 +109,7 @@ namespace mcut
     {
         // normal of polygon
         math::vec3 polygon_normal;
-        int polygon_normal_largest_component;
+        int polygon_normal_largest_component = -1;
         // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
         std::vector<math::vec3> polygon_vertices;
     };

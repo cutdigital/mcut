@@ -63,11 +63,11 @@ namespace mcut
 
         function_wrapper() = default;
 
-        function_wrapper(function_wrapper &&other) : impl(std::move(other.impl))
+        function_wrapper(function_wrapper &&other) noexcept : impl(std::move(other.impl))
         {
         }
 
-        function_wrapper &operator=(function_wrapper &&other)
+        function_wrapper &operator=(function_wrapper &&other) noexcept
         {
             impl = std::move(other.impl);
             return *this;
@@ -120,6 +120,14 @@ namespace mcut
             return (old_head);
         }
 
+#if _WIN32 // on windows
+        // there is a C26115 warning here, which is by design. The warning is caused by 
+        // the fact that our function here has the side effect of locking the mutex "head_mutex" 
+        // via the construction of the unique_lock.
+        // The warning is removed by annotating the function with "_Acquires_lock_(...)".
+        // See here: https://developercommunity.visualstudio.com/t/unexpected-warning-c26115-for-returning-a-unique-l/1077322
+        _Acquires_lock_(head_lock)
+#endif
         std::unique_lock<std::mutex> wait_for_data()
         {
             std::unique_lock<std::mutex> head_lock(head_mutex);

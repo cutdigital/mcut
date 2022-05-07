@@ -1050,22 +1050,22 @@ namespace mcut
 
     void mesh_t::reserve_for_additional_vertices(std::uint32_t n)
     {
-        m_vertices.reserve(number_of_internal_vertices() + n);
+        m_vertices.reserve((std::uint64_t)number_of_internal_vertices() + n);
     }
 
     void mesh_t::reserve_for_additional_edges(std::uint32_t n)
     {
-        m_edges.reserve(number_of_internal_edges() + n);
+        m_edges.reserve((std::uint64_t)number_of_internal_edges() + n);
     }
 
     void mesh_t::reserve_for_additional_halfedges(std::uint32_t n)
     {
-        m_halfedges.reserve(number_of_internal_halfedges() + n);
+        m_halfedges.reserve((std::uint64_t)number_of_internal_halfedges() + n);
     }
 
     void mesh_t::reserve_for_additional_faces(std::uint32_t n)
     {
-        m_faces.reserve(number_of_internal_faces() + n);
+        m_faces.reserve((std::uint64_t)number_of_internal_faces() + n);
     }
 
     void mesh_t::reserve_for_additional_elements(std::uint32_t n)
