@@ -1916,9 +1916,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
             // merge results from other threads
 
-            for (int i = 0; i < (int)futures.size(); ++i)
+            for (int fi = 0; fi < (int)futures.size(); ++fi)
             {
-                std::future<OutputStorageType> &f = futures[i];
+                std::future<OutputStorageType> &f = futures[fi];
                 MCUT_ASSERT(f.valid()); // The behavior is undefined if valid()== false before the call to wait_for
 
                 OutputStorageType future_res = f.get();

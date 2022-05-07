@@ -238,10 +238,11 @@ namespace mcut
     typedef std::vector<halfedge_data_t> halfedge_array_t;
     typedef std::vector<face_data_t> face_array_t;
 
+    typedef array_iterator_t<face_array_t> face_array_iterator_t;
     typedef array_iterator_t<vertex_array_t> vertex_array_iterator_t;
     typedef array_iterator_t<edge_array_t> edge_array_iterator_t;
     typedef array_iterator_t<halfedge_array_t> halfedge_array_iterator_t;
-    typedef array_iterator_t<face_array_t> face_array_iterator_t;
+    
 
     /*
         Internal mesh data structure used for cutting meshes

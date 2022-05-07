@@ -437,7 +437,7 @@ McResult indexArrayMeshToHalfedgeMesh(
         {
             for (InputStorageIteratorType i = block_start_; i != block_end_; ++i)
             {
-                uint32_t faceID = std::distance(partial_sums.cbegin(), i);
+                uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), i);
                 std::vector<mcut::vd_t> &faceVertices = faces[faceID];
                 int numFaceVertices = ((uint32_t *)pFaceSizes)[faceID];
 
@@ -527,7 +527,7 @@ McResult indexArrayMeshToHalfedgeMesh(
             for (InputStorageIteratorType face_iter = block_start_;
                  face_iter != block_end_; ++face_iter)
             {
-                uint32_t faceID = std::distance(partial_sums.cbegin(), face_iter);
+                uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), face_iter);
                 const std::vector<mcut::vd_t> &faceVertices = faces.at(faceID);
                 mcut::fd_t fd = halfedgeMesh.add_face(faceVertices);
 
@@ -787,7 +787,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             for (InputStorageIteratorType viter = block_start_; viter != block_end_; ++viter)
             {
                 const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(*viter);
-                const uint32_t i = std::distance(halfedgeMeshInfo.mesh.vertices_begin(), viter);
+                const uint32_t i = (uint32_t)std::distance(halfedgeMeshInfo.mesh.vertices_begin(), viter);
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 2u] = point.z();
@@ -997,7 +997,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         {
             for (InputStorageIteratorType i = block_start_; i != block_end_; ++i)
             {
-                const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+                const uint32_t faceID = (uint32_t)std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
 
                 {
                     std::vector<mcut::vd_t> vertices_around_face = halfedgeMeshInfo.mesh.get_vertices_around_face(*i);
@@ -1057,9 +1057,13 @@ McResult halfedgeMeshToIndexArrayMesh(
         std::vector<std::future<int>> futures;
         int _1;
 
+        auto vvv = halfedgeMeshInfo.mesh.vertices_begin();;
+        std::advance(vvv, 1);
+        auto hhh = halfedgeMeshInfo.mesh.halfedges_begin();;
+        std::advance(hhh, 1);
         auto fff = halfedgeMeshInfo.mesh.faces_begin();
         std::advance(fff, 1);
-
+        
         parallel_fork_and_join(
             ctxtPtr->scheduler,
             halfedgeMeshInfo.mesh.faces_begin(),
@@ -1172,7 +1176,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         {
             for (InputStorageIteratorType i = block_start_; i != block_end_; ++i)
             {
-                const int faceID = std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
+                const uint32_t faceID = (uint32_t)std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
                 { // store face-vertex indices
                     const std::vector<mcut::vd_t> &faceVertices = gatheredFaces[faceID];
                     const uint32_t faceSize = (uint32_t)faceVertices.size();
@@ -1285,7 +1289,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
                 //uint32_t r = halfedgeMeshInfo.mesh.count_removed_elements_in_range(halfedgeMeshInfo.mesh.edges_begin(), eiter);
                 // NOTE: our override of std::distance accounts for removed elements
-                uint32_t edge_idx = std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter); // - r;
+                uint32_t edge_idx = (uint32_t)std::distance(halfedgeMeshInfo.mesh.edges_begin(), eiter); // - r;
                 //printf("edge_idx = %d (%u)\n",edge_idx, (uint32_t)*eiter );
                 //MCUT_ASSERT((size_t)v0 < vmap.size());
                 MCUT_ASSERT(((size_t)edge_idx * 2u) + 0u < indexArrayMesh.numEdgeIndices);
