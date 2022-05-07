@@ -855,7 +855,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     remapped_faces_LOCAL.push_back(std::vector<vd_t>());
                     std::vector<vd_t> &remapped_face = remapped_faces_LOCAL.back(); // using remapped cc descriptors
-                    local_remapped_face_to_ccID.push_back(cc_id);
+                    local_remapped_face_to_ccID.push_back((int)cc_id);
                     local_remapped_face_to_mX_face.push_back(fd);
 
                     //std::map<size_t, std::vector<fd_t>>::iterator ccID_to_cc_to_mX_face_fiter = ccID_to_cc_to_mX_face.find(cc_id);
@@ -918,8 +918,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                      remapped_face_iter != remapped_faces_.cend();
                      ++remapped_face_iter)
                 {
-                    int idx = std::distance(remapped_faces_.cbegin(), remapped_face_iter);
-                    int remapped_face_cc_id = local_remapped_face_to_ccID_.at(idx);
+                    uint32_t idx = (uint32_t)std::distance(remapped_faces_.cbegin(), remapped_face_iter);
+                    uint32_t remapped_face_cc_id = local_remapped_face_to_ccID_.at(idx);
 
                     MCUT_ASSERT(ccID_to_mesh.find(remapped_face_cc_id) != ccID_to_mesh.end());
 
@@ -2683,7 +2683,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 fd_t face_xyz = tested_face;
                                 fd_t face_pqs = tested_edge_face == tested_edge_h0_face ? tested_edge_h1_face : mesh_t::null_face();
 
-                                vd_t new_vertex_descr(intersection_points_LOCAL.size());
+                                vd_t new_vertex_descr((vd_t::index_type)intersection_points_LOCAL.size());
                                 intersection_points_LOCAL.push_back(intersection_point); /*m0.add_vertex(intersection_point)*/
                                 ;
 
@@ -2834,10 +2834,10 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // iterate through all available future so that we can 1) get their results
                 // and 2) ensure that all scheduled jobs are completed before exiting (or returning from)
                 // the kernel
-                for (int i = 0; i < (int)futures.size(); ++i)
+                for (int i_ = 0; i_ < (int)futures.size(); ++i_)
                 {
 
-                    std::future<OutputStorageTypesTuple> &f = futures[i];
+                    std::future<OutputStorageTypesTuple> &f = futures[i_];
                     MCUT_ASSERT(f.valid()); // The behavior is undefined if valid()== false before the call to wait_for
 
                     OutputStorageTypesTuple future_result = f.get(); // "get()" is a blocking function
@@ -2863,7 +2863,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     const std::unordered_map<fd_t, std::vector<vd_t>> &ps_iface_to_ivtx_list_FUTURE = std::get<4>(future_result);
                     const bool &partial_cut_detected_FUTURE = std::get<5>(future_result);
                     const std::vector<mcut::math::vec3> &intersection_points_FUTURE = std::get<6>(future_result);
-                    const uint32_t intersection_points_in_future = intersection_points_FUTURE.size();
+                    const uint32_t intersection_points_in_future = (uint32_t)intersection_points_FUTURE.size();
 
                     MCUT_ASSERT(intersection_points_FUTURE.size() == m0_ivtx_to_intersection_registry_entry_FUTURE.size());
 
@@ -4786,8 +4786,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 std::unordered_map<vd_t, std::vector<hd_t>> &ivtx_to_incoming_hlist_LOCAL = std::get<2>(local_output);
                 std::vector<std::pair<vd_t, vd_t>> &edges_LOCAL = std::get<3>(local_output);
 
-                const int rough_number_of_edges = std::distance(block_start_, block_end_);
-                edges_LOCAL.reserve(rough_number_of_edges * 1.2); // most edges are original
+                const uint32_t rough_number_of_edges = (uint32_t)std::distance(block_start_, block_end_);
+                edges_LOCAL.reserve((uint32_t)(rough_number_of_edges * 1.2)); // most edges are original
 
                 for (edge_array_iterator_t iter_ps_edge = block_start_; iter_ps_edge != block_end_; ++iter_ps_edge)
                 {
@@ -4821,7 +4821,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         //const hd_t h = m0.add_edge(vertices_on_ps_edge.back(), vertices_on_ps_edge.front());
                         //MCUT_ASSERT(h != mesh_t::null_halfedge());
                         edges_LOCAL.push_back(std::make_pair(vertices_on_ps_edge.back(), vertices_on_ps_edge.front()));
-                        const ed_t edge = ed_t(edges_LOCAL.size() - 1);
+                        const ed_t edge = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                         const hd_t h(edge * 2);
 
                         ps_to_m0_non_intersecting_edge_LOCAL[ps_edge] = edge;
@@ -4869,7 +4869,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 //h0 = m0.add_edge(first, second);
                                 //MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                                 edges_LOCAL.push_back(std::make_pair(first, second));
-                                m0_h0_edge_local = ed_t(edges_LOCAL.size() - 1);
+                                m0_h0_edge_local = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                                 h0 = hd_t(m0_h0_edge_local * 2); // mimmick halfedge descriptor
 
                                 //MCUT_ASSERT(m0.target(h0) == second);
@@ -4879,7 +4879,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 //MCUT_ASSERT(h1 != mesh_t::null_halfedge());
 
                                 edges_LOCAL.push_back(std::make_pair(second, third));
-                                m0_h1_edge_local = ed_t(edges_LOCAL.size() - 1);
+                                m0_h1_edge_local = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                                 h1 = hd_t(m0_h1_edge_local * 2);
 
                                 //MCUT_ASSERT(m0.target(m0.opposite(h1)) == second);
@@ -4892,7 +4892,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 //h0 = m0.add_edge(first, third);
                                 //MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                                 edges_LOCAL.push_back(std::make_pair(first, third));
-                                m0_h0_edge_local = ed_t(edges_LOCAL.size() - 1);
+                                m0_h0_edge_local = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                                 h0 = hd_t(m0_h0_edge_local * 2);
 
                                 ivtx_to_incoming_hlist_LOCAL[third].push_back(h0);
@@ -4900,7 +4900,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 //h1 = m0.add_edge(third, second);
                                 //MCUT_ASSERT(h1 != mesh_t::null_halfedge());
                                 edges_LOCAL.push_back(std::make_pair(third, second));
-                                m0_h1_edge_local = ed_t(edges_LOCAL.size() - 1);
+                                m0_h1_edge_local = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                                 h1 = hd_t(m0_h1_edge_local * 2);
 
                                 //ivtx_to_incoming_hlist_LOCAL[third].push_back(m0.opposite(h1));
@@ -4913,7 +4913,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             //h0 = m0.add_edge(second, first); // o-->x
                             //MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                             edges_LOCAL.push_back(std::make_pair(second, first));
-                            m0_h0_edge_local = ed_t(edges_LOCAL.size() - 1);
+                            m0_h0_edge_local = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                             h0 = hd_t(m0_h0_edge_local * 2);
 
                             ivtx_to_incoming_hlist_LOCAL[first].push_back(h0);
@@ -4922,7 +4922,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             //h1 = m0.add_edge(first, third);
                             //MCUT_ASSERT(h1 != mesh_t::null_halfedge());
                             edges_LOCAL.push_back(std::make_pair(first, third));
-                            m0_h1_edge_local = ed_t(edges_LOCAL.size() - 1);
+                            m0_h1_edge_local = ed_t((ed_t::index_type)(edges_LOCAL.size() - 1));
                             h1 = hd_t(m0_h1_edge_local * 2);
 
                             //MCUT_ASSERT(m0.target(m0.opposite(h1)) == first);

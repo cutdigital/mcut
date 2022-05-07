@@ -112,7 +112,7 @@ namespace mcut
 
         descriptor_t_ &operator+=(std::ptrdiff_t n)
         {
-            m_value = m_value + n;
+            m_value = (unsigned int)(m_value + n);
             return *this;
         }
 
@@ -456,7 +456,7 @@ namespace mcut
     void write_off(const char *fpath, const mcut::mesh_t &mesh);
     void read_off(mcut::mesh_t &mesh, const char *fpath);
 
-    template <typename V>
+    template <typename V = face_array_t>
     class array_iterator_t : public V::const_iterator
     {
         const mesh_t *mesh_ptr;
