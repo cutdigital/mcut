@@ -55,7 +55,7 @@
 #define MCUT_ASSERT(a)                            \
     do                                            \
     {                                             \
-        if (0 == (a))                             \
+        if (false == (a))                             \
         {                                         \
             std::fprintf(stderr,                  \
                          "Assertion failed: %s, " \

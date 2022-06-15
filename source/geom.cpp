@@ -551,7 +551,7 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
 math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3 &polygon_normal,
                                                                 const int polygon_normal_largest_component)
 {
-    MCUT_ASSERT(math::squared_length(polygon_normal) > 0);
+    MCUT_ASSERT(math::squared_length(polygon_normal) > math::real_number_t(0.0));
     MCUT_ASSERT(polygon_normal_largest_component >= 0);
     MCUT_ASSERT(polygon_normal_largest_component <= 2);
 
