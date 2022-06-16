@@ -29,9 +29,6 @@
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/scheduler.h"
 #endif
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-#include <cfenv>
-#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 #include <algorithm>
 #include <numeric>
@@ -56,112 +53,6 @@ std::atomic_bool mcut::thread_pool_terminate(false);
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-6;
-
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-McRoundingModeFlags convertRoundingMode(int rm)
-{
-    McRoundingModeFlags rmf = (McRoundingModeFlags)MC_ROUNDING_MODE_TO_NEAREST;
-    switch (rm)
-    {
-    case FE_TONEAREST:
-        rmf = MC_ROUNDING_MODE_TO_NEAREST;
-        break;
-    case FE_TOWARDZERO:
-        rmf = MC_ROUNDING_MODE_TOWARD_ZERO;
-        break;
-    case FE_UPWARD:
-        rmf = MC_ROUNDING_MODE_TOWARD_POS_INF;
-        break;
-    case FE_DOWNWARD:
-        rmf = MC_ROUNDING_MODE_TOWARD_NEG_INF;
-        break;
-    default:
-#if defined(MCUT_DEBUG_BUILD)
-        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
-#endif
-        break;
-    }
-    return rmf;
-}
-
-int convertRoundingMode(McRoundingModeFlags rm)
-{
-    int f = FE_TONEAREST;
-    switch (rm)
-    {
-    case MC_ROUNDING_MODE_TO_NEAREST:
-        f = FE_TONEAREST;
-        break;
-    case MC_ROUNDING_MODE_TOWARD_ZERO:
-        f = FE_TOWARDZERO;
-        break;
-    case MC_ROUNDING_MODE_TOWARD_POS_INF:
-        f = FE_UPWARD;
-        break;
-    case MC_ROUNDING_MODE_TOWARD_NEG_INF:
-        f = FE_DOWNWARD;
-        break;
-    default:
-#if defined(MCUT_DEBUG_BUILD)
-        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
-#endif
-        break;
-    }
-    return f;
-}
-#else
-McRoundingModeFlags convertRoundingMode(mp_rnd_t rm)
-{
-    McRoundingModeFlags rmf = MC_ROUNDING_MODE_TO_NEAREST;
-    switch (rm)
-    {
-    case MPFR_RNDN:
-        rmf = MC_ROUNDING_MODE_TO_NEAREST;
-        break;
-    case MPFR_RNDZ:
-        rmf = MC_ROUNDING_MODE_TOWARD_ZERO;
-        break;
-    case MPFR_RNDU:
-        rmf = MC_ROUNDING_MODE_TOWARD_POS_INF;
-        break;
-    case MPFR_RNDD:
-        rmf = MC_ROUNDING_MODE_TOWARD_NEG_INF;
-        break;
-    default:
-#if defined(MCUT_DEBUG_BUILD)
-        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
-#endif
-        break;
-    }
-    return rmf;
-}
-
-mp_rnd_t convertRoundingMode(McRoundingModeFlags rm)
-{
-    mp_rnd_t f = MPFR_RNDN;
-    switch (rm)
-    {
-    case MC_ROUNDING_MODE_TO_NEAREST:
-        f = MPFR_RNDN;
-        break;
-    case MC_ROUNDING_MODE_TOWARD_ZERO:
-        f = MPFR_RNDZ;
-        break;
-    case MC_ROUNDING_MODE_TOWARD_POS_INF:
-        f = MPFR_RNDU;
-        break;
-    case MC_ROUNDING_MODE_TOWARD_NEG_INF:
-        f = MPFR_RNDD;
-        break;
-    default:
-#if defined(MCUT_DEBUG_BUILD)
-        fprintf(stderr, "[MCUT]: conversion error (McRoundingModeFlags)\n");
-#endif
-        break;
-    }
-    return f;
-}
-#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 struct IndexArrayMesh
 {
@@ -230,6 +121,7 @@ struct McDispatchContextInternal
 #if defined(MCUT_MULTI_THREADED)
     mcut::thread_pool scheduler;
 #endif
+
     std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase *)>> connComps = {};
 
     // state & dispatch flags
@@ -244,7 +136,6 @@ struct McDispatchContextInternal
     McFlags debugSource = 0;
     McFlags debugType = 0;
     McFlags debugSeverity = 0;
-    //std::string lastLoggedDebugDetail = "";
 
     void log(McDebugSource source,
              McDebugType type,
@@ -257,89 +148,7 @@ struct McDispatchContextInternal
             (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
         }
     }
-
-    // numerical configs
-    // -----------------
-
-    // defaults
-    static McRoundingModeFlags defaultRoundingMode;
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    static uint64_t defaultPrecision;
-    static const uint64_t minPrecision;
-    static const uint64_t maxPrecision;
-    uint64_t precision = defaultPrecision;
-#else
-    static mpfr_prec_t defaultPrecision;
-    static const mpfr_prec_t minPrecision;
-    static const mpfr_prec_t maxPrecision;
-    mpfr_prec_t precision = defaultPrecision;
-#endif
-
-    // user values
-
-    McRoundingModeFlags roundingMode = defaultRoundingMode;
-
-    void applyPrecisionAndRoundingModeSettings()
-    {
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-        if (roundingMode != defaultRoundingMode)
-        {
-            std::fesetround(convertRoundingMode(roundingMode));
-        }
-
-        if (precision != defaultPrecision)
-        {
-            log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "redundant precision change");
-            // no-op ("mcut::math::real_number_t" is just "double" so we cannot change precision - its fixed)
-        }
-#else
-        // MPFR uses global state which could be potentially polluted other libraries/apps using MCUT
-        //if (roundingMode != defaultRoundingMode) {
-        mcut::math::arbitrary_precision_number_t::set_default_rounding_mode(convertRoundingMode(roundingMode));
-        //}
-
-        //if (precision != defaultPrecision) {
-        mcut::math::arbitrary_precision_number_t::set_default_precision(precision);
-        //}
-#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    }
-
-    void revertPrecisionAndRoundingModeSettings()
-    {
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-        if (roundingMode != defaultRoundingMode)
-        {
-            std::fesetround(convertRoundingMode(defaultRoundingMode));
-        }
-
-        if (precision != defaultPrecision)
-        {
-            log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "redundant precision change");
-            // no-op ("mcut::math::real_number_t" is just "double" so we cannot change precision - its fixed)
-        }
-#else
-        // if (roundingMode != defaultRoundingMode) {
-        mcut::math::arbitrary_precision_number_t::set_default_rounding_mode(convertRoundingMode(defaultRoundingMode));
-        //}
-
-        // if (precision != defaultPrecision) {
-        mcut::math::arbitrary_precision_number_t::set_default_precision(defaultPrecision);
-        // }
-#endif
-    }
 };
-
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(std::fegetround());
-uint64_t McDispatchContextInternal::defaultPrecision = sizeof(mcut::math::real_number_t) * 8;
-const uint64_t McDispatchContextInternal::minPrecision = McDispatchContextInternal::defaultPrecision;
-const uint64_t McDispatchContextInternal::maxPrecision = McDispatchContextInternal::defaultPrecision;
-#else
-McRoundingModeFlags McDispatchContextInternal::defaultRoundingMode = convertRoundingMode(mcut::math::arbitrary_precision_number_t::get_default_rounding_mode());
-mpfr_prec_t McDispatchContextInternal::defaultPrecision = mcut::math::arbitrary_precision_number_t::get_default_precision();
-const mpfr_prec_t McDispatchContextInternal::minPrecision = MPFR_PREC_MIN;
-const mpfr_prec_t McDispatchContextInternal::maxPrecision = MPFR_PREC_MAX;
-#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 std::map<McContext, std::unique_ptr<McDispatchContextInternal>> gDispatchContexts;
 
@@ -562,7 +371,7 @@ McResult indexArrayMeshToHalfedgeMesh(
             okay = okay && val == 0;
             if (!okay)
             {
-                continue; // just go on to wait for all tasks to finish before we return to user
+                continue; // just go on (to next iteration) in order to at-least wait for all tasks to finish before we return to user
             }
 
             result = add_faces(future_res.first, future_res.second);
@@ -574,14 +383,14 @@ McResult indexArrayMeshToHalfedgeMesh(
             return McResult::MC_INVALID_VALUE;
         }
 
-        //const std::vector<std::vector<mcut::vd_t>> &faces_MASTER_THREAD = std::get<0>(partial_res); // add last to maintain order
+        // add lastly in order to maintain order
         result = add_faces(partial_res.first, partial_res.second);
         if (result != McResult::MC_NO_ERROR)
         {
             return result;
         }
     }
-#else
+#else // #if defined(MCUT_MULTI_THREADED)
     int faceSizeOffset = 0;
     for (uint32_t i = 0; i < numFaces; ++i)
     {
@@ -862,7 +671,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             f.wait(); // simply wait for result to be done
         }
     }
-#else
+#else // #if defined(MCUT_MULTI_THREADED)
 
     for (uint32_t i = 0; i < indexArrayMesh.numVertices; ++i)
     {
@@ -964,6 +773,10 @@ McResult halfedgeMeshToIndexArrayMesh(
         }
     }
     TIMESTACK_POP();
+
+    //
+    // TODO: add functionality to add seam edges
+    //
 
     //
     // faces
@@ -1084,7 +897,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             f.wait(); // simply wait for result to be done
         }
     }
-#else
+#else // #if defined(MCUT_MULTI_THREADED)
 
     int faceID = 0; //std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     for (mcut::face_array_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
@@ -1227,7 +1040,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             f.wait(); // simply wait for result to be done
         }
     }
-#else
+#else // #if defined(MCUT_MULTI_THREADED)
     faceID = 0; //std::distance(halfedgeMeshInfo.mesh.faces_begin(), i);
     // for each face
     for (mcut::face_array_iterator_t i = halfedgeMeshInfo.mesh.faces_begin(); i != halfedgeMeshInfo.mesh.faces_end(); ++i)
@@ -1325,7 +1138,7 @@ McResult halfedgeMeshToIndexArrayMesh(
             f.wait(); // simply wait for result to be done
         }
     }
-#else
+#else // #if defined(MCUT_MULTI_THREADED)
     // note: cannot use std::distance with halfedge mesh iterators
     // not implemented because it'd be too slow
     uint32_t edge_idx = 0; // std::distance(halfedgeMeshInfo.mesh.edges_begin(), i);
@@ -1367,117 +1180,6 @@ McResult halfedgeMeshToIndexArrayMesh(
     }
 #endif
     TIMESTACK_POP();
-
-    return result;
-}
-
-MCAPI_ATTR McResult MCAPI_CALL mcSetRoundingMode(McContext context, McFlags rmode)
-{
-    McResult result = MC_NO_ERROR;
-
-    auto ctxtIter = gDispatchContexts.find(context);
-
-    if (ctxtIter == gDispatchContexts.cend())
-    {
-        std::fprintf(stderr, "error: context undefined");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
-
-    McRoundingModeFlags f = static_cast<McRoundingModeFlags>(rmode);
-    bool isvalid = f == MC_ROUNDING_MODE_TO_NEAREST ||     //
-                   f == MC_ROUNDING_MODE_TOWARD_ZERO ||    //
-                   f == MC_ROUNDING_MODE_TOWARD_POS_INF || //
-                   f == MC_ROUNDING_MODE_TOWARD_NEG_INF;
-    if (!isvalid)
-    {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "invalid rounding mode");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    ctxtPtr->roundingMode = f;
-    return result;
-}
-
-MCAPI_ATTR McResult MCAPI_CALL mcGetRoundingMode(McContext context, McFlags *rmode)
-{
-    McResult result = MC_NO_ERROR;
-
-    if (context == nullptr)
-    {
-        std::fprintf(stderr, "err: context undefined\n");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    auto ctxtIter = gDispatchContexts.find(context);
-
-    if (ctxtIter == gDispatchContexts.cend())
-    {
-        std::fprintf(stderr, "err: context undefined");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    const std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
-
-    *rmode = ctxtPtr->roundingMode;
-
-    return result;
-}
-
-MCAPI_ATTR McResult MCAPI_CALL mcSetPrecision(McContext context, uint64_t prec)
-{
-    McResult result = MC_NO_ERROR;
-
-    if (context == nullptr)
-    {
-        std::fprintf(stderr, "err: context undefined\n");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    auto ctxtIter = gDispatchContexts.find(context);
-
-    if (ctxtIter == gDispatchContexts.cend())
-    {
-        std::fprintf(stderr, "err: context undefined");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    const std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
-
-    if (prec < McDispatchContextInternal::minPrecision || prec > McDispatchContextInternal::maxPrecision)
-    {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "out of range precision");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    ctxtPtr->precision = prec;
-
-    return result;
-}
-
-MCAPI_ATTR McResult MCAPI_CALL mcGetPrecision(McContext context, uint64_t *prec)
-{
-    McResult result = MC_NO_ERROR;
-
-    auto ctxtIter = gDispatchContexts.find(context);
-
-    if (ctxtIter == gDispatchContexts.cend())
-    {
-        std::fprintf(stderr, "err: context undefined");
-        result = McResult::MC_INVALID_VALUE;
-        return result;
-    }
-
-    const std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
-    *prec = ctxtPtr->precision;
 
     return result;
 }
@@ -1713,70 +1415,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
             memcpy(pMem, reinterpret_cast<void *>(&ctxtPtr->flags), bytes);
         }
         break;
-    case MC_DEFAULT_PRECISION:
-        if (pMem == nullptr)
-        {
-            *pNumBytes = sizeof(ctxtPtr->defaultPrecision);
-        }
-        else
-        {
-            if (bytes > sizeof(ctxtPtr->defaultPrecision))
-            {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                result = McResult::MC_INVALID_VALUE;
-                return result;
-            }
-            memcpy(pMem, reinterpret_cast<void *>(&ctxtPtr->defaultPrecision), bytes);
-        }
-        break;
-    case MC_DEFAULT_ROUNDING_MODE:
-        if (pMem == nullptr)
-        {
-            *pNumBytes = sizeof(ctxtPtr->defaultRoundingMode);
-        }
-        else
-        {
-            if (bytes > sizeof(ctxtPtr->defaultRoundingMode))
-            {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                result = McResult::MC_INVALID_VALUE;
-                return result;
-            }
-            memcpy(pMem, reinterpret_cast<void *>(&ctxtPtr->defaultRoundingMode), bytes);
-        }
-        break;
-    case MC_PRECISION_MAX:
-        if (pMem == nullptr)
-        {
-            *pNumBytes = sizeof(McDispatchContextInternal::maxPrecision);
-        }
-        else
-        {
-            if (bytes > sizeof(McDispatchContextInternal::maxPrecision))
-            {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                result = McResult::MC_INVALID_VALUE;
-                return result;
-            }
-            memcpy(pMem, reinterpret_cast<const void *>(&McDispatchContextInternal::maxPrecision), bytes);
-        }
-        break;
-    case MC_PRECISION_MIN:
-        if (pMem == nullptr)
-        {
-            *pNumBytes = sizeof(McDispatchContextInternal::minPrecision);
-        }
-        else
-        {
-            if (bytes > sizeof(McDispatchContextInternal::minPrecision))
-            {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                result = McResult::MC_INVALID_VALUE;
-                return result;
-            }
-            memcpy(pMem, reinterpret_cast<const void *>(&McDispatchContextInternal::minPrecision), bytes);
-        }
-        break;
 #if 0
     case MC_DEBUG_KERNEL_TRACE:
         if (pMem == nullptr)
@@ -1805,6 +1443,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
     return result;
 }
 
+// perform minimal checks on the input mesh arrays provided by the user to 
+// ensure that they form a valid non-manifold mesh
 bool checkFrontendMesh(
     std::unique_ptr<McDispatchContextInternal> &ctxtPtr,
     const void *pVertices,
@@ -1848,35 +1488,9 @@ bool checkFrontendMesh(
     return result;
 }
 
-#if 0
-McResult checkMeshPlacement(std::unique_ptr<McDispatchContextInternal>& ctxtPtr, const mcut::mesh_t& srcMesh, const mcut::mesh_t& cutMesh)
-{
-    MCUT_ASSERT(srcMesh.number_of_vertices() >= 3);
-    MCUT_ASSERT(cutMesh.number_of_vertices() >= 3);
-
-    McResult result = McResult::MC_NO_ERROR;
-    for (mcut::vertex_array_iterator_t i = srcMesh.vertices_begin(); i != srcMesh.vertices_end(); ++i) {
-        const mcut::math::vec3& srcMeshVertex = srcMesh.vertex(*i);
-        for (mcut::vertex_array_iterator_t j = cutMesh.vertices_begin(); j != cutMesh.vertices_end(); ++j) {
-            const mcut::math::vec3& cutMeshVertex = cutMesh.vertex(*j);
-            if (srcMeshVertex.x() == cutMeshVertex.x() && srcMeshVertex.y() == cutMeshVertex.y() && srcMeshVertex.z() == cutMeshVertex.z()) {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
-                    "source-mesh vertex " + std::to_string(*i) + " is the same as cut-mesh vertex " + std::to_string(*j) + "\n");
-                result = McResult::MC_INVALID_MESH_PLACEMENT;
-                break;
-            }
-        }
-        if (result != McResult::MC_NO_ERROR) {
-            break;
-        }
-    }
-
-    return result;
-}
-#endif
-
 #if defined(USE_OIBVH)
 
+// TODO: move this to bvh.h/cpp
 void constructOIBVH(
     const mcut::mesh_t &mesh,
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &bvhAABBs,
@@ -2356,6 +1970,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
     return true;
 }
 
+// check that the halfedge-mesh version of a user-provided mesh is valid (i.e.
+// it is a non-manifold mesh containing a single connected component etc.)
 McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, const mcut::mesh_t &m)
 {
 
@@ -2476,6 +2092,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     TIMESTACK_PUSH(__FUNCTION__);
 
     McResult result = McResult::MC_NO_ERROR;
+    // get the context data given the handle
     std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator ctxtIter = gDispatchContexts.find(context);
 
     // check context found
@@ -2486,6 +2103,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         return result;
     }
 
+    // context data/state
     std::unique_ptr<McDispatchContextInternal> &ctxtPtr = ctxtIter->second;
 
     if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0)
@@ -2542,10 +2160,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         return result;
     }
 
-    mcut::input_t backendInput;
+    mcut::input_t backendInput; // kernel/backend inpout
+
 #if defined(MCUT_MULTI_THREADED)
     backendInput.scheduler = &ctxtPtr->scheduler;
 #endif
+
     backendInput.src_mesh = &srcMeshInternal;
 
     backendInput.verbose = false;
@@ -2592,8 +2212,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         backendInput.keep_fragments_sealed_inside = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE);
         backendInput.keep_unsealed_fragments = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_NONE);
         backendInput.keep_fragments_partially_cut = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED);
-        //backendInput.keep_fragments_sealed_outside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE);
-        //backendInput.keep_fragments_sealed_inside_exhaustive = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE);
         backendInput.keep_inside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_INSIDE);
         backendInput.keep_outside_patches = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_PATCH_OUTSIDE);
         backendInput.keep_srcmesh_seam = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_FILTER_SEAM_SRCMESH);
@@ -3818,10 +3436,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         try
         {
-            ctxtPtr->applyPrecisionAndRoundingModeSettings();
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch");
+            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_KERNEL, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch");
             mcut::dispatch(backendOutput, backendInput);
-            ctxtPtr->revertPrecisionAndRoundingModeSettings();
         }
         catch (const std::exception *e)
         {
@@ -3860,9 +3476,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     TIMESTACK_PUSH("create face partition maps");
     // NOTE: face descriptors in "fpPartitionChildFaceToInputCutMeshFace", need to be offsetted
     // by the number of internal source-mesh faces/vertices. This is to ensure consistency with the kernel's data-mapping and make
-    // it easier for us to map vertex and face descriptor in connected components to the correct instance in the user-provided
+    // it easier for us to map vertex and face descriptors in connected components to the correct instance in the user-provided
     // input meshes.
-    // This offsetting follows a design choice used in the kernel that (ps-faces belonging to cut-mesh start [after] the
+    // This offsetting follows a design choice used in the kernel that ("ps-faces" belonging to cut-mesh start [after] the
     // source-mesh faces).
     // Refer to the function "halfedgeMeshToIndexArrayMesh()" on how we use this information.
     std::unordered_map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = fpPartitionChildFaceToInputCutMeshFace;
@@ -4010,7 +3626,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     // seam connected components
     // -------------------------
 
-    // NOTE: seamed meshes are not available if there was no partial cut intersection (due to constraints imposed by halfedge construction rules).
+    // NOTE: seam meshes are not available if there was a partial cut intersection (due to constraints imposed by halfedge construction rules).
 
     //  src mesh
 
@@ -4146,11 +3762,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             numSrcMeshVertices, numSrcMeshFaces, srcMeshInternal.number_of_vertices(), srcMeshInternal.number_of_faces());
         TIMESTACK_POP();
     }
-
-#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    // for the caches and pools, in all threads where MPFR is potentially used
-    mpfr_mp_memory_cleanup();
-#endif
 
     TIMESTACK_POP();
 

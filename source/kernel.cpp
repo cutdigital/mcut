@@ -38,7 +38,7 @@
 
 
 #ifndef LICENSE_PURCHASED
-#define lmsg() printf("WARNING: MCUT is copyrighted and may not be sold or included in commercial products without a license.")
+#define lmsg() printf("NOTE: MCUT is copyrighted and may not be sold or included in commercial products without a license.\n")
 #else
 #define lmsg()
 #endif // #ifndef LICENSE_PURCHASED

@@ -284,20 +284,6 @@ typedef enum McContextCreationFlags {
 } McContextCreationFlags;
 
 /**
- * \enum McRoundingModeFlags
- * @brief Numerical rounding mode.
- *
- * This enum structure defines the supported rounding modes which are applied when computing intersections during a dispatch call.
- * The MC_ROUNDING_MODE_TO_NEAREST mode works as in the IEEE 754 standard: in case the number to be rounded lies exactly in the middle of two representable numbers, it is rounded to the one with the least significant bit set to zero
- */
-typedef enum McRoundingModeFlags {
-    MC_ROUNDING_MODE_TO_NEAREST = (1 << 2), /**< round to nearest (roundTiesToEven in IEEE 754-2008).*/
-    MC_ROUNDING_MODE_TOWARD_ZERO = (1 << 3), /**< round toward zero (roundTowardZero in IEEE 754 - 2008).*/
-    MC_ROUNDING_MODE_TOWARD_POS_INF = (1 << 4), /**< round toward plus infinity (roundTowardPositive in IEEE 754-2008).*/
-    MC_ROUNDING_MODE_TOWARD_NEG_INF = (1 << 5) /**< round toward minus infinity (roundTowardNegative in IEEE 754-2008).*/
-} McRoundingModeFlags;
-
-/**
  * \enum McDispatchFlags
  * @brief Dispatch configuration flags.
  *
@@ -361,11 +347,7 @@ typedef enum McDispatchFlags {
  */
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
-    MC_DONT_CARE = 1 << 1, /**< wildcard.*/
-    MC_DEFAULT_PRECISION = 1 << 2, /**< Default number of bits used to represent the significand of a floating-point number.*/
-    MC_DEFAULT_ROUNDING_MODE = 1 << 3, /**< Default way to round the result of a floating-point operation.*/
-    MC_PRECISION_MAX = 1 << 4, /**< Maximum value for precision bits.*/
-    MC_PRECISION_MIN = 1 << 5, /**< Minimum value for precision bits.*/
+    MC_DONT_CARE = 1 << 1 /**< wildcard.*/
 } McQueryFlags;
 
 /**
@@ -412,132 +394,6 @@ typedef void (*pfn_mcDebugOutput_CALLBACK)(
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(
     McContext* pContext, McFlags flags);
-
-/** @brief Set the numerical rounding mode.
-*
-* This function updates context state to use given rounding mode during dispatch calls. See ::McRoundingModeFlags.
-*
-* @param [in] context a pointer to a previous allocated context.
-* @param [in] rmode The rounding mode.
-*
- * An example of usage:
- * @code
- * McResult err = mcSetRoundingMode(&myContext, MC_ROUNDING_MODE_TO_NEAREST);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL
-*   -# \p rmode defines an invalid bitfield (e.g. more than one rounding mode).
-*
-* @note This function is a no-op if ARBITRARY_PRECISION_NUMBERS is not defined.
-*/
-extern MCAPI_ATTR McResult MCAPI_CALL mcSetRoundingMode(
-    McContext context,
-    McFlags rmode);
-
-/** @brief Get the numerical rounding mode.
-*
-* This function retrieves the rounding mode currently used the context. @see McRoundingModeFlags
-*
-* @param [in] context The context handle
-* @param [out] pRmode The returned value for the current rounding mode
-*
- * An example of usage:
- * @code
- * McFlags myRoundingMode = 0;
- * McResult err = mcGetRoundingMode(&myContext, &myRoundingMode);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p pRmode is NULL.
-*/
-extern MCAPI_ATTR McResult MCAPI_CALL mcGetRoundingMode(
-    McContext context,
-    McFlags* pRmode);
-
-/** @brief Set the precision bits.
-*
-* This function sets the default precision to be exactly prec bits, where prec can be any integer between MC_PRECISION_MAX and MC_PRECISION_MIN. The precision of a variable means the number of bits used to store its significand. The default precision is set to 53 bits initially if ARBITRARY_PRECISION_NUMBERS is defined. Otherwise, the default precision is set to "sizeof(long double) * 8" bits.
-*
-* @param [in] context a pointer to the allocated context handle
-* @param [in] prec The number precision bits
-*
-*
- * An example of usage:
- * @code
- * uint64_t prec = 64;
- * McResult err = mcSetPrecision(&myContext, prec);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p prec is not an between #MC_PRECISION_MAX and #MC_PRECISION_MIN (See ::McQueryFlags).
-*
-* @note This function is a no-op if ARBITRARY_PRECISION_NUMBERS is not defined. Do not attempt to set the precision to any value near #MC_PRECISION_MAX, otherwise mcut will abort due to an assertion failure. Moreover, you may reach some memory limit on your platform, in which case the program may abort, crash or have undefined behavior (depending on your C implementation).
-
-*/
-extern MCAPI_ATTR McResult MCAPI_CALL mcSetPrecision(
-    McContext context,
-    uint64_t prec);
-
-/** @brief Get the number of precision bits.
-*
-* This function retrieves the number of precision bits currently used by the context.
-*
-* @param [in] context The context handle
-* @param [out] pPrec The number of precision bits
-*
- * An example of usage:
- * @code
- * uint64_t myPrecisionBits = 0;
- * McResult err = mcGetPrecision(&myContext, &myPrecisionBits);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p pPrec is NULL.
-*
-*/
-extern MCAPI_ATTR McResult MCAPI_CALL mcGetPrecision(
-    McContext context,
-    uint64_t* pPrec);
 
 /** @brief Specify a callback to receive debugging messages from the MCUT library.
 *
