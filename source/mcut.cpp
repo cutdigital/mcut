@@ -35,7 +35,7 @@
 #include <queue>
 #include <fstream>
 #include <memory>
-#include <random> // perturbation
+#include <random> // for numerical perturbation
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
@@ -54,6 +54,10 @@ std::atomic_bool mcut::thread_pool_terminate(false);
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-6;
 
+// internal frontend data structure which we use to store connected component 
+// data. Information requested by a client/user via "mcGetConnectedComponentData"
+// is read from this data structure (halfedge meshes are used by the backend 
+// kernel)
 struct IndexArrayMesh
 {
     IndexArrayMesh() {}
@@ -81,6 +85,7 @@ struct IndexArrayMesh
     uint32_t numTriangleIndices = 0;
 };
 
+// base struct from which other structs represent connected components inherit
 struct McConnCompBase
 {
     virtual ~McConnCompBase(){};
@@ -88,6 +93,7 @@ struct McConnCompBase
     IndexArrayMesh indexArrayMesh;
 };
 
+// struct representing a fragment
 struct McFragmentConnComp : public McConnCompBase
 {
     McFragmentLocation fragmentLocation = (McFragmentLocation)0;
@@ -95,46 +101,61 @@ struct McFragmentConnComp : public McConnCompBase
     McPatchLocation patchLocation = (McPatchLocation)0;
 };
 
+// struct representing a patch
 struct McPatchConnComp : public McConnCompBase
 {
     McPatchLocation patchLocation = (McPatchLocation)0;
 };
 
+// struct representing a seam
 struct McSeamConnComp : public McConnCompBase
 {
     McSeamOrigin origin = (McSeamOrigin)0;
 };
 
+// struct representing an input (user provided mesh)
 struct McInputConnComp : public McConnCompBase
 {
     McInputOrigin origin = (McInputOrigin)0;
 };
 
+// our custome deleter function for std::unique_ptr variable of an array type
 template <typename Derived>
 void ccDeletorFunc(McConnCompBase *p)
 {
     delete static_cast<Derived *>(p);
 }
 
+// struct defining the state of a context object
 struct McDispatchContextInternal
 {
 #if defined(MCUT_MULTI_THREADED)
+    // work scheduling state
     mcut::thread_pool scheduler;
 #endif
 
+    // the current set of connected components associated with context
     std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase *)>> connComps = {};
 
-    // state & dispatch flags
-    // -----
+    // The state and flag variable current used to configure the next dispatch call
     McFlags flags = (McFlags)0;
     McFlags dispatchFlags = (McFlags)0;
 
-    // debugging
-    // ---------
+    // client/user debugging variable
+    // ------------------------------
+
+    // function pointer to user-define callback function for status/erro reporting
     pfn_mcDebugOutput_CALLBACK debugCallback = nullptr;
+    // user provided data for callback
     const void *debugCallbackUserParam = nullptr;
+
+    // TODO: make use of the following three filter inside the log function
+
+    // controller for permmited messages based on the source of message
     McFlags debugSource = 0;
+    // controller for permmited messages based on the type of message
     McFlags debugType = 0;
+    // controller for permmited messages based on the severity of message
     McFlags debugSeverity = 0;
 
     void log(McDebugSource source,
@@ -150,8 +171,11 @@ struct McDispatchContextInternal
     }
 };
 
+// list of contexts created by client/user
 std::map<McContext, std::unique_ptr<McDispatchContextInternal>> gDispatchContexts;
 
+// this function converts an index array mesh (e.g. as recieved by the dispatch 
+// function) into a halfedge mesh representation for the kernel backend.
 McResult indexArrayMeshToHalfedgeMesh(
     std::unique_ptr<McDispatchContextInternal> &ctxtPtr,
     mcut::mesh_t &halfedgeMesh,
@@ -165,57 +189,72 @@ McResult indexArrayMeshToHalfedgeMesh(
 {
     TIMESTACK_PUSH(__FUNCTION__);
 
-    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
+    ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
 
     McResult result = McResult::MC_NO_ERROR;
-    //std::unordered_map<uint32_t, mcut::vd_t> vmap;
 
+    // minor optimization 
     halfedgeMesh.reserve_for_additional_elements(numVertices);
 
     TIMESTACK_PUSH("add vertices");
+
+    // did the user provide vertex arrays of 32-bit floats...?
     if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT)
     {
         const float *vptr = reinterpret_cast<const float *>(pVertices);
+
+        // for each input mesh-vertex
         for (uint32_t i = 0; i < numVertices; ++i)
         {
             const float &x = vptr[(i * 3) + 0];
             const float &y = vptr[(i * 3) + 1];
             const float &z = vptr[(i * 3) + 2];
-            /*vmap[i]*/ mcut::vd_t vd = halfedgeMesh.add_vertex(
+
+            // insert our vertex into halfedge mesh 
+            mcut::vd_t vd = halfedgeMesh.add_vertex(
                 mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
+            
             MCUT_ASSERT(vd != mcut::mesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
     }
+    // did the user provide vertex arrays of 64-bit double...?
     else if (ctxtPtr->dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE)
     {
         const double *vptr = reinterpret_cast<const double *>(pVertices);
+
+        // for each input mesh-vertex
         for (uint32_t i = 0; i < numVertices; ++i)
         {
             const double &x = vptr[(i * 3) + 0];
             const double &y = vptr[(i * 3) + 1];
             const double &z = vptr[(i * 3) + 2];
-            /*vmap[i]*/ mcut::vd_t vd = halfedgeMesh.add_vertex(
+            
+            // insert our vertex into halfedge mesh 
+            mcut::vd_t vd = halfedgeMesh.add_vertex(
                 mcut::math::real_number_t(x) + (perturbation != NULL ? (*perturbation).x() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(y) + (perturbation != NULL ? (*perturbation).y() : mcut::math::real_number_t(0.)),
                 mcut::math::real_number_t(z) + (perturbation != NULL ? (*perturbation).z() : mcut::math::real_number_t(0.)));
+            
             MCUT_ASSERT(vd != mcut::mesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
     }
+    // oh oh ..
     else
     {
         result = McResult::MC_INVALID_VALUE;
 
         if (result != McResult::MC_NO_ERROR)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid bit precision flag");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid bit precision flag");
 
             return result;
         }
     }
     TIMESTACK_POP();
 
+    // compute the mesh bounding box while we are at it (for numerical perturbation)
     mcut::math::vec3 bboxMin(1e10);
     mcut::math::vec3 bboxMax(-1e10);
 
@@ -234,6 +273,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 #if defined(MCUT_MULTI_THREADED)
     std::vector<uint32_t> partial_sums(numFaces, 0); // prefix sum result
     std::partial_sum(pFaceSizes, pFaceSizes + numFaces, partial_sums.data());
+
     {
         typedef std::vector<uint32_t>::const_iterator InputStorageIteratorType;
         typedef std::pair<InputStorageIteratorType, InputStorageIteratorType> OutputStorageType; // range of faces
@@ -259,10 +299,10 @@ McResult indexArrayMeshToHalfedgeMesh(
                     if (exchanged) // first thread to detect error
                     {
                         ctxtPtr->log(                                //
-                            McDebugSource::MC_DEBUG_SOURCE_API,      //
-                            McDebugType::MC_DEBUG_TYPE_ERROR,        //
+                            MC_DEBUG_SOURCE_API,      //
+                            MC_DEBUG_TYPE_ERROR,        //
                             0,                                       //
-                            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
+                            MC_DEBUG_SEVERITY_HIGH, //
                             "invalid face-size for face - " + std::to_string(faceID) + " (size = " + std::to_string(numFaceVertices) + ")");
                     }
                     break;
@@ -274,41 +314,24 @@ McResult indexArrayMeshToHalfedgeMesh(
                 for (int j = 0; j < numFaceVertices; ++j)
                 {
                     uint32_t idx = ((uint32_t *)pFaceIndices)[faceBaseOffset + j];
+                    
                     MCUT_ASSERT(idx < numVertices);
-#if 0
-                    std::unordered_map<uint32_t, mcut::vd_t>::const_iterator fIter = vmap.find(idx);
 
-                    if (fIter == vmap.cend())
-                    {
-                        int zero = (int)McResult::MC_NO_ERROR;
-                        bool exchanged = atm_result.compare_exchange_strong(zero, 1);
-                        if (exchanged) // first thread to detect error
-                        {
-                            ctxtPtr->log(                                //
-                                McDebugSource::MC_DEBUG_SOURCE_API,      //
-                                McDebugType::MC_DEBUG_TYPE_ERROR,        //
-                                0,                                       //
-                                McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
-                                "invalid vertex index - " + std::to_string(idx));
-                        }
-                        break;
-                    }
-#endif
-                    const mcut::vertex_descriptor_t descr(idx); // = fIter->second; //vmap[*fIter.first];
-
+                    const mcut::vertex_descriptor_t descr(idx); 
                     const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
                     if (isDuplicate)
                     {
                         int zero = (int)McResult::MC_NO_ERROR;
                         bool exchanged = atm_result.compare_exchange_strong(zero, 2);
+
                         if (exchanged) // first thread to detect error
                         {
-                            ctxtPtr->log(                                //
-                                McDebugSource::MC_DEBUG_SOURCE_API,      //
-                                McDebugType::MC_DEBUG_TYPE_ERROR,        //
-                                0,                                       //
-                                McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
+                            ctxtPtr->log(                                
+                                MC_DEBUG_SOURCE_API,      
+                                MC_DEBUG_TYPE_ERROR,        
+                                0,                                       
+                                MC_DEBUG_SEVERITY_HIGH, 
                                 "found duplicate vertex in face - " + std::to_string(faceID));
                         }
                         break;
@@ -348,10 +371,10 @@ McResult indexArrayMeshToHalfedgeMesh(
                     if (result != McResult::MC_NO_ERROR)
                     {
                         ctxtPtr->log(                                //
-                            McDebugSource::MC_DEBUG_SOURCE_API,      //
-                            McDebugType::MC_DEBUG_TYPE_ERROR,        //
+                            MC_DEBUG_SOURCE_API,      //
+                            MC_DEBUG_TYPE_ERROR,        //
                             0,                                       //
-                            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, //
+                            MC_DEBUG_SEVERITY_HIGH, //
                             "invalid vertices on face - " + std::to_string(faceID));
                         return result;
                     }
@@ -405,7 +428,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
             if (result != McResult::MC_NO_ERROR)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid face-size for face - " + std::to_string(i) + " (size = " + std::to_string(numFaceVertices) + ")");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid face-size for face - " + std::to_string(i) + " (size = " + std::to_string(numFaceVertices) + ")");
 
                 return result;
             }
@@ -417,24 +440,7 @@ McResult indexArrayMeshToHalfedgeMesh(
         {
 
             uint32_t idx = ((uint32_t *)pFaceIndices)[faceSizeOffset + j];
-#if 0
-            std::unordered_map<uint32_t, mcut::vd_t>::const_iterator fIter = vmap.find(idx);
-
-            if (fIter == vmap.cend())
-            {
-
-                result = McResult::MC_INVALID_VALUE;
-
-                if (result != McResult::MC_NO_ERROR)
-                {
-                    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid vertex index - " + std::to_string(idx));
-
-                    return result;
-                }
-            }
-#endif
             const mcut::vertex_descriptor_t descr(idx); // = fIter->second; //vmap[*fIter.first];
-
             const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
             if (isDuplicate)
@@ -443,7 +449,7 @@ McResult indexArrayMeshToHalfedgeMesh(
 
                 if (result != McResult::MC_NO_ERROR)
                 {
-                    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "found duplicate vertex in face - " + std::to_string(i));
+                    ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "found duplicate vertex in face - " + std::to_string(i));
 
                     return result;
                 }
@@ -461,7 +467,7 @@ McResult indexArrayMeshToHalfedgeMesh(
             {
                 // Hint: this can happen when the mesh does not have a consistent 
                 // winding order i.e. some faces are CCW and others are CW
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
 
                 return result;
             }
@@ -489,19 +495,6 @@ McResult convert(const mcut::status_t &v)
     case mcut::status_t::INVALID_MESH_INTERSECTION:
         result = McResult::MC_INVALID_OPERATION;
         break;
-    //case mcut::status_t::INVALID_CUT_MESH:
-    //    result = McResult::MC_INVALID_CUT_MESH;
-    //    break;
-    //case mcut::status_t::INVALID_MESH_INTERSECTION:
-    //case mcut::status_t::INVALID_BVH_INTERSECTION:
-    //    result = McResult::MC_INVALID_OPERATION;
-    //    break;
-    //case mcut::status_t::EDGE_EDGE_INTERSECTION:
-    //    result = McResult::MC_EDGE_EDGE_INTERSECTION;
-    //   break;
-    //case mcut::status_t::FACE_VERTEX_INTERSECTION:
-    //    result = McResult::MC_FACE_VERTEX_INTERSECTION;
-    //    break;
     default:
         std::fprintf(stderr, "[MCUT]: warning - conversion error (McResult=%d)\n", (int)v);
     }
@@ -548,6 +541,8 @@ McFragmentLocation convert(const mcut::connected_component_location_t &v)
     return result;
 }
 
+// this function converts a halfedge mesh representation (from the kernel 
+// backend) to an index array mesh (for the user).
 McResult halfedgeMeshToIndexArrayMesh(
 #if defined(MCUT_MULTI_THREADED)
     const std::unique_ptr<McDispatchContextInternal> &ctxtPtr,
@@ -567,7 +562,6 @@ McResult halfedgeMeshToIndexArrayMesh(
 
     McResult result = McResult::MC_NO_ERROR;
 
-    //std::vector<uint32_t> vmap(halfedgeMeshInfo.mesh.number_of_vertices());
     //
     // vertices
     //
@@ -599,11 +593,10 @@ McResult halfedgeMeshToIndexArrayMesh(
             {
                 const mcut::math::vec3 &point = halfedgeMeshInfo.mesh.vertex(*viter);
                 const uint32_t i = (uint32_t)std::distance(halfedgeMeshInfo.mesh.vertices_begin(), viter);
+                
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 2u] = point.z();
-
-                //vmap[*viter] = i;
 
                 if (!halfedgeMeshInfo.data_maps.vertex_map.empty())
                 {
@@ -1207,6 +1200,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext *pContext, McFlags flag
     }
     *pContext = ret.first->first;
 
+    // perhaps we may want this to be cal exactly once in a client app
     ::exactinit();
 
     return result;
@@ -1236,7 +1230,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mc
 
     if (cb == nullptr)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "callback parameter NULL");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_LOW, "callback parameter NULL");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -1309,16 +1303,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     if (!sourceParamValid)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid source parameter value");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_MEDIUM, "Invalid source parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
-    for (auto i : {McDebugSource::MC_DEBUG_SOURCE_API, McDebugSource::MC_DEBUG_SOURCE_KERNEL})
+    for (auto i : {MC_DEBUG_SOURCE_API, MC_DEBUG_SOURCE_KERNEL})
     {
         if ((source & i) && enabled)
         {
-            int n = trailing_zeroes(McDebugSource::MC_DEBUG_SOURCE_ALL & i);
+            int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i);
             ctxtPtr->debugSource = set_bit(ctxtPtr->debugSource, n);
         }
     }
@@ -1331,18 +1325,18 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     if (!typeParamValid)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug type parameter value");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug type parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
     ctxtPtr->debugType = 0;
 
-    for (auto i : {McDebugType::MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, McDebugType::MC_DEBUG_TYPE_ERROR, McDebugType::MC_DEBUG_TYPE_OTHER})
+    for (auto i : {MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, MC_DEBUG_TYPE_ERROR, MC_DEBUG_TYPE_OTHER})
     {
         if ((type & i) && enabled)
         {
-            int n = trailing_zeroes(McDebugType::MC_DEBUG_TYPE_ALL & i);
+            int n = trailing_zeroes(MC_DEBUG_TYPE_ALL & i);
             ctxtPtr->debugType = set_bit(ctxtPtr->debugType, n);
         }
     }
@@ -1356,18 +1350,18 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
 
     if (!severityParamValid)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug severity parameter value");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_MEDIUM, "Invalid debug severity parameter value");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
     ctxtPtr->debugSeverity = 0;
 
-    for (auto i : {McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION})
+    for (auto i : {MC_DEBUG_SEVERITY_HIGH, MC_DEBUG_SEVERITY_LOW, MC_DEBUG_SEVERITY_MEDIUM, MC_DEBUG_SEVERITY_NOTIFICATION})
     {
         if ((severity & i) && enabled)
         {
-            int n = trailing_zeroes(McDebugSeverity::MC_DEBUG_SEVERITY_ALL & i);
+            int n = trailing_zeroes(MC_DEBUG_SEVERITY_ALL & i);
             ctxtPtr->debugSeverity = set_bit(ctxtPtr->debugSeverity, n);
         }
     }
@@ -1392,7 +1386,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
 
     if (bytes != 0 && pMem == nullptr)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "null parameter");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "null parameter");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -1408,34 +1402,15 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         {
             if (bytes > sizeof(ctxtPtr->flags))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
             memcpy(pMem, reinterpret_cast<void *>(&ctxtPtr->flags), bytes);
         }
         break;
-#if 0
-    case MC_DEBUG_KERNEL_TRACE:
-        if (pMem == nullptr)
-        {
-            *pNumBytes = ctxtPtr->lastLoggedDebugDetail.length();
-        }
-        else
-        {
-            if (bytes == 0 || bytes > ctxtPtr->lastLoggedDebugDetail.length())
-            {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
-                result = McResult::MC_INVALID_VALUE;
-                return result;
-            }
-            memcpy(pMem, reinterpret_cast<const void *>(ctxtPtr->lastLoggedDebugDetail.data()), bytes);
-        }
-        break;
-        break;
-#endif
     default:
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_LOW, "unknown info parameter");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_LOW, "unknown info parameter");
         result = McResult::MC_INVALID_VALUE;
         break;
     }
@@ -1483,430 +1458,10 @@ bool checkFrontendMesh(
 
     if (!result)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, errmsg);
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, errmsg);
     }
     return result;
 }
-
-#if defined(USE_OIBVH)
-
-// TODO: move this to bvh.h/cpp
-void constructOIBVH(
-    const mcut::mesh_t &mesh,
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &bvhAABBs,
-    std::vector<mcut::fd_t> &bvhLeafNodeFaces,
-    std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &face_bboxes,
-    const mcut::math::real_number_t &slightEnlargmentEps = mcut::math::real_number_t(0.0))
-{
-    TIMESTACK_PUSH(__FUNCTION__);
-    const int meshFaceCount = mesh.number_of_faces();
-    const int bvhNodeCount = mcut::bvh::get_ostensibly_implicit_bvh_size(meshFaceCount);
-
-    // compute mesh-face bounding boxes and their centers
-    // ::::::::::::::::::::::::::::::::::::::::::::::::::
-
-    face_bboxes.resize(meshFaceCount); //, mcut::geom::bounding_box_t<mcut::math::fast_vec3>());
-    std::vector<mcut::math::fast_vec3> face_bbox_centers(meshFaceCount, mcut::math::fast_vec3());
-
-    // for each face in mesh
-    for (mcut::face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
-    {
-        const int faceIdx = static_cast<int>(*f);
-        const std::vector<mcut::vd_t> vertices_on_face = mesh.get_vertices_around_face(*f);
-
-        // for each vertex on face
-        for (std::vector<mcut::vd_t>::const_iterator v = vertices_on_face.cbegin(); v != vertices_on_face.cend(); ++v)
-        {
-            const mcut::math::fast_vec3 coords = mesh.vertex(*v);
-            face_bboxes[faceIdx].expand(coords);
-        }
-
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3> &bbox = face_bboxes[faceIdx];
-
-        if (slightEnlargmentEps > mcut::math::real_number_t(0.0))
-        {
-            bbox.enlarge(slightEnlargmentEps);
-        }
-
-        // calculate bbox center
-        face_bbox_centers[*f] = (bbox.minimum() + bbox.maximum()) / 2;
-    }
-
-    // compute mesh bounding box
-    // :::::::::::::::::::::::::
-
-    bvhAABBs.resize(bvhNodeCount);
-    mcut::geom::bounding_box_t<mcut::math::fast_vec3> &meshBbox = bvhAABBs.front(); // root bounding box
-
-    // for each vertex in mesh
-    for (mcut::vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
-    {
-        const mcut::math::vec3 &coords = mesh.vertex(*v);
-        meshBbox.expand(coords);
-    }
-
-    // compute morton codes
-    // ::::::::::::::::::::
-
-    std::vector<std::pair<mcut::fd_t, uint32_t>> bvhLeafNodeDescriptors(meshFaceCount, std::pair<mcut::fd_t, uint32_t>());
-
-    for (mcut::face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f)
-    {
-        const uint32_t faceIdx = static_cast<uint32_t>(*f);
-
-        const mcut::math::fast_vec3 &face_aabb_centre = face_bbox_centers.at(faceIdx);
-        const mcut::math::fast_vec3 offset = face_aabb_centre - meshBbox.minimum();
-        const mcut::math::fast_vec3 dims = meshBbox.maximum() - meshBbox.minimum();
-
-        const unsigned int mortion_code = mcut::bvh::morton3D(
-            static_cast<float>(offset.x() / dims.x()),
-            static_cast<float>(offset.y() / dims.y()),
-            static_cast<float>(offset.z() / dims.z()));
-
-        const uint32_t idx = (uint32_t)std::distance(mesh.faces_begin(), f); // NOTE: mesh.faces_begin() may not be the actual beginning internally
-        bvhLeafNodeDescriptors[idx].first = *f;
-        bvhLeafNodeDescriptors[idx].second = mortion_code;
-    }
-
-    // sort faces according to morton codes
-
-    std::sort(
-        bvhLeafNodeDescriptors.begin(),
-        bvhLeafNodeDescriptors.end(),
-        [](const std::pair<mcut::fd_t, uint32_t> &a, const std::pair<mcut::fd_t, uint32_t> &b)
-        {
-            return a.second < b.second;
-        });
-
-    bvhLeafNodeFaces.resize(meshFaceCount);
-
-    const int leaf_level_index = mcut::bvh::get_leaf_level_from_real_leaf_count(meshFaceCount);
-    const int leftmost_real_node_on_leaf_level = mcut::bvh::get_level_leftmost_node(leaf_level_index);
-    const int rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(leaf_level_index, meshFaceCount);
-    const int rightmost_real_node_on_leaf_level = mcut::bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, leaf_level_index);
-
-    // save sorted leaf node bvhAABBs and their corrresponding face id
-    for (std::vector<std::pair<mcut::fd_t, uint32_t>>::const_iterator it = bvhLeafNodeDescriptors.cbegin(); it != bvhLeafNodeDescriptors.cend(); ++it)
-    {
-        const uint32_t index_on_leaf_level = (uint32_t)std::distance(bvhLeafNodeDescriptors.cbegin(), it);
-
-        bvhLeafNodeFaces[index_on_leaf_level] = it->first;
-
-        const int implicit_idx = leftmost_real_node_on_leaf_level + index_on_leaf_level;
-        const int memory_idx = mcut::bvh::get_node_mem_index(
-            implicit_idx,
-            leftmost_real_node_on_leaf_level,
-            0,
-            rightmost_real_node_on_leaf_level);
-
-        const mcut::geom::bounding_box_t<mcut::math::fast_vec3> &face_bbox = face_bboxes[(uint32_t)it->first];
-        bvhAABBs[memory_idx] = face_bbox;
-    }
-
-    // construct internal-node bounding boxes
-    // ::::::::::::::::::::::::::::::::::::::
-
-    // for each level in the oi-bvh tree (starting from the penultimate level)
-    for (int level_index = leaf_level_index - 1; level_index >= 0; --level_index)
-    {
-
-        const int rightmost_real_node_on_level = mcut::bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_index);
-        const int leftmost_real_node_on_level = mcut::bvh::get_level_leftmost_node(level_index);
-        const int number_of_real_nodes_on_level = (rightmost_real_node_on_level - leftmost_real_node_on_level) + 1;
-
-        // for each node on the current level
-        for (int level_node_idx_iter = 0; level_node_idx_iter < number_of_real_nodes_on_level; ++level_node_idx_iter)
-        {
-
-            const int node_implicit_idx = leftmost_real_node_on_level + level_node_idx_iter;
-            const int left_child_implicit_idx = (node_implicit_idx * 2) + 1;
-            const int right_child_implicit_idx = (node_implicit_idx * 2) + 2;
-            const bool is_penultimate_level = (level_index == (leaf_level_index - 1));
-            const int rightmost_real_node_on_child_level = mcut::bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_index + 1);
-            const int leftmost_real_node_on_child_level = mcut::bvh::get_level_leftmost_node(level_index + 1);
-            const bool right_child_exists = (right_child_implicit_idx <= rightmost_real_node_on_child_level);
-
-            mcut::geom::bounding_box_t<mcut::math::fast_vec3> node_bbox;
-
-            if (is_penultimate_level)
-            { // both children are leaves
-
-                const int left_child_index_on_level = left_child_implicit_idx - leftmost_real_node_on_child_level;
-                const mcut::fd_t &left_child_face = bvhLeafNodeFaces.at(left_child_index_on_level);
-                const mcut::geom::bounding_box_t<mcut::math::fast_vec3> &left_child_bbox = face_bboxes.at(left_child_face);
-
-                node_bbox.expand(left_child_bbox);
-
-                if (right_child_exists)
-                {
-                    const int right_child_index_on_level = right_child_implicit_idx - leftmost_real_node_on_child_level;
-                    const mcut::fd_t &right_child_face = bvhLeafNodeFaces.at(right_child_index_on_level);
-                    const mcut::geom::bounding_box_t<mcut::math::fast_vec3> &right_child_bbox = face_bboxes.at(right_child_face);
-                    node_bbox.expand(right_child_bbox);
-                }
-            }
-            else
-            { // remaining internal node levels
-
-                const int left_child_memory_idx = mcut::bvh::get_node_mem_index(
-                    left_child_implicit_idx,
-                    leftmost_real_node_on_child_level,
-                    0,
-                    rightmost_real_node_on_child_level);
-                const mcut::geom::bounding_box_t<mcut::math::fast_vec3> &left_child_bbox = bvhAABBs.at(left_child_memory_idx);
-
-                node_bbox.expand(left_child_bbox);
-
-                if (right_child_exists)
-                {
-                    const int right_child_memory_idx = mcut::bvh::get_node_mem_index(
-                        right_child_implicit_idx,
-                        leftmost_real_node_on_child_level,
-                        0,
-                        rightmost_real_node_on_child_level);
-                    const mcut::geom::bounding_box_t<mcut::math::fast_vec3> &right_child_bbox = bvhAABBs.at(right_child_memory_idx);
-                    node_bbox.expand(right_child_bbox);
-                }
-            }
-
-            const int node_memory_idx = mcut::bvh::get_node_mem_index(
-                node_implicit_idx,
-                leftmost_real_node_on_level,
-                0,
-                rightmost_real_node_on_level);
-
-            bvhAABBs.at(node_memory_idx) = node_bbox;
-        } // for each real node on level
-    }     // for each internal level
-    TIMESTACK_POP();
-}
-
-void intersectOIBVHs(
-    std::map<mcut::fd_t, std::vector<mcut::fd_t>> &ps_face_to_potentially_intersecting_others,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &srcMeshBvhAABBs,
-    const std::vector<mcut::fd_t> &srcMeshBvhLeafNodeFaces,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &cutMeshBvhAABBs,
-    const std::vector<mcut::fd_t> &cutMeshBvhLeafNodeFaces)
-{
-    TIMESTACK_PUSH(__FUNCTION__);
-    // simultaneuosly traverse both BVHs to find intersecting pairs
-    std::queue<mcut::bvh::node_pair_t> traversalQueue;
-    traversalQueue.push({0, 0}); // left = sm BVH; right = cm BVH
-
-    const int numSrcMeshFaces = (int)srcMeshBvhLeafNodeFaces.size();
-    MCUT_ASSERT(numSrcMeshFaces >= 1);
-    const int numCutMeshFaces = (int)cutMeshBvhLeafNodeFaces.size();
-    MCUT_ASSERT(numCutMeshFaces >= 1);
-
-    const int sm_bvh_leaf_level_idx = mcut::bvh::get_leaf_level_from_real_leaf_count(numSrcMeshFaces);
-    const int cs_bvh_leaf_level_idx = mcut::bvh::get_leaf_level_from_real_leaf_count(numCutMeshFaces);
-
-    const int sm_bvh_rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(sm_bvh_leaf_level_idx, numSrcMeshFaces);
-    const int cs_bvh_rightmost_real_leaf = mcut::bvh::get_rightmost_real_leaf(cs_bvh_leaf_level_idx, numCutMeshFaces);
-
-    do
-    {
-        mcut::bvh::node_pair_t ct_front_node = traversalQueue.front();
-
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3> sm_bvh_node_bbox;
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3> cs_bvh_node_bbox;
-
-        // sm
-        const int sm_bvh_node_implicit_idx = ct_front_node.m_left;
-        const int sm_bvh_node_level_idx = mcut::bvh::get_level_from_implicit_idx(sm_bvh_node_implicit_idx);
-        const bool sm_bvh_node_is_leaf = sm_bvh_node_level_idx == sm_bvh_leaf_level_idx;
-        const int sm_bvh_node_level_leftmost_node = mcut::bvh::get_level_leftmost_node(sm_bvh_node_level_idx);
-        mcut::fd_t sm_node_face = mcut::mesh_t::null_face();
-        const int sm_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(sm_bvh_rightmost_real_leaf, sm_bvh_leaf_level_idx, sm_bvh_node_level_idx);
-        const int sm_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
-            sm_bvh_node_implicit_idx,
-            sm_bvh_node_level_leftmost_node,
-            0,
-            sm_bvh_node_level_rightmost_node);
-        sm_bvh_node_bbox = srcMeshBvhAABBs.at(sm_bvh_node_mem_idx);
-
-        if (sm_bvh_node_is_leaf)
-        {
-            const int sm_bvh_node_idx_on_level = sm_bvh_node_implicit_idx - sm_bvh_node_level_leftmost_node;
-            sm_node_face = srcMeshBvhLeafNodeFaces.at(sm_bvh_node_idx_on_level);
-        }
-
-        // cs
-        const int cs_bvh_node_implicit_idx = ct_front_node.m_right;
-        const int cs_bvh_node_level_idx = mcut::bvh::get_level_from_implicit_idx(cs_bvh_node_implicit_idx);
-        const int cs_bvh_node_level_leftmost_node = mcut::bvh::get_level_leftmost_node(cs_bvh_node_level_idx);
-        const bool cs_bvh_node_is_leaf = cs_bvh_node_level_idx == cs_bvh_leaf_level_idx;
-        mcut::fd_t cs_node_face = mcut::mesh_t::null_face();
-        const int cs_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(cs_bvh_rightmost_real_leaf, cs_bvh_leaf_level_idx, cs_bvh_node_level_idx);
-        const int cs_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
-            cs_bvh_node_implicit_idx,
-            cs_bvh_node_level_leftmost_node,
-            0,
-            cs_bvh_node_level_rightmost_node);
-        cs_bvh_node_bbox = cutMeshBvhAABBs.at(cs_bvh_node_mem_idx);
-
-        if (cs_bvh_node_is_leaf)
-        {
-            const int cs_bvh_node_idx_on_level = cs_bvh_node_implicit_idx - cs_bvh_node_level_leftmost_node;
-            cs_node_face = cutMeshBvhLeafNodeFaces.at(cs_bvh_node_idx_on_level);
-        }
-
-        const bool haveOverlap = intersect_bounding_boxes(sm_bvh_node_bbox, cs_bvh_node_bbox);
-
-        if (haveOverlap)
-        {
-
-            if (cs_bvh_node_is_leaf && sm_bvh_node_is_leaf)
-            {
-                MCUT_ASSERT(cs_node_face != mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
-
-                mcut::fd_t cs_node_face_offsetted = mcut::fd_t(cs_node_face + numSrcMeshFaces);
-
-                ps_face_to_potentially_intersecting_others[sm_node_face].push_back(cs_node_face_offsetted);
-                ps_face_to_potentially_intersecting_others[cs_node_face_offsetted].push_back(sm_node_face);
-            }
-            else if (sm_bvh_node_is_leaf && !cs_bvh_node_is_leaf)
-            {
-                MCUT_ASSERT(cs_node_face == mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
-
-                const int cs_bvh_node_left_child_implicit_idx = (cs_bvh_node_implicit_idx * 2) + 1;
-                const int cs_bvh_node_right_child_implicit_idx = (cs_bvh_node_implicit_idx * 2) + 2;
-
-                const int rightmost_real_node_on_child_level = mcut::bvh::get_level_rightmost_real_node(cs_bvh_rightmost_real_leaf, cs_bvh_leaf_level_idx, cs_bvh_node_level_idx + 1);
-                const bool right_child_is_real = cs_bvh_node_right_child_implicit_idx <= rightmost_real_node_on_child_level;
-
-                traversalQueue.push({sm_bvh_node_implicit_idx, cs_bvh_node_left_child_implicit_idx});
-
-                if (right_child_is_real)
-                {
-                    traversalQueue.push({sm_bvh_node_implicit_idx, cs_bvh_node_right_child_implicit_idx});
-                }
-            }
-            else if (!sm_bvh_node_is_leaf && cs_bvh_node_is_leaf)
-            {
-
-                MCUT_ASSERT(cs_node_face != mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face == mcut::mesh_t::null_face());
-
-                const int sm_bvh_node_left_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 1;
-                const int sm_bvh_node_right_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 2;
-
-                const int rightmost_real_node_on_child_level = mcut::bvh::get_level_rightmost_real_node(sm_bvh_rightmost_real_leaf, sm_bvh_leaf_level_idx, sm_bvh_node_level_idx + 1);
-                const bool right_child_is_real = sm_bvh_node_right_child_implicit_idx <= rightmost_real_node_on_child_level;
-
-                traversalQueue.push({sm_bvh_node_left_child_implicit_idx, cs_bvh_node_implicit_idx});
-
-                if (right_child_is_real)
-                {
-                    traversalQueue.push({sm_bvh_node_right_child_implicit_idx, cs_bvh_node_implicit_idx});
-                }
-            }
-            else
-            { // both nodes are internal
-                MCUT_ASSERT(cs_node_face == mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face == mcut::mesh_t::null_face());
-
-                const int sm_bvh_node_left_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 1;
-                const int sm_bvh_node_right_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 2;
-
-                const int cs_bvh_node_left_child_implicit_idx = (cs_bvh_node_implicit_idx * 2) + 1;
-                const int cs_bvh_node_right_child_implicit_idx = (cs_bvh_node_implicit_idx * 2) + 2;
-
-                const int sm_rightmost_real_node_on_child_level = mcut::bvh::get_level_rightmost_real_node(sm_bvh_rightmost_real_leaf, sm_bvh_leaf_level_idx, sm_bvh_node_level_idx + 1);
-                const bool sm_right_child_is_real = sm_bvh_node_right_child_implicit_idx <= sm_rightmost_real_node_on_child_level;
-
-                const int cs_rightmost_real_node_on_child_level = mcut::bvh::get_level_rightmost_real_node(cs_bvh_rightmost_real_leaf, cs_bvh_leaf_level_idx, cs_bvh_node_level_idx + 1);
-                const bool cs_right_child_is_real = cs_bvh_node_right_child_implicit_idx <= cs_rightmost_real_node_on_child_level;
-
-                traversalQueue.push({sm_bvh_node_left_child_implicit_idx, cs_bvh_node_left_child_implicit_idx});
-
-                if (cs_right_child_is_real)
-                {
-                    traversalQueue.push({sm_bvh_node_left_child_implicit_idx, cs_bvh_node_right_child_implicit_idx});
-                }
-
-                if (sm_right_child_is_real)
-                {
-                    traversalQueue.push({sm_bvh_node_right_child_implicit_idx, cs_bvh_node_left_child_implicit_idx});
-
-                    if (cs_right_child_is_real)
-                    {
-                        traversalQueue.push({sm_bvh_node_right_child_implicit_idx, cs_bvh_node_right_child_implicit_idx});
-                    }
-                }
-            }
-        }
-
-        traversalQueue.pop(); // rm ct_front_node
-    } while (!traversalQueue.empty());
-    TIMESTACK_POP();
-}
-#endif
-#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
-std::vector<vd_t> insert_bounding_box_mesh(mesh_t &bvh_mesh, const geom::bounding_box_t<math::fast_vec3> &bbox)
-{
-    math::fast_vec3 dim2 = ((bbox.maximum() - bbox.minimum()) / 2.0);
-    math::fast_vec3 back_bottom_left(-dim2.x(), -dim2.y(), -dim2.z());
-    math::fast_vec3 shift = (bbox.minimum() - back_bottom_left);
-    math::fast_vec3 front_bl = (math::fast_vec3(-dim2.x(), -dim2.y(), dim2.z()) + shift);
-    math::fast_vec3 front_br = (math::fast_vec3(dim2.x(), -dim2.y(), dim2.z()) + shift);
-    math::fast_vec3 front_tr = (math::fast_vec3(dim2.x(), dim2.y(), dim2.z()) + shift);
-    math::fast_vec3 front_tl = (math::fast_vec3(-dim2.x(), dim2.y(), dim2.z()) + shift);
-    math::fast_vec3 back_bl = (back_bottom_left + shift);
-    math::fast_vec3 back_br = (math::fast_vec3(dim2.x(), -dim2.y(), -dim2.z()) + shift);
-    math::fast_vec3 back_tr = (math::fast_vec3(dim2.x(), dim2.y(), -dim2.z()) + shift);
-    math::fast_vec3 back_tl = (math::fast_vec3(-dim2.x(), dim2.y(), -dim2.z()) + shift);
-
-    std::vector<vd_t> v;
-    v.resize(8);
-
-    // front
-    v[0] = bvh_mesh.add_vertex(front_bl); // bottom left
-    MCUT_ASSERT(v[0] != mesh_t::null_vertex());
-    v[1] = bvh_mesh.add_vertex(front_br); // bottom right
-    MCUT_ASSERT(v[1] != mesh_t::null_vertex());
-    v[2] = bvh_mesh.add_vertex(front_tr); // top right
-    MCUT_ASSERT(v[2] != mesh_t::null_vertex());
-    v[3] = bvh_mesh.add_vertex(front_tl); // top left
-    MCUT_ASSERT(v[3] != mesh_t::null_vertex());
-    // back
-    v[4] = bvh_mesh.add_vertex(back_bl); // bottom left
-    MCUT_ASSERT(v[4] != mesh_t::null_vertex());
-    v[5] = bvh_mesh.add_vertex(back_br); // bottom right
-    MCUT_ASSERT(v[5] != mesh_t::null_vertex());
-    v[6] = bvh_mesh.add_vertex(back_tr); // top right
-    MCUT_ASSERT(v[6] != mesh_t::null_vertex());
-    v[7] = bvh_mesh.add_vertex(back_tl); // top left
-    MCUT_ASSERT(v[7] != mesh_t::null_vertex());
-
-    const std::vector<vd_t> face0 = {v[0], v[1], v[2], v[3]}; // front
-    const fd_t f0 = bvh_mesh.add_face(face0);
-    MCUT_ASSERT(f0 != mesh_t::null_face());
-
-    const std::vector<vd_t> face1 = {v[7], v[6], v[5], v[4]}; //  back
-    const fd_t f1 = bvh_mesh.add_face(face1);
-    MCUT_ASSERT(f1 != mesh_t::null_face());
-
-    const std::vector<vd_t> face2 = {v[1], v[5], v[6], v[2]}; // right
-    const fd_t f2 = bvh_mesh.add_face(face2);
-    MCUT_ASSERT(f2 != mesh_t::null_face());
-
-    const std::vector<vd_t> face3 = {v[0], v[3], v[7], v[4]}; // left
-    const fd_t f3 = bvh_mesh.add_face(face3);
-    MCUT_ASSERT(f3 != mesh_t::null_face());
-
-    const std::vector<vd_t> face4 = {v[3], v[2], v[6], v[7]}; // top
-    const fd_t f4 = bvh_mesh.add_face(face4);
-    MCUT_ASSERT(f4 != mesh_t::null_face());
-
-    const std::vector<vd_t> face5 = {v[4], v[5], v[1], v[0]}; // bottom
-    const fd_t f5 = bvh_mesh.add_face(face5);
-    MCUT_ASSERT(f5 != mesh_t::null_face());
-    return v;
-}
-#endif // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
 
 bool is_coplanar(const mcut::mesh_t &m, const mcut::fd_t &f, int &fv_count)
 {
@@ -1979,10 +1534,10 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
     if (m.number_of_vertices() < 3)
     {
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_API,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             "Invalid vertex count (V=" + std::to_string(m.number_of_vertices()) + ")");
         result = false;
     }
@@ -1990,10 +1545,10 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
     if (m.number_of_faces() < 1)
     {
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_API,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             "Invalid face count (F=" + std::to_string(m.number_of_faces()) + ")");
         result = false;
     }
@@ -2006,10 +1561,10 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
     if (n != 1)
     {
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_API,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             "Detected multiple connected components in mesh (N=" + std::to_string(n) + ")");
         result = false;
     }
@@ -2022,10 +1577,10 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
         if(!face_is_coplanar)
         {
             ctxtPtr->log(
-                        McDebugSource::MC_DEBUG_SOURCE_API,
-                        McDebugType::MC_DEBUG_TYPE_OTHER,
+                        MC_DEBUG_SOURCE_API,
+                        MC_DEBUG_TYPE_OTHER,
                         0,
-                        McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
+                        MC_DEBUG_SEVERITY_NOTIFICATION,
                         "Vertices (" + std::to_string(fv_count) + ") on face " + std::to_string(*f) + " not coplanar");
                     // No need to return false, simply warn. It is difficult to 
                     // know whether the non-coplanarity is severe enough to cause
@@ -2038,36 +1593,6 @@ McResult check_input_mesh(std::unique_ptr<McDispatchContextInternal> &ctxtPtr, c
                     //result = false;
                     break;
         }
-        #if 0
-        const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(*f);
-        const int nv = (int)vertices.size();
-        if (nv > 3) //non-triangle
-        {
-            for (int i = 0; i < (nv - 3); ++i)
-            {
-                int j = (i + 1) % nv;
-                int k = (i + 2) % nv;
-                int l = (i + 3) % nv;
-
-                const mcut::vd_t &vi = vertices[i];
-                const mcut::vd_t &vj = vertices[j];
-                const mcut::vd_t &vk = vertices[k];
-                const mcut::vd_t &vl = vertices[l];
-
-                const mcut::math::vec3 &vi_coords = m.vertex(vi);
-                const mcut::math::vec3 &vj_coords = m.vertex(vj);
-                const mcut::math::vec3 &vk_coords = m.vertex(vk);
-                const mcut::math::vec3 &vl_coords = m.vertex(vl);
-
-                bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, vl_coords);
-
-                if (!are_coplaner)
-                {
-                    
-                }
-            }
-        }
-        #endif
     }
 
     return result ? MC_NO_ERROR : MC_INVALID_VALUE;
@@ -2108,7 +1633,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
     if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "dispatch floating-point type unspecified");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "dispatch floating-point type unspecified");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -2171,7 +1696,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     backendInput.verbose = false;
     backendInput.require_looped_cutpaths = false;
 
-    backendInput.verbose = static_cast<bool>((ctxtPtr->flags & MC_DEBUG) && (ctxtPtr->debugType & McDebugSource::MC_DEBUG_SOURCE_KERNEL));
+    backendInput.verbose = static_cast<bool>((ctxtPtr->flags & MC_DEBUG) && (ctxtPtr->debugType & MC_DEBUG_SOURCE_KERNEL));
     backendInput.require_looped_cutpaths = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS);
     backendInput.populate_vertex_maps = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
     backendInput.populate_face_maps = static_cast<bool>(ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);
@@ -2182,10 +1707,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         // The user states that she does not want a partial cut but yet also states that she
         // wants to keep fragments with partial cuts. These two options are mutually exclusive!
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_API,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             "use of mutually-exclusive flags: MC_DISPATCH_REQUIRE_THROUGH_CUTS & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED");
         return McResult::MC_INVALID_VALUE;
     }
@@ -2236,10 +1761,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     if ((backendInput.keep_fragments_sealed_outside && backendInput.keep_fragments_sealed_outside_exhaustive))
     {
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_API,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             "use of mutually exclusive flags MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE_EXHAUSTIVE and MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE");
         return MC_INVALID_VALUE;
     }
@@ -2247,10 +1772,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     if ((backendInput.keep_fragments_sealed_inside && backendInput.keep_fragments_sealed_inside_exhaustive))
     {
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_API,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_API,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             "use of mutually exclusive flags MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE_EXHAUSTIVE and MC_DISPATCH_FILTER_FRAGMENT_SEALING_INSIDE");
         return MC_INVALID_VALUE;
     }
@@ -2263,18 +1788,18 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     // Construct BVHs
     // ::::::::::::::
 
-    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
+    ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
 
 #if defined(USE_OIBVH)
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshBvhAABBs;
     std::vector<mcut::fd_t> srcMeshBvhLeafNodeFaces;
     std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> srcMeshFaceBboxes;
-    constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
+    mcut::bvh::constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
 #else
     mcut::bvh::BoundingVolumeHierarchy srcMeshBVH;
     srcMeshBVH.buildTree(srcMeshInternal);
 #endif
-    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
+    ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
     std::unordered_map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputSrcMeshFace;
     std::unordered_map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputCutMeshFace;
@@ -2393,7 +1918,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #if defined(USE_OIBVH)
                 cutMeshBvhAABBs.clear();
                 cutMeshBvhLeafNodeFaces.clear();
-                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
+                mcut::bvh::constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
 #else
                 cutMeshBVH.buildTree(cutMeshInternal, perturbation_const);
 #endif
@@ -2814,10 +2339,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                         result = McResult::MC_INVALID_OPERATION;
 
                         ctxtPtr->log(
-                            McDebugSource::MC_DEBUG_SOURCE_KERNEL,
-                            McDebugType::MC_DEBUG_TYPE_ERROR,
+                            MC_DEBUG_SOURCE_KERNEL,
+                            MC_DEBUG_TYPE_ERROR,
                             0,
-                            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+                            MC_DEBUG_SEVERITY_HIGH,
                             "Floating-polygon partitioning step could not find a usable fpSegment");
 
                         return result;
@@ -3255,7 +2780,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #if defined(USE_OIBVH)
                 srcMeshBvhAABBs.clear();
                 srcMeshBvhLeafNodeFaces.clear();
-                constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
+                mcut::bvh::constructOIBVH(srcMeshInternal, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, srcMeshFaceBboxes);
 #else
                 srcMeshBVH.buildTree(srcMeshInternal);
 #endif
@@ -3265,7 +2790,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #if defined(USE_OIBVH)
                 cutMeshBvhAABBs.clear();
                 cutMeshBvhLeafNodeFaces.clear();
-                constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
+                mcut::bvh::constructOIBVH(cutMeshInternal, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces, cutMeshFaceBboxes, perturbation_const);
 #else
                 cutMeshBVH.buildTree(cutMeshInternal, perturbation_const);
 #endif
@@ -3348,7 +2873,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         // NOTE: we check for defects here since both input meshes may be modified by the polygon partitioning process above.
         // Partitiining is involked after atleast one dispatch call.
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Check source-mesh for defects");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Check source-mesh for defects");
 
         result = check_input_mesh(ctxtPtr, srcMeshInternal);
         if (result != McResult::MC_NO_ERROR)
@@ -3356,7 +2881,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             return result;
         }
 
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
 
         result = check_input_mesh(ctxtPtr, cutMeshInternal);
         if (result != McResult::MC_NO_ERROR)
@@ -3369,11 +2894,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             // Evaluate BVHs to find polygon pairs that will be tested for intersection
             // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
             anyBvhWasRebuilt = false;
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
             ps_face_to_potentially_intersecting_others.clear();
 #if defined(USE_OIBVH)
-            intersectOIBVHs(ps_face_to_potentially_intersecting_others, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
+            mcut::bvh::intersectOIBVHs(ps_face_to_potentially_intersecting_others, srcMeshBvhAABBs, srcMeshBvhLeafNodeFaces, cutMeshBvhAABBs, cutMeshBvhLeafNodeFaces);
 #else
             mcut::bvh::BoundingVolumeHierarchy::intersectBVHTrees(
 #if defined(MCUT_MULTI_THREADED)
@@ -3388,10 +2913,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 #endif
 
             ctxtPtr->log(
-                McDebugSource::MC_DEBUG_SOURCE_API,
-                McDebugType::MC_DEBUG_TYPE_OTHER,
+                MC_DEBUG_SOURCE_API,
+                MC_DEBUG_TYPE_OTHER,
                 0,
-                McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION,
+                MC_DEBUG_SEVERITY_NOTIFICATION,
                 "Polygon-pairs found = " + std::to_string(ps_face_to_potentially_intersecting_others.size()));
 
             if (ps_face_to_potentially_intersecting_others.empty())
@@ -3409,7 +2934,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                 }
                 else
                 {
-                    ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+                    ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
                     return result;
                 }
             }
@@ -3430,7 +2955,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
         try
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_KERNEL, McDebugType::MC_DEBUG_TYPE_OTHER, 0, McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch");
+            ctxtPtr->log(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch");
             mcut::dispatch(backendOutput, backendInput);
         }
         catch (const std::exception *e)
@@ -3456,10 +2981,10 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     {
 
         ctxtPtr->log(
-            McDebugSource::MC_DEBUG_SOURCE_KERNEL,
-            McDebugType::MC_DEBUG_TYPE_ERROR,
+            MC_DEBUG_SOURCE_KERNEL,
+            MC_DEBUG_TYPE_ERROR,
             0,
-            McDebugSeverity::MC_DEBUG_SEVERITY_HIGH,
+            MC_DEBUG_SEVERITY_HIGH,
             mcut::to_string(backendOutput.status) + " : " + backendOutput.logger.get_reason_for_failure());
 
         //ctxtPtr->lastLoggedDebugDetail = backendOutput.logger.get_log_string();
@@ -3782,14 +3307,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 
     if (connectedComponentType == 0)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid type-parameter");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid type-parameter");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
     if (numConnComps == nullptr && pConnComps == nullptr)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "null parameter");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "null parameter");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -3856,7 +3381,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
     if (bytes != 0 && pMem == nullptr)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "null parameter");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "null parameter");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -3865,7 +3390,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
     if (ccRef == ctxtPtr->connComps.cend())
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid connected component id");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid connected component id");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -3885,7 +3410,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -3906,7 +3431,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             if (bytes > allocatedBytes)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             } // if
@@ -3917,7 +3442,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             if (nelems % 3 != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -3948,7 +3473,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             if (bytes > allocatedBytes)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             } // if
@@ -3960,7 +3485,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             if (nelems % 3 != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -3992,14 +3517,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(uint32_t) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4019,14 +3544,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numFaceIndices * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(uint32_t) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4045,14 +3570,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numFaces * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(uint32_t) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4072,14 +3597,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numFaceAdjFaceIndices * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(uint32_t) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4098,14 +3623,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numFaces * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(uint32_t) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4125,14 +3650,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(uint32_t) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4152,14 +3677,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numEdgeIndices * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % (sizeof(uint32_t) * 2) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4177,13 +3702,13 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > sizeof(McConnectedComponentType))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
             if (bytes % sizeof(McConnectedComponentType) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4195,7 +3720,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid client pointer type");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid client pointer type");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4209,14 +3734,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 
             if (bytes > sizeof(McFragmentLocation))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(McFragmentLocation) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4230,7 +3755,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT && ccData->type != MC_CONNECTED_COMPONENT_TYPE_PATCH)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "connected component must be a patch or a fragment");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "connected component must be a patch or a fragment");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4243,14 +3768,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > sizeof(McPatchLocation))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(McPatchLocation) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4273,7 +3798,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid client pointer type");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid client pointer type");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4286,14 +3811,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > sizeof(McFragmentSealType))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % sizeof(McFragmentSealType) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4307,7 +3832,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if (ccData->type != MC_CONNECTED_COMPONENT_TYPE_SEAM && ccData->type != MC_CONNECTED_COMPONENT_TYPE_INPUT)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid connected component type");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid connected component type");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4322,14 +3847,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > nbytes)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if ((bytes % nbytes) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4351,7 +3876,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if (ccData->type == MC_CONNECTED_COMPONENT_TYPE_INPUT)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "cannot query seam vertices on input connected component");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "cannot query seam vertices on input connected component");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4364,14 +3889,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numSeamVertexIndices * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % (sizeof(uint32_t)) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4383,7 +3908,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if ((ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP) == 0)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "dispatch flags not set");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_MEDIUM, "dispatch flags not set");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4395,14 +3920,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numVertices * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % (sizeof(uint32_t)) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4414,7 +3939,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     {
         if ((ctxtPtr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP) == 0)
         {
-            ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_MEDIUM, "dispatch flags not set");
+            ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_MEDIUM, "dispatch flags not set");
             result = McResult::MC_INVALID_VALUE;
             return result;
         }
@@ -4427,14 +3952,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         {
             if (bytes > ccData->indexArrayMesh.numFaces * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % (sizeof(uint32_t)) != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4514,9 +4039,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                     if(faceTriangleIndices.empty())
                     {
                         ctxtPtr->log(
-                            McDebugSource::MC_DEBUG_SOURCE_KERNEL, 
-                            McDebugType::MC_DEBUG_TYPE_OTHER, 0, 
-                            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
+                            MC_DEBUG_SOURCE_KERNEL, 
+                            MC_DEBUG_TYPE_OTHER, 0, 
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
                     }
 
                     // The winding order after triangulation is not consistent. 
@@ -4571,9 +4096,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                         if(usedVertexIndicators[i]==false)
                         {
                             ctxtPtr->log(
-                            McDebugSource::MC_DEBUG_SOURCE_KERNEL, 
-                            McDebugType::MC_DEBUG_TYPE_OTHER, 0, 
-                            McDebugSeverity::MC_DEBUG_SEVERITY_NOTIFICATION, "Found unused vertex on face " + std::to_string(f) + " for triangulation");
+                            MC_DEBUG_SOURCE_KERNEL, 
+                            MC_DEBUG_TYPE_OTHER, 0, 
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "Found unused vertex on face " + std::to_string(f) + " for triangulation");
                             break;
                         }
                     }
@@ -4601,14 +4126,14 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             MCUT_ASSERT(ccData->indexArrayMesh.numTriangleIndices >= 3);
             if (bytes > ccData->indexArrayMesh.numTriangleIndices * sizeof(uint32_t))
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "out of bounds memory access");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
 
             if (bytes % (sizeof(uint32_t)) != 0 || (bytes / sizeof(uint32_t)) % 3 != 0)
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of bytes");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
@@ -4618,7 +4143,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
     }
     break;
     default:
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid enum flag");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid enum flag");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -4644,21 +4169,21 @@ McResult MCAPI_CALL mcReleaseConnectedComponents(
 
     if (numConnComps > (uint32_t)ctxtPtr->connComps.size())
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid number of connected components");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid number of connected components");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
     if (numConnComps == 0 && pConnComps != NULL)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "number of connected components not set");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "number of connected components not set");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
 
     if (numConnComps > 0 && pConnComps == NULL)
     {
-        ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid pointer to connected components");
+        ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid pointer to connected components");
         result = McResult::MC_INVALID_VALUE;
         return result;
     }
@@ -4677,7 +4202,7 @@ McResult MCAPI_CALL mcReleaseConnectedComponents(
             auto ccRef = ctxtPtr->connComps.find(connCompId);
             if (ccRef == ctxtPtr->connComps.cend())
             {
-                ctxtPtr->log(McDebugSource::MC_DEBUG_SOURCE_API, McDebugType::MC_DEBUG_TYPE_ERROR, 0, McDebugSeverity::MC_DEBUG_SEVERITY_HIGH, "invalid connected component id");
+                ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid connected component id");
                 result = McResult::MC_INVALID_VALUE;
                 return result;
             }
