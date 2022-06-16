@@ -25,15 +25,14 @@
 #
 #	MCUT_BUILD_AS_SHARED_LIB [default=ON] - Build MCUT as a shared/dynamic library (.so/.dll).
 #	MCUT_BUILD_DOCUMENTATION [default=OFF] - Build documentation (explicit dependancy on Doxygen) 
-#	MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS [default=OFF] - Build using arbitrary precision numbers, which introduces a dependency on MPFR (version 4.0.2).
 #	MCUT_BUILD_TESTS [default=OFF] - Build the tests (implicit dependancy on GoogleTest)
 #	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
-#	MCUT_BUILD_WITH_MULTITHREADING [default=ON] - Build as multi-threaded library
+#	MCUT_BUILD_WITH_MULTITHREADING [default=ON] - Build as configurable multi-threaded library
 #
-# This script will define the following cache variables:
+# This script will define the following CMake cache variables:
 #
 #	MCUT_INCLUDE_DIR - the MCUT include directory
-# 	MCUT_LIB_PATH - path to the MCUT library (.so/.dll || .a/.lib)
+# 	MCUT_LIB_PATH - path to the MCUT library (i.e. .so/.dll or .a/.lib files)
 
 cmake_minimum_required(VERSION 3.12...3.13 FATAL_ERROR)
 
@@ -46,7 +45,7 @@ else()
 	set(MCUT_TOPLEVEL_PROJECT OFF)
 endif()
 
-set ( DESCRIPTION "Surface-mesh cutting library." )
+set ( DESCRIPTION "Mesh cutting library." )
 
 if (NOT WIN32 AND NOT CMAKE_BUILD_TYPE)
 	message(STATUS "No build type selected, default to Release")
@@ -77,6 +76,32 @@ set (project_API_version_string "${MCUT_VERSION}")
 set (project_build_version_string "${MCUT_VERSION}")
 set (project_namespace_name MCUT)
 
+# Only do these if this is the main project, and not if it is included through add_subdirectory
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+
+  # Let's ensure -std=c++xx instead of -std=g++xx
+  set(CMAKE_CXX_EXTENSIONS OFF)
+
+  # Let's nicely support folders in IDEs
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+  # Testing only available if this is the main app
+  # Note this needs to be done in the main CMakeLists
+  # since it calls enable_testing, which must be in the
+  # main CMakeLists.
+  include(CTest)
+
+  # Docs only available if this is the main app
+  find_package(Doxygen)
+  if(Doxygen_FOUND)
+    add_subdirectory(docs)
+  else()
+    message(STATUS "Doxygen not found, not building docs")
+  endif()
+endif()
+
+include(CMakePrintHelpers) 
+
 #
 # User options
 #
@@ -84,7 +109,6 @@ option(MCUT_BUILD_DOCUMENTATION "Configure to build docs with Doxygen" OFF) # OF
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TESTS)
 	option(MCUT_BUILD_TESTS "Configure to build tests" ON)
 endif()
-option(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS "Build the arbitrary precision library as well" OFF) # OFF by default
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
 option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" ON)
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS)
@@ -94,25 +118,6 @@ endif()
 # machine-precision-numbers library targets
 #
 set (target_name mcut)
-
-#
-# arbitrary-precision-numbers library target & dependencies
-#
-if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
-
-	#
-	# find MPFR & MPIR
-	#
-	if (MSVC)
-		message(STATUS "[MCUT] searching for MPIR in system environment")
-		find_package(MCUT_MPIR REQUIRED) # GMP
-	endif()
-
-	find_package(MCUT_MPFR REQUIRED)
-
-	list(APPEND include_dirs ${MCUT_MPFR_INCLUDE_DIR} ${MCUT_MPIR_INCLUDE_DIR}) 
-	list(APPEND extra_libs ${MCUT_MPFR_LIBRARY} ${MCUT_MPIR_LIBRARY}) 
-endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
 
 #
 # MCUT compilation variables/settings
@@ -164,7 +169,7 @@ set (	project_source_files
 #
 
 # This function invokes commands which create a library target (static, shared etc.)
-function(create_library_target LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF)
+function(create_library_target LIBRARY_TYPE)
     message(STATUS "[MCUT] create target: name=${target_name} type=${LIBRARY_TYPE}")
 	
 	add_library(${target_name} ${LIBRARY_TYPE} ${project_source_files})
@@ -172,7 +177,7 @@ function(create_library_target LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF)
 	target_include_directories(${target_name} PRIVATE ${include_dirs})
 	target_link_libraries(${target_name} PRIVATE ${extra_libs})
 	target_compile_options(${target_name} PRIVATE ${compilation_flags})
-	target_compile_definitions(${target_name} PRIVATE ${preprocessor_defs} ${ARBITRARY_PRECISION_NUMBERS_DEF})
+	target_compile_definitions(${target_name} PRIVATE ${preprocessor_defs} )
 	
 	if (MCUT_BUILD_AS_SHARED_LIB AND WIN32)
 		# add macro to export .dll symbols
@@ -192,30 +197,14 @@ function(create_library_target LIBRARY_TYPE ARBITRARY_PRECISION_NUMBERS_DEF)
 	endif()
 endfunction()
 
-if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
-	#
-	# arbitrary-precision numbers builds
-	#
-	if(MCUT_BUILD_AS_SHARED_LIB)
-		create_library_target(SHARED MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1 )
-	else()
-		create_library_target(STATIC MCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1)
-	endif()
-
-	message(STATUS "[MCUT] MCUT_MPFR_INCLUDE_DIR=${MCUT_MPFR_INCLUDE_DIR}")
-	message(STATUS "[MCUT] MCUT_MPFR_LIBRARY=${MCUT_MPFR_LIBRARY}")
-	message(STATUS "[MCUT] MCUT_MPIR_INCLUDE_DIR=${MCUT_MPIR_INCLUDE_DIR}")
-	message(STATUS "[MCUT] MCUT_MPIR_LIBRARY=${MCUT_MPIR_LIBRARY}")
+#
+# create target
+#
+if(MCUT_BUILD_AS_SHARED_LIB)
+	create_library_target(SHARED) 
 else()
-	#
-	# machine-precision numbers builds
-	#
-	if(MCUT_BUILD_AS_SHARED_LIB)
-		create_library_target(SHARED "") 
-	else()
-		create_library_target(STATIC "")
-	endif()
-endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+	create_library_target(STATIC)
+endif()
 
 set (MCUT_LIB_PATH $<TARGET_FILE:mcut>  CACHE STRING "Path to the compiled MCUT library file")
 message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
@@ -225,13 +214,6 @@ message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
 # We enable the code that is used to download those projects here:
 #
 if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
-	#include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/DownloadProject.cmake)
-
-	#if (CMAKE_VERSION VERSION_LESS 3.2)
-	#	set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
-	#else()
-	#	set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
-	#endif()
 
 	# FetchContent added in CMake 3.11, downloads during the configure step
 	include(FetchContent)
@@ -246,13 +228,6 @@ if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
 		GIT_TAG       	v2.3.0
 		GIT_PROGRESS TRUE
 	)
-
-	# used by tests & tutorials
-	#download_project(PROJ                libigl
-	#				 GIT_REPOSITORY      https://github.com/libigl/libigl.git
-	#				 GIT_TAG             v2.3.0
-	#				 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
-	#)
 
 	#set(libigl_include_dir ${CMAKE_BINARY_DIR}/libigl-src/include)
 	set(libigl_include_dir ${libigl_SOURCE_DIR}/include)
@@ -324,32 +299,20 @@ if(MCUT_BUILD_AS_SHARED_LIB)
 	#
 	# dynamic libs
 	#
-	if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
-		install(TARGETS ${apn_shared_lib_name}
-				LIBRARY
-				DESTINATION lib/apn/shared
-				COMPONENT dynamic_libraries)
-	else()
-		install(TARGETS ${mpn_shared_lib_name}
-				LIBRARY
-				DESTINATION lib/mpn/shared
-				COMPONENT dynamic_libraries)
-	endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+
+	install(TARGETS ${mpn_shared_lib_name}
+			LIBRARY
+			DESTINATION lib/mpn/shared
+			COMPONENT dynamic_libraries)
 else()
 	#
 	# static libs
 	#
-	if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
-		install(TARGETS ${apn_static_lib_name} 
-				ARCHIVE
-				DESTINATION lib/apn/static
-				COMPONENT static_libraries)
-	else()
-		install(TARGETS ${mpn_static_lib_name}
-				ARCHIVE
-				DESTINATION lib/mpn/static
-				COMPONENT static_libraries)
-	endif() # if(MCUT_BUILD_WITH_ARBITRARY_PRECISION_NUMBERS)
+	
+	install(TARGETS ${mpn_static_lib_name}
+			ARCHIVE
+			DESTINATION lib/mpn/static
+			COMPONENT static_libraries)
 endif()
 
 #
@@ -398,14 +361,14 @@ set(CPACK_COMPONENT_GROUP_DEVELOPMENT_DESCRIPTION
   "All of the tools you'll ever need to develop software")
 
 set (CPACK_PACKAGE_NAME "MCUT")
-set (CPACK_PACKAGE_VENDOR "CutDigital Software Ltd")
+set (CPACK_PACKAGE_VENDOR "Floyd M. Chitalu")
 set (CPACK_PACKAGE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set (CPACK_PACKAGE_VERSION_MAJOR "${MCUT_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${MCUT_MINOR}")
 set (CPACK_PACKAGE_VERSION_PATCH "${MCUT_PATCH}")
 #set (CPACK_PACKAGE_DESCRIPTION "MCUT (pronounced ‘emcut’) is a tool for cutting meshes.")
 #set (CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION.txt)
-set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "MCUT is a library for cutting meshes.")
+set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "MCUT is a library for cutting meshes to perform tasks like boolean operations and more.")
 set (CPACK_PACKAGE_HOMEPAGE_URL "https://cutdigital.github.io/mcut.site/")
 set (CPACK_PACKAGE_INSTALL_DIRECTORY ${CPACK_PACKAGE_NAME})
 # set (CPACK_PACKAGE_ICON ) 
