@@ -2776,13 +2776,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             mcut::math::real_number_t predResult(0xdeadbeef);
                             for (std::vector<mcut::math::vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it)
                             {
-#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-                                bool are_collinear = mcut::geom::collinear(segStart, segEnd, (*it));
-                                if (are_collinear)
-                                {
-                                    return true;
-                                }
-#else
+
                                 bool are_collinear = mcut::geom::collinear(segStart, segEnd, (*it), predResult);
                                 // last ditch attempt to prevent the possibility of creating a partitioning
                                 // edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
@@ -2792,7 +2786,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                                 {
                                     return true;
                                 }
-#endif
+
                             }
                             return false;
                         }; // end lambda
@@ -3931,11 +3925,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             for (uint32_t i = 0; i < nelems; ++i)
             {
                 const mcut::math::real_number_t &val = ccData->indexArrayMesh.pVertices[i];
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+
                 const float val_ = static_cast<float>(val);
-#else
-                const float val_ = static_cast<float>(val.to_double());
-#endif
+
                 memcpy(outPtr + off, reinterpret_cast<const void *>(&val_), sizeof(float));
                 off += 1;
             }
@@ -3978,11 +3970,9 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
             for (uint32_t i = 0; i < nelems; ++i)
             {
                 const mcut::math::real_number_t &val = ccData->indexArrayMesh.pVertices[i];
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+
                 const double val_ = static_cast<double>(val);
-#else
-                const double val_ = static_cast<double>(val.to_double());
-#endif
+
                 memcpy(outPtr + byteOffset, reinterpret_cast<const void *>(&val_), sizeof(double));
                 byteOffset += 1;
             }

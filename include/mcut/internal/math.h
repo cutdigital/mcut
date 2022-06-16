@@ -23,10 +23,7 @@
 #ifndef MCUT_MATH_H_
 #define MCUT_MATH_H_
 
-#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-#else
 #include <cmath>
-#endif
 
 #include <iostream>
 #include <limits>
