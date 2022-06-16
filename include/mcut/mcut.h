@@ -41,47 +41,50 @@ extern "C" {
 
 #include "platform.h"
 
-// Macro to encode MCUT version
+/** @file */
+
+/** Macro to encode MCUT version */
 #define MC_MAKE_VERSION(major, minor, patch) \
     (((major) << 22) | ((minor) << 12) | (patch))
 
-// MCUT 1.0 version number
+/** MCUT 1.0 version number */
 #define MC_API_VERSION_1_0 MC_MAKE_VERSION(1, 0, 0) // Patch version should always be set to 0
 
-// Macro to decode MCUT version (MAJOR) from MC_HEADER_VERSION_COMPLETE
+/** Macro to decode MCUT version (MAJOR) from MC_HEADER_VERSION_COMPLETE */
 #define MC_VERSION_MAJOR(version) ((uint32_t)(version) >> 22)
 
-// Macro to decode MCUT version (MINOR) from MC_HEADER_VERSION_COMPLETE
+/** Macro to decode MCUT version (MINOR) from MC_HEADER_VERSION_COMPLETE */
 #define MC_VERSION_MINOR(version) (((uint32_t)(version) >> 12) & 0x3ff)
 
-// Macro to decode MCUT version (PATCH) from MC_HEADER_VERSION_COMPLETE
+/** Macro to decode MCUT version (PATCH) from MC_HEADER_VERSION_COMPLETE */
 #define MC_VERSION_PATCH(version) ((uint32_t)(version)&0xfff)
 
-// Version of this file
+/** Version of this file */
 #define MC_HEADER_VERSION 100
 
-// Complete version of this file
+/** Complete version of this file */
 #define MC_HEADER_VERSION_COMPLETE MC_MAKE_VERSION(1, 0, MC_HEADER_VERSION)
 
-// Constant value assigned to null variables and parameters
+/** Constant value assigned to null variables and parameters */
 #define MC_NULL_HANDLE 0
 
-// Helper-macro to define opaque handles
+/** Helper-macro to define opaque handles */
 #define MC_DEFINE_HANDLE(object) typedef struct object##_T* object;
 
+/** A garbage value that is assigned to undefined index values */
 #define MC_UNDEFINED_VALUE UINT32_MAX
 
 /**
  * @brief Connected component handle.
  *
- * Opaque type referencing a connected component which the client must use to access mesh data after a dispatch call.
+ * Opaque type referencing a connected component which the client/user must use to access mesh data after a dispatch call.
  */
 typedef struct McConnectedComponent_T* McConnectedComponent;
 
 /**
  * @brief Context handle.
  *
- * Opaque type referencing a working state (e.g. independent thread) which the client must use to initialise, dispatch, and access data.
+ * Opaque type referencing a working state (e.g. independent thread) which the client/user must use to initialise, dispatch, and access data.
  */
 typedef struct McContext_T* McContext;
 
@@ -134,18 +137,18 @@ typedef enum McResult {
  * This enum structure defines the possible types of connected components which can be queried from the API after a dispatch call. 
  */
 typedef enum McConnectedComponentType {
-    MC_CONNECTED_COMPONENT_TYPE_FRAGMENT = (1 << 0), /**< A connected component that is originates from the source-mesh. */
+    MC_CONNECTED_COMPONENT_TYPE_FRAGMENT = (1 << 0), /**< A connected component that originates from the source-mesh. */
     MC_CONNECTED_COMPONENT_TYPE_PATCH = (1 << 2), /**< A connected component that is originates from the cut-mesh. */
-    MC_CONNECTED_COMPONENT_TYPE_SEAM = (1 << 3), /**< A connected component that is similer to an input mesh (source-mesh or cut-mesh), but with additional edges introduced as as a result of the cut (the intersection contour/curve). */
-    MC_CONNECTED_COMPONENT_TYPE_INPUT = (1 << 4), /**< A connected component that is copy of an input mesh (source-mesh or cut-mesh). Such a connected component may contain new faces and vertices, which will happen if MCUT internally performs polygon partitioning. Polygon partitioning occurs on an input mesh which intersects the other without severing at least one edge. An example is splitting a tetrahedron (source-mesh) in two parts using one large triangle (cut-mesh): in this case, the large triangle would be partitioned into two faces to ensure that at least one of this cut-mesh are severed by the tetrahedron. */
+    MC_CONNECTED_COMPONENT_TYPE_SEAM = (1 << 3), /**< A connected component representing an input mesh (source-mesh or cut-mesh), but with additional vertices and edges that are introduced as as a result of the cut (i.e. the intersection contour/curve). */
+    MC_CONNECTED_COMPONENT_TYPE_INPUT = (1 << 4), /**< A connected component that is copy of an input mesh (source-mesh or cut-mesh). Such a connected component may contain new faces and vertices, which will happen if MCUT internally performs polygon partitioning. Polygon partitioning occurs when an input mesh intersects the other without severing at least one edge. An example is splitting a tetrahedron (source-mesh) in two parts using one large triangle (cut-mesh): in this case, the large triangle would be partitioned into two faces to ensure that at least one of this cut-mesh are severed by the tetrahedron. This is what allows MCUT to reconnect topology after the cut. */
     MC_CONNECTED_COMPONENT_TYPE_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McConnectedComponentType;
 
 /**
  * \enum McFragmentLocation
- * @brief The possible geometrical locations of a fragment connected component with-respect-to the cut-mesh.
+ * @brief The possible geometrical locations of a fragment (connected component), which are defined with-respect-to the cut-mesh.
  *
- * This enum structure defines the possible locations where a fragment connected component can be relative to the cut-mesh. Note that the labels of 'above' or 'below' here are defined with-respect-to the winding-order (and hence, normal orientation) of the cut-mesh. 
+ * This enum structure defines the possible locations where a fragment can be relative to the cut-mesh. Note that the labels of 'above' or 'below' here are defined with-respect-to the winding-order (and hence, normal orientation) of the cut-mesh. 
  */
 typedef enum McFragmentLocation {
     MC_FRAGMENT_LOCATION_ABOVE = 1 << 0, /**< Fragment is located above the cut-mesh. */
@@ -156,9 +159,9 @@ typedef enum McFragmentLocation {
 
 /**
  * \enum McFragmentSealType
- * @brief Topological configurations of a fragment connected component with-respect-to hole-filling.
+ * @brief Topological configurations of a fragment as defined with-respect-to hole-filling/sealing.
  *
- * This enum structure defines the possible configurations that a fragment connected component can be in regarding the hole-filling process. Here, hole-filling refers to the stage/phase when holes produced by a cut are filled with a subset of polygons of the cut-mesh.
+ * This enum structure defines the possible configurations that a fragment will be in regarding the hole-filling process. Here, hole-filling refers to the stage/phase when holes produced by a cut are filled with a subset of polygons of the cut-mesh.
  */
 typedef enum McFragmentSealType {
     MC_FRAGMENT_SEAL_TYPE_COMPLETE = 1 << 0, /**< Holes are completely sealed (watertight). */
@@ -168,9 +171,9 @@ typedef enum McFragmentSealType {
 
 /**
  * \enum McPatchLocation
- * @brief Geometrical location of a patch connected component with-respect-to the source-mesh.
+ * @brief The possible geometrical locations of a patch as defined with-respect-to the source-mesh.
  *
- * This enum structure defines the possible locations where a patch connected component can be relative to the source-mesh. Note that the labels of 'inside' or 'outside' here are defined with-respect-to the winding-order (and hence, normal orientation) of the source-mesh.
+ * This enum structure defines the possible locations where a patch can be relative to the source-mesh. Note that the labels of 'inside' or 'outside' here are defined with-respect-to the winding-order (and hence, normal orientation) of the source-mesh.
  */
 typedef enum McPatchLocation {
     MC_PATCH_LOCATION_INSIDE = 1 << 0, /**< Patch is located on the interior of the source-mesh (used to seal holes). */
@@ -181,7 +184,7 @@ typedef enum McPatchLocation {
 
 /**
  * \enum McSeamOrigin
- * @brief Input mesh from which a seam connected component is derived.
+ * @brief The input mesh from which a seam is derived.
  *
  * This enum structure defines the possible origins of a seam connected component, which can be either the source-mesh or the cut-mesh. 
  */
@@ -224,7 +227,7 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION = (1 << 11), /**< The location of a patch with respect to the source mesh (See also: ::McPatchLocation).*/
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE = (1 << 12), /**< The Hole-filling configuration of a fragment connected component (See also: ::McFragmentSealType). */
     MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX = (1 << 13), /**< List of seam-vertices as an array of indices.*/
-    MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 14), /**< The input mesh (source- or cut-mesh) from which a "seam" is derived (See also: ::McSeamedConnectedComponentOrigin). */
+    MC_CONNECTED_COMPONENT_DATA_ORIGIN = (1 << 14), /**< The input mesh (source- or cut-mesh) from which a "seam" is derived (See also: ::McSeamOrigin). */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP = (1 << 15), /**< List of a subset of vertex indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh vertex or MC_UNDEFINED_VALUE. This index-value corresponds to the connected component vertex at the accessed index. The value at index 0 of the queried array is the index of the vertex in the original input mesh. In order to clearly distinguish indices of the cut mesh from those of the source mesh, this index value corresponds to a cut mesh vertex index if it is great-than-or-equal-to the number of source-mesh vertices. Intersection points are mapped to MC_UNDEFINED_VALUE. The input mesh (i.e. source- or cut-mesh) will be deduced by the user from the type of connected component with which the information is queried. The input connected component (source-mesh or cut-mesh) that is referred to must be one stored internally by MCUT (i.e. a connected component queried from the API via ::McInputOrigin), to ensure consistency with any modification done internally by MCUT. */
     MC_CONNECTED_COMPONENT_DATA_FACE_MAP = (1 << 16), /**< List a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces. The input connected component (source-mesh or cut-mesh) that is referred to must be one stored internally by MCUT (i.e. a connected component queried from the API via ::McInputOrigin), to ensure consistency with any modification done internally by MCUT. */
     // incidence and adjacency information
@@ -242,7 +245,7 @@ typedef enum McConnectedComponentData {
  */
 typedef enum McDebugSource {
     MC_DEBUG_SOURCE_API = 1 << 0, /**< messages generated by usage of the MCUT API. */
-    MC_DEBUG_SOURCE_KERNEL = 1 << 1, /**< messages generated by the cutting kernel. */
+    MC_DEBUG_SOURCE_KERNEL = 1 << 1, /**< messages generated by internal logic implementing the kernel. */
     MC_DEBUG_SOURCE_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McDebugSource;
 
@@ -292,7 +295,7 @@ typedef enum McContextCreationFlags {
 typedef enum McDispatchFlags {
     MC_DISPATCH_VERTEX_ARRAY_FLOAT = (1 << 0), /**< Interpret the input mesh vertices as arrays of 32-bit floating-point numbers.*/
     MC_DISPATCH_VERTEX_ARRAY_DOUBLE = (1 << 1), /**< Interpret the input mesh vertices as arrays of 64-bit floating-point numbers.*/
-    MC_DISPATCH_REQUIRE_THROUGH_CUTS = (1 << 2), /**< Require that all intersection paths/curves/contours partition the source-mesh into two disjoint parts. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts i.e it disallows partial cuts. NOTE: This flag may not be used with ::MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED.*/
+    MC_DISPATCH_REQUIRE_THROUGH_CUTS = (1 << 2), /**< Require that all intersection paths/curves/contours partition the source-mesh into two (or more) fully disjoint parts. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts i.e it disallows partial cuts. NOTE: This flag may not be used with ::MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED.*/
     MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 3), /**< Compute connected-component-to-input mesh vertex-id maps. See also: ::MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP */
     MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 4), /**< Compute connected-component-to-input mesh face-id maps. . See also: ::MC_CONNECTED_COMPONENT_DATA_FACE_MAP*/
     //
@@ -356,7 +359,7 @@ typedef enum McQueryFlags {
  *
  * The callback function should have this prototype (in C), or be otherwise compatible with such a prototype.
  */
-typedef void (*pfn_mcDebugOutput_CALLBACK)(
+typedef void (MCAPI_PTR *pfn_mcDebugOutput_CALLBACK)(
     McDebugSource source,
     McDebugType type,
     unsigned int id,
@@ -510,24 +513,19 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
 *
 * @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
 * @param[in] flags The flags indicating how to interprete input data and configure the execution.
-* @param[in] pSrcMeshVertices The vertices (x,y,z) of the source mesh.
-* @param[in] pSrcMeshFaceIndices The indices of the faces (polygons) in the source mesh.
-* @param[in] pSrcMeshFaceSizes The sizes (in terms of vertex indices) of the faces in the source mesh.
+* @param[in] pSrcMeshVertices The array of vertex coordinates (i.e. in xyzxyzxyz... format) of the source mesh.
+* @param[in] pSrcMeshFaceIndices The array of vertex indices of the faces (polygons) in the source mesh.
+* @param[in] pSrcMeshFaceSizes The array of the sizes (in terms of number of vertex indices) of the faces in the source mesh.
 * @param[in] numSrcMeshVertices The number of vertices in the source mesh.
 * @param[in] numSrcMeshFaces The number of faces in the source mesh.
-* @param[in] pCutMeshVertices The vertices (x,y,z) of the cut mesh.
-* @param[in] pCutMeshFaceIndices The indices of the faces (polygons) in the cut mesh.
-* @param[in] pCutMeshFaceSizes The sizes (in terms of vertex indices) of the faces in the cut mesh.
+* @param[in] pCutMeshVertices The array of vertex coordinates (i.e. in xyzxyzxyz... format) of the cut mesh.
+* @param[in] pCutMeshFaceIndices The array of vertex indices of the faces (polygons) in the cut mesh.
+* @param[in] pCutMeshFaceSizes The array of the sizes (in terms of number of vertex indices) of the faces in the cut mesh.
 * @param[in] numCutMeshVertices The number of vertices in the cut mesh.
 * @param[in] numCutMeshFaces The number of faces in the cut mesh.
 *
 * This function specifies the two mesh objects to operate on. The 'source mesh' is the mesh to be cut 
 * (i.e. partitioned) along intersection paths prescribed by the 'cut mesh'. 
-* 
-* Numerical operations are performed only to evaluate polygon intersection points. The rest of 
-* the function pipeline resolves the combinatorial structure of the underlying meshes using halfedge 
-* connectivity. These numerical operations are represented exact predicates which makes the routine
-* also robust to floating-point error.
 *
 * An example of usage:
 * @code
@@ -536,7 +534,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
 *        // parse vertex arrays as 32 bit vertex coordinates (float*)
 *        MC_DISPATCH_VERTEX_ARRAY_FLOAT,
 *        // source mesh data
-*        pSrcMeshVertices,
+*        pSrcMeshVertices, 
 *        pSrcMeshFaceIndices,
 *        pSrcMeshFaceSizes,
 *        numSrcMeshVertices,
@@ -702,12 +700,12 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 * @param[out] pMem A pointer to memory location where appropriate values for a given \p flags will be returned. If \p pMem is NULL, it is ignored.
 * @param[out] pNumBytes Returns the actual size in bytes of data being queried by \p flags. If \p pNumBytes is NULL, it is ignored.
 *
-* The connected component queries described in the ::McConnectedComponentInfo should return the same information for a connected component returned by ::mcGetConnectedComponents.
+* The connected component queries described in the ::McConnectedComponentData should return the same information for a connected component returned by ::mcGetConnectedComponents.
 *
  * An example of usage:
  * @code
  * uint64_t numBytes = 0;
- * McResult err = mcGetConnectedComponentData(myContext,  connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
+ * McResult err = mcGetConnectedComponentData(myContext,  connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -715,7 +713,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  * 
  * double* pVertices = (double*)malloc(numBytes);
  *
- * err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL);
+ * err = mcGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error

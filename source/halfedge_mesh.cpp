@@ -347,13 +347,6 @@ namespace mcut
         return add_vertex(x, y, z);
     }
 
-#if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-    vertex_descriptor_t mesh_t::add_vertex(const math::fast_vec3 &point)
-    {
-        return add_vertex(point.x(), point.y(), point.z());
-    }
-#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-
     vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t &x, const math::real_number_t &y, const math::real_number_t &z)
     {
         vertex_descriptor_t vd = mesh_t::null_vertex();

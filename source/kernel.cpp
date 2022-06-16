@@ -42,8 +42,6 @@
 #else
 #define lmsg()
 #endif // #ifndef LICENSE_PURCHASED
-// This macro is for BVH-debugging purposes (visualzation). Can be excruciatingly slow when using exact numbers.
-// #define MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE
 
 namespace std{
     // need to declare partial and explicit specializations in every translation unit 

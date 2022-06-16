@@ -36,7 +36,7 @@
 
 cmake_minimum_required(VERSION 3.12...3.13 FATAL_ERROR)
 
-project(mcut LANGUAGES CXX C)
+project(mcut LANGUAGES CXX C) 
 
 get_directory_property(MCUT_PARENT_DIR PARENT_DIRECTORY)
 if(NOT MCUT_PARENT_DIR)

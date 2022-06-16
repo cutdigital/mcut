@@ -50,27 +50,38 @@ extern "C"
 {
 #endif // __cplusplus
 
+/** @file */
+
 #if defined(_WIN32)
     
 #ifdef MCUT_SHARED_LIB
 
 #if defined(MCUT_EXPORT_SHARED_LIB_SYMBOLS)
+    //** Symbol visibilty */
     #define MCAPI_ATTR __declspec(dllexport)
 #else
+    //** Symbol visibilty */
     #define MCAPI_ATTR __declspec(dllimport)
 #endif
 
 #else // MCUT_SHARED_LIB
+
+    //** Symbol visibilty */
 #define MCAPI_ATTR
+
 #endif // MCUT_SHARED_LIB
 
-    // On Windows, mcut commands use the stdcall convention
+    //** Function calling convention */
     #define MCAPI_CALL __stdcall
+    //** Function pointer-type declaration helper */
     #define MCAPI_PTR  MCAPI_CALL
 #else // #if defined(_WIN32)
-    // On other platforms, use the default calling convention
+    
+    //** Symbol visibilty */
     #define MCAPI_ATTR __attribute__((visibility("default")))
+    //** Function calling convention */
     #define MCAPI_CALL
+    //** Function pointer-type declaration helper */
     #define MCAPI_PTR
 #endif // #if defined(_WIN32)
 
