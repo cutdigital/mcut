@@ -56,7 +56,7 @@
 
 void mcCheckError_(McResult err, const char* file, int line);
 
-void mcDebugOutput(McDebugSource source,
+void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
     McDebugSeverity severity,

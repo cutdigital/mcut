@@ -2803,71 +2803,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         } // if (floating_polygon_was_detected) {
         TIMESTACK_POP();
 
-#if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
-        ///////////////////////////////////////////////////////////////////////////
-        // generate BVH meshes
-        ///////////////////////////////////////////////////////////////////////////
-
-        if (input.verbose)
-        {
-            lg << "create BVH meshes\n";
-
-            for (std::map<std::string, std::vector<geom::bounding_box_t<math::fast_vec3>>>::iterator mesh_bvh_iter = bvh_internal_nodes_array.begin();
-                 mesh_bvh_iter != bvh_internal_nodes_array.end();
-                 ++mesh_bvh_iter)
-            {
-
-                const std::string mesh_name = mesh_bvh_iter->first;
-                const std::vector<geom::bounding_box_t<math::fast_vec3>> &internal_nodes_array = mesh_bvh_iter->second;
-                const std::vector<std::pair<fd_t, unsigned int>> &leaf_nodes_array = bvh_leaf_nodes_array.at(mesh_name);
-                const int real_leaf_node_count = (int)leaf_nodes_array.size();
-                //const int bvh_real_node_count = bvh::get_ostensibly_implicit_bvh_size(real_leaf_node_count);
-                const int leaf_level_index = bvh::get_leaf_level_from_real_leaf_count(real_leaf_node_count);
-
-                mesh_t bvh_mesh;
-
-                // internal levels
-                for (int level_idx = 0; level_idx <= leaf_level_index; ++level_idx)
-                {
-
-                    const int rightmost_real_leaf = bvh::get_rightmost_real_leaf(leaf_level_index, real_leaf_node_count);
-                    const int rightmost_real_node_on_level = bvh::get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, level_idx);
-                    const int leftmost_real_node_on_level = bvh::get_level_leftmost_node(level_idx);
-                    const int number_of_real_nodes_on_level = (rightmost_real_node_on_level - leftmost_real_node_on_level) + 1;
-
-                    for (int level_node_idx_iter = 0; level_node_idx_iter < number_of_real_nodes_on_level; ++level_node_idx_iter)
-                    {
-
-                        geom::bounding_box_t<math::fast_vec3> node_bbox;
-                        const bool is_leaf_level = (level_idx == leaf_level_index);
-
-                        if (is_leaf_level)
-                        {
-                            const fd_t leaf_node_face = leaf_nodes_array.at(level_node_idx_iter).first;
-                            //node_bbox = ps_face_bboxes.at(leaf_node_face);
-                            node_bbox.expand(ps_face_bboxes.at(leaf_node_face));
-                        }
-                        else
-                        {
-                            const int node_implicit_idx = leftmost_real_node_on_level + level_node_idx_iter;
-                            const int node_memory_idx = bvh::get_node_mem_index(
-                                node_implicit_idx,
-                                leftmost_real_node_on_level,
-                                0,
-                                rightmost_real_node_on_level);
-                            node_bbox.expand(internal_nodes_array.at(node_memory_idx));
-                        }
-
-                        std::vector<vd_t> node_bbox_vertices = insert_bounding_box_mesh(bvh_mesh, node_bbox);
-                    }
-                }
-
-                dump_mesh(bvh_mesh, (mesh_name + ".bvh").c_str());
-            }
-
-        } // if (input.verbose)
-#endif    // #if defined(MCUT_DUMP_BVH_MESH_IN_DEBUG_MODE)
-
         // Check for mesh defects
         // ::::::::::::::::::::::
 
@@ -2986,8 +2921,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
             0,
             MC_DEBUG_SEVERITY_HIGH,
             mcut::to_string(backendOutput.status) + " : " + backendOutput.logger.get_reason_for_failure());
-
-        //ctxtPtr->lastLoggedDebugDetail = backendOutput.logger.get_log_string();
 
         return result;
     }
