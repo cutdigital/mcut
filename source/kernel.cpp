@@ -218,63 +218,63 @@ namespace mcut
     {
         const std::string name = std::string(fbasename) + ".off";
 
-        DEBUG_CODE_MASK((*logger_ptr) << "save " << name << std::endl;);
+        
 
-        DEBUG_CODE_MASK((*logger_ptr) << "vertices = " << mesh.number_of_vertices() << std::endl;);
+        
 
         for (vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v)
         {
-            DEBUG_CODE_MASK((*logger_ptr).indent(););
-            DEBUG_CODE_MASK((*logger_ptr) << vstr(*v) << " (" << mesh.vertex(*v).x() << ", " << mesh.vertex(*v).y() << ", " << mesh.vertex(*v).z() << ")" << std::endl;);
-            DEBUG_CODE_MASK((*logger_ptr).unindent(););
+            
+            
+            
         }
 
-        DEBUG_CODE_MASK((*logger_ptr) << "edges = " << mesh.number_of_edges() << std::endl;);
+        
 
         for (edge_array_iterator_t e = mesh.edges_begin(); e != mesh.edges_end(); ++e)
         {
-            DEBUG_CODE_MASK((*logger_ptr).indent(););
-            DEBUG_CODE_MASK((*logger_ptr) << estr(mesh, *e) << std::endl;);
-            DEBUG_CODE_MASK((*logger_ptr).unindent(););
+            
+            
+            
         }
 
-        DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << mesh.number_of_halfedges() << std::endl;);
+        
 
         for (halfedge_array_iterator_t h = mesh.halfedges_begin(); h != mesh.halfedges_end(); ++h)
         {
-            DEBUG_CODE_MASK((*logger_ptr).indent(););
-            DEBUG_CODE_MASK((*logger_ptr) << hstr(mesh, *h) << std::endl;);
-            DEBUG_CODE_MASK((*logger_ptr).unindent(););
+            
+            
+            
         }
 
-        DEBUG_CODE_MASK((*logger_ptr) << "faces = " << mesh.number_of_faces() << std::endl;);
+        
 
         for (face_array_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
         {
-            DEBUG_CODE_MASK((*logger_ptr).indent(););
-            DEBUG_CODE_MASK((*logger_ptr) << "face " << *face_iter << std::endl;);
+            
+            
 
             const std::vector<halfedge_descriptor_t> &halfedges_around_face = mesh.get_halfedges_around_face(*face_iter);
 
-            DEBUG_CODE_MASK((*logger_ptr).indent(););
+            
 
             //int num_halfedges = ;
             MCUT_ASSERT((int)halfedges_around_face.size());
 
-            DEBUG_CODE_MASK((*logger_ptr).indent(););
-            //DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << num_halfedges << std::endl;);
+            
+            //
             for (std::vector<halfedge_descriptor_t>::const_iterator h = halfedges_around_face.cbegin();
                  h != halfedges_around_face.cend();
                  ++h)
             {
-                DEBUG_CODE_MASK((*logger_ptr).indent(););
-                DEBUG_CODE_MASK((*logger_ptr) << hstr(mesh, *h) << std::endl;);
-                DEBUG_CODE_MASK((*logger_ptr).unindent(););
+                
+                
+                
             }
-            DEBUG_CODE_MASK((*logger_ptr).unindent(););
+            
 
-            DEBUG_CODE_MASK((*logger_ptr).unindent(););
-            DEBUG_CODE_MASK((*logger_ptr).unindent(););
+            
+            
         }
 
         write_off(name.c_str(), mesh);
@@ -488,8 +488,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         bool keep_fragments_partially_cut)
     {
 
-        DEBUG_CODE_MASK((*logger_ptr) << "extract connected components" << std::endl;);
-        DEBUG_CODE_MASK((*logger_ptr).indent();)
+        
+        
 
         // the auxilliary halfedge mesh containing vertices and edges referenced by the traced polygons
         mesh_t mesh = in; // copy
@@ -499,7 +499,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // Insert traced polygons into the auxilliary mesh
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK((*logger_ptr) << "total polygons = " << mX_traced_polygons.size() << std::endl;);
+        
 
         TIMESTACK_PUSH("Extract CC: Insert polygons");
 
@@ -616,7 +616,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         ///////////////////////////////////////////////////////////////////////////
         // find connected components in "mesh"
         ///////////////////////////////////////////////////////////////////////////
-        DEBUG_CODE_MASK((*logger_ptr) << "search connected components" << std::endl;);
+        
 
         // connected components
         std::map<std::size_t, mesh_t> ccID_to_mesh;
@@ -643,7 +643,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         find_connected_components(fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
         TIMESTACK_POP();
 
-        //DEBUG_CODE_MASK((*logger_ptr) << "connected components = " << num << std::endl;);
+        //
 
         ///////////////////////////////////////////////////////////////////////////
         // Map vertex descriptors to each connected component
@@ -1069,9 +1069,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
             if (proceed_to_save_mesh)
             {
-                DEBUG_CODE_MASK((*logger_ptr) << "connected component id = " << cc_id << std::endl;);
+                
 
-                DEBUG_CODE_MASK((*logger_ptr).indent(););
+                
                 connected_component_location_t location = connected_component_location_t::UNDEFINED;
 
                 if (!sm_polygons_below_cs.empty() && !sm_polygons_above_cs.empty())
@@ -1221,18 +1221,18 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                 connected_components[cc_id].emplace_back(cc, std::move(ccinfo));
 
-                DEBUG_CODE_MASK((*logger_ptr) << "location = " << to_string(location) << std::endl;);
-                DEBUG_CODE_MASK((*logger_ptr) << "vertices = " << cc.number_of_vertices() << std::endl;);
-                DEBUG_CODE_MASK((*logger_ptr) << "edges = " << cc.number_of_edges() << std::endl;);
-                DEBUG_CODE_MASK((*logger_ptr) << "halfedges = " << cc.number_of_halfedges() << std::endl;);
-                DEBUG_CODE_MASK((*logger_ptr) << "faces = " << cc.number_of_faces() << std::endl;);
+                
+                
+                
+                
+                
 
-                DEBUG_CODE_MASK((*logger_ptr).unindent(););
+                
             }
         }
         TIMESTACK_POP();
 
-        DEBUG_CODE_MASK((*logger_ptr).unindent(););
+        
 
         return mesh;
     }
@@ -1456,7 +1456,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             vd_t h_tgt = m1.target(h_proc);
             const vd_t tgt_copy = m1.add_vertex(m1.vertex(h_tgt)); // make a copy
 
-            DEBUG_CODE_MASK((*logger_ptr) << "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;);
+            
             resolved_inst = tgt_copy;
         }
         else
@@ -1529,7 +1529,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             const math::vec3 &vertex = m1.vertex(h_tgt);
             const vd_t tgt_copy = m1.add_vertex(vertex); // make a copy
 
-            DEBUG_CODE_MASK((*logger_ptr) << "duplicate vertex : original=" << vstr(h_tgt) << " copy=" << vstr(tgt_copy) << std::endl;);
+            
             resolved_inst = tgt_copy;
         }
 
@@ -1716,19 +1716,19 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         TIMESTACK_PUSH("Check source mesh is closed");
         const bool sm_is_watertight = mesh_is_closed(sm);
-        DEBUG_CODE_MASK(lg << "src-mesh is watertight = " << sm_is_watertight << std::endl;);
+        
         TIMESTACK_POP();
 
         TIMESTACK_PUSH("Check cut mesh is closed");
         const bool cm_is_watertight = mesh_is_closed(cs);
-        DEBUG_CODE_MASK(lg << "cut-mesh is watertight = " << cm_is_watertight << std::endl;);
+        
         TIMESTACK_POP();
 
         ///////////////////////////////////////////////////////////////////////////
         // create polygon soup
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "create polygon soup (ps)" << std::endl;);
+        
 
         TIMESTACK_PUSH("Create ps");
         mesh_t ps = sm; // copy
@@ -1809,14 +1809,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         const int ps_vtx_cnt = ps.number_of_vertices();
         //const int ps_face_cnt = ps.number_of_faces();
 
-        DEBUG_CODE_MASK(lg << "polygon-soup vertices = " << ps_vtx_cnt << std::endl;);
-        //DEBUG_CODE_MASK(lg << "polygon-soup faces = " << ps_face_cnt << std::endl;);
+        
+        //
 
         ///////////////////////////////////////////////////////////////////////////
         // create the first auxilliary halfedge data structure ("m0")
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "create auxiliary mesh (`m0`)" << std::endl;);
+        
 
         TIMESTACK_PUSH("Create m0");
         // The auxilliary data structure stores:
@@ -1849,7 +1849,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // Calculate polygon intersection points
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "calculate intersection-points" << std::endl;);
+        
 
         std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
 
@@ -3044,15 +3044,6 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 MCUT_ASSERT(ps_tested_face_to_vertices.find(tested_face) != ps_tested_face_to_vertices.end());
                 const std::vector<math::vec3> &tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
 
-                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " vertices = " << tested_face_descriptors.size() << std::endl;);
-
-                //for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
-                //    const math::vec3& vertex = ps.vertex(*it);
-                //    DEBUG_CODE_MASK(lg << "v: " << vertex << std::endl;);
-                //    tested_face_vertices.push_back(vertex);
-                //}
-                // std::cout  << "faces = [" << fstr(tested_face) << ", " << fstr(tested_edge_h0_face) << ", " << fstr(tested_edge_h1_face) << "]" << std::endl;
-                   
                 // compute plane of tested_face
                 // -----------------------
 
@@ -3061,15 +3052,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
                 const math::real_number_t &tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param.at(tested_face);
                 MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
-                const int &tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face); // geom::compute_polygon_plane_coefficients(
-                    /// tested_face_plane_normal,
-                    // tested_face_plane_param_d,
-                    // tested_face_vertices.data(),
-                //  (int)tested_face_vertices.size());
-
-                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " normal = " << tested_face_plane_normal << std::endl;);
-                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " largest normal component = " << tested_face_plane_normal_max_comp << std::endl;);
-                //DEBUG_CODE_MASK(lg << "face " << fstr(tested_face) << " plane d-coeff = " << tested_face_plane_param_d << std::endl;);
+                const int &tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face); 
 
                 math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
 
@@ -3095,13 +3078,13 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 #endif
                 bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
 
-                DEBUG_CODE_MASK(lg << "plane intersection exists: " << std::boolalpha << (bool)have_plane_intersection << std::endl;);
+                
 
                 if (have_plane_intersection)
                 { // does the segment intersect the plane?
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
-                    DEBUG_CODE_MASK(lg << "intersection point: " << intersection_point << std::endl;);
+                    
 
                     if (segment_intersection_type != '1')
                     { // the segment only touches the the plane (the line reprsented by segment still intersects the plane)
@@ -3208,7 +3191,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     bool have_point_in_polygon = in_poly_test_intersection_type == 'i';
 
-                    DEBUG_CODE_MASK(lg << "point in polygon = " << std::boolalpha << have_point_in_polygon << std::endl;);
+                    
 
                     if (have_point_in_polygon)
                     { // NOTE: point must be [inside] the polygon for us to consider it further
@@ -3286,14 +3269,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
 #if 0
 
-                    //DEBUG_CODE_MASK_(lg << "add vertex" << std::endl;);
-                    //DEBUG_CODE_MASK_(lg.indent(););
-                    //DEBUG_CODE_MASK_(std::cout << "position = (" << intersection_point << ")" << std::endl;);
-                    //DEBUG_CODE_MASK_(std::cout  << "descriptor = " << vstr(new_vertex_descr) << std::endl;);
-                    //DEBUG_CODE_MASK_(std::cout  << "registry-entry" << std::endl;);
-                    //DEBUG_CODE_MASK_(lg.indent(););
-                    DEBUG_CODE_MASK_(std::cout  << "****faces = [" << fstr(tested_face) << ", " << fstr(tested_edge_h0_face) << ", " << fstr(tested_edge_h1_face) << "]" << std::endl;);
-                    //DEBUG_CODE_MASK_(lg << "halfedge = " << hstr(ps, halfedge_pq) << std::endl;);
+                    //
+                    //
+                    //
+                    //
+                    //
+                    //
+                    
+                    //
                    
 #endif
                         //m0_ivtx_to_ps_faces.insert(std::make_pair(new_vertex_descr, new_vertex_incident_ps_faces));
@@ -3349,7 +3332,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                             if (is_border_reentrant_ivertex)
                             {
-                                DEBUG_CODE_MASK(lg << "is border" << std::endl;);
+                                
                                 cm_border_reentrant_ivtx_list.push_back(new_vertex_descr);
                             } //else // is regular
                         }
@@ -3376,13 +3359,13 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     } // if (have_point_in_polygon)
 
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
                 } // if (have_plane_intersection) {
             }     // for (std::vector<fd_t>::const_iterator intersected_faces_iter = intersected_faces.cbegin(); intersected_faces_iter != intersected_faces.cend(); ++intersected_faces_iter) {
 
         } // for (std::map<ed_t, std::vector<fd_t>>::const_iterator ps_edge_face_intersection_pairs_iter = ps_edge_face_intersection_pairs.cbegin(); ps_edge_face_intersection_pairs_iter != ps_edge_face_intersection_pairs.cend(); ps_edge_face_intersection_pairs_iter++) {
 #endif
-        DEBUG_CODE_MASK(lg << "partial cut = " << std::boolalpha << partial_cut_detected << std::endl;);
+        
 
         // Create edges from the new intersection points
         // ---------------------------------------------
@@ -3413,7 +3396,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         TIMESTACK_POP();
 
-        DEBUG_CODE_MASK(lg << "total intersection-points = " << m0_ivtx_to_intersection_registry_entry.size() << std::endl;);
+        
 #if 0
         for (std::map<vd_t, std::pair<ed_t, fd_t>>::const_iterator entry_it = m0_ivtx_to_intersection_registry_entry.cbegin(); entry_it != m0_ivtx_to_intersection_registry_entry.cend(); ++entry_it)
         {
@@ -3440,7 +3423,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         if (partial_cut_detected && cm_border_reentrant_ivtx_list.size() == 0)
         {
             // can happen with case when both the input mesh and cut surface are not watertight
-            DEBUG_CODE_MASK(lg << "note: did not find cut-surface tip re-entrant vertices." << std::endl;);
+            
         }
 
         if (input.verbose)
@@ -3466,7 +3449,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // Check for degenerate mesh intersections
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "detect degeneracies" << std::endl;);
+        
 
         // TODO: this is redundnat (remove)
         vertex_array_iterator_t m0_ivtx_iter_begin = m0.vertices_begin();
@@ -3548,7 +3531,13 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             const std::vector<vd_t> &intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
             if((int)intersection_test_ivtx_list.size() < 2)
             {
-                printf("sm_face=%d cm_face=%d\n", (int)sm_face, (int)cm_face);
+                const vd_t ivtx = intersection_test_ivtx_list.back();
+                const ed_t &ps_edge = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).first;
+                const fd_t ps_edge_f0 = ps.face(ps.halfedge(ps_edge, 0));
+                const fd_t ps_edge_f1 = ps.face(ps.halfedge(ps_edge, 1));
+                const fd_t ps_f = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).second;
+
+                printf("(%d, %d) [%d, %d, %d]\n", (int)sm_face, (int)cm_face, (int)ps_edge_f0, (int)ps_edge_f1, (int)ps_f);
             }
 
         }
@@ -3565,7 +3554,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             MCUT_ASSERT((int)intersection_test_ivtx_list.size() >= 2); // edge-case scenario: an edge intersects with another edge exactly
             const uint32_t new_ivertices_count = (uint32_t)intersection_test_ivtx_list.size();
 
-            DEBUG_CODE_MASK(lg << "create edge(s) from " << new_ivertices_count << " intersection points" << std::endl;);
+            
 
             if (new_ivertices_count == 2)
             { // one edge
@@ -3581,7 +3570,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     //!interior_edge_exists(m0, first_new_ivertex, second_new_ivertex /*, m0_cutpath_edges*/)
                 )
                 {
-                    DEBUG_CODE_MASK(lg << "add edge (xx) : " << estr(first_new_ivertex, second_new_ivertex) << std::endl;);
+                    
 
                     hd_t h = m0.add_edge(first_new_ivertex, second_new_ivertex);
                     MCUT_ASSERT(h != mesh_t::null_halfedge());
@@ -3708,7 +3697,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                         if ((int)shared_faces_containing_edge.size() == 2)
                         {
-                            DEBUG_CODE_MASK(lg << "add edge (xx) : " << estr(src_vertex, tgt_vertex) << " (from concave intersection)" << std::endl;);
+                            
 
                             const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // insert segment!
 
@@ -3760,9 +3749,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         ///////////////////////////////////////////////////////////////////////////
 
         TIMESTACK_PUSH("Find cut-paths ");
-        DEBUG_CODE_MASK(lg << "find cut-paths" << std::endl;);
+        
 
-        DEBUG_CODE_MASK(lg.indent(););
+        
 
         // We are now going to search for all the cut-paths created from the intersection
         // between source- and cut-mesh faces. Some of these cut-paths identify holes to be
@@ -3790,7 +3779,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // build implicit cut-path sequences (a sorted set of connected edges)
         // -----------------------------------------------------------------------
 
-        DEBUG_CODE_MASK(lg << "build implicit cut-path sequences" << std::endl;);
+        
 
         // An "implicit" cut-path sequence is a list of cut-path edges that are sorted (i.e.
         // this means that in memory, edges are placed next to others they connect to).
@@ -3804,11 +3793,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
             //const int diff = (int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size();
             MCUT_ASSERT((int)m0_ivtx_to_cutpath_edges.size() - (int)m0_ivtx_to_cutpath_sequence.size() >= 2); // need a minimum of 2 intersection points (one edge) to form a sequence
-            DEBUG_CODE_MASK(lg.indent(););
+            
             int cur_cutpath_sequence_index = (int)m0_cutpath_sequences.size();
 
-            DEBUG_CODE_MASK(lg << "current disjoint implicit cut-path sequence = " << cur_cutpath_sequence_index << std::endl;);
-            DEBUG_CODE_MASK(lg.indent(););
+            
+            
             // start from an intersection point that is not yet mapped-to/associated-with a
             //  sequence in "cur_cutpath_sequence"
             // pick the vertex which is a terminal vertex (to start search from beginning of sequence)
@@ -3883,14 +3872,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
             do
             { // an iteration will add an edge to the current cut-path sequence
-                DEBUG_CODE_MASK(lg.indent(););
+                
 
                 // update state
                 current_vertex = next_vertex;
                 current_edge = next_edge;
 
-                DEBUG_CODE_MASK(lg << "current vertex = " << current_vertex << std::endl;);
-                DEBUG_CODE_MASK(lg << "current edge = " << current_edge << std::endl;);
+                
+                
 
                 // add edge
                 cur_cutpath_sequence.emplace_back(current_edge);
@@ -3972,19 +3961,19 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     }
                 } // if (!reached_end_of_sequence) {
 
-                DEBUG_CODE_MASK(lg.unindent(););
+                
 
                 // while there is another edge to added to the current disjoint implicit cutpath sequence
             } while (next_edge != mesh_t::null_edge());
 
-            DEBUG_CODE_MASK(lg << "disjoint implicit cut-path sequence size = " << cur_cutpath_sequence.size() << std::endl;);
+            
 
-            DEBUG_CODE_MASK(lg.unindent(););
-            DEBUG_CODE_MASK(lg.unindent(););
+            
+            
             // while not all intersection-points have been mapped to a disjoint implicit cutpath sequence
         } while (m0_edge_to_cutpath_sequence.size() != m0_cutpath_edges.size());
 
-        DEBUG_CODE_MASK(lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;);
+        
 
         MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
 
@@ -3999,7 +3988,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         TIMESTACK_POP();
 
-        DEBUG_CODE_MASK(lg << "total explicit cut-path sequences = " << m0_cutpath_sequences.size() << std::endl;);
+        
 
         MCUT_ASSERT(m0_cutpath_sequences.empty() == false);
 
@@ -4013,7 +4002,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // us to determine the properties of the cut-paths
         //
 
-        DEBUG_CODE_MASK(lg << "find border intersection points" << std::endl;);
+        
 
         TIMESTACK_PUSH("Infer cutpath info");
 
@@ -4026,7 +4015,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
              iter != m0_ivtx_to_intersection_registry_entry.cend();
              ++iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
             const vd_t &ivtx = vd_t((std::uint32_t)std::distance(m0_ivtx_to_intersection_registry_entry.cbegin(), iter) + ps.number_of_vertices()); //iter->first;
 
             const ed_t edge_of_ivtx_ps_he = iter->first; //iter->second.first; // ps.edge(ivtx_ps_he);
@@ -4037,15 +4026,15 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 MCUT_ASSERT(m0_cutpath_terminal_vertices.count(ivtx) == 0);
                 m0_cutpath_terminal_vertices[ivtx] = iter;
                 MCUT_ASSERT(m0_cutpath_terminal_vertices.count(ivtx) == 1);
-                DEBUG_CODE_MASK(lg << vstr(ivtx) << std::endl;);
+                
             }
 
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
-        DEBUG_CODE_MASK(lg << "total border intersection points = " << m0_cutpath_terminal_vertices.size() << std::endl;);
+        
 
-        DEBUG_CODE_MASK(lg << "infer cut-path properties" << std::endl;);
+        
 
         // MapKey=index of an explicit cutpath in  m0_cutpath_sequences
         // MapValue=a tuple of boolean properties (is_linear, is_hole, is_srcmesh_severing).
@@ -4061,12 +4050,12 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
              iter != m0_cutpath_sequences.cend();
              ++iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
             const int cutpath_index = (int)std::distance(m0_cutpath_sequences.cbegin(), iter);
 
-            DEBUG_CODE_MASK(lg << "explicit cut-path = " << cutpath_index << std::endl;);
+            
 
-            DEBUG_CODE_MASK(lg.indent(););
+            
             const std::vector<ed_t> &cutpath = *iter;
 
             MCUT_ASSERT(m0_cutpath_sequence_to_properties.count(cutpath_index) == 0);
@@ -4211,11 +4200,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 //}
             }
 
-            DEBUG_CODE_MASK(lg << "type = `" << (cutpath_is_linear ? "linear" : "circular") << "`" << std::endl;);
-            DEBUG_CODE_MASK(lg << "hole = " << std::boolalpha << cutpath_is_hole << std::endl;);
+            
+            
 
-            DEBUG_CODE_MASK(lg.unindent(););
-            DEBUG_CODE_MASK(lg.unindent(););
+            
+            
         }
 
         m0_cutpath_terminal_vertices.clear(); // free
@@ -4255,12 +4244,12 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             }
         }
 
-        DEBUG_CODE_MASK(lg << "total explicit linear cutpaths = " << num_explicit_linear_cutpaths << std::endl;);
-        DEBUG_CODE_MASK(lg << "total explicit circular cutpaths = " << num_explicit_circular_cutpaths << std::endl;);
-        DEBUG_CODE_MASK(lg << "total explicit cutpaths making holes = " << explicit_cutpaths_making_holes.size() << std::endl;);
-        DEBUG_CODE_MASK(lg << "total explict cutpaths severing the srcmesh = " << explicit_cutpaths_severing_srcmesh.size() << std::endl;);
+        
+        
+        
+        
 
-        DEBUG_CODE_MASK(lg.unindent();); // end of cutpath sequence detection code
+        
 
         TIMESTACK_POP();
 
@@ -4433,7 +4422,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // Gather/map intersection points on each intersecting faces
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "associate intersecting faces to intersection-points" << std::endl;);
+        
 
         // TODO: build this data structure during polygon intersection tests!
         std::map<
@@ -4493,19 +4482,19 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         for (std::map<fd_t, std::vector<vd_t>>::const_iterator i = ps_iface_to_ivtx_list.cbegin(); i != ps_iface_to_ivtx_list.cend(); ++i)
         {
-            DEBUG_CODE_MASK(lg.indent(););
-            DEBUG_CODE_MASK(lg << "face " << i->first << std::endl;);
+            
+            
 
             // log
-            DEBUG_CODE_MASK(lg.indent(););
+            
             for (std::vector<vd_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j)
             {
-                DEBUG_CODE_MASK(lg << vstr(*j) << " ";
+                
             }
-            DEBUG_CODE_MASK(lg << std::endl;);
-            DEBUG_CODE_MASK(lg.unindent(););
+            
+            
 
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 #endif
 
@@ -4517,8 +4506,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         TIMESTACK_PUSH("Create polygon-exterior edges (w/ > 3 vertices)");
 
-        DEBUG_CODE_MASK(lg << "create polygon-exterior edges" << std::endl;);
-        DEBUG_CODE_MASK(lg.indent(););
+        
+        
         // Part 1
         //
         // Here, we identify ps-edges with more than 3 coincident m0-vertices (ps-
@@ -4547,7 +4536,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         for (std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             // TODO: get_vertices_on_ps_edge() is not needed we can probably infer this information using previously/pre-computed std::maps
             // vertices that lie on current ps edge
@@ -4569,7 +4558,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // and rest of points (intersection points)
                 vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), iter_ps_edge->second.cbegin(), iter_ps_edge->second.cend());
 
-                DEBUG_CODE_MASK(lg << "ps-edge " << estr(ps, iter_ps_edge->first) << " : ";);
+                
 
                 MCUT_ASSERT(ps_edge_to_vertices.find(iter_ps_edge->first) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
 
@@ -4578,7 +4567,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 for (std::vector<vd_t>::const_iterator it = vertices_on_ps_edge.cbegin(); it != vertices_on_ps_edge.cend(); ++it)
                 {
 
-                    DEBUG_CODE_MASK(lg << vstr(*it) << " ";);
+                    
 
                     const math::vec3 &vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
                     ps_edge_to_vertices.at(iter_ps_edge->first).push_back(std::make_pair(*it, vertex_coordinates));
@@ -4587,13 +4576,13 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     //m0_to_m1_poly_ext_int_edge_vertex.insert(std::make_pair(*it, std::vector<vd_t>()));
                     //}
                 }
-                DEBUG_CODE_MASK(lg << std::endl;);
+                
             }
 
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
-        DEBUG_CODE_MASK(lg << "ps-edges with > 3 coincident vertices = " << ps_edge_to_vertices.size() << std::endl;);
+        
 
         // In the next for-loop, we sort each list of vertices on each ps-edge
         // which more than 3 coincident vertices
@@ -4656,7 +4645,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
              ++ps_edge_coincident_vertices_iter)
         {
 
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             // get sorted list of vertices on edge
             const std::vector<vd_t> &coincident_sorted_vertices = ps_edge_coincident_vertices_iter->second;
@@ -4680,7 +4669,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 const vd_t tgt_vertex = *(iter);
                 const hd_t h = m0.add_edge(src_vertex, tgt_vertex); // create edge!
 
-                DEBUG_CODE_MASK(lg << "add edge : " << estr(src_vertex, tgt_vertex) << std::endl;);
+                
 
                 MCUT_ASSERT(h != mesh_t::null_halfedge());
 
@@ -4735,7 +4724,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 }
             }
 
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
         TIMESTACK_POP();
@@ -4755,7 +4744,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // b) ps-edge is coincident on three m0-vertices such that one is an intersection point
         //
 
-        DEBUG_CODE_MASK(lg << "create edges on ps-edges with 2 (oo) or 3 vertices (ox or xo)" << std::endl;);
+        
 
         // a map between edge ids in "ps" and in "m0", which is the data structure we are progressively
         // defining to hold data for the new mesh containing clipped polygons
@@ -5069,7 +5058,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // for each ps-edge
         for (edge_array_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             if (ps_edge_to_vertices.find(*iter_ps_edge) != ps_edge_to_vertices.end())
             {
@@ -5094,7 +5083,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
             if (vertices_on_ps_edge.size() == 2) // simple case (edge did not intersect with any polygon)
             {
-                DEBUG_CODE_MASK(lg << "add edge (oo) : (" << vertices_on_ps_edge.back() << ", " << vertices_on_ps_edge.front() << ")" << std::endl;);
+                
 
                 const hd_t h = m0.add_edge(vertices_on_ps_edge.back(), vertices_on_ps_edge.front());
 
@@ -5137,14 +5126,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         //
                         // o x o
                         //
-                        DEBUG_CODE_MASK(lg << "add edge (ox) : " << estr(first, second) << std::endl;);
+                        
                         h0 = m0.add_edge(first, second);
                         MCUT_ASSERT(h0 != mesh_t::null_halfedge());
 
                         MCUT_ASSERT(m0.target(h0) == second);
                         ivtx_to_incoming_hlist[second].push_back(h0);
 
-                        DEBUG_CODE_MASK(lg << "add edge (xo) : " << estr(second, third) << std::endl;);
+                        
                         h1 = m0.add_edge(second, third);
                         MCUT_ASSERT(h1 != mesh_t::null_halfedge());
 
@@ -5156,12 +5145,12 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         //
                         //  o o x
                         //
-                        DEBUG_CODE_MASK(lg << "add edge (ox) : " << estr(first, third) << std::endl;);
+                        
                         h0 = m0.add_edge(first, third);
                         MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                         ivtx_to_incoming_hlist[third].push_back(h0);
 
-                        DEBUG_CODE_MASK(lg << "add edge (xo) : " << estr(third, second) << std::endl;);
+                        
                         h1 = m0.add_edge(third, second);
                         MCUT_ASSERT(h1 != mesh_t::null_halfedge());
                         ivtx_to_incoming_hlist[third].push_back(m0.opposite(h1));
@@ -5172,14 +5161,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     //
                     // x o o
                     //
-                    DEBUG_CODE_MASK(lg << "add edge (ox) : " << estr(second, first) << std::endl;);
+                    
                     h0 = m0.add_edge(second, first); // o-->x
                     MCUT_ASSERT(h0 != mesh_t::null_halfedge());
                     ivtx_to_incoming_hlist[first].push_back(h0);
 
                     MCUT_ASSERT(m0.target(m0.opposite(h0)) == second);
 
-                    DEBUG_CODE_MASK(lg << "add edge (xo) : " << estr(first, third) << std::endl;);
+                    
                     h1 = m0.add_edge(first, third); // x-->o
                     MCUT_ASSERT(h1 != mesh_t::null_halfedge());
 
@@ -5203,9 +5192,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     }
                 }
             }
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
-        DEBUG_CODE_MASK(lg.unindent(););
+        
 #endif // #if defined(MCUT_MULTI_THREADED)
 
         TIMESTACK_POP(); // &&&&&
@@ -5221,7 +5210,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // -----------------------------------------------
 
         TIMESTACK_PUSH("Clip polygons"); // &&&&&
-        DEBUG_CODE_MASK(lg << "clip intersecting faces" << std::endl;);
+        
 
         // Stores the all polygons, including new polygons that are produced after clipping
         // and the faces that remained unchanged because they were not intersecting. Note
@@ -5940,7 +5929,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // for each face in the polygon-soup mesh
         for (face_array_iterator_t ps_face_iter = ps.faces_begin(); ps_face_iter != ps.faces_end(); ++ps_face_iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             const fd_t &ps_face = *ps_face_iter;
 
@@ -5951,14 +5940,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             bool is_intersecting_ps_face = ps_iface_to_m0_edge_list_fiter != ps_iface_to_m0_edge_list.end();
             bool is_from_cut_mesh = ps_is_cutmesh_face(ps_face, sm_face_count);
 
-            DEBUG_CODE_MASK(lg << "face " << ps_face << std::endl;);
+            
 
             std::vector<traced_polygon_t> child_polygons; // new polygons traced on current face
 
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
-            DEBUG_CODE_MASK(lg << "origin-mesh = " << (is_from_cut_mesh ? "cut-mesh" : "source-mesh") << std::endl;);
-            DEBUG_CODE_MASK(lg << "is intersecting face = " << std::boolalpha << is_intersecting_ps_face << std::endl;);
+            
+            
 
             if (is_intersecting_ps_face == false)
             { // non-intersecting face
@@ -5981,7 +5970,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // for each halfedge in the current polygon
                 for (std::vector<hd_t>::const_iterator hbegin = halfedges_around_face.cbegin(); hbegin != halfedges_around_face.cend(); ++hbegin)
                 {
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
                     // get the source and target vertex descriptors in the polygon soup
                     const vd_t ps_h_src = ps.source(*hbegin);
@@ -6004,16 +5993,16 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     // resolve the correct halfedge by match the source and target vertex descriptors
                     if (m0.source(m0_edge_h0) == m0_h_src && m0.target(m0_edge_h0) == m0_h_tgt)
                     {
-                        DEBUG_CODE_MASK(lg << hstr(m0, m0_edge_h0) << std::endl;);
+                        
                         retraced_poly.emplace_back(m0_edge_h0);
                     }
                     else
                     {
-                        DEBUG_CODE_MASK(lg << hstr(m0, m0_edge_h1) << std::endl;);
+                        
                         retraced_poly.emplace_back(m0_edge_h1);
                     }
 
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
                 }
 
                 MCUT_ASSERT(retraced_poly.size() == halfedges_around_face.size());
@@ -6065,21 +6054,21 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 coincident_vertices.reserve(coincident_vertices.size() + intersection_points_on_face.size());
                 coincident_vertices.insert(coincident_vertices.end(), intersection_points_on_face.cbegin(), intersection_points_on_face.cend());
 
-                DEBUG_CODE_MASK(lg << "intersection points on face = " << intersection_points_on_face.size() << std::endl;);
+                
 
                 MCUT_ASSERT(intersection_points_on_face.size() >= 2); // minimum (two intersecting convex polygons)
 
                 // dump to log
                 if (input.verbose)
                 {
-                    DEBUG_CODE_MASK(lg << "coincident vertices = " << coincident_vertices.size() << std::endl;);
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
+                    
                     for (std::vector<vd_t>::const_iterator j = coincident_vertices.cbegin(); j != coincident_vertices.cend(); ++j)
                     {
-                        DEBUG_CODE_MASK(lg << vstr(*j) << " ";);
+                        
                     }
-                    DEBUG_CODE_MASK(lg << std::endl;);
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
+                    
                 }
 
                 // After gathering the vertices above, we will now collect edges on the face
@@ -6143,7 +6132,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                 // dump info to log
 
-                DEBUG_CODE_MASK(lg << "boundary edges = " << incident_boundary_edge_count << std::endl;);
+                
 
                 if (lg.verbose())
                 {
@@ -6151,9 +6140,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                          exterior_edge_iter != incident_edges.cbegin() + incident_boundary_edge_count;
                          ++exterior_edge_iter)
                     {
-                        DEBUG_CODE_MASK(lg.indent(););
-                        DEBUG_CODE_MASK(lg << estr(m0, *exterior_edge_iter) << std::endl;); // " ext-edge=" << *exterior_edge_iter << " : " << m0.vertex(*exterior_edge_iter, 0) << " " << m0.vertex(*exterior_edge_iter, 1) << std::endl;);
-                        DEBUG_CODE_MASK(lg.unindent(););
+                        
+                        
+                        
                     }
                 }
 
@@ -6173,7 +6162,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // Thus, we need one more filtering step which will remove these redundant halfedges from
                 // the gather set.
 
-                DEBUG_CODE_MASK(lg << "gather exterior halfedges on face" << std::endl;);
+                
 
                 std::vector<hd_t> incident_halfedges;
 
@@ -6424,13 +6413,13 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 //walked_edges.reserve(incident_edges.size());
                 do
                 {
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
                     current_exterior_halfedge = next_exterior_halfedge;
                     incident_halfedges.push_back(current_exterior_halfedge);
                     walked_edges[m0.edge(current_exterior_halfedge)] = true;
 
-                    DEBUG_CODE_MASK(lg << hstr(m0, current_exterior_halfedge) << std::endl;);
+                    
 
                     const vd_t current_tgt = m0.target(current_exterior_halfedge);
                     next_exterior_halfedge = mesh_t::null_halfedge(); // reset
@@ -6494,7 +6483,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             }
                         }
                     }
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
                 } while (next_exterior_halfedge != mesh_t::null_halfedge() /*first_boundary_halfedge*/);
 
                 MCUT_ASSERT(incident_halfedges.size() >= 3); // minimum i.e. for a triangles!
@@ -6503,7 +6492,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                 const int exterior_halfedge_count = (int)incident_halfedges.size();
 
-                DEBUG_CODE_MASK(lg << "exterior halfedges on face = " << exterior_halfedge_count << std::endl;);
+                
 
                 MCUT_ASSERT(exterior_halfedge_count == incident_boundary_edge_count);
 
@@ -6526,12 +6515,12 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // dump
                 if (input.verbose)
                 {
-                    DEBUG_CODE_MASK(lg << "halfedges on face : ";);
+                    
                     for (std::vector<hd_t>::const_iterator j = incident_halfedges.cbegin(); j != incident_halfedges.cend(); ++j)
                     {
-                        DEBUG_CODE_MASK(lg << " <" << *j << ">";);
+                        
                     }
-                    DEBUG_CODE_MASK(lg << std::endl;);
+                    
                 }
 
                 // Note: at this stage, we have all the halfedges that we need to trace child polygons.
@@ -6555,17 +6544,17 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     MCUT_ASSERT(incident_halfedges_to_be_walked.size() >= 2);
 
-                    DEBUG_CODE_MASK(lg << "polygon " << m0_polygons.size() + child_polygons.size() << std::endl;);
+                    
 
                     bool is_valid_polygon = false;
                     do
                     { // each iteration walks a halfedge to incremetally trace a child polygon
-                        DEBUG_CODE_MASK(lg.indent(););
+                        
 
                         // 1. update state
                         current_halfedge = next_halfedge;
 
-                        DEBUG_CODE_MASK(lg << hstr(m0, current_halfedge) << std::endl;);
+                        
 
                         child_polygon.push_back(current_halfedge);
                         const vd_t current_halfedge_target = m0.target(current_halfedge);
@@ -6592,7 +6581,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 if (current_halfedge != m0.opposite(child_polygon.front()))
                                 {
                                     is_valid_polygon = true;
-                                    DEBUG_CODE_MASK(lg.unindent(););
+                                    
                                     break;
                                 }
                                 else
@@ -6650,7 +6639,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                     if (std::find(child_polygon.cbegin(), child_polygon.cend(), premptive_next) != child_polygon.cend())
                                     {
                                         is_valid_polygon = true;
-                                        DEBUG_CODE_MASK(lg.unindent(););
+                                        
                                         break;
                                     }
                                 }
@@ -6716,12 +6705,12 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         }
 
                         next_halfedge = prime_candidate;
-                        DEBUG_CODE_MASK(lg.unindent(););
+                        
                     } while (next_halfedge != mesh_t::null_halfedge());
 
                     if (is_valid_polygon)
                     {
-                        DEBUG_CODE_MASK(lg << "valid" << std::endl;);
+                        
 
                         const int poly_idx = (int)(m0_polygons.size() + child_polygons.size());
                         if (ps_is_cutmesh_face(ps_face, sm_face_count))
@@ -6741,7 +6730,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 } while (!incident_halfedges_to_be_walked.empty());
             } // if (!is_intersecting_ps_face) {
 
-            DEBUG_CODE_MASK(lg << "traced polygons on face = " << child_polygons.size() << std::endl;);
+            
 
             m0_polygons.insert(m0_polygons.end(), child_polygons.cbegin(), child_polygons.cend());
 
@@ -6750,8 +6739,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 traced_sm_polygon_count += (int)child_polygons.size();
             }
 
-            DEBUG_CODE_MASK(lg.unindent(););
-            DEBUG_CODE_MASK(lg.unindent(););
+            
+            
         } // for each ps-face to trace
 
 #endif // #if defined(MCUT_MULTI_THREADED)
@@ -6780,7 +6769,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // cutting algorithm i.e when duplicating intersection points, creating cut-mesh patches, stitching (hole
         // filling), and more.
 
-        DEBUG_CODE_MASK(lg << "traced polygons = " << m0_polygons.size() << " (source-mesh = " << traced_sm_polygon_count << ")" << std::endl;);
+        
 
         MCUT_ASSERT((int)m0_polygons.size() >= ps.number_of_faces());
 
@@ -6812,7 +6801,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // mesh rules (to avoid potentially crashing the program due to logic error).
         //
 
-        DEBUG_CODE_MASK(lg << "dump traced-polygons if possible" << std::endl;);
+        
 
         bool all_cutpaths_are_circular = (num_explicit_circular_cutpaths == num_explicit_cutpath_sequences);
 
@@ -6943,7 +6932,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // Map each halfedge to the traced polygons that uses it
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "map halfedges to polygons" << std::endl;);
+        
 
         // We now need to manually maintain halfedge incidence (i.e. "used-by") information since
         // the traced-polygon connectivity is not stored inside our halfedge mesh data structure.
@@ -6973,7 +6962,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             const traced_polygon_t &traced_polygon = *traced_polygon_iter;
             const int traced_polygon_index = (int)std::distance(m0_polygons.cbegin(), traced_polygon_iter);
 
-            DEBUG_CODE_MASK(lg << "polygon = " << traced_polygon_index << " :";);
+            
 
             // for each halfedge in polygon
             for (traced_polygon_t::const_iterator traced_polygon_halfedge_iter = traced_polygon.cbegin();
@@ -6983,7 +6972,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                 const hd_t &traced_polygon_halfedge = *traced_polygon_halfedge_iter;
 #if 0
-                DEBUG_CODE_MASK(lg << " " << hstr(m0, traced_polygon_halfedge););
+                
 
                 std::pair<std::map<hd_t, std::vector<int>>::iterator, bool> pair = m0_h_to_ply.insert(std::make_pair(traced_polygon_halfedge, std::vector<int>()));
 
@@ -7000,19 +6989,19 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 MCUT_ASSERT(m0_h_to_ply.at(traced_polygon_halfedge).size() <= 2);
 #endif
             }
-            DEBUG_CODE_MASK(lg << std::endl;);
+            
         }
 
 #if 0
     // dump
     for (std::map<hd_t, std::vector<int>>::const_iterator i = m0_h_to_ply.cbegin(); i != m0_h_to_ply.cend(); ++i) {
-        DEBUG_CODE_MASK(lg << "halfedge " << i->first << ": ";);
+        
         for (std::vector<int>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) {
-            DEBUG_CODE_MASK(lg.indent(););
-            DEBUG_CODE_MASK(lg << " <" << *j << ">";);
-            DEBUG_CODE_MASK(lg.unindent(););
+            
+            
+            
         }
-        DEBUG_CODE_MASK(lg << std::endl;);
+        
     }
 #endif
 
@@ -7040,7 +7029,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         if (explicit_cutpaths_making_holes.size() > 0)
         { // atleast one cut-path makes a hole to be sealed later
-            DEBUG_CODE_MASK(lg << "find known exterior cut-mesh polygons" << std::endl;);
+            
 
             // for each traced cut-mesh polygon
 
@@ -7735,7 +7724,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
       x - intersection-vertex/point
     */
 
-        DEBUG_CODE_MASK(lg << "transform intersection-halfedges" << std::endl;);
+        
 
         // This data structure will map the descriptors of intersection-halfedges in "m0"
         // to their descriptor in "m1". Thus, some halfedges (in "m0") will be mapped to
@@ -7861,7 +7850,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         do
         {
-            //DEBUG_CODE_MASK(lg << "SCBS iteration: " << ++strongly_connected_sm_boundary_seq_iter_id << std::endl;);
+            //
 
             MCUT_ASSERT((m0_1st_sm_ihe_fiter != m0_sm_ihe_to_flag.end())); // their must be at least one halfedge from which we can start walking!
 
@@ -7872,14 +7861,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             do
             {
 
-                DEBUG_CODE_MASK(lg.indent(););
+                
 
                 hd_t m0_cur_h = mesh_t::null_halfedge();
                 // get first intersection halfedge which determine's the first polygon of the current SCBS.
                 // Note that the current SCBS is determined implicitely from this initial intersection halfedge.
                 const hd_t seq_init_ihe = m0_ox_hlist.back();
 
-                DEBUG_CODE_MASK(lg << "first SCBS halfedge  = " << seq_init_ihe << std::endl;);
+                
 
                 m0_ox_hlist.pop_back(); // remove "seq_init_ihe" from queue
                 hd_t m0_nxt_h = seq_init_ihe;
@@ -7890,10 +7879,10 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 do
                 { // process ih sequence starting from "seq_init_ihe"
 
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
                     m0_cur_h = m0_nxt_h; // current
-                    DEBUG_CODE_MASK(lg << "curr(m0)  = " << hstr(m0, m0_cur_h) << std::endl;);
+                    
                     m0_nxt_h = m0.next(m0_cur_h); // next
 
                     const vd_t m0_cur_h_src = m0.source(m0_cur_h);
@@ -8008,7 +7997,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     if (!m0_cur_h_is_exterior || (m0_cur_h_is_exterior && m0_to_m1_ihe.find(m0_cur_h) == m0_to_m1_ihe.cend()))
                     {
 
-                        DEBUG_CODE_MASK(lg << "create edge = " << estr(m1_cur_h_src, m1_cur_h_tgt) << std::endl;);
+                        
 
                         // create processed version (i.e. "m1" version) of "m0_cur_h"
                         hd_t m1_cur_h = m1.add_edge(m1_cur_h_src, m1_cur_h_tgt);
@@ -8089,7 +8078,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         MCUT_ASSERT(m0_to_m1_ihe.find(m0_cur_h) != m0_to_m1_ihe.cend());
                         const hd_t m1_cur_h = m0_to_m1_ihe.at(m0_cur_h);
 
-                        DEBUG_CODE_MASK(lg << "recycled halfedge = " << hstr(m1, m1_cur_h) << std::endl;);
+                        
                     }
 
                     //
@@ -8121,14 +8110,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     m0_sm_ihe_to_flag.at(m0_cur_h) = true; // mark as "processed"
 
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
                 } while (
                     // "next" is ihalfedge
                     (m0_is_intersection_point(m0.source(m0_nxt_h), ps_vtx_cnt) || m0_is_intersection_point(m0.target(m0_nxt_h), ps_vtx_cnt)) &&
                     // "next" is not transformed. For case when ihalfedge-sequence forms a loop.
                     m0_sm_ihe_to_flag.at(m0_nxt_h) == false); // TODO: I think this last condition is the same as "m0_nxt_h" == "seq_init_ihe" (try it bcz using m0_sm_ihe_to_flag will be slower)
 
-                DEBUG_CODE_MASK(lg.unindent(););
+                
             } while (!m0_ox_hlist.empty());
 
             //
@@ -8218,10 +8207,10 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
 #if 0
     // dump
-    DEBUG_CODE_MASK(lg << "m0 to m1 ihalfedge" << std::endl;);
+    
 
     for (std::map<hd_t, hd_t>::const_iterator i = m0_to_m1_ihe.cbegin(); i != m0_to_m1_ihe.cend(); ++i) {
-        DEBUG_CODE_MASK(lg << "<" << i->first << ", " << i->second << ">" << std::endl;);
+        
     }
 #endif
 
@@ -8431,9 +8420,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         if (proceed_to_fill_holes == false)
         {
-            DEBUG_CODE_MASK(lg << "no holes to fill" << std::endl;);
+            
 
-            DEBUG_CODE_MASK(lg << "end" << std::endl;);
+            
             return; // exit
         }
 
@@ -8863,13 +8852,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             }
         }
 
-        DEBUG_CODE_MASK(lg << "patch-graph adjacency matrix:\n"
-                           << scs_adj_matrix << std::endl;);
+        
 
         const math::matrix_t<> scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
 
-        DEBUG_CODE_MASK(lg << "squared:\n"
-                           << scs_adj_matrix_sqrd << std::endl;);
+        
 
         // Here we do graph coloring using BFS
         // NOTE: coloring is used to mark patches as either interior or exterior.
@@ -8958,7 +8945,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         if (partial_cut_detected)
         {
-            DEBUG_CODE_MASK(lg << "save non-duplicate intersection points" << std::endl;);
+            
             //
             // Here we save the cut-mesh border vertices (non-intersection points) which
             // are on the interior (inside) of the src-mesh.
@@ -9206,7 +9193,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             {
 
                                 const int &poly_idx = m0_h_to_ply.at(opp_of_next_of_opp_of_cur_he).front(); // NOTE: class-2 or class-1 ihalfedges are incident to only one polygon
-                                // DEBUG_CODE_MASK(lg << "poly_idx=" << poly_idx << std::endl;);
+                                // 
                                 next_he_poly_iter = m0_polygons.cbegin() + (poly_idx);
                                 MCUT_ASSERT(next_he_poly_iter != m0_polygons.cend());
                                 const traced_polygon_t &poly = *next_he_poly_iter;
@@ -9240,7 +9227,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // Infer patch location (inside/outside) based on graph coloring
         ///////////////////////////////////////////////////////////////////////////
 
-        DEBUG_CODE_MASK(lg << "infer patch locations" << std::endl;);
+        
 
         //
         // Here we will now explicitly association location information to the graph
@@ -9393,16 +9380,16 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         //m0_cm_poly_to_patch_idx.clear();
 #if 0
         // dump
-        DEBUG_CODE_MASK(lg << "color label values (dye)" << std::endl;);
-        DEBUG_CODE_MASK(lg.indent(););
+        
+        
         for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin(); color_to_ccw_patches_iter != color_to_patch.cend(); ++color_to_ccw_patches_iter)
         {
             const char color_label = color_to_ccw_patches_iter->first;
             //const cut_surface_patch_location_t color_label_dye = patch_color_label_to_location.at(color_label);
 
-            DEBUG_CODE_MASK(lg << (char)color_label << "=" << (patch_color_label_to_location.at(color_label) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << std::endl;);
+            
         }
-        DEBUG_CODE_MASK(lg.unindent(););
+        
 #endif
         TIMESTACK_POP();
 
@@ -9412,7 +9399,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         TIMESTACK_PUSH("Create reversed patches");
 
-        DEBUG_CODE_MASK(lg << "create reversed patches" << std::endl;);
+        
 
         const int traced_polygon_count = (int)m0_polygons.size(); // does not include the reversed cut-mesh polygons
 
@@ -9430,18 +9417,18 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             >
             patch_to_opposite;
 
-        DEBUG_CODE_MASK(lg << "color tags = " << color_to_patch.size() << std::endl;);
+        
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin();
              color_to_ccw_patches_iter != color_to_patch.cend();
              ++color_to_ccw_patches_iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             //const char color_id = color_to_ccw_patches_iter->first;
 
-            //DEBUG_CODE_MASK(lg << "color = " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
+            //
 
             // add entry
             MCUT_ASSERT(color_to_cw_patch.count(color_to_ccw_patches_iter->first) == 0);
@@ -9453,18 +9440,18 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             // list of reversed patches with current color
             std::vector<int> &cw_patch_color = color_to_cw_patch.at(color_to_ccw_patches_iter->first);
 
-            DEBUG_CODE_MASK(lg << "patch count = " << color_to_ccw_patches_iter->second.size() << std::endl;);
+            
 
             // for each patch with current color
             for (std::vector<int>::const_iterator patch_iter = color_to_ccw_patches_iter->second.cbegin();
                  patch_iter != color_to_ccw_patches_iter->second.cend();
                  ++patch_iter)
             {
-                DEBUG_CODE_MASK(lg.indent(););
+                
 
                 const int patch_idx = *patch_iter;
 
-                DEBUG_CODE_MASK(lg << "patch = " << patch_idx << " (normal)" << std::endl;);
+                
 
                 const std::vector<int> &patch = patches.at(patch_idx);
 
@@ -9478,7 +9465,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 patch_to_opposite[patch_idx] = cw_patch_idx;
                 patch_to_opposite[cw_patch_idx] = patch_idx;
 
-                DEBUG_CODE_MASK(lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;);
+                
 
                 MCUT_ASSERT(patches.count(cw_patch_idx) == 0);
                 patches[cw_patch_idx] = std::vector<int>();
@@ -9507,12 +9494,12 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 for (int ccw_patch_iter = 0; ccw_patch_iter < initial_patch_size; ++ccw_patch_iter)
                 {
 
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
                     // get the polygon index
                     const int ccw_patch_poly_idx = patch.at(ccw_patch_iter);
 
-                    DEBUG_CODE_MASK(lg << "polygon = " << ccw_patch_poly_idx << " (normal)" << std::endl;);
+                    
 
                     // all polygon are stored in the same array so we can use that to deduce
                     // index of new reversed polygon
@@ -9603,16 +9590,16 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             cw_poly.push_back(tmp.at(index));
                         }
 
-                        DEBUG_CODE_MASK(lg << "polygon = " << cw_poly_idx << " (reversed)" << std::endl;);
+                        
 
-                        DEBUG_CODE_MASK(lg.indent(););
+                        
                         {
                             for (traced_polygon_t::const_iterator cw_poly_he_iter = cw_poly.cbegin(); cw_poly_he_iter != cw_poly.cend(); ++cw_poly_he_iter)
                             {
-                                DEBUG_CODE_MASK(lg << *cw_poly_he_iter << " <" << m0.source(*cw_poly_he_iter) << ", " << m0.target(*cw_poly_he_iter) << ">" << std::endl;);
+                                
                             }
                         }
-                        DEBUG_CODE_MASK(lg.unindent(););
+                        
 
                         MCUT_ASSERT(m0.source(cw_poly.front()) == m0.target(cw_poly.back())); // must form loop
 
@@ -9636,11 +9623,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         m0_to_ps_face[cw_poly_idx] = m0_to_ps_face.at(ccw_patch_poly_idx);
                     }
 
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
                 }
-                DEBUG_CODE_MASK(lg.unindent(););
+                
             }
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
         TIMESTACK_POP();
@@ -9648,11 +9635,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // number of reversed cut-mesh polygons
         //const int cw_cs_poly_count = ((int)m0_polygons.size() - traced_polygon_count);
 
-        //DEBUG_CODE_MASK(lg << "reversed cut-mesh polygons = " << cw_cs_poly_count << std::endl;);
+        //
 
         // NOTE: at this stage, all patch polygons (ccw/normal) also have an opposite (cw/reversed)
 
-        DEBUG_CODE_MASK(lg << "merge normal and reversed patches" << std::endl;);
+        
 
         // merge the opposite color_to_patch data structure
 
@@ -9663,11 +9650,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
              color_to_cw_patch_iter != color_to_cw_patch.cend();
              ++color_to_cw_patch_iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             const char color_value = color_to_cw_patch_iter->first;
 
-            DEBUG_CODE_MASK(lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
+            
 
             // get reversed patches
             const std::vector<int> &colored_cw_patches = color_to_cw_patch_iter->second;
@@ -9679,33 +9666,33 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             // dump
             if (input.verbose)
             {
-                DEBUG_CODE_MASK(lg << "total patches = " << colored_patches.size() << std::endl;);
+                
 
                 for (std::vector<int>::const_iterator colored_patch_iter = colored_patches.cbegin();
                      colored_patch_iter != colored_patches.cend();
                      ++colored_patch_iter)
                 {
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
                     const int patch_idx = *colored_patch_iter;
                     const std::vector<int> &patch = patches.at(patch_idx);
                     //const int is_ccw = (int)(std::distance(colored_patches.cbegin(), colored_patch_iter) < (int)(patch.size() / 2));
 
-                    //DEBUG_CODE_MASK(lg << "patch = " << patch_idx << " (" << (is_ccw ? "normal" : "reversed") << ")" << std::endl;);
+                    //
 
-                    DEBUG_CODE_MASK(lg.indent(););
-                    DEBUG_CODE_MASK(lg << "polygons=" << patch.size() << " :";);
+                    
+                    
                     for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter)
                     {
-                        DEBUG_CODE_MASK(lg << " " << *patch_poly_iter;);
+                        
                     }
-                    DEBUG_CODE_MASK(lg << std::endl;);
-                    DEBUG_CODE_MASK(lg.unindent(););
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
+                    
+                    
                 }
             }
 
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
         TIMESTACK_POP();
@@ -9716,24 +9703,24 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
         TIMESTACK_PUSH("Save patches");
 
-        DEBUG_CODE_MASK(lg << "save patch meshes" << std::endl;);
+        
 
         // for each color
         for (std::map<char, std::vector<int>>::const_iterator color_to_patches_iter = color_to_patch.cbegin();
              color_to_patches_iter != color_to_patch.cend();
              ++color_to_patches_iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             const char color_id = color_to_patches_iter->first;
-            DEBUG_CODE_MASK(lg << "color=" << (char)color_id << std::endl;);
+            
 
             // for each patch with current color
             for (std::vector<int>::const_iterator patch_iter = color_to_patches_iter->second.cbegin();
                  patch_iter != color_to_patches_iter->second.cend();
                  ++patch_iter)
             {
-                DEBUG_CODE_MASK(lg.indent(););
+                
                 const int cur_patch_idx = *patch_iter;
 
                 const cut_surface_patch_location_t &patch_location = patch_color_label_to_location.at(color_id);
@@ -9754,7 +9741,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     >
                     m0_to_patch_mesh_vertex;
 
-                DEBUG_CODE_MASK(lg << "patch -  " << cur_patch_idx << std::endl;);
+                
 
                 // NOTE: ccw/normal patches are created before their reversed counterparts (hence the modulo Operator trick)
 
@@ -9763,7 +9750,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 const cut_surface_patch_winding_order_t patch_descriptor = is_ccw_patch ? cut_surface_patch_winding_order_t::DEFAULT : cut_surface_patch_winding_order_t::REVERSE;
                 const std::string cs_patch_descriptor_str = to_string(patch_descriptor);
 
-                DEBUG_CODE_MASK(lg << "is " << cs_patch_descriptor_str << " patch" << std::endl;);
+                
 
                 // get the patch's polygons
                 const std::vector<int> &patch = patches.at(cur_patch_idx);
@@ -9915,9 +9902,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 {
                     output.outside_patches[patch_descriptor].emplace_back(std::move(omi));
                 }
-                DEBUG_CODE_MASK(lg.unindent(););
+                
             }
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
         TIMESTACK_POP();
@@ -9943,7 +9930,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // whether each reversed patch is a floating patch or not. We will use this
         // information during stitching
         //
-        DEBUG_CODE_MASK(lg << "calculate reversed-patch seed variables" << std::endl;);
+        
 
         TIMESTACK_PUSH("Create reversed-patch seed variables");
 
@@ -9952,27 +9939,27 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
              color_to_cw_patch_iter != color_to_cw_patch.cend();
              ++color_to_cw_patch_iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             //const char color_value = color_to_cw_patch_iter->first;
 
-            //DEBUG_CODE_MASK(lg << "color = " << color_value << " (" << (patch_color_label_to_location.at(color_value) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
+            //
 
             // get the reversed patch of the current color
             const std::vector<int> &colored_cw_patches = color_to_cw_patch_iter->second;
 
-            DEBUG_CODE_MASK(lg << "patches = " << colored_cw_patches.size() << std::endl;);
+            
 
             // for each patch
             for (std::vector<int>::const_iterator colored_cw_patch_iter = colored_cw_patches.cbegin();
                  colored_cw_patch_iter != colored_cw_patches.cend();
                  ++colored_cw_patch_iter)
             {
-                DEBUG_CODE_MASK(lg.indent(););
+                
 
                 const int cw_patch_idx = *colored_cw_patch_iter;
 
-                DEBUG_CODE_MASK(lg << "patch = " << cw_patch_idx << " (reversed)" << std::endl;);
+                
 
                 // get patch polygons
                 //const std::vector<int>& cw_patch = patches.at(cw_patch_idx);
@@ -10000,7 +9987,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // opposite halfedge of the seed interior intersection halfedge of the opposite ccw/normal patch
                 const hd_t ccw_patch_seed_interior_ihalfedge_opp = m0.opposite(ccw_patch_seed_interior_ihalfedge);
 
-                DEBUG_CODE_MASK(lg << "seed interior intersection-halfedge = " << ccw_patch_seed_interior_ihalfedge_opp << std::endl;);
+                
 
                 // find the reversed polygon which uses "ccw_patch_seed_interior_ihalfedge_opp"
                 // this will be the seed polygon of the current reversed patch
@@ -10026,7 +10013,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // the index of the seed polygon of the current reversed patch
                 const int cw_patch_seed_poly_idx = *find_iter;
 
-                DEBUG_CODE_MASK(lg << "seed polygon = " << cw_patch_seed_poly_idx << std::endl;);
+                
 
                 // the patch must contain the polygon
                 MCUT_ASSERT(std::find(patches.at(cw_patch_idx).cbegin(), patches.at(cw_patch_idx).cend(), cw_patch_seed_poly_idx) != patches.at(cw_patch_idx).cend());
@@ -10051,9 +10038,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 //MCUT_ASSERT(seed_poly_idx_insertion.second == true);
                 MCUT_ASSERT(patch_to_seed_poly_idx.count(cw_patch_idx) == 1);
 
-                DEBUG_CODE_MASK(lg.unindent(););
+                
             }
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         }
 
         //patch_to_floating_flag.clear(); // free
@@ -10077,7 +10064,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // if the cut-mesh is water-tight)
         //
 
-        DEBUG_CODE_MASK(lg << "stitch patches" << std::endl;);
+        
 
         TIMESTACK_PUSH("Stitching"); // &&&&&
 
@@ -10146,11 +10133,11 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
              color_to_patches_iter != color_to_patch.cend();
              ++color_to_patches_iter)
         {
-            DEBUG_CODE_MASK(lg.indent(););
+            
 
             const char color_id = color_to_patches_iter->first;
 
-            DEBUG_CODE_MASK(lg << "color : " << color_id << " (" << (patch_color_label_to_location.at(color_id) == cut_surface_patch_location_t::OUTSIDE ? "exterior" : "interior") << ")" << std::endl;);
+            
 
             const cut_surface_patch_location_t &location = patch_color_label_to_location.at(color_id);
 
@@ -10202,7 +10189,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                vd_t  // "m0" cut-mesh ovtx instance
                                > &m1_to_m0_cm_ovtx_colored = colour_to_m1_to_m0_cm_ovtx[color_id];
 
-            DEBUG_CODE_MASK(lg << "patches : " << color_to_patches_iter->second.size() << std::endl;);
+            
 
             // keeps track of the total number of cut-mesh polygons for the current color tag (interior/ext)
             int stitched_poly_counter = 0;
@@ -10212,18 +10199,18 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                  patch_iter != color_to_patches_iter->second.cend();
                  ++patch_iter)
             {
-                DEBUG_CODE_MASK(lg.indent(););
+                
 
                 // get patch index
                 const int cur_patch_idx = *patch_iter;
 
-                DEBUG_CODE_MASK(lg << "patch = " << cur_patch_idx << std::endl;);
+                
 
                 // is it a ccw/normal patch i.e. not the cw/reversed version
                 // NOTE: ccw/normal patches are created/traced before reversed counterparts (hence the modulo trick)
                 const bool is_ccw_patch = ((cur_patch_idx % total_ccw_patch_count) == cur_patch_idx);
 
-                DEBUG_CODE_MASK(lg << "is " << (is_ccw_patch ? "ccw" : "cw") << " patch" << std::endl;);
+                
 
                 MCUT_ASSERT(patches.find(cur_patch_idx) != patches.cend());
                 ///////////////////////////////////////////////////////////////////////////
@@ -10294,7 +10281,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // PERSONAL NOTE: this probably requires a visual example to properly understand
                 const hd_t m1_seed_interior_ihe_opp_opp = m1_colored.opposite(m1_seed_interior_ihe_opp); // i.e. m1 instance of m0_patch_seed_poly_he_opp
 
-                DEBUG_CODE_MASK(lg << "stitch polygon-halfedges of patch" << std::endl;);
+                
 
                 // this queue contains information identifying the patch polygons next-in-queue
                 // to be stitched into the inferred connected component
@@ -10317,7 +10304,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 do
                 {
 
-                    DEBUG_CODE_MASK(lg.indent(););
+                    
 
                     // the first processed/stitched of halfedge the current polygon (our starting point)
                     hd_t m1_cur_patch_cur_poly_1st_he = mesh_t::null_halfedge();
@@ -10332,7 +10319,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                     m0_poly_already_enqueued[(std::size_t)m0_cur_patch_cur_poly_idx - traced_sm_polygon_count] = true;
 
-                    DEBUG_CODE_MASK(lg << "polygon = " << m0_cur_patch_cur_poly_idx << std::endl;);
+                    
 
                     // must be within the range of the traced polygons (include the reversed ones)
                     MCUT_ASSERT(m0_cur_patch_cur_poly_idx < (int)m0_polygons.size());
@@ -10375,14 +10362,14 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     do
                     { // for each remaining halfedge of current polygon being stitched
 
-                        DEBUG_CODE_MASK(lg.indent(););
+                        
 
                         if (transformed_he_counter == 1)
                         { // are we processing the second halfedge?
                             // log
                             // TODO: proper printing functions
-                            DEBUG_CODE_MASK(lg << "transform: <" << m0.source(m0_cur_patch_cur_poly_1st_he) << ", " << m0.target(m0_cur_patch_cur_poly_1st_he) << "> - <"
-                                               << m1_colored.source(m1_cur_patch_cur_poly_1st_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_1st_he) << ">" << std::endl;);
+                            
+                                             //  << m1_colored.source(m1_cur_patch_cur_poly_1st_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_1st_he) << ">" << std::endl;);
                         }
 
                         // index of current halfedge index to be processed
@@ -10435,7 +10422,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         if (cur_is_last_to_be_transformed)
                         {
 
-                            DEBUG_CODE_MASK(lg << "last halfedge" << std::endl;);
+                            
 
                             // we can infer the updated version of the target vertex from the halfedge
                             // which is already updated. Update tgt will be the source of the first
@@ -10510,7 +10497,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                                 use halfedge defined by computed transformed_src and transformed_tgt
                         */
 
-                            DEBUG_CODE_MASK(lg << "o-->x" << std::endl;);
+                            
 
                             // check if opposite halfedge of current is updated. (NOTE: searching only through
                             // the polygons of the current patch)
@@ -10604,7 +10591,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                             // the current halfedge will either be interior or exterior.
 
-                            DEBUG_CODE_MASK(lg << "x-->x" << std::endl;);
+                            
 
                             //MCUT_ASSERT(m0_ivtx_to_ps_edge.find(m0.source(m0_cur_patch_cur_poly_cur_he)) != m0_ivtx_to_ps_edge.cend());
 
@@ -10631,7 +10618,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             if (is_valid_ambiguious_interior_edge)
                             {
 
-                                DEBUG_CODE_MASK(lg << "interior" << std::endl;);
+                                
 
                                 MCUT_ASSERT(m0_to_m1_ihe.find(m0_cur_patch_cur_poly_cur_he_opp) != m0_to_m1_ihe.cend());
                                 const hd_t m1_cur_patch_cur_poly_cur_he_opp = m0_to_m1_ihe.at(m0_cur_patch_cur_poly_cur_he_opp);
@@ -10644,7 +10631,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             else
                             { // its an exterior x-->x halfedge
 
-                                DEBUG_CODE_MASK(lg << "exterior" << std::endl;);
+                                
 
                                 // look up the transformed "next" by looking finding the
                                 // coincident source-mesh polygon and then getting the transformed instance of "next".
@@ -10688,7 +10675,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         }
                         else
                         { // class 0 or 2 i.e. o-->o or x-->o
-                            DEBUG_CODE_MASK(lg << "o-->o or x-->o" << std::endl;);
+                            
                             /*
                             In the following steps, our ability to deduce the correct target vertex instance 
                             by simply checking whether "opp" or "next" is updated before 
@@ -10869,7 +10856,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
 
                                                     const vd_t m0_poly_he_tgt_dupl = m1_colored.add_vertex(m0.vertex(m0_cur_patch_cur_poly_cur_he_tgt));
 
-                                                    DEBUG_CODE_MASK(lg << "add vertex = " << m0_poly_he_tgt_dupl << std::endl;);
+                                                    
 
                                                     MCUT_ASSERT(m0_poly_he_tgt_dupl != mesh_t::null_halfedge());
 
@@ -10891,7 +10878,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             //ed_t e = get_computed_edge(/*m1_colored, */ m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
                             //hd_t h = m1_colored.halfedge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
                             ed_t e = m1_colored.edge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt, true);
-                            DEBUG_CODE_MASK(lg << "edge = " << e << std::endl;);
+                            
 
                             if (e != mesh_t::null_edge())
                             { // if edge already exists
@@ -10911,7 +10898,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             else
                             {
 
-                                DEBUG_CODE_MASK(lg << "create new edge" << std::endl;);
+                                
 
                                 m1_cur_patch_cur_poly_cur_he = m1_colored.add_edge(m1_cs_cur_patch_polygon_he_src, m1_cs_cur_patch_polygon_he_tgt);
                                 // TODO:replace with map (for O(Log N) searches)
@@ -10924,8 +10911,8 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                             }
                         } // if (m1_cur_patch_cur_poly_cur_he == mesh_t::null_halfedge()) {
 
-                        DEBUG_CODE_MASK(lg << "transform: <" << m0.source(m0_cur_patch_cur_poly_cur_he) << ", " << m0.target(m0_cur_patch_cur_poly_cur_he) << "> - <"
-                                           << m1_colored.source(m1_cur_patch_cur_poly_cur_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_cur_he) << ">" << std::endl;);
+                        
+                                         //  << m1_colored.source(m1_cur_patch_cur_poly_cur_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_cur_he) << ">" << std::endl;);
 
                         // halfedge must have been found (created or inferred)
                         MCUT_ASSERT(m1_cur_patch_cur_poly_cur_he != mesh_t::null_halfedge());
@@ -10965,7 +10952,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                         patch_to_m1_he.insert(std::make_pair(cur_patch_idx, m1_cur_patch_cur_poly_cur_he));
                         transformed_he_counter += 1; // next halfedge in m0_cur_patch_cur_poly
 
-                        DEBUG_CODE_MASK(lg.unindent(););
+                        
                     } while (transformed_he_counter != (int)m0_cur_patch_cur_poly.size()); // while not all halfedges of the current polygon have been transformed.
 
                     //
@@ -11289,7 +11276,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                     ++global_cm_poly_stitch_counter;
                     stitched_poly_counter++;
 
-                    DEBUG_CODE_MASK(lg.unindent(););
+                    
                 } while (!patch_poly_stitching_queue.empty()); // for each polygon of patch
 
                 //
@@ -11297,9 +11284,9 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
                 // So, the current patch has been stitch to a src-mesh fragment
                 //
 
-                DEBUG_CODE_MASK(lg.unindent(););
+                
             } // for each patch
-            DEBUG_CODE_MASK(lg.unindent(););
+            
         } // for each color
 
         TIMESTACK_POP(); // &&&&&
@@ -11322,7 +11309,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         // NOTE: At this stage, all patches of the current have been stitched
         //
 
-        DEBUG_CODE_MASK(lg << "total cut-mesh polygons stitched = " << global_cm_poly_stitch_counter << std::endl;);
+        
 
         bool userWantsFullySealedFragmentsANY = (input.keep_fragments_sealed_inside || input.keep_fragments_sealed_outside);
         bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
@@ -11335,7 +11322,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
             // create the [fully] sealed meshes defined by the final set of traced polygons
             ///////////////////////////////////////////////////////////////////////////////
 
-            DEBUG_CODE_MASK(lg << "create final sealed connected components" << std::endl;);
+            
 
             for (std::map<char, std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>>::iterator color_to_separated_CCs_iter = color_to_separated_connected_ccsponents.begin();
                  color_to_separated_CCs_iter != color_to_separated_connected_ccsponents.end();
@@ -11451,7 +11438,7 @@ bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut:
         patch_color_label_to_location.clear(); // free
         color_to_separated_connected_ccsponents.clear();
 
-        DEBUG_CODE_MASK(lg << "end" << std::endl;);
+        
 
         TIMESTACK_POP();
 
