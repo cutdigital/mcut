@@ -22,6 +22,7 @@
 
 #include "mcut/internal/geom.h"
 #include <algorithm> // std::sort
+#include <tuple> // std::make_tuple std::get<>
 
 namespace mcut
 {
