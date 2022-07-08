@@ -52,7 +52,7 @@ std::atomic_bool mcut::thread_pool_terminate(false);
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
-const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-6;
+const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-4;
 
 // internal frontend data structure which we use to store connected component 
 // data. Information requested by a client/user via "mcGetConnectedComponentData"
