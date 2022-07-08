@@ -2965,7 +2965,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
              ++j)
         {
 
-            const std::string cs_patch_loc_str = mcut::to_string(j->first);
+            //const std::string cs_patch_loc_str = mcut::to_string(j->first);
 
             for (std::vector<mcut::output_mesh_info_t>::const_iterator k = j->second.cbegin(); k != j->second.cend(); ++k)
             {

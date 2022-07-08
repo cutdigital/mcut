@@ -36,7 +36,6 @@
 #include <tuple>
 #include <unordered_map>
 
-
 #ifndef LICENSE_PURCHASED
 #define lmsg() printf("NOTE: MCUT is copyrighted and may not be sold or included in commercial products without a license.\n")
 #else
@@ -56,52 +55,6 @@ typename mcut::edge_array_iterator_t::difference_type distance(
 namespace mcut {
 
 logger_t* logger_ptr = nullptr;
-
-std::string vstr(const vd_t& v, const std::string& pre = "", const std::string& post = "")
-{
-    std::stringstream ss;
-    ss << pre << "v" << v << post;
-    return ss.str();
-}
-
-std::string fstr(const fd_t& f, const std::string& pre = "", const std::string& post = "")
-{
-    std::stringstream ss;
-    ss << pre << "f";
-    if (f != mesh_t::null_face())
-        ss << f;
-    else
-        ss << "-";
-    ss << post;
-    return ss.str();
-}
-
-std::string hstr_(const vd_t& s, const vd_t& t, const std::string& pre = "[", const std::string& post = "]", const std::string& delim = " ")
-{
-    std::stringstream ss;
-    ss << pre << vstr(s) << delim << vstr(t) << post;
-    return ss.str();
-}
-
-std::string hstr(const mesh_t& m, const hd_t& h)
-{
-    std::stringstream ss;
-    ss << "h" << h << " ";
-    return ss.str() + hstr_(m.source(h), m.target(h));
-}
-
-std::string estr(const mesh_t& m, const ed_t& e, const std::string& pre = "(", const std::string& post = ")", const std::string& delim = " ")
-{
-    std::stringstream ss;
-    ss << "e" << e << " ";
-    return ss.str() + hstr_(m.vertex(e, 0), m.vertex(e, 1), pre, post, delim);
-}
-
-std::string estr(const vd_t& s, const vd_t& t, const std::string& pre = "(", const std::string& post = ")", const std::string& delim = " ")
-{
-    std::stringstream ss;
-    return ss.str() + hstr_(s, t, pre, post, delim);
-}
 
 std::string to_string(const connected_component_location_t& v)
 {
@@ -238,6 +191,7 @@ void dump_mesh(const mesh_t& mesh, const char* fbasename)
     write_off(name.c_str(), mesh);
 }
 
+#if 0
 bool point_on_face_plane(const mcut::mesh_t& m, const mcut::fd_t& f, const mcut::math::vec3& p, int& fv_count)
 {
     const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
@@ -264,6 +218,7 @@ bool point_on_face_plane(const mcut::mesh_t& m, const mcut::fd_t& f, const mcut:
     }
     return true;
 }
+#endif
 
 /*
     dfs(node u)
@@ -1516,8 +1471,9 @@ std::vector<vd_t> linear_projection_sort(const std::vector<std::pair<vd_t, math:
 //
 void dispatch(output_t& output, const input_t& input)
 {
-    lmsg()
-        TIMESTACK_PUSH(__FUNCTION__);
+    lmsg();
+
+    TIMESTACK_PUSH(__FUNCTION__);
 
     logger_t& lg = output.logger;
     logger_ptr = &output.logger;
@@ -3158,35 +3114,22 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<hd_t> // list of halfedges whose target is the intersection point
         >
         ivtx_to_incoming_hlist;
-#if 1 // used for debugging colinearity bug, which occur when we have poly with eg. > 3 
-    // vertices where at least 3 more-or-less are colinear but exact predicate says no. 
-            for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
-             cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
-             ++cutpath_edge_creation_info_iter)
-        {
+#if 1 // used for debugging colinearity bug, which occur when we have poly with eg. > 3
+    // vertices where at least 3 more-or-less are colinear but exact predicate says no.
+    for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
+         cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
+         ++cutpath_edge_creation_info_iter) {
 
-            const fd_t sm_face = cutpath_edge_creation_info_iter->first.first;
-            const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
-            MCUT_ASSERT(!ps_is_cutmesh_face(sm_face, sm_face_count));
-            const std::vector<vd_t> &intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
-            if((int)intersection_test_ivtx_list.size() < 2)
-            {
-                const vd_t ivtx = intersection_test_ivtx_list.back();
-                const ed_t &ps_edge = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).first;
-                const fd_t ps_edge_f0 = ps.face(ps.halfedge(ps_edge, 0));
-                const fd_t ps_edge_f1 = ps.face(ps.halfedge(ps_edge, 1));
-                //const bool is_cm_edge = ps_is_cutmesh_face(ps_edge_f0, sm_face_count);
-                const fd_t ps_f = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).second;
-
-                auto sm_or_cm = [&](fd_t f)
-                {
-                    return ps_is_cutmesh_face(f, sm_face_count) ? "cm" : "sm";
-                };
-
-                auto descr_v = [&](fd_t f)
-                {
-                    return ps_is_cutmesh_face(f, sm_face_count) ? f-sm_face_count : f;
-                };
+        const fd_t sm_face = cutpath_edge_creation_info_iter->first.first;
+        const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
+        MCUT_ASSERT(!ps_is_cutmesh_face(sm_face, sm_face_count));
+        const std::vector<vd_t>& intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
+        if ((int)intersection_test_ivtx_list.size() < 2) {
+            const vd_t ivtx = intersection_test_ivtx_list.back();
+            const ed_t& ps_edge = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).first;
+            const fd_t ps_edge_f0 = ps.face(ps.halfedge(ps_edge, 0));
+            const fd_t ps_edge_f1 = ps.face(ps.halfedge(ps_edge, 1));
+            const fd_t ps_f = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).second;
 
 #if 0
                 auto dump_faces = [&](std::vector<fd_t> fv, std::string fpath)
@@ -3215,26 +3158,36 @@ void dispatch(output_t& output, const input_t& input)
                 dump_mesh(sm, "sm-.off");
                 dump_mesh(cs, "cm-.off");
 #endif
+
+            output.status = status_t::GENERAL_POSITION_VIOLATION;
+
+            if (!input.enforce_general_position) {
+
+                // Our assumption of having inputs in general position has been violated, we need to terminate
+                // with an error since perturbation (i.e. enforcement of general positions) is disabled.
+                // If any one of a segment's vertices only touch (i.e. lie on) the plane
+                // then that implies a situation of cutting through a vertex which is undefined.
+
+                auto sm_or_cm = [&](fd_t f) {
+                    return ps_is_cutmesh_face(f, sm_face_count) ? "cm" : "sm";
+                };
+
+                auto descr_v = [&](fd_t f) {
+                    return ps_is_cutmesh_face(f, sm_face_count) ? f - sm_face_count : f;
+                };
+
                 char buff[128];
-                sprintf(buff,"edge(%s.f%d, %s.f%d) lies exactly on face %s.f%d\n", 
-                sm_or_cm(ps_edge_f0), (int)descr_v(ps_edge_f0), 
-                sm_or_cm(ps_edge_f1), (int)descr_v(ps_edge_f1), 
-                sm_or_cm(ps_f), (int)descr_v(ps_f));
+                sprintf(buff, "edge(%s.f%d, %s.f%d) lies exactly on face %s.f%d\n",
+                    sm_or_cm(ps_edge_f0), (int)descr_v(ps_edge_f0),
+                    sm_or_cm(ps_edge_f1), (int)descr_v(ps_edge_f1),
+                    sm_or_cm(ps_f), (int)descr_v(ps_f));
 
-                output.status = status_t::GENERAL_POSITION_VIOLATION;
-
-                if (!input.enforce_general_position) {
-                    // Our assumption of having inputs in general position has been violated, we need to terminate
-                    // with an error since perturbation (i.e. enforcement of general positions) is disabled.
-                    // If any one of a segment's vertices only touch (i.e. lie on) the plane
-                    // then that implies a situation of cutting through a vertex which is undefined.
-                    lg.set_reason_for_failure(buff);
-                }
-
-                return;
+                lg.set_reason_for_failure(buff);
             }
 
+            return;
         }
+    }
 #endif
     for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
          cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();

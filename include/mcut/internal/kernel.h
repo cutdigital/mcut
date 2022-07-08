@@ -221,14 +221,7 @@ namespace mcut
             detected_floating_polygons;
     };
 
-    //
-    // returns string equivalent value (e.g. for printing)
-    //
-    std::string to_string(const connected_component_location_t &);
-    std::string to_string(const cut_surface_patch_location_t &);
-    std::string to_string(const status_t &);
-    std::string to_string(const cut_surface_patch_winding_order_t &);
-
+    // internal main
     void dispatch(output_t &out, const input_t &in);
 
     int find_connected_components(std::vector<int> &fccmap, const mesh_t &mesh, std::vector<int> &cc_to_vertex_count,
