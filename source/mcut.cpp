@@ -492,7 +492,7 @@ McResult convert(const mcut::status_t &v)
         result = McResult::MC_NO_ERROR;
         break;
     case mcut::status_t::GENERAL_POSITION_VIOLATION:
-    case mcut::status_t::INVALID_MESH_INTERSECTION:
+    case mcut::status_t::INVALID_MESH_INTERSECTION: 
         result = McResult::MC_INVALID_OPERATION;
         break;
     default:

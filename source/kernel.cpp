@@ -2722,39 +2722,6 @@ void dispatch(output_t& output, const input_t& input)
              ++tested_faces_iter) {
             const fd_t tested_face = *tested_faces_iter;
 
-            auto dump_faces = [&](std::vector<fd_t> fv, std::string fpath)
-                {
-                    std::ofstream file(fpath);
-                    for(vertex_array_iterator_t v = ps.vertices_begin(); v != ps.vertices_end(); ++v)
-                    {
-                        file << "v " << ps.vertex(*v).x() << " " << ps.vertex(*v).y() << " " << ps.vertex(*v).z() << std::endl;
-                    }
-
-                    for(auto f : fv)
-                    {
-                        file << "f ";
-                        std::vector<vd_t> verts = ps.get_vertices_around_face(f); 
-                        for(auto v : verts)
-                        {
-                            file << v +1<< " ";
-                        }
-                        file << "\n";
-                    }
-                };
-
-                dump_faces({ tested_edge_h0_face, tested_edge_h0_face }, "ps_edge.obj");
-                dump_faces({ tested_face }, "tested_face.obj");
-
-            auto sm_or_cm = [&](fd_t f)
-                {
-                    return ps_is_cutmesh_face(f, sm_face_count) ? "cm" : "sm";
-                };
-
-            printf("[%s%d, %s%d, %s%d]\n", 
-            sm_or_cm(tested_edge_h0_face), tested_edge_belongs_to_cm ? (int)tested_edge_h0_face - sm_face_count : (int)tested_edge_h0_face, 
-            sm_or_cm(tested_edge_h1_face), tested_edge_belongs_to_cm ? (int)tested_edge_h1_face - sm_face_count : (int)tested_edge_h1_face, 
-            sm_or_cm(tested_face), !tested_edge_belongs_to_cm ? (int)tested_face - sm_face_count : (int)tested_face);
-
             // We are now finding the intersection points determined by calculating the location
             // where each halfedge of face A intersects the area defined by face B (if it exists).
 
@@ -3191,7 +3158,8 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<hd_t> // list of halfedges whose target is the intersection point
         >
         ivtx_to_incoming_hlist;
-#if 1
+#if 1 // used for debugging colinearity bug, which occur when we have poly with eg. > 3 
+    // vertices where at least 3 more-or-less are colinear but exact predicate says no. 
             for (std::map<mcut::pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
              cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();
              ++cutpath_edge_creation_info_iter)
@@ -3207,7 +3175,7 @@ void dispatch(output_t& output, const input_t& input)
                 const ed_t &ps_edge = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).first;
                 const fd_t ps_edge_f0 = ps.face(ps.halfedge(ps_edge, 0));
                 const fd_t ps_edge_f1 = ps.face(ps.halfedge(ps_edge, 1));
-                const bool is_cm_edge = ps_is_cutmesh_face(ps_edge_f0, sm_face_count);
+                //const bool is_cm_edge = ps_is_cutmesh_face(ps_edge_f0, sm_face_count);
                 const fd_t ps_f = m0_ivtx_to_intersection_registry_entry.at(ivtx - ps.number_of_vertices()).second;
 
                 auto sm_or_cm = [&](fd_t f)
@@ -3220,6 +3188,7 @@ void dispatch(output_t& output, const input_t& input)
                     return ps_is_cutmesh_face(f, sm_face_count) ? f-sm_face_count : f;
                 };
 
+#if 0
                 auto dump_faces = [&](std::vector<fd_t> fv, std::string fpath)
                 {
                     std::ofstream file(fpath);
@@ -3234,7 +3203,7 @@ void dispatch(output_t& output, const input_t& input)
                         std::vector<vd_t> verts = ps.get_vertices_around_face(f); 
                         for(auto v : verts)
                         {
-                            file << v +1<< " ";
+                            file << v+1 << " ";
                         }
                         file << "\n";
                     }
@@ -3245,11 +3214,24 @@ void dispatch(output_t& output, const input_t& input)
 
                 dump_mesh(sm, "sm-.off");
                 dump_mesh(cs, "cm-.off");
-
-                printf("(sm%d, cm%d) [%s%d, %s%d, %s%d]\n", (int)descr_v(sm_face), (int)descr_v(cm_face), 
+#endif
+                char buff[128];
+                sprintf(buff,"edge(%s.f%d, %s.f%d) lies exactly on face %s.f%d\n", 
                 sm_or_cm(ps_edge_f0), (int)descr_v(ps_edge_f0), 
                 sm_or_cm(ps_edge_f1), (int)descr_v(ps_edge_f1), 
                 sm_or_cm(ps_f), (int)descr_v(ps_f));
+
+                output.status = status_t::GENERAL_POSITION_VIOLATION;
+
+                if (!input.enforce_general_position) {
+                    // Our assumption of having inputs in general position has been violated, we need to terminate
+                    // with an error since perturbation (i.e. enforcement of general positions) is disabled.
+                    // If any one of a segment's vertices only touch (i.e. lie on) the plane
+                    // then that implies a situation of cutting through a vertex which is undefined.
+                    lg.set_reason_for_failure(buff);
+                }
+
+                return;
             }
 
         }
