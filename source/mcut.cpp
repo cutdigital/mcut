@@ -53,6 +53,7 @@ std::atomic_bool mcut::thread_pool_terminate(false);
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
 const mcut::math::real_number_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-4;
+const int MAX_PERTUBATION_ATTEMPTS = 1<<3;
 
 // internal frontend data structure which we use to store connected component 
 // data. Information requested by a client/user via "mcGetConnectedComponentData"
@@ -1864,6 +1865,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 
             if (perturbationIters > 0)
             {
+
+                if(perturbationIters >= MAX_PERTUBATION_ATTEMPTS)
+                {
+                    ctxtPtr->log(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_MEDIUM, backendOutput.logger.get_reason_for_failure());
+                    ctxtPtr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_MEDIUM, "max perturbation iteratons reached");
+                    
+                    return MC_INVALID_OPERATION;
+                }
                 // use by the kernel track if the most-recent perturbation causes the cut-mesh and src-mesh to
                 // not intersect at all, which means we need to perturb again.
                 backendInput.general_position_enforcement_count = perturbationIters;

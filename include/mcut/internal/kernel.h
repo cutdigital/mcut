@@ -230,6 +230,14 @@ namespace mcut
     // return true if point p lies on the plane of every three vertices of f
     bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count);
 
+    //
+    // returns string equivalent value (e.g. for printing)
+    //
+    std::string to_string(const connected_component_location_t &);
+    std::string to_string(const cut_surface_patch_location_t &);
+    std::string to_string(const status_t &);
+    std::string to_string(const cut_surface_patch_winding_order_t &);
+
 } // namespace mcut
 
 #endif // #ifndef MCUT_KERNEL_H

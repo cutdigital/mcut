@@ -55,83 +55,87 @@ typename mcut::edge_array_iterator_t::difference_type distance(
 namespace mcut {
 
 logger_t* logger_ptr = nullptr;
-
-std::string to_string(const connected_component_location_t& v)
-{
-    std::string s;
-    switch (v) {
-    case connected_component_location_t::ABOVE:
-        s = "a";
-        break;
-    case connected_component_location_t::BELOW:
-        s = "b";
-        break;
-    case connected_component_location_t::UNDEFINED:
-        s = "u";
-        break;
+std::string to_string(const connected_component_location_t &v)
+    {
+        std::string s;
+        switch (v)
+        {
+        case connected_component_location_t::ABOVE:
+            s = "a";
+            break;
+        case connected_component_location_t::BELOW:
+            s = "b";
+            break;
+        case connected_component_location_t::UNDEFINED:
+            s = "u";
+            break;
+        }
+        return s;
     }
-    return s;
-}
 
-std::string to_string(const cut_surface_patch_location_t& v)
-{
-    std::string s;
-    switch (v) {
-    case cut_surface_patch_location_t::INSIDE:
-        s = "i";
-        break;
-    case cut_surface_patch_location_t::OUTSIDE:
-        s = "o";
-        break;
-    case cut_surface_patch_location_t::UNDEFINED:
-        s = "u";
-        break;
+    std::string to_string(const cut_surface_patch_location_t &v)
+    {
+        std::string s;
+        switch (v)
+        {
+        case cut_surface_patch_location_t::INSIDE:
+            s = "i";
+            break;
+        case cut_surface_patch_location_t::OUTSIDE:
+            s = "o";
+            break;
+        case cut_surface_patch_location_t::UNDEFINED:
+            s = "u";
+            break;
+        }
+        return s;
     }
-    return s;
-}
 
-std::string to_string(const status_t& v)
-{
-    std::string s;
-    switch (v) {
-    case status_t::SUCCESS:
-        s = "SUCCESS";
-        break;
-    case status_t::INVALID_SRC_MESH:
-        s = "INVALID_SRC_MESH";
-        break;
-    case status_t::INVALID_CUT_MESH:
-        s = "INVALID_CUT_MESH";
-        break;
-    case status_t::INVALID_MESH_INTERSECTION:
-        s = "INVALID_MESH_INTERSECTION";
-        break;
-    case status_t::GENERAL_POSITION_VIOLATION:
-        s = "GENERAL_POSITION_VIOLATION";
-        break;
-    case status_t::DETECTED_FLOATING_POLYGON:
-        s = "DETECTED_FLOATING_POLYGON";
-        break;
-        // case status_t::FACE_VERTEX_INTERSECTION:
-        //     s = "FACE_VERTEX_INTERSECTION";
-        //     break;
+    std::string to_string(const status_t &v)
+    {
+        std::string s;
+        switch (v)
+        {
+        case status_t::SUCCESS:
+            s = "SUCCESS";
+            break;
+        case status_t::INVALID_SRC_MESH:
+            s = "INVALID_SRC_MESH";
+            break;
+        case status_t::INVALID_CUT_MESH:
+            s = "INVALID_CUT_MESH";
+            break;
+        case status_t::INVALID_MESH_INTERSECTION:
+            s = "INVALID_MESH_INTERSECTION";
+            break;
+        case status_t::GENERAL_POSITION_VIOLATION:
+            s = "GENERAL_POSITION_VIOLATION";
+            break;
+        case status_t::DETECTED_FLOATING_POLYGON:
+            s = "DETECTED_FLOATING_POLYGON";
+            break;
+            //case status_t::FACE_VERTEX_INTERSECTION:
+            //    s = "FACE_VERTEX_INTERSECTION";
+            //    break;
+        }
+        return s;
     }
-    return s;
-}
 
-std::string to_string(const cut_surface_patch_winding_order_t& v)
-{
-    std::string s;
-    switch (v) {
-    case cut_surface_patch_winding_order_t::DEFAULT:
-        s = "def";
-        break;
-    case cut_surface_patch_winding_order_t::REVERSE:
-        s = "rev";
-        break;
+    std::string to_string(const cut_surface_patch_winding_order_t &v)
+    {
+        std::string s;
+        switch (v)
+        {
+        case cut_surface_patch_winding_order_t::DEFAULT:
+            s = "def";
+            break;
+        case cut_surface_patch_winding_order_t::REVERSE:
+            s = "rev";
+            break;
+        }
+        return s;
     }
-    return s;
-}
+
 
 int wrap_integer(int x, const int lo, const int hi)
 {
