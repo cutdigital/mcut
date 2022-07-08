@@ -1201,7 +1201,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext *pContext, McFlags flag
     *pContext = ret.first->first;
 
     // perhaps we may want this to be cal exactly once in a client app
-    ::exactinit();
+    //::exactinit();
 
     return result;
 }

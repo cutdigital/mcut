@@ -21,6 +21,7 @@
  */
 
 #include "mcut/internal/geom.h"
+#include <algorithm> // std::sort
 
 namespace mcut
 {
@@ -45,6 +46,7 @@ mcut::math::real_number_t orient3d(const mcut::math::vec3 &pa, const mcut::math:
     const double pd_[3] = {static_cast<double>(pd.x()), static_cast<double>(pd.y()), static_cast<double>(pd.z())};
 
     return ::orient3d(pa_, pb_, pc_, pd_); // shewchuk predicate
+    //return ::orient3d((double*)(&pa[0]), (double*)(&pb[0]), (double*)(&pc[0]), (double*)(&pd[0]));
 }
 
 #if 0
@@ -161,35 +163,52 @@ bool determine_three_noncollinear_vertices(int &i, int &j, int &k, const std::ve
     project2D(x, polygon_vertices, polygon_normal, polygon_normal_largest_component);
     MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
 
+    /*
+        NOTE: We cannot just use _any_/the first result of "colinear(x[i], x[j], x[k])" which returns true since
+        any three points that are _nearly_ colinear (in the limit of floating point precision)
+        will be found to be not colinear when using the exact predicate "orient2d".
+        This would have implications "further down the line", where e.g. the three nearly colinear points
+        are determined to be non-colinear (in the exact sense) but using them to evaluate
+        operations like segment-plane intersection would then give a false positive. 
+        To overcome this, must find the three vertices of the polygon, which maximise non-colinearity. 
+
+        NOTE: if the polygon has 3 vertices and they are indeed nearly colinear then answer is determined by the
+        exact predicate (i.e. i j k = 0 1 2)
+    */
+
     // get any three vertices that are not collinear
     i = 0;
     j = i + 1;
     k = j + 1;
-    bool found = false;
+    std::vector<std::tuple<int, int, int, math::real_number_t>> non_colinear_triplets;
+    
     for (; i < polygon_vertex_count; ++i)
     {
         for (; j < polygon_vertex_count; ++j)
         {
             for (; k < polygon_vertex_count; ++k)
             {
-                if (!collinear(x[i], x[j], x[k]))
+                math::real_number_t predRes;
+                if (!collinear(x[i], x[j], x[k], predRes))
                 {
-                    found = true;
-                    break;
+                    non_colinear_triplets.emplace_back(std::make_tuple(i,j,k,predRes));
                 }
             }
-            if (found)
-            {
-                break;
-            }
-        }
-        if (found)
-        {
-            break;
         }
     }
 
-    return found;
+    std::sort(non_colinear_triplets.begin(), non_colinear_triplets.end(), 
+    [](const std::tuple<int, int, int, math::real_number_t>& a, const std::tuple<int, int, int, math::real_number_t>& b){
+        return std::fabs(std::get<3>(a)) > std::fabs(std::get<3>(b)); 
+    });
+
+    std::tuple<int, int, int, math::real_number_t> best_triplet = non_colinear_triplets.front(); // maximising non-colinearity
+
+    i = std::get<0>(best_triplet);
+    j = std::get<1>(best_triplet);
+    k = std::get<2>(best_triplet);
+
+    return !non_colinear_triplets.empty(); // need at least one non-colinear triplet
 }
 
 char compute_segment_plane_intersection_type(const math::vec3 &q, const math::vec3 &r,
@@ -197,6 +216,8 @@ char compute_segment_plane_intersection_type(const math::vec3 &q, const math::ve
                                              const math::vec3 &polygon_normal,
                                              const int polygon_normal_largest_component)
 {
+    // TODO: we could also return i,j and k so that "determine_three_noncollinear_vertices" is not called multiple times,
+    // which we do to determine the type of intersection and the actual intersection point
     const int polygon_vertex_count = (int)polygon_vertices.size();
     // ... any three vertices that are not collinear
     int i = 0;

@@ -159,31 +159,35 @@ template <typename T = real_number_t> class vec3_ : public vec2_<T>
     const T &operator[](int index) const
     {
         MCUT_ASSERT(index >= 0 && index <= 2);
-        const T *val = nullptr;
-        if (index <= 1)
+        if (index == 0)
         {
-            val = &vec2_<T>::operator[](index);
+            return this->m_x;
+        }
+        else if(index ==1)
+        {
+            return this->m_y;
         }
         else
         {
-            val = &m_z;
+            return this->m_z;
         }
-        return *val;
     }
 
     T &operator[](int index)
     {
         MCUT_ASSERT(index >= 0 && index <= 2);
-        T *val = nullptr;
-        if (index <= 1)
+        if (index == 0)
         {
-            val = &vec2_<T>::operator[](index);
+            return this->m_x;
+        }
+        else if(index ==1)
+        {
+            return this->m_y;
         }
         else
         {
-            val = &m_z;
+            return this->m_z;
         }
-        return *val;
     }
 
     // intended for converting from arb-prec to fast vec
