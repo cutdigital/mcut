@@ -363,7 +363,7 @@ McResult indexArrayMeshToHalfedgeMesh(
                  face_iter != block_end_; ++face_iter)
             {
                 uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), face_iter);
-                const std::vector<mcut::vd_t> &faceVertices = faces.at(faceID);
+                const std::vector<mcut::vd_t> &faceVertices = faces[faceID];
                 mcut::fd_t fd = halfedgeMesh.add_face(faceVertices);
 
                 if (fd == mcut::mesh_t::null_face())
@@ -603,7 +603,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                 {
                     MCUT_ASSERT((size_t)*viter < halfedgeMeshInfo.data_maps.vertex_map.size() /*halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1*/);
 
-                    uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(*viter);
+                    uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map[*viter];
                     uint32_t userInputMeshVertexDescr = UINT32_MAX;
                     bool internalInputMeshVertexDescrIsForIntersectionPoint = (internalInputMeshVertexDescr == UINT32_MAX);
 
@@ -689,7 +689,7 @@ McResult halfedgeMeshToIndexArrayMesh(
 
             // Here we use whatever value was assigned to the current vertex by the kernel.
             // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(vdescr /**vIter*/);
+            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map[vdescr /**vIter*/];
             // We use the same default value as that used by the kernel for intersection
             // points (intersection points at mapped to uint_max i.e. null_vertex())
             uint32_t userInputMeshVertexDescr = UINT32_MAX;
@@ -824,7 +824,7 @@ McResult halfedgeMeshToIndexArrayMesh(
                 {
                     MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
 
-                    uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+                    uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map[*i];
                     uint32_t userInputMeshFaceDescr = INT32_MAX;
                     const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
 
@@ -914,7 +914,7 @@ McResult halfedgeMeshToIndexArrayMesh(
         {
             MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
 
-            uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+            uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map[*i];
             uint32_t userInputMeshFaceDescr = INT32_MAX;
             const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
 
@@ -2083,8 +2083,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                             for (int edgeIter = 0; edgeIter < numFaceEdges; ++edgeIter)
                             {
 
-                                const mcut::math::vec2 &faceEdgeV0 = faceVertexCoords2D.at(((size_t)edgeIter) + 0);
-                                const mcut::math::vec2 &faceEdgeV1 = faceVertexCoords2D.at((((size_t)edgeIter) + 1) % numFaceVertices);
+                                const mcut::math::vec2 &faceEdgeV0 = faceVertexCoords2D[((size_t)edgeIter) + 0];
+                                const mcut::math::vec2 &faceEdgeV1 = faceVertexCoords2D[(((size_t)edgeIter) + 1) % numFaceVertices];
 
                                 // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
                                 // Does the current edge of "face" intersect/pass through the area of
@@ -2096,8 +2096,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                                 for (int fpEdgeIter = 0; fpEdgeIter < (int)fpEdgeCount; ++fpEdgeIter)
                                 {
 
-                                    const mcut::math::vec2 &fpEdgeV0 = fpVertexCoords2D.at(((size_t)fpEdgeIter) + 0);
-                                    const mcut::math::vec2 &fpEdgeV1 = fpVertexCoords2D.at((((size_t)fpEdgeIter) + 1) % fpVertexCount);
+                                    const mcut::math::vec2 &fpEdgeV0 = fpVertexCoords2D[((size_t)fpEdgeIter) + 0];
+                                    const mcut::math::vec2 &fpEdgeV1 = fpVertexCoords2D[(((size_t)fpEdgeIter) + 1) % fpVertexCount];
 
                                     // placeholders
                                     mcut::math::real_number_t _1; // unused
@@ -2124,7 +2124,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                                     // for each floating polygon vertex ...
                                     for (int fpVertIter = 0; fpVertIter < (int)fpVertexCoords2D.size(); ++fpVertIter)
                                     {
-                                        const char ret = mcut::geom::compute_point_in_polygon_test(fpVertexCoords2D.at(fpVertIter), faceVertexCoords2D);
+                                        const char ret = mcut::geom::compute_point_in_polygon_test(fpVertexCoords2D[fpVertIter], faceVertexCoords2D);
                                         if (ret == 'i')
                                         { // check if strictly interior
                                             faceContainingFP = *it;
@@ -2219,9 +2219,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     auto fpGetEdgeVertexCoords = [&](const int fpEdgeIdx, mcut::math::vec2 &fpEdgeV0, mcut::math::vec2 &fpEdgeV1)
                     {
                         const int fpFirstEdgeV0Idx = (((size_t)fpEdgeIdx) + 0);
-                        fpEdgeV0 = fpVertexCoords2D.at(fpFirstEdgeV0Idx);
+                        fpEdgeV0 = fpVertexCoords2D[fpFirstEdgeV0Idx];
                         const int fpFirstEdgeV1Idx = (((size_t)fpEdgeIdx) + 1) % fpVertexCount;
-                        fpEdgeV1 = fpVertexCoords2D.at(fpFirstEdgeV1Idx);
+                        fpEdgeV1 = fpVertexCoords2D[fpFirstEdgeV1Idx];
                     };
 
                     auto fpGetEdgeMidpoint = [&](int edgeIdx)
@@ -2393,8 +2393,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     for (int origFaceEdgeIter = 0; origFaceEdgeIter < originFaceEdgeCount; ++origFaceEdgeIter)
                     {
 
-                        const mcut::math::vec2 &origFaceEdgeV0 = originFaceVertexCoords2D.at(((size_t)origFaceEdgeIter) + 0);
-                        const mcut::math::vec2 &origFaceEdgeV1 = originFaceVertexCoords2D.at(((origFaceEdgeIter) + 1) % originFaceVertexCount);
+                        const mcut::math::vec2 &origFaceEdgeV0 = originFaceVertexCoords2D[((size_t)origFaceEdgeIter) + 0];
+                        const mcut::math::vec2 &origFaceEdgeV1 = originFaceVertexCoords2D[((origFaceEdgeIter) + 1) % originFaceVertexCount];
 
                         const mcut::math::real_number_t garbageVal(0xdeadbeef);
                         mcut::math::vec2 intersectionPoint(garbageVal);
@@ -2507,7 +2507,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     // NOTE: minus-1 since "get_vertices_around_face(origin_face)" builds a list using halfedge target vertices
                     // See the starred note above
                     int halfedgeIdx = origFaceEdge0Idx; // mcut::wrap_integer(origFaceEdge0Idx - 1, 0, (int)originFaceEdgeCount - 1); //(origFaceEdge0Idx + 1) % originFaceEdgeCount;
-                    const mcut::hd_t origFaceEdge0Halfedge = origFaceHalfedges.at(halfedgeIdx);
+                    const mcut::hd_t origFaceEdge0Halfedge = origFaceHalfedges[halfedgeIdx];
                     MCUT_ASSERT(origin_face == fpOriginInputMesh->face(origFaceEdge0Halfedge));
                     const mcut::ed_t origFaceEdge0Descr = fpOriginInputMesh->edge(origFaceEdge0Halfedge);
                     const mcut::vd_t origFaceEdge0HalfedgeSrcDescr = fpOriginInputMesh->source(origFaceEdge0Halfedge);
@@ -2543,7 +2543,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
                     const mcut::math::real_number_t &origFaceEdge1IntPointEqnParam = originFaceIntersectedEdge1Info.second.second;
 
                     halfedgeIdx = origFaceEdge1Idx; /// mcut::wrap_integer(origFaceEdge1Idx - 1, 0, (int)originFaceEdgeCount - 1); // (origFaceEdge1Idx + 1) % originFaceEdgeCount;
-                    const mcut::hd_t origFaceEdge1Halfedge = origFaceHalfedges.at(halfedgeIdx);
+                    const mcut::hd_t origFaceEdge1Halfedge = origFaceHalfedges[halfedgeIdx];
                     MCUT_ASSERT(origin_face == fpOriginInputMesh->face(origFaceEdge1Halfedge));
                     const mcut::ed_t origFaceEdge1Descr = fpOriginInputMesh->edge(origFaceEdge1Halfedge);
                     const mcut::vd_t origFaceEdge1HalfedgeSrcDescr = fpOriginInputMesh->source(origFaceEdge1Halfedge);
@@ -4026,7 +4026,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
                     for(int i =0; i < (int)faceTriangleIndices.size(); ++i)
                     {
                         const uint32_t triangleLocalVertexIndex = faceTriangleIndices[i]; // id local within the current face that we are triangulating
-                        const uint32_t triangleGlobalVertexIndex = faceLocalToGlobleVertexMap.at(triangleLocalVertexIndex);
+                        const uint32_t triangleGlobalVertexIndex = faceLocalToGlobleVertexMap[triangleLocalVertexIndex];
                         faceTriangleIndices[i] = triangleGlobalVertexIndex; // id in the mesh
                         usedVertexIndicators[triangleLocalVertexIndex] = true;
                     }
