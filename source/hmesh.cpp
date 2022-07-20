@@ -294,7 +294,9 @@
         MCUT_ASSERT((size_t)t < m_vertices.size()); // MCUT_ASSERT(m_vertices.count(t) == 1);
         const vertex_data_t &tvd = m_vertices[t];
         const std::vector<halfedge_descriptor_t> &t_halfedges = tvd.m_halfedges;
-        std::vector<edge_descriptor_t> t_edges;
+        
+        static thread_local std::vector<edge_descriptor_t> t_edges;
+        t_edges.resize(0);
         t_edges.reserve(t_halfedges.size());
 
         for (std::vector<halfedge_descriptor_t>::const_iterator i = t_halfedges.cbegin(); i != t_halfedges.cend(); i++)
@@ -635,8 +637,15 @@
         MCUT_ASSERT(f != null_face());
 
         const std::vector<halfedge_descriptor_t> &halfedges_on_face = get_halfedges_around_face(f);
+<<<<<<< HEAD:source/hmesh.cpp
         std::vector<vertex_descriptor_t> vertex_descriptors(halfedges_on_face.size());
 
+=======
+        static thread_local std::vector<vertex_descriptor_t> vertex_descriptors;
+
+        vertex_descriptors.resize(halfedges_on_face.size());
+        
+>>>>>>> minor opts to kernel.cpp:source/halfedge_mesh.cpp
         for (int i = 0; i < (int)halfedges_on_face.size(); ++i)
         {
             const halfedge_descriptor_t h = halfedges_on_face[i];
@@ -666,7 +675,9 @@
         MCUT_ASSERT(v != null_vertex());
         // halfedges whoe target is 'v'
         const std::vector<halfedge_descriptor_t> &halfedges = get_halfedges_around_vertex(v);
-        std::vector<vertex_descriptor_t> out;
+        static thread_local std::vector<vertex_descriptor_t> out;
+        out.resize(0);
+        out.reserve(halfedges.size());
         for (std::vector<halfedge_descriptor_t>::const_iterator h = halfedges.cbegin(); h != halfedges.cend(); ++h)
         {
             vertex_descriptor_t src = source(*h);
@@ -687,8 +698,12 @@
         MCUT_ASSERT(f != null_face());
 
         static thread_local std::vector<face_descriptor_t> faces_around_face;
+<<<<<<< HEAD:source/hmesh.cpp
         faces_around_face.clear();
 
+=======
+        faces_around_face.resize(0);
+>>>>>>> minor opts to kernel.cpp:source/halfedge_mesh.cpp
         const std::vector<halfedge_descriptor_t> &halfedges_on_face = (halfedges_around_face_ != nullptr) ? *halfedges_around_face_ : get_halfedges_around_face(f);
 
         for (int i = 0; i < (int)halfedges_on_face.size(); ++i)
@@ -805,8 +820,9 @@
 
         face_data_t &fd = m_faces[f];
 
-        std::vector<vertex_descriptor_t> face_vertices; // ... that are used by face
-
+        static thread_local std::vector<vertex_descriptor_t> face_vertices; // ... that are used by face
+        face_vertices.resize(0);
+        
         // disassociate halfedges
 
         for (std::vector<halfedge_descriptor_t>::const_iterator it = fd.m_halfedges.cbegin(); it != fd.m_halfedges.cend(); ++it)
