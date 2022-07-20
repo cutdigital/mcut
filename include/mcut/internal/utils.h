@@ -86,7 +86,16 @@
 #define EXCEPTION_THROWN 
 #endif
 
-//#define PROFILING_BUILD
+#define PEDANTIC_SUBSCRIPT_ACCESS 1
+
+#if defined(PEDANTIC_SUBSCRIPT_ACCESS)
+#define SUBSCRIPT_ACCESS(x, i) x.at(i)
+#else
+#define SUBSCRIPT_ACCESS(x, i) x[i]
+#endif
+
+
+#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
 #include <chrono>
