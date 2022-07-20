@@ -31,7 +31,7 @@
 #include <memory>
 #include <vector>
 
-#undef MCUT_MULTI_THREADED
+//#undef MCUT_MULTI_THREADED
 
 namespace mcut
 {
