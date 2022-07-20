@@ -397,7 +397,7 @@
         halfedge_data_t *halfedge0_data_ptr = nullptr;
         if (reusing_removed_h0_descr)
         {
-            //halfedge0_data_ptr = &m_halfedges.at(h0_idx);
+            //halfedge0_data_ptr = &m_halfedges[h0_idx);
         }
         else
         {
@@ -423,7 +423,7 @@
         halfedge_data_t *halfedge1_data_ptr = nullptr;
         if (reusing_removed_h1_descr)
         {
-            //halfedge1_data_ptr = &m_halfedges.at(h1_idx);
+            //halfedge1_data_ptr = &m_halfedges[h1_idx);
         }
         else
         {
@@ -539,24 +539,24 @@
 
             // check if edge exists between v0 and v1 (using halfedges incident to either v0 or v1)
             // TODO: use the halfedge(..., true) function
-            //vertex_data_t& v0_data = m_vertices.at(v0);
-            //vertex_data_t& v1_data = m_vertices.at(v1);
+            //vertex_data_t& v0_data = m_vertices[v0];
+            //vertex_data_t& v1_data = m_vertices[v1];
 
 #if 0
-        vertex_data_t& v0_data = m_vertices.at(v0);
-        vertex_data_t& v1_data = m_vertices.at(v1);
+        vertex_data_t& v0_data = m_vertices[v0];
+        vertex_data_t& v1_data = m_vertices[v1];
 
         bool connecting_edge_exists = false;
         halfedge_descriptor_t v0_h = null_halfedge();
         halfedge_descriptor_t v1_h = null_halfedge();
 
         for (int v0_h_iter = 0; v0_h_iter < static_cast<int>(v0_data.m_halfedges.size()); ++v0_h_iter) {
-            v0_h = v0_data.m_halfedges.at(v0_h_iter);
+            v0_h = v0_data.m_halfedges[v0_h_iter];
             const edge_descriptor_t v0_e = edge(v0_h);
 
             for (int v1_h_iter = 0; v1_h_iter < static_cast<int>(v1_data.m_halfedges.size()); ++v1_h_iter) {
 
-                v1_h = v1_data.m_halfedges.at(v1_h_iter);
+                v1_h = v1_data.m_halfedges[v1_h_iter];
                 const edge_descriptor_t v1_e = edge(v1_h);
                 const bool same_edge = (v0_e == v1_e);
 
@@ -641,7 +641,7 @@
         {
             const halfedge_descriptor_t h = halfedges_on_face[i];
             //MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
-            //const halfedge_data_t& hd = m_halfedges.at(h);
+            //const halfedge_data_t& hd = m_halfedges[h];
             vertex_descriptors[i] = vertex_descriptor_t(prepend_offset + target(h) /*hd.t*/);
         }
         return vertex_descriptors;
