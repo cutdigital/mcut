@@ -20,7 +20,7 @@
  * Author(s)     : Floyd M. Chitalu
  */
 
-#include "mcut/internal/halfedge_mesh.h"
+#include "mcut/internal/hmesh.h"
 
 #include <algorithm>
 #include <cstdio>

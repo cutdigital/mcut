@@ -1,7 +1,6 @@
 #include "mcut/internal/frontend.h"
-#include "mcut/internal/frontend_intersect.h"
+#include "mcut/internal/preprocess.h"
 
-#include "mcut/internal/geom.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
 

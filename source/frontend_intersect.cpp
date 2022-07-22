@@ -1,8 +1,7 @@
 #include "mcut/internal/frontend.h"
 
 #include "mcut/internal/bvh.h"
-#include "mcut/internal/geom.h"
-#include "mcut/internal/halfedge_mesh.h"
+#include "mcut/internal/hmesh.h"
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
