@@ -196,7 +196,7 @@ void dump_mesh(const hmesh_t& mesh, const char* fbasename)
 }
 
 #if 0
-bool point_on_face_plane(const mcut::hmesh_t& m, const mcut::fd_t& f, const mcut::math::vec3& p, int& fv_count)
+bool point_on_face_plane(const mcut::hmesh_t& m, const mcut::fd_t& f, const mcut::vec3& p, int& fv_count)
 {
     const std::vector<mcut::vd_t> vertices = m.get_vertices_around_face(f);
     fv_count = (int)vertices.size();
@@ -209,11 +209,11 @@ bool point_on_face_plane(const mcut::hmesh_t& m, const mcut::fd_t& f, const mcut
             const mcut::vd_t& vj = vertices[j];
             const mcut::vd_t& vk = vertices[k];
 
-            const mcut::math::vec3& vi_coords = m.vertex(vi);
-            const mcut::math::vec3& vj_coords = m.vertex(vj);
-            const mcut::math::vec3& vk_coords = m.vertex(vk);
+            const mcut::vec3& vi_coords = m.vertex(vi);
+            const mcut::vec3& vj_coords = m.vertex(vj);
+            const mcut::vec3& vk_coords = m.vertex(vk);
 
-            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, p);
+            const bool are_coplaner = mcut::coplaner(vi_coords, vj_coords, vk_coords, p);
 
             if (!are_coplaner) {
                 return false;
@@ -1071,23 +1071,23 @@ bool is_virtual_face(const fd_t& face)
     particular component (x, y, or z) of their coordinates is not the same amongst two or more vertices
     */
 bool have_same_coordinate(
-    const std::vector<std::pair<vd_t, math::vec3>>& bin_vertices_sorted,
+    const std::vector<std::pair<vd_t, vec3>>& bin_vertices_sorted,
     const int coordinate_index = 0 // 0 = x, 1 = y, 2 = z component
 )
 {
     // for each vertex, compare to all others in vector (compare by given component)
     bool is_duplicate = false;
-    for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator i = bin_vertices_sorted.begin(); i != bin_vertices_sorted.end(); ++i) {
-        const math::vec3& vertex_i_coordinates = i->second;
+    for (std::vector<std::pair<vd_t, vec3>>::const_iterator i = bin_vertices_sorted.begin(); i != bin_vertices_sorted.end(); ++i) {
+        const vec3& vertex_i_coordinates = i->second;
         const double vertex_i_coordinate = vertex_i_coordinates[coordinate_index];
         bool vertex_i_coordinate_is_duplicate = false;
 
-        for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator j = bin_vertices_sorted.begin(); j != bin_vertices_sorted.end(); ++j) {
+        for (std::vector<std::pair<vd_t, vec3>>::const_iterator j = bin_vertices_sorted.begin(); j != bin_vertices_sorted.end(); ++j) {
             if (j == i) {
                 continue; // same vertex, skip
             }
 
-            const math::vec3& vertex_j_coordinates = j->second;
+            const vec3& vertex_j_coordinates = j->second;
             const double vertex_j_coordinate = vertex_j_coordinates[coordinate_index];
             vertex_i_coordinate_is_duplicate = (vertex_i_coordinate == vertex_j_coordinate);
 
@@ -1324,7 +1324,7 @@ vd_t resolve_intersection_point_descriptor(
         MCUT_ASSERT((uint32_t)h_proc < (uint32_t)m1.number_of_halfedges());
         vd_t h_tgt = m1.target(h_proc);
         MCUT_ASSERT((uint32_t)h_tgt < (uint32_t)m1.number_of_vertices());
-        const math::vec3& vertex = m1.vertex(h_tgt);
+        const vec3& vertex = m1.vertex(h_tgt);
         const vd_t tgt_copy = m1.add_vertex(vertex); // make a copy
 
         resolved_inst = tgt_copy;
@@ -1433,7 +1433,7 @@ bool mesh_is_closed(const hmesh_t& mesh)
 
 // TODO: thsi can be improved by comparing based on the largest component of the difference vector
 // sort points along a straight line
-std::vector<vd_t> linear_projection_sort(const std::vector<std::pair<vd_t, math::vec3>>& points)
+std::vector<vd_t> linear_projection_sort(const std::vector<std::pair<vd_t, vec3>>& points)
 {
     /*
 1. pick one point as the origin
@@ -1445,16 +1445,16 @@ std::vector<vd_t> linear_projection_sort(const std::vector<std::pair<vd_t, math:
 5. sort points according to scalar products values from <4b>
 */
     MCUT_ASSERT(points.size() >= 2);
-    const std::vector<std::pair<vd_t, math::vec3>>::const_iterator origin = points.cbegin();
-    const std::vector<std::pair<vd_t, math::vec3>>::const_iterator dst = points.cbegin() + 1;
+    const std::vector<std::pair<vd_t, vec3>>::const_iterator origin = points.cbegin();
+    const std::vector<std::pair<vd_t, vec3>>::const_iterator dst = points.cbegin() + 1;
 
-    math::vec3 orig_to_dst_vec = math::normalize(origin->second - dst->second);
+    vec3 orig_to_dst_vec = normalize(origin->second - dst->second);
 
     std::vector<std::pair<vd_t, double>> point_projections;
 
-    for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator i = points.cbegin(); i != points.cend(); ++i) {
-        math::vec3 orig_to_point_vec = (origin->second - i->second);
-        point_projections.emplace_back(i->first, math::dot_product(orig_to_point_vec, orig_to_dst_vec));
+    for (std::vector<std::pair<vd_t, vec3>>::const_iterator i = points.cbegin(); i != points.cend(); ++i) {
+        vec3 orig_to_point_vec = (origin->second - i->second);
+        point_projections.emplace_back(i->first, dot_product(orig_to_point_vec, orig_to_dst_vec));
     }
 
     std::sort(point_projections.begin(), point_projections.end(),
@@ -1836,11 +1836,11 @@ void dispatch(output_t& output, const input_t& input)
     TIMESTACK_PUSH("Build edge bounding boxes");
 
     // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
-    std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::vec3>> ps_edge_to_bbox;
+    std::unordered_map<ed_t, bounding_box_t<mcut::vec3>> ps_edge_to_bbox;
 
 #if defined(MCUT_MULTI_THREADED)
     {
-        typedef std::unordered_map<ed_t, geom::bounding_box_t<mcut::math::vec3>> OutputStorageType;
+        typedef std::unordered_map<ed_t, bounding_box_t<mcut::vec3>> OutputStorageType;
         typedef std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator InputStorageIteratorType;
 
         auto fn_compute_ps_edge_bbox = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
@@ -1850,7 +1850,7 @@ void dispatch(output_t& output, const input_t& input)
                 const ed_t edge = iedge_iter->first;
                 const vd_t v0 = ps.vertex(edge, 0);
                 const vd_t v1 = ps.vertex(edge, 1);
-                geom::bounding_box_t<mcut::math::vec3>& edge_bbox = ps_edge_to_bbox_local[edge];
+                bounding_box_t<mcut::vec3>& edge_bbox = ps_edge_to_bbox_local[edge];
                 edge_bbox.expand(ps.vertex(v0));
                 edge_bbox.expand(ps.vertex(v1));
             }
@@ -1888,7 +1888,7 @@ void dispatch(output_t& output, const input_t& input)
         const ed_t edge = iedge_iter->first;
         const vd_t v0 = ps.vertex(edge, 0);
         const vd_t v1 = ps.vertex(edge, 1);
-        geom::bounding_box_t<mcut::math::vec3>& edge_bbox = ps_edge_to_bbox[edge];
+        bounding_box_t<mcut::vec3>& edge_bbox = ps_edge_to_bbox[edge];
         edge_bbox.expand(ps.vertex(v0));
         edge_bbox.expand(ps.vertex(v1));
     }
@@ -1908,11 +1908,11 @@ void dispatch(output_t& output, const input_t& input)
         auto fn_compute_edgefair_pair_culling = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
             for (std::unordered_map<ed_t, std::vector<fd_t>>::iterator iedge_iter = block_start_; iedge_iter != block_end_; iedge_iter++) {
                 const ed_t edge = iedge_iter->first;
-                const geom::bounding_box_t<mcut::math::vec3>& edge_bbox = ps_edge_to_bbox[edge];
+                const bounding_box_t<mcut::vec3>& edge_bbox = ps_edge_to_bbox[edge];
                 std::vector<fd_t>& edge_ifaces = iedge_iter->second;
 
                 for (std::vector<fd_t>::iterator iface_iter = edge_ifaces.begin(); iface_iter != edge_ifaces.end(); /*increment inside loop*/) {
-                    const geom::bounding_box_t<mcut::math::vec3>* iface_bbox = nullptr;
+                    const bounding_box_t<mcut::vec3>* iface_bbox = nullptr;
                     bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
                     if (is_sm_face) {
 #if defined(USE_OIBVH)
@@ -1930,7 +1930,7 @@ void dispatch(output_t& output, const input_t& input)
 #endif
                     }
 
-                    bool intersect = geom::intersect_bounding_boxes(edge_bbox, *iface_bbox);
+                    bool intersect = intersect_bounding_boxes(edge_bbox, *iface_bbox);
 
                     if (!intersect) {
                         // remove because "iface_iter" was paired with a coincident face (of "edge") based on
@@ -1968,11 +1968,11 @@ void dispatch(output_t& output, const input_t& input)
          iedge_iter != ps_edge_face_intersection_pairs.end();
          iedge_iter++) {
         const ed_t edge = iedge_iter->first;
-        const geom::bounding_box_t<mcut::math::vec3>& edge_bbox = ps_edge_to_bbox[edge];
+        const bounding_box_t<mcut::vec3>& edge_bbox = ps_edge_to_bbox[edge];
         std::vector<fd_t>& edge_ifaces = iedge_iter->second;
 
         for (std::vector<fd_t>::iterator iface_iter = edge_ifaces.begin(); iface_iter != edge_ifaces.end(); /*increment inside loop*/) {
-            const geom::bounding_box_t<mcut::math::vec3>* iface_bbox = nullptr;
+            const bounding_box_t<mcut::vec3>* iface_bbox = nullptr;
             bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
             if (is_sm_face) {
 #if defined(USE_OIBVH)
@@ -1990,7 +1990,7 @@ void dispatch(output_t& output, const input_t& input)
 #endif
             }
 
-            bool intersect = geom::intersect_bounding_boxes(edge_bbox, *iface_bbox);
+            bool intersect = intersect_bounding_boxes(edge_bbox, *iface_bbox);
 
             if (!intersect) {
                 // remove because "iface_iter" was paired with a coincident face (of "edge") based on
@@ -2014,46 +2014,46 @@ void dispatch(output_t& output, const input_t& input)
     // compute/extract geometry properties of each tested face
     //--------------------------------------------------------
 
-    std::unordered_map<fd_t, math::vec3> ps_tested_face_to_plane_normal;
+    std::unordered_map<fd_t, vec3> ps_tested_face_to_plane_normal;
     std::unordered_map<fd_t, double> ps_tested_face_to_plane_normal_d_param;
     std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
-    std::unordered_map<fd_t, std::vector<math::vec3>> ps_tested_face_to_vertices;
+    std::unordered_map<fd_t, std::vector<vec3>> ps_tested_face_to_vertices;
 
 #if defined(MCUT_MULTI_THREADED)
     {
         typedef std::tuple<
-            std::unordered_map<fd_t, math::vec3>, // ps_tested_face_to_plane_normal;
+            std::unordered_map<fd_t, vec3>, // ps_tested_face_to_plane_normal;
             std::unordered_map<fd_t, double>, // ps_tested_face_to_plane_normal_d_param;
             std::unordered_map<fd_t, int>, // ps_tested_face_to_plane_normal_max_comp;
-            std::unordered_map<fd_t, std::vector<math::vec3>> // ps_tested_face_to_vertices;
+            std::unordered_map<fd_t, std::vector<vec3>> // ps_tested_face_to_vertices;
             >
             OutputStorageTypesTuple;
         typedef std::map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator InputStorageIteratorType;
 
         auto fn_compute_intersecting_face_properties = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
             OutputStorageTypesTuple output_res;
-            std::unordered_map<fd_t, math::vec3>& ps_tested_face_to_plane_normal_LOCAL = std::get<0>(output_res);
+            std::unordered_map<fd_t, vec3>& ps_tested_face_to_plane_normal_LOCAL = std::get<0>(output_res);
             std::unordered_map<fd_t, double>& ps_tested_face_to_plane_normal_d_param_LOCAL = std::get<1>(output_res);
             std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_LOCAL = std::get<2>(output_res);
-            std::unordered_map<fd_t, std::vector<math::vec3>>& ps_tested_face_to_vertices_LOCAL = std::get<3>(output_res);
+            std::unordered_map<fd_t, std::vector<vec3>>& ps_tested_face_to_vertices_LOCAL = std::get<3>(output_res);
 
             for (std::map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator tested_faces_iter = block_start_;
                  tested_faces_iter != block_end_;
                  tested_faces_iter++) {
                 // get the vertices of tested_face (used to estimate its normal etc.)
                 std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_faces_iter->first);
-                std::vector<math::vec3>& tested_face_vertices = ps_tested_face_to_vertices_LOCAL[tested_faces_iter->first]; // insert and get reference
+                std::vector<vec3>& tested_face_vertices = ps_tested_face_to_vertices_LOCAL[tested_faces_iter->first]; // insert and get reference
 
                 for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
-                    const math::vec3& vertex = ps.vertex(*it);
+                    const vec3& vertex = ps.vertex(*it);
                     tested_face_vertices.push_back(vertex);
                 }
 
-                math::vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal_LOCAL[tested_faces_iter->first];
+                vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal_LOCAL[tested_faces_iter->first];
                 double& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param_LOCAL[tested_faces_iter->first];
                 int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp_LOCAL[tested_faces_iter->first];
 
-                tested_face_plane_normal_max_comp = geom::compute_polygon_plane_coefficients(
+                tested_face_plane_normal_max_comp = compute_polygon_plane_coefficients(
                     tested_face_plane_normal,
                     tested_face_plane_param_d,
                     tested_face_vertices.data(),
@@ -2089,10 +2089,10 @@ void dispatch(output_t& output, const input_t& input)
 
             OutputStorageTypesTuple future_res = f.get();
 
-            std::unordered_map<fd_t, math::vec3>& ps_tested_face_to_plane_normal_FUTURE = std::get<0>(future_res);
+            std::unordered_map<fd_t, vec3>& ps_tested_face_to_plane_normal_FUTURE = std::get<0>(future_res);
             std::unordered_map<fd_t, double>& ps_tested_face_to_plane_normal_d_param_FUTURE = std::get<1>(future_res);
             std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_FUTURE = std::get<2>(future_res);
-            std::unordered_map<fd_t, std::vector<math::vec3>>& ps_tested_face_to_vertices_FUTURE = std::get<3>(future_res);
+            std::unordered_map<fd_t, std::vector<vec3>>& ps_tested_face_to_vertices_FUTURE = std::get<3>(future_res);
 
             ps_tested_face_to_plane_normal.insert(
                 ps_tested_face_to_plane_normal_FUTURE.cbegin(),
@@ -2121,18 +2121,18 @@ void dispatch(output_t& output, const input_t& input)
          tested_faces_iter++) {
         // get the vertices of tested_face (used to estimate its normal etc.)
         std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_faces_iter->first);
-        std::vector<math::vec3>& tested_face_vertices = ps_tested_face_to_vertices[tested_faces_iter->first]; // insert and get reference
+        std::vector<vec3>& tested_face_vertices = ps_tested_face_to_vertices[tested_faces_iter->first]; // insert and get reference
 
         for (std::vector<vd_t>::const_iterator it = tested_face_descriptors.cbegin(); it != tested_face_descriptors.cend(); ++it) {
-            const math::vec3& vertex = ps.vertex(*it);
+            const vec3& vertex = ps.vertex(*it);
             tested_face_vertices.push_back(vertex);
         }
 
-        math::vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal[tested_faces_iter->first];
+        vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal[tested_faces_iter->first];
         double& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param[tested_faces_iter->first];
         int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp[tested_faces_iter->first];
 
-        tested_face_plane_normal_max_comp = geom::compute_polygon_plane_coefficients(
+        tested_face_plane_normal_max_comp = compute_polygon_plane_coefficients(
             tested_face_plane_normal,
             tested_face_plane_param_d,
             tested_face_vertices.data(),
@@ -2170,7 +2170,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // std::map<
     ///    vd_t, // intersection point
-    ///    math::vec3 // the normal vector of intersected face from which intersection point came from
+    ///    vec3 // the normal vector of intersected face from which intersection point came from
     //    >
     //    m0_ivtx_to_tested_polygon_normal;
 
@@ -2210,7 +2210,7 @@ void dispatch(output_t& output, const input_t& input)
             std::map<mcut::pair<fd_t>, std::vector<vd_t>>, // cutpath_edge_creation_info
             std::unordered_map<fd_t, std::vector<vd_t>>, // ps_iface_to_ivtx_list
             bool, // partial_cut_detected
-            std::vector<mcut::math::vec3> // list of intersection points computed in a future
+            std::vector<mcut::vec3> // list of intersection points computed in a future
             >
             OutputStorageTypesTuple;
 
@@ -2225,7 +2225,7 @@ void dispatch(output_t& output, const input_t& input)
             std::map<mcut::pair<fd_t>, std::vector<vd_t>>& cutpath_edge_creation_info_LOCAL = std::get<3>(local_output);
             std::unordered_map<fd_t, std::vector<vd_t>>& ps_iface_to_ivtx_list_LOCAL = std::get<4>(local_output);
             bool& partial_cut_detected_LOCAL = std::get<5>(local_output);
-            std::vector<mcut::math::vec3>& intersection_points_LOCAL = std::get<6>(local_output);
+            std::vector<mcut::vec3>& intersection_points_LOCAL = std::get<6>(local_output);
 
             // NOTE: threads do not add vertices into m0 to prevent contention on a shared resource.
             // They instead store a placeholder value that is analogous to an local offset i.e.
@@ -2254,10 +2254,10 @@ void dispatch(output_t& output, const input_t& input)
 
                 // source vertex
                 const vertex_descriptor_t tested_edge_h0_source_descr = ps.source(tested_edge_h0);
-                const math::vec3& tested_edge_h0_source_vertex = ps.vertex(tested_edge_h0_source_descr);
+                const vec3& tested_edge_h0_source_vertex = ps.vertex(tested_edge_h0_source_descr);
                 // target vertex
                 const vertex_descriptor_t tested_edge_h0_target_descr = ps.target(tested_edge_h0);
-                const math::vec3& tested_edge_h0_target_vertex = ps.vertex(tested_edge_h0_target_descr);
+                const vec3& tested_edge_h0_target_vertex = ps.vertex(tested_edge_h0_target_descr);
 
                 // This boolean var is evaluated based on the fact that sm faces come before cm faces inside the "ps" data structure
                 const fd_t tested_edge_h0_face = ps.face(tested_edge_h0);
@@ -2276,21 +2276,21 @@ void dispatch(output_t& output, const input_t& input)
 
                     // get the vertices of tested_face (used to estimate its normal etc.)
                     MCUT_ASSERT(ps_tested_face_to_vertices.find(tested_face) != ps_tested_face_to_vertices.end());
-                    const std::vector<math::vec3>& tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
+                    const std::vector<vec3>& tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
 
                     // compute plane of tested_face
                     // -----------------------
 
                     MCUT_ASSERT(ps_tested_face_to_plane_normal.find(tested_face) != ps_tested_face_to_plane_normal.end());
-                    const math::vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal.at(tested_face);
+                    const vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal.at(tested_face);
                     MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
                     const double& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param.at(tested_face);
                     MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
-                    const int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face); // geom::compute_polygon_plane_coefficients(
+                    const int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face); // compute_polygon_plane_coefficients(
 
-                    math::vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
+                    vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
 
-                    char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
+                    char segment_intersection_type = compute_segment_plane_intersection_type( // exact**
                         tested_edge_h0_source_vertex,
                         tested_edge_h0_target_vertex,
                         tested_face_vertices,
@@ -2302,7 +2302,7 @@ void dispatch(output_t& output, const input_t& input)
                     if (have_plane_intersection) {
                         if (segment_intersection_type != '1') {
                             bool violatedGP = false;
-                            std::vector<const math::vec3*> points_touching_plane;
+                            std::vector<const vec3*> points_touching_plane;
 
                             if (segment_intersection_type == 'q' || segment_intersection_type == 'r') {
                                 points_touching_plane.push_back((segment_intersection_type == 'q') ? &tested_edge_h0_source_vertex : &tested_edge_h0_target_vertex);
@@ -2311,9 +2311,9 @@ void dispatch(output_t& output, const input_t& input)
                                 points_touching_plane.push_back(&tested_edge_h0_target_vertex);
                             }
 
-                            for (std::vector<const math::vec3*>::const_iterator i = points_touching_plane.cbegin(); i != points_touching_plane.cend(); ++i) {
-                                const math::vec3& point = (*(*i));
-                                char result = geom::compute_point_in_polygon_test(
+                            for (std::vector<const vec3*>::const_iterator i = points_touching_plane.cbegin(); i != points_touching_plane.cend(); ++i) {
+                                const vec3& point = (*(*i));
+                                char result = compute_point_in_polygon_test(
                                     point,
                                     tested_face_vertices,
                                     tested_face_plane_normal,
@@ -2340,14 +2340,14 @@ void dispatch(output_t& output, const input_t& input)
                             }
                         }
 
-                        geom::compute_segment_plane_intersection(
+                        compute_segment_plane_intersection(
                             intersection_point,
                             tested_face_plane_normal,
                             tested_face_plane_param_d,
                             tested_edge_h0_source_vertex,
                             tested_edge_h0_target_vertex);
 
-                        char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
+                        char in_poly_test_intersection_type = compute_point_in_polygon_test(
                             intersection_point,
                             tested_face_vertices,
                             //#if 1
@@ -2443,7 +2443,7 @@ void dispatch(output_t& output, const input_t& input)
             partial_res, // output computed by master thread
             futures);
 
-        std::vector<mcut::math::vec3> intersection_points;
+        std::vector<mcut::vec3> intersection_points;
         std::tie(
             m0_ivtx_to_intersection_registry_entry,
             cm_border_reentrant_ivtx_list,
@@ -2456,7 +2456,7 @@ void dispatch(output_t& output, const input_t& input)
 
         // Add intersection points computed by master thread in to "m0" and
         // account for intersection point offsets
-        for (std::vector<mcut::math::vec3>::const_iterator i = intersection_points.cbegin(); i != intersection_points.cend(); ++i) {
+        for (std::vector<mcut::vec3>::const_iterator i = intersection_points.cbegin(); i != intersection_points.cend(); ++i) {
             const vd_t stored_descr = m0.add_vertex(*i);
             MCUT_ASSERT(stored_descr != hmesh_t::null_vertex());
         }
@@ -2532,13 +2532,13 @@ void dispatch(output_t& output, const input_t& input)
                 const std::map<mcut::pair<fd_t>, std::vector<vd_t>>& cutpath_edge_creation_info_FUTURE = std::get<3>(future_result);
                 const std::unordered_map<fd_t, std::vector<vd_t>>& ps_iface_to_ivtx_list_FUTURE = std::get<4>(future_result);
                 const bool& partial_cut_detected_FUTURE = std::get<5>(future_result);
-                const std::vector<mcut::math::vec3>& intersection_points_FUTURE = std::get<6>(future_result);
+                const std::vector<mcut::vec3>& intersection_points_FUTURE = std::get<6>(future_result);
                 const uint32_t intersection_points_in_future = (uint32_t)intersection_points_FUTURE.size();
 
                 MCUT_ASSERT(intersection_points_FUTURE.size() == m0_ivtx_to_intersection_registry_entry_FUTURE.size());
 
                 // add intersection point corresponding to the current future
-                for (std::vector<mcut::math::vec3>::const_iterator it = intersection_points_FUTURE.cbegin();
+                for (std::vector<mcut::vec3>::const_iterator it = intersection_points_FUTURE.cbegin();
                      it != intersection_points_FUTURE.cend();
                      ++it) {
                     const vd_t stored_descr = m0.add_vertex(*it);
@@ -2665,10 +2665,10 @@ void dispatch(output_t& output, const input_t& input)
 
         // source vertex
         const vertex_descriptor_t tested_edge_h0_source_descr = ps.source(tested_edge_h0);
-        const math::vec3& tested_edge_h0_source_vertex = ps.vertex(tested_edge_h0_source_descr);
+        const vec3& tested_edge_h0_source_vertex = ps.vertex(tested_edge_h0_source_descr);
         // target vertex
         const vertex_descriptor_t tested_edge_h0_target_descr = ps.target(tested_edge_h0);
-        const math::vec3& tested_edge_h0_target_vertex = ps.vertex(tested_edge_h0_target_descr);
+        const vec3& tested_edge_h0_target_vertex = ps.vertex(tested_edge_h0_target_descr);
 
         // This boolean var is evaluated based on the fact that sm faces come before cm faces inside the "ps" data structure
         const fd_t tested_edge_h0_face = ps.face(tested_edge_h0);
@@ -2688,24 +2688,24 @@ void dispatch(output_t& output, const input_t& input)
             // get the vertices of tested_face (used to estimate its normal etc.)
             // std::vector<vd_t> tested_face_descriptors = ps.get_vertices_around_face(tested_face);
             MCUT_ASSERT(ps_tested_face_to_vertices.find(tested_face) != ps_tested_face_to_vertices.end());
-            const std::vector<math::vec3>& tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
+            const std::vector<vec3>& tested_face_vertices = ps_tested_face_to_vertices.at(tested_face);
 
             // compute plane of tested_face
             // -----------------------
 
             MCUT_ASSERT(ps_tested_face_to_plane_normal.find(tested_face) != ps_tested_face_to_plane_normal.end());
-            const math::vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal.at(tested_face);
+            const vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal.at(tested_face);
             MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
             const double& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param.at(tested_face);
             MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
             const int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(tested_face);
 
-            math::vec3 intersection_point(0., 0., 0.); // the intersection po int to be computed
+            vec3 intersection_point(0., 0., 0.); // the intersection po int to be computed
 
             // TODO: replace this with shewchuck predicate (nasty failure on test 42)
             // at least orient3d will be able to give use the corrent result!
 #if 0
-            char lp_intersection_result = geom::compute_line_plane_intersection(
+            char lp_intersection_result = compute_line_plane_intersection(
                 intersection_point,
                 tested_edge_h0_source_vertex,
                 tested_edge_h0_target_vertex,
@@ -2715,7 +2715,7 @@ void dispatch(output_t& output, const input_t& input)
                 tested_face_plane_normal,
                 tested_face_plane_param_d);
 #else
-            char segment_intersection_type = geom::compute_segment_plane_intersection_type( // exact**
+            char segment_intersection_type = compute_segment_plane_intersection_type( // exact**
                 tested_edge_h0_source_vertex,
                 tested_edge_h0_target_vertex,
                 tested_face_vertices,
@@ -2734,7 +2734,7 @@ void dispatch(output_t& output, const input_t& input)
                     // If this is true then we have indeed violated GP. Otherwise, we just treat this as a non-intersection because
                     // the what-would-have-been intersection point actually lies outside the tested_face.
                     bool violatedGP = false;
-                    std::vector<const math::vec3*> points_touching_plane;
+                    std::vector<const vec3*> points_touching_plane;
 
                     if (segment_intersection_type == 'q' /*segment start*/ || segment_intersection_type == 'r' /*segment end*/) { // only one segment end is touching plane
                         points_touching_plane.push_back((segment_intersection_type == 'q') ? &tested_edge_h0_source_vertex : &tested_edge_h0_target_vertex);
@@ -2744,9 +2744,9 @@ void dispatch(output_t& output, const input_t& input)
                     }
 
                     // if any point in "points_touching_plane" is inside the tested_face then we have violated GP
-                    for (std::vector<const math::vec3*>::const_iterator i = points_touching_plane.cbegin(); i != points_touching_plane.cend(); ++i) {
-                        const math::vec3& point = (*(*i));
-                        char result = geom::compute_point_in_polygon_test(
+                    for (std::vector<const vec3*>::const_iterator i = points_touching_plane.cbegin(); i != points_touching_plane.cend(); ++i) {
+                        const vec3& point = (*(*i));
+                        char result = compute_point_in_polygon_test(
                             point,
                             tested_face_vertices,
                             tested_face_plane_normal,
@@ -2789,7 +2789,7 @@ void dispatch(output_t& output, const input_t& input)
                 // NOTE: if using fixed precision floats (i.e. double), then here we just care about getting the intersection point
                 // irrespective of whether "segment_intersection_result" is consistent with "segment_intersection_type" from above.
                 // The inconsistency can happen during edge cases. see e.g. test 42.
-                geom::compute_segment_plane_intersection(
+                compute_segment_plane_intersection(
                     intersection_point,
                     tested_face_plane_normal,
                     tested_face_plane_param_d,
@@ -2797,7 +2797,7 @@ void dispatch(output_t& output, const input_t& input)
                     tested_edge_h0_target_vertex);
 
                 // is our intersection point in the polygon?
-                char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
+                char in_poly_test_intersection_type = compute_point_in_polygon_test(
                     intersection_point,
                     tested_face_vertices,
                     tested_face_plane_normal,
@@ -2877,13 +2877,13 @@ void dispatch(output_t& output, const input_t& input)
                     
                     if (!on_face)
                     { 
-                        const math::vec3 normal = math::normalize(tested_face_plane_normal);
-                        const double length = math::length(normal) ;
+                        const vec3 normal = normalize(tested_face_plane_normal);
+                        const double length = length(normal) ;
 
                         //MCUT_ASSERT(length == double(1.0));
-                        const math::vec3& point_on_plane = tested_face_vertices.back(); // any vertex will do (assuming all vertices of face are coplanar)
-                        const math::vec3 vec = (intersection_point - point_on_plane);
-                        const double dot = math::dot_product(normal, vec);
+                        const vec3& point_on_plane = tested_face_vertices.back(); // any vertex will do (assuming all vertices of face are coplanar)
+                        const vec3 vec = (intersection_point - point_on_plane);
+                        const double dot = dot_product(normal, vec);
                         intersection_point = intersection_point - (normal * dot);
                         point_on_face_plane(ps, tested_face, intersection_point, fv_count);
                     }
@@ -3249,7 +3249,7 @@ void dispatch(output_t& output, const input_t& input)
             std::vector<
                 std::pair<
                     vd_t, // descriptor
-                    math::vec3 // coordinates
+                    vec3 // coordinates
                     >>
                 ivertex_coords;
 
@@ -3261,7 +3261,7 @@ void dispatch(output_t& output, const input_t& input)
 
             std::vector<vd_t> sorted_descriptors = linear_projection_sort(ivertex_coords);
 
-            // for (std::vector<std::pair<vd_t, math::vec3>>::const_iterator iter = ivertex_coords.cbegin() + 1; iter != ivertex_coords.cend(); ++iter) {
+            // for (std::vector<std::pair<vd_t, vec3>>::const_iterator iter = ivertex_coords.cbegin() + 1; iter != ivertex_coords.cend(); ++iter) {
             for (std::vector<vd_t>::const_iterator iter = sorted_descriptors.cbegin() + 1; iter != sorted_descriptors.cend(); ++iter) {
                 // const vd_t src_vertex = (iter - 1)->first;
                 // const vd_t tgt_vertex = (iter)->first;
@@ -3299,9 +3299,9 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(shared_faces.size() >= 2); // connectable intersection points must match by 2 or more faces
 
                     // compute edge mid-point (could be any point along the edge that is not one of the vertices)
-                    const math::vec3& src_vertex_coords = m0.vertex(src_vertex);
-                    const math::vec3& tgt_vertex_coords = m0.vertex(tgt_vertex);
-                    const math::vec3 midpoint = (tgt_vertex_coords + src_vertex_coords) * double(0.5);
+                    const vec3& src_vertex_coords = m0.vertex(src_vertex);
+                    const vec3& tgt_vertex_coords = m0.vertex(tgt_vertex);
+                    const vec3 midpoint = (tgt_vertex_coords + src_vertex_coords) * double(0.5);
 
                     std::vector<int> shared_faces_containing_edge;
                     // for each shared face
@@ -3309,15 +3309,15 @@ void dispatch(output_t& output, const input_t& input)
                         const fd_t shared_face = *sf_iter;
 
                         MCUT_ASSERT(ps_tested_face_to_plane_normal.find(shared_face) != ps_tested_face_to_plane_normal.cend());
-                        const math::vec3& shared_face_plane_normal = ps_tested_face_to_plane_normal.at(shared_face);
+                        const vec3& shared_face_plane_normal = ps_tested_face_to_plane_normal.at(shared_face);
 
                         MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(shared_face) != ps_tested_face_to_plane_normal_max_comp.cend());
                         int shared_face_normal_max_comp = ps_tested_face_to_plane_normal_max_comp.at(shared_face);
 
                         MCUT_ASSERT(ps_tested_face_to_vertices.find(shared_face) != ps_tested_face_to_vertices.cend());
-                        const std::vector<math::vec3>& shared_face_vertices = ps_tested_face_to_vertices.at(shared_face);
+                        const std::vector<vec3>& shared_face_vertices = ps_tested_face_to_vertices.at(shared_face);
 
-                        char in_poly_test_intersection_type = geom::compute_point_in_polygon_test(
+                        char in_poly_test_intersection_type = compute_point_in_polygon_test(
                             midpoint,
                             shared_face_vertices,
                             shared_face_plane_normal,
@@ -4067,7 +4067,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // std::map<vd_t, std::vector<vd_t>> m0_to_m1_poly_ext_int_edge_vertex;
 
-    std::unordered_map<ed_t, std::vector<std::pair<vd_t, math::vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
+    std::unordered_map<ed_t, std::vector<std::pair<vd_t, vec3>>> ps_edge_to_vertices; // stores ps-edges with more-than 3 coincident vertices
 
     for (std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator iter_ps_edge = ps_intersecting_edges.cbegin(); iter_ps_edge != ps_intersecting_edges.cend(); ++iter_ps_edge) {
 
@@ -4092,11 +4092,11 @@ void dispatch(output_t& output, const input_t& input)
 
             MCUT_ASSERT(ps_edge_to_vertices.find(iter_ps_edge->first) == ps_edge_to_vertices.end()); // edge cannot have been traversed before!
 
-            ps_edge_to_vertices.insert(std::make_pair(iter_ps_edge->first, std::vector<std::pair<vd_t, math::vec3>>()));
+            ps_edge_to_vertices.insert(std::make_pair(iter_ps_edge->first, std::vector<std::pair<vd_t, vec3>>()));
 
             for (std::vector<vd_t>::const_iterator it = vertices_on_ps_edge.cbegin(); it != vertices_on_ps_edge.cend(); ++it) {
 
-                const math::vec3& vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
+                const vec3& vertex_coordinates = m0.vertex(*it); // get the coordinates (for sorting)
                 ps_edge_to_vertices.at(iter_ps_edge->first).push_back(std::make_pair(*it, vertex_coordinates));
 
                 // if (m0_is_intersection_point(*it, ps_vtx_cnt)) { // is intersection point
@@ -4111,15 +4111,15 @@ void dispatch(output_t& output, const input_t& input)
 
     std::unordered_map<ed_t, std::vector<vd_t>> ps_edge_to_sorted_descriptors; // sorted vertex that lie on each edge with > 3 vertices
 
-    for (std::unordered_map<ed_t, std::vector<std::pair<vd_t, math::vec3>>>::iterator edge_vertices_iter = ps_edge_to_vertices.begin(); edge_vertices_iter != ps_edge_to_vertices.end(); ++edge_vertices_iter) {
-        std::vector<std::pair<vd_t, math::vec3>>& incident_vertices = edge_vertices_iter->second;
+    for (std::unordered_map<ed_t, std::vector<std::pair<vd_t, vec3>>>::iterator edge_vertices_iter = ps_edge_to_vertices.begin(); edge_vertices_iter != ps_edge_to_vertices.end(); ++edge_vertices_iter) {
+        std::vector<std::pair<vd_t, vec3>>& incident_vertices = edge_vertices_iter->second;
 
         ps_edge_to_sorted_descriptors[edge_vertices_iter->first] = linear_projection_sort(incident_vertices);
 
 #if 0
       // since all points are on straight line, we sort them by x-coord and by y-coord if x-coord is the same for all vertices
       std::sort(incident_vertices.begin(), incident_vertices.end(),
-        [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
+        [&](const std::pair<vd_t, vec3>& a, const std::pair<vd_t, vec3>& b) {
           return (a.second.x() < b.second.x());
         });
 
@@ -4128,7 +4128,7 @@ void dispatch(output_t& output, const input_t& input)
       if (x_coordinate_is_same) {
         // ... then  sort on y-coord
         std::sort(incident_vertices.begin(), incident_vertices.end(),
-          [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
+          [&](const std::pair<vd_t, vec3>& a, const std::pair<vd_t, vec3>& b) {
             return (a.second.y() < b.second.y());
           });
 
@@ -4137,7 +4137,7 @@ void dispatch(output_t& output, const input_t& input)
         if (y_coordinate_is_same) {
           // ... then  sort on z-coord
           std::sort(incident_vertices.begin(), incident_vertices.end(),
-            [&](const std::pair<vd_t, math::vec3>& a, const std::pair<vd_t, math::vec3>& b) {
+            [&](const std::pair<vd_t, vec3>& a, const std::pair<vd_t, vec3>& b) {
               return (a.second.z() < b.second.z());
             });
         }
@@ -6321,7 +6321,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 // get the intersection info which was calculated earlier (src-mesh normal vector )
                 // NOTE: this is exactly the same numerical calculation that was computed previously.
-                // const std::map<vd_t, math::vec3>::const_iterator cs_nonborder_reentrant_ivertices_find_iter = cm_nonborder_reentrant_ivtx_list.find(cs_poly_he_tgt);
+                // const std::map<vd_t, vec3>::const_iterator cs_nonborder_reentrant_ivertices_find_iter = cm_nonborder_reentrant_ivtx_list.find(cs_poly_he_tgt);
                 // const bool tgt_is_nonborder_reentrant_vertex = cs_nonborder_reentrant_ivertices_find_iter != cm_nonborder_reentrant_ivtx_list.cend();
                 // std::vector<vd_t>::const_iterator border_reentrant_vertex_find_iter = std::find(cm_border_reentrant_ivtx_list.cbegin(), cm_border_reentrant_ivtx_list.cend(), cs_poly_he_tgt);
                 // const bool tgt_is_border_reentrant_vertex = border_reentrant_vertex_find_iter != cm_border_reentrant_ivtx_list.cend();
@@ -6368,7 +6368,7 @@ void dispatch(output_t& output, const input_t& input)
                 //  tgt-ivertex (i.e. with scalar product) using the halfedge's src and tgt
                 //  coordinates and the normal of the face which was intersected to produce
                 //  the tgt vertex.
-                // const math::vec3& polygon_normal = cs_nonborder_reentrant_ivertices_find_iter->second;
+                // const vec3& polygon_normal = cs_nonborder_reentrant_ivertices_find_iter->second;
                 // MCUT_ASSERT(m0_ivtx_to_tested_polygon_normal.find(cs_poly_he_tgt) != m0_ivtx_to_tested_polygon_normal.cend());
 
                 // get the registry entry edge
@@ -6404,25 +6404,25 @@ void dispatch(output_t& output, const input_t& input)
                 MCUT_ASSERT(ps_tested_face_to_plane_normal.find(*tested_face) != ps_tested_face_to_plane_normal.cend());
 
                 // get normal of face
-                const math::vec3& polygon_normal = ps_tested_face_to_plane_normal.at(*tested_face); // m0_ivtx_to_tested_polygon_normal.at(cs_poly_he_tgt);
-                // const math::vec3& polygon_normal = geometric_data.first; // source-mesh face normal
+                const vec3& polygon_normal = ps_tested_face_to_plane_normal.at(*tested_face); // m0_ivtx_to_tested_polygon_normal.at(cs_poly_he_tgt);
+                // const vec3& polygon_normal = geometric_data.first; // source-mesh face normal
                 // const double& orig_scalar_prod = geometric_data.second; // the dot product result we computed earlier
 
-                // MCUT_ASSERT(math::sign(orig_scalar_prod) == math::NEGATIVE);
+                // MCUT_ASSERT(sign(orig_scalar_prod) == NEGATIVE);
 
                 // calculate the vector represented by the current halfedge
-                const math::vec3 cs_poly_he_vector = m0.vertex(cs_poly_he_tgt) - m0.vertex(cs_poly_he_src);
+                const vec3 cs_poly_he_vector = m0.vertex(cs_poly_he_tgt) - m0.vertex(cs_poly_he_src);
                 // calculate dot product with the src-mesh normal
-                const double scalar_prod = math::dot_product(polygon_normal, cs_poly_he_vector);
+                const double scalar_prod = dot_product(polygon_normal, cs_poly_he_vector);
                 // the original ps-halfedge was "incoming" (pointing inwards) and gave a
                 // negative scalar-product with the src-mesh face normal.
                 // check that it is the same
                 // Note: we want the same sign (i.e. cs_poly_he_vector has negative scalar-product)
                 // because we want the class-1 ihalfedge which is exterior but points inside the src-mesh
-                // is_border_polygon = (math::sign(scalar_prod) == math::NEGATIVE);
+                // is_border_polygon = (sign(scalar_prod) == NEGATIVE);
                 //}
 
-                if (math::sign(scalar_prod) == math::NEGATIVE) { // the current halfedge passed the sign test
+                if (sign(scalar_prod) == NEGATIVE) { // the current halfedge passed the sign test
                     MCUT_ASSERT(known_exterior_cm_polygons.find(cs_poly_idx) == known_exterior_cm_polygons.cend());
                     known_exterior_cm_polygons[cs_poly_idx] = (int)std::distance(cs_poly.cbegin(), cs_poly_he_iter);
                     break; // done, we now know "cs_poly_idx" as an exterior polygon
@@ -6479,7 +6479,7 @@ void dispatch(output_t& output, const input_t& input)
                 continue; // either class-0 (o-->o) or class-2 (x-->o)
             }
 
-            // const std::map<vd_t, math::vec3>::const_iterator sm_nonborder_reentrant_ivertices_find_iter = sm_nonborder_reentrant_ivtx_list.find(sm_poly_he_tgt);
+            // const std::map<vd_t, vec3>::const_iterator sm_nonborder_reentrant_ivertices_find_iter = sm_nonborder_reentrant_ivtx_list.find(sm_poly_he_tgt);
             // const bool tgt_is_sm_nonborder_reentrant_vertex = sm_nonborder_reentrant_ivertices_find_iter != sm_nonborder_reentrant_ivtx_list.cend();
 
             // NOTE: we do not need source-mesh border re-entrant vertices because they are not useful for the
@@ -6554,15 +6554,15 @@ void dispatch(output_t& output, const input_t& input)
             MCUT_ASSERT(ps_tested_face_to_plane_normal.find(*tested_face) != ps_tested_face_to_plane_normal.cend());
 
             // get normal of face
-            const math::vec3& polygon_normal = ps_tested_face_to_plane_normal.at(*tested_face);
-            // const math::vec3& polygon_normal = m0_ivtx_to_tested_polygon_normal.at(sm_poly_he_tgt);
-            // const math::vec3& polygon_normal = geometric_data.first;
+            const vec3& polygon_normal = ps_tested_face_to_plane_normal.at(*tested_face);
+            // const vec3& polygon_normal = m0_ivtx_to_tested_polygon_normal.at(sm_poly_he_tgt);
+            // const vec3& polygon_normal = geometric_data.first;
             // const double& orig_scalar_prod = geometric_data.second;
 
-            // MCUT_ASSERT(math::sign(orig_scalar_prod) == math::NEGATIVE);
+            // MCUT_ASSERT(sign(orig_scalar_prod) == NEGATIVE);
 
-            const math::vec3 sm_poly_he_vector = m0.vertex(sm_poly_he_tgt) - m0.vertex(sm_poly_he_src);
-            const double scalar_prod = math::dot_product(polygon_normal, sm_poly_he_vector);
+            const vec3 sm_poly_he_vector = m0.vertex(sm_poly_he_tgt) - m0.vertex(sm_poly_he_src);
+            const double scalar_prod = dot_product(polygon_normal, sm_poly_he_vector);
 
             // Again, the notion of exterior is denoted by a negative dot-product.
             // Original ps-halfedge was "incoming" and gave a negative scalar-product
@@ -6571,7 +6571,7 @@ void dispatch(output_t& output, const input_t& input)
             // We want the same sign (i.e. cs_poly_he_vector has negative scalar-product) because we want
             // the class-1 ihalfedge which is exterior but points "inside" the cut-mesh (i.e. torward
             // the negative side)
-            if (math::sign(scalar_prod) == math::NEGATIVE) {
+            if (sign(scalar_prod) == NEGATIVE) {
 
                 // At this point, we have found our class-1 (or class 3, x-->x) source-mesh halfedge
                 // from which we can infer whether the current polygon is "above" (outside) or
@@ -7943,7 +7943,7 @@ void dispatch(output_t& output, const input_t& input)
     // adjacency between patches (sharing a cut path).
     //
 
-    math::matrix_t<> scs_adj_matrix((int)patches.size(), (int)patches.size()); // square
+    matrix_t<> scs_adj_matrix((int)patches.size(), (int)patches.size()); // square
 
     for (std::map<int, std::vector<int>>::const_iterator patch_iter = graph_patch_to_adj_list.cbegin();
          patch_iter != graph_patch_to_adj_list.cend();
@@ -7967,7 +7967,7 @@ void dispatch(output_t& output, const input_t& input)
         }
     }
 
-    const math::matrix_t<> scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
+    const matrix_t<> scs_adj_matrix_sqrd = scs_adj_matrix * scs_adj_matrix;
 
     // Here we do graph coloring using BFS
     // NOTE: coloring is used to mark patches as either interior or exterior.

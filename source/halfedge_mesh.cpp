@@ -339,7 +339,7 @@ namespace mcut
         return (h == hmesh_t::null_halfedge() ? hmesh_t::null_edge() : edge(h));
     }
 
-    vertex_descriptor_t hmesh_t::add_vertex(const math::vec3 &point)
+    vertex_descriptor_t hmesh_t::add_vertex(const vec3 &point)
     {
         const double x = point.x();
         const double y = point.y();
@@ -372,7 +372,7 @@ namespace mcut
 
         MCUT_ASSERT(vd != hmesh_t::null_vertex());
 
-        data_ptr->p = math::vec3(x, y, z);
+        data_ptr->p = vec3(x, y, z);
 
         return vd;
     }
@@ -622,7 +622,7 @@ namespace mcut
         return new_face_idx;
     }
 
-    const math::vec3 &hmesh_t::vertex(const vertex_descriptor_t &vd) const
+    const vec3 &hmesh_t::vertex(const vertex_descriptor_t &vd) const
     {
         MCUT_ASSERT(vd != null_vertex());
         MCUT_ASSERT((size_t)vd < m_vertices.size());
@@ -1160,7 +1160,7 @@ namespace mcut
         for (mcut::vertex_array_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter)
         {
             //const vertex_data_t& vdata = iter.second;
-            const math::vec3 &point = mesh.vertex(*iter);
+            const vec3 &point = mesh.vertex(*iter);
             outfile << (double)point.x() << " " << (double)point.y() << " " << (double)point.z() << "\n";
         }
 

@@ -108,10 +108,10 @@ namespace mcut
     struct floating_polygon_info_t
     {
         // normal of polygon
-        math::vec3 polygon_normal;
+        vec3 polygon_normal;
         int polygon_normal_largest_component = -1;
         // the positions of the vertices of the floating polygon (order implies connectivity i.e. two points next to each other share a vertex)
-        std::vector<math::vec3> polygon_vertices;
+        std::vector<vec3> polygon_vertices;
     };
 
     //
@@ -128,8 +128,8 @@ namespace mcut
         // extracting edge-face intersection pairs
         const std::map<mcut::fd_t, std::vector<mcut::fd_t>> *ps_face_to_potentially_intersecting_others = nullptr;
 #if defined(USE_OIBVH)
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *source_hmesh_face_aabb_array_ptr = nullptr;
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *cut_hmesh_face_aabb_array_ptr = nullptr;
+        const std::vector<mcut::bounding_box_t<mcut::vec3>> *source_hmesh_face_aabb_array_ptr = nullptr;
+        const std::vector<mcut::bounding_box_t<mcut::vec3>> *cut_hmesh_face_aabb_array_ptr = nullptr;
 #else
         bvh::BoundingVolumeHierarchy *source_hmesh_BVH;
         bvh::BoundingVolumeHierarchy *cut_hmesh_BVH;
@@ -228,7 +228,7 @@ namespace mcut
                                   std::vector<int> &cc_to_face_count);
 
     // return true if point p lies on the plane of every three vertices of f
-    bool point_on_face_plane(const mcut::hmesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count);
+    bool point_on_face_plane(const mcut::hmesh_t &m, const mcut::fd_t &f, const mcut::vec3 &p, int &fv_count);
 
     //
     // returns string equivalent value (e.g. for printing)

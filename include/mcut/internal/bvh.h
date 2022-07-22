@@ -102,19 +102,19 @@ namespace bvh {
 
     extern void build_oibvh(
         const mcut::hmesh_t& mesh,
-        std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& bvhAABBs,
+        std::vector<mcut::bounding_box_t<mcut::vec3>>& bvhAABBs,
         std::vector<mcut::fd_t>& bvhLeafNodeFaces,
-        std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& face_bboxes,
+        std::vector<mcut::bounding_box_t<mcut::vec3>>& face_bboxes,
         const double& slightEnlargmentEps = double(0.0));
 
     extern void intersectOIBVHs(
         std::map<mcut::fd_t, std::vector<mcut::fd_t>>& ps_face_to_potentially_intersecting_others,
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& srcMeshBvhAABBs,
+        const std::vector<mcut::bounding_box_t<mcut::vec3>>& srcMeshBvhAABBs,
         const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& cutMeshBvhAABBs,
+        const std::vector<mcut::bounding_box_t<mcut::vec3>>& cutMeshBvhAABBs,
         const std::vector<mcut::fd_t>& cutMeshBvhLeafNodeFaces);
 #else
-    typedef mcut::geom::bounding_box_t<mcut::math::vec3> BBox;
+    typedef mcut::bounding_box_t<mcut::vec3> BBox;
     static inline BBox Union(const BBox& a, const BBox& b)
     {
         BBox out = a;
@@ -122,7 +122,7 @@ namespace bvh {
         return out;
     }
 
-    static inline BBox Union(const BBox& a, const math::vec3& b)
+    static inline BBox Union(const BBox& a, const vec3& b)
     {
         BBox out = a;
         out.expand(b);
@@ -147,8 +147,8 @@ namespace bvh {
         }
 
         int primitiveNumber;
-        math::vec3 centroid;
-        geom::bounding_box_t<math::vec3> bounds;
+        vec3 centroid;
+        bounding_box_t<vec3> bounds;
     };
 
     // Each BVHBuildNode represents a node of the BVH. All nodes store a BBox, which stores
@@ -189,7 +189,7 @@ namespace bvh {
             nPrimitives = 0;
         }
 
-        mcut::geom::bounding_box_t<mcut::math::vec3> bounds;
+        mcut::bounding_box_t<mcut::vec3> bounds;
         std::shared_ptr<BVHBuildNode> children[2];
         uint32_t splitAxis, firstPrimOffset, nPrimitives;
     };
@@ -272,7 +272,7 @@ namespace bvh {
 
         // three stages to BVH construction
         void buildTree(const hmesh_t& mesh_,
-            const math::fixed_precision_number_t& enlargementEps_ = math::fixed_precision_number_t(0.0),
+            const fixed_precision_number_t& enlargementEps_ = fixed_precision_number_t(0.0),
             uint32_t mp_ = 1,
             const SplitMethod& sm_ = SplitMethod::SPLIT_MIDDLE);
 
@@ -313,7 +313,7 @@ namespace bvh {
         const hmesh_t* mesh;
         int maxPrimsInNode;
         SplitMethod splitMethod;
-        math::fixed_precision_number_t enlargementEps; // used to slight enlarge BVH (with bounds of max cut-mesh perturbation magnitude)
+        fixed_precision_number_t enlargementEps; // used to slight enlarge BVH (with bounds of max cut-mesh perturbation magnitude)
         std::vector<BVHPrimitiveInfo> buildData;
         std::vector<fd_t> primitives; // ordered primitives
         std::vector<BBox> primitiveOrderedBBoxes; // unsorted elements correspond to mesh indices

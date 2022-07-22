@@ -29,7 +29,7 @@ bool client_input_arrays_to_hmesh(
     const uint32_t* pFaceSizes,
     const uint32_t numVertices,
     const uint32_t numFaces,
-    const mcut::math::vec3* perturbation = NULL)
+    const mcut::vec3* perturbation = NULL)
 {
     TIMESTACK_PUSH(__FUNCTION__);
 
@@ -82,16 +82,16 @@ bool client_input_arrays_to_hmesh(
     TIMESTACK_POP();
 
     // compute the mesh bounding box while we are at it (for numerical perturbation)
-    mcut::math::vec3 bboxMin(1e10);
-    mcut::math::vec3 bboxMax(-1e10);
+    mcut::vec3 bboxMin(1e10);
+    mcut::vec3 bboxMax(-1e10);
 
     TIMESTACK_PUSH("create bbox");
     for (mcut::vertex_array_iterator_t i = halfedgeMesh.vertices_begin(); i != halfedgeMesh.vertices_end(); ++i) {
-        const mcut::math::vec3& coords = halfedgeMesh.vertex(*i);
-        bboxMin = mcut::math::compwise_min(bboxMin, coords);
-        bboxMax = mcut::math::compwise_max(bboxMax, coords);
+        const mcut::vec3& coords = halfedgeMesh.vertex(*i);
+        bboxMin = mcut::compwise_min(bboxMin, coords);
+        bboxMax = mcut::compwise_max(bboxMax, coords);
     }
-    bboxDiagonal = mcut::math::length(bboxMax - bboxMin);
+    bboxDiagonal = mcut::length(bboxMax - bboxMin);
     TIMESTACK_POP();
 
     TIMESTACK_PUSH("create faces");
@@ -281,15 +281,15 @@ bool client_input_arrays_to_hmesh(
 
 // this function converts a halfedge mesh representation (from the kernel
 // backend) to an index array mesh (for the user).
-void halfedgeMeshToIndexArrayMesh(
+void hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
     const std::unique_ptr<context_t>& context_uptr,
 #endif
     array_mesh_t& indexArrayMesh,
     const mcut::output_mesh_info_t& halfedgeMeshInfo,
-    const std::unordered_map<mcut::vd_t, mcut::math::vec3>& addedFpPartitioningVerticesOnCorrespondingInputSrcMesh,
+    const std::unordered_map<mcut::vd_t, mcut::vec3>& addedFpPartitioningVerticesOnCorrespondingInputSrcMesh,
     const std::unordered_map<mcut::fd_t, mcut::fd_t>& fpPartitionChildFaceToCorrespondingInputSrcMeshFace,
-    const std::unordered_map<mcut::vd_t, mcut::math::vec3>& addedFpPartitioningVerticesOnCorrespondingInputCutMesh,
+    const std::unordered_map<mcut::vd_t, mcut::vec3>& addedFpPartitioningVerticesOnCorrespondingInputCutMesh,
     const std::unordered_map<mcut::fd_t, mcut::fd_t>& fpPartitionChildFaceToCorrespondingInputCutMeshFace,
     const int userSrcMeshVertexCount,
     const int userSrcMeshFaceCount,
@@ -324,7 +324,7 @@ void halfedgeMeshToIndexArrayMesh(
 
         auto fn_copy_vertices = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageType {
             for (InputStorageIteratorType viter = block_start_; viter != block_end_; ++viter) {
-                const mcut::math::vec3& point = halfedgeMeshInfo.mesh.vertex(*viter);
+                const mcut::vec3& point = halfedgeMeshInfo.mesh.vertex(*viter);
                 const uint32_t i = (uint32_t)std::distance(halfedgeMeshInfo.mesh.vertices_begin(), viter);
 
                 indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
@@ -343,11 +343,11 @@ void halfedgeMeshToIndexArrayMesh(
                         const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internalSrcMeshVertexCount);
 
                         if (internalInputMeshVertexDescrIsForSrcMesh) {
-                            std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                            std::unordered_map<mcut::vd_t, mcut::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
                             vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.cend());
                         } else // internalInputMeshVertexDescrIsForCutMesh
                         {
-                            std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputCutMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                            std::unordered_map<mcut::vd_t, mcut::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputCutMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
                             vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputCutMesh.cend());
                         }
 
@@ -396,7 +396,7 @@ void halfedgeMeshToIndexArrayMesh(
         // mcut::vertex_array_iterator_t vIter = halfedgeMeshInfo.mesh.vertices_begin();
         // std::advance(vIter, i);
         mcut::vd_t vdescr(i);
-        const mcut::math::vec3& point = halfedgeMeshInfo.mesh.vertex(vdescr /**vIter*/);
+        const mcut::vec3& point = halfedgeMeshInfo.mesh.vertex(vdescr /**vIter*/);
 
         indexArrayMesh.pVertices[((size_t)i * 3u) + 0u] = point.x();
         indexArrayMesh.pVertices[((size_t)i * 3u) + 1u] = point.y();
@@ -430,11 +430,11 @@ void halfedgeMeshToIndexArrayMesh(
                 const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internalSrcMeshVertexCount);
 
                 if (internalInputMeshVertexDescrIsForSrcMesh) {
-                    std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                    std::unordered_map<mcut::vd_t, mcut::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
                     vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.cend());
                 } else // internalInputMeshVertexDescrIsForCutMesh
                 {
-                    std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputCutMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
+                    std::unordered_map<mcut::vd_t, mcut::vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputCutMesh.find(mcut::vd_t(internalInputMeshVertexDescr));
                     vertexExistsDueToFacePartition = (fiter != addedFpPartitioningVerticesOnCorrespondingInputCutMesh.cend());
                 }
 
@@ -873,12 +873,12 @@ bool is_coplanar(const mcut::hmesh_t& m, const mcut::fd_t& f, int& fv_count)
             const mcut::vd_t& vk = vertices[k];
             const mcut::vd_t& vl = vertices[l];
 
-            const mcut::math::vec3& vi_coords = m.vertex(vi);
-            const mcut::math::vec3& vj_coords = m.vertex(vj);
-            const mcut::math::vec3& vk_coords = m.vertex(vk);
-            const mcut::math::vec3& vl_coords = m.vertex(vl);
+            const mcut::vec3& vi_coords = m.vertex(vi);
+            const mcut::vec3& vj_coords = m.vertex(vj);
+            const mcut::vec3& vk_coords = m.vertex(vk);
+            const mcut::vec3& vl_coords = m.vertex(vl);
 
-            const bool are_coplaner = mcut::geom::coplaner(vi_coords, vj_coords, vk_coords, vl_coords);
+            const bool are_coplaner = mcut::coplaner(vi_coords, vj_coords, vk_coords, vl_coords);
 
             if (!are_coplaner) {
                 return false;
@@ -1010,16 +1010,16 @@ McFragmentLocation convert(const mcut::sm_frag_location_t& v)
 }
 
 void resolve_floating_polygons(
-    bool &source_hmesh_modified,
-    bool &cut_hmesh_modified,
+    bool& source_hmesh_modified,
+    bool& cut_hmesh_modified,
     const std::map<mcut::fd_t /*input mesh face with fp*/, std::vector<mcut::floating_polygon_info_t> /*list of floating polys*/>& detected_floating_polygons,
     const int source_hmesh_face_count_prev,
     mcut::hmesh_t& source_hmesh,
     mcut::hmesh_t& cut_hmesh,
     std::unordered_map<mcut::fd_t /*child face*/, mcut::fd_t /*parent face in the [user-provided] source mesh*/>& source_hmesh_child_to_usermesh_birth_face,
     std::unordered_map<mcut::fd_t /*child face*/, mcut::fd_t /*parent face in the [user-provided] cut mesh*/>& cut_hmesh_child_to_usermesh_birth_face,
-    std::unordered_map<mcut::vd_t, mcut::math::vec3>& source_hmesh_new_poly_partition_vertices,
-    std::unordered_map<mcut::vd_t, mcut::math::vec3>& cut_hmesh_new_poly_partition_vertices)
+    std::unordered_map<mcut::vd_t, mcut::vec3>& source_hmesh_new_poly_partition_vertices,
+    std::unordered_map<mcut::vd_t, mcut::vec3>& cut_hmesh_new_poly_partition_vertices)
 {
     for (std::map<mcut::fd_t, std::vector<mcut::floating_polygon_info_t>>::const_iterator detected_floating_polygons_iter = detected_floating_polygons.cbegin();
          detected_floating_polygons_iter != detected_floating_polygons.cend();
@@ -1046,7 +1046,7 @@ void resolve_floating_polygons(
         // We store the coordinates here too because they are sometimes needed to performed perturbation.
         // This perturbation can happen when an input mesh face is partitioned with e.g. edge where that
         // is sufficient to resolve all floating polygons detected on that input mesh face.
-        std::unordered_map<mcut::vd_t, mcut::math::vec3>& new_poly_partition_vertices = (parent_face_from_source_hmesh ? source_hmesh_new_poly_partition_vertices : cut_hmesh_new_poly_partition_vertices);
+        std::unordered_map<mcut::vd_t, mcut::vec3>& new_poly_partition_vertices = (parent_face_from_source_hmesh ? source_hmesh_new_poly_partition_vertices : cut_hmesh_new_poly_partition_vertices);
 
         // Now compute the actual input mesh face index (accounting for offset)
         // i.e. index/descriptor into the mesh referenced by "parent_face_hmesh_ptr"
@@ -1074,9 +1074,9 @@ void resolve_floating_polygons(
 
             // project the floating polygon to 2D
 
-            std::vector<mcut::math::vec2> floating_poly_vertices_2d;
+            std::vector<mcut::vec2> floating_poly_vertices_2d;
 
-            mcut::geom::project2D(floating_poly_vertices_2d, fpi.polygon_vertices, fpi.polygon_normal, fpi.polygon_normal_largest_component);
+            mcut::project2D(floating_poly_vertices_2d, fpi.polygon_vertices, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
             // face to be (potentially) partitioned
             // NOTE: This "origin_face" variable refer's to face that [may] actually be a child face that was created (in a previous iteration)
@@ -1145,19 +1145,19 @@ void resolve_floating_polygons(
                     // ::::::::::::::::::::::
                     // get face vertex coords
                     const std::vector<mcut::vd_t> face_vertex_descriptors = parent_face_hmesh_ptr->get_vertices_around_face(face);
-                    std::vector<mcut::math::vec3> face_vertex_coords_3d(face_vertex_descriptors.size());
+                    std::vector<mcut::vec3> face_vertex_coords_3d(face_vertex_descriptors.size());
 
                     for (std::vector<mcut::vd_t>::const_iterator i = face_vertex_descriptors.cbegin(); i != face_vertex_descriptors.cend(); ++i) {
                         const size_t idx = std::distance(face_vertex_descriptors.cbegin(), i);
-                        const mcut::math::vec3& coords = parent_face_hmesh_ptr->vertex(*i);
+                        const mcut::vec3& coords = parent_face_hmesh_ptr->vertex(*i);
                         face_vertex_coords_3d[idx] = coords;
                     }
 
                     // :::::::::::::::::::::::::
                     // project face coords to 2D
-                    std::vector<mcut::math::vec2> face_vertex_coords_2d;
+                    std::vector<mcut::vec2> face_vertex_coords_2d;
 
-                    mcut::geom::project2D(face_vertex_coords_2d, face_vertex_coords_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
+                    mcut::project2D(face_vertex_coords_2d, face_vertex_coords_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                     const int face_edge_count = (int)face_vertex_descriptors.size(); // num edges == num verts
                     const int face_vertex_count = face_edge_count;
@@ -1165,8 +1165,8 @@ void resolve_floating_polygons(
                     // for each edge of face
                     for (int edge_iter = 0; edge_iter < face_edge_count; ++edge_iter) {
 
-                        const mcut::math::vec2& face_edge_v0 = face_vertex_coords_2d.at(((size_t)edge_iter) + 0);
-                        const mcut::math::vec2& face_edge_v1 = face_vertex_coords_2d.at((((size_t)edge_iter) + 1) % face_vertex_count);
+                        const mcut::vec2& face_edge_v0 = face_vertex_coords_2d.at(((size_t)edge_iter) + 0);
+                        const mcut::vec2& face_edge_v1 = face_vertex_coords_2d.at((((size_t)edge_iter) + 1) % face_vertex_count);
 
                         // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
                         // Does the current edge of "face" intersect/pass through the area of
@@ -1177,15 +1177,15 @@ void resolve_floating_polygons(
                         // for each edge of current floating poly
                         for (int fp_face_edge_iter = 0; fp_face_edge_iter < (int)floating_poly_edge_count; ++fp_face_edge_iter) {
 
-                            const mcut::math::vec2& fp_edge_v0 = floating_poly_vertices_2d[((size_t)fp_face_edge_iter) + 0];
-                            const mcut::math::vec2& fp_edge_v1 = floating_poly_vertices_2d[(((size_t)fp_face_edge_iter) + 1) % floating_poly_vertex_count];
+                            const mcut::vec2& fp_edge_v0 = floating_poly_vertices_2d[((size_t)fp_face_edge_iter) + 0];
+                            const mcut::vec2& fp_edge_v1 = floating_poly_vertices_2d[(((size_t)fp_face_edge_iter) + 1) % floating_poly_vertex_count];
 
                             // placeholders
                             double _1; // unused
                             double _2; // unused
-                            mcut::math::vec2 _3; // unused
+                            mcut::vec2 _3; // unused
 
-                            const char res = mcut::geom::compute_segment_intersection(face_edge_v0, face_edge_v1, fp_edge_v0, fp_edge_v1, _3, _1, _2);
+                            const char res = mcut::compute_segment_intersection(face_edge_v0, face_edge_v1, fp_edge_v0, fp_edge_v1, _3, _1, _2);
 
                             if (res == '1') { // implies a propery segment-segment intersection
                                 have_face_edge_intersecting_fp = true;
@@ -1202,7 +1202,7 @@ void resolve_floating_polygons(
 
                             // for each floating polygon vertex ...
                             for (int fpVertIter = 0; fpVertIter < (int)floating_poly_vertices_2d.size(); ++fpVertIter) {
-                                const char ret = mcut::geom::compute_point_in_polygon_test(floating_poly_vertices_2d.at(fpVertIter), face_vertex_coords_2d);
+                                const char ret = mcut::compute_point_in_polygon_test(floating_poly_vertices_2d.at(fpVertIter), face_vertex_coords_2d);
                                 if (ret == 'i') { // check if strictly interior
                                     face_containing_floating_poly = *it;
                                     break;
@@ -1246,7 +1246,7 @@ void resolve_floating_polygons(
             // gather vertices of "origin_face" (descriptors and 3d coords)
 
             // std::vector<mcut::vd_t> originFaceVertexDescriptors = parent_face_hmesh_ptr->get_vertices_around_face(origin_face);
-            std::vector<mcut::math::vec3> origin_face_vertices_3d;
+            std::vector<mcut::vec3> origin_face_vertices_3d;
             // get information about each edge (used by "origin_face") that needs to be split along the respective intersection point
             const std::vector<mcut::hd_t>& origin_face_halfedges = parent_face_hmesh_ptr->get_halfedges_around_face(origin_face);
 
@@ -1264,8 +1264,8 @@ void resolve_floating_polygons(
             // floating polygon have the same normal!)
             //
 
-            std::vector<mcut::math::vec2> origin_face_vertices_2d;
-            mcut::geom::project2D(origin_face_vertices_2d, origin_face_vertices_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
+            std::vector<mcut::vec2> origin_face_vertices_2d;
+            mcut::project2D(origin_face_vertices_2d, origin_face_vertices_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
             // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
             // 1. pick two edges in the floating polygon
@@ -1287,7 +1287,7 @@ void resolve_floating_polygons(
             // 14.  store a mapping from newly traced polygons to the original (user provided) input mesh elements
             // --> This will also be used client vertex- and face-data mapping.
 
-            const auto fp_get_edge_vertex_coords = [&](const int fp_edge_idx, mcut::math::vec2& fp_edge_v0, mcut::math::vec2& fp_edge_v1) {
+            const auto fp_get_edge_vertex_coords = [&](const int fp_edge_idx, mcut::vec2& fp_edge_v0, mcut::vec2& fp_edge_v1) {
                 const size_t fp_edge_v0_idx = (((size_t)fp_edge_idx) + 0);
                 fp_edge_v0 = floating_poly_vertices_2d[fp_edge_v0_idx];
                 const size_t fp_edge_v1_idx = (((size_t)fp_edge_idx) + 1) % floating_poly_vertex_count;
@@ -1295,12 +1295,12 @@ void resolve_floating_polygons(
             };
 
             const auto fp_get_edge_midpoint = [&](int edgeIdx) {
-                mcut::math::vec2 edgeV0;
-                mcut::math::vec2 edgeV1;
+                mcut::vec2 edgeV0;
+                mcut::vec2 edgeV1;
 
                 fp_get_edge_vertex_coords(edgeIdx, edgeV0, edgeV1);
 
-                const mcut::math::vec2 midPoint(
+                const mcut::vec2 midPoint(
                     (edgeV0.x() + edgeV1.x()) / double(2.0), //
                     (edgeV0.y() + edgeV1.y()) / double(2.0));
 
@@ -1308,9 +1308,9 @@ void resolve_floating_polygons(
             };
 
             auto fp_get_midpoint_distance = [&](std::pair<int, int> edgePair) {
-                const mcut::math::vec2 edge0MidPoint = fp_get_edge_midpoint(edgePair.first);
-                const mcut::math::vec2 edge1MidPoint = fp_get_edge_midpoint(edgePair.second);
-                const double dist = mcut::math::squared_length(edge1MidPoint - edge0MidPoint);
+                const mcut::vec2 edge0MidPoint = fp_get_edge_midpoint(edgePair.first);
+                const mcut::vec2 edge1MidPoint = fp_get_edge_midpoint(edgePair.second);
+                const double dist = mcut::squared_length(edge1MidPoint - edge0MidPoint);
                 return dist;
             };
 
@@ -1353,28 +1353,28 @@ void resolve_floating_polygons(
 
             // the line segment constructed from midpoints of two edges of the
             // floating polygon
-            std::pair<mcut::math::vec2, mcut::math::vec2> fpSegment;
+            std::pair<mcut::vec2, mcut::vec2> fpSegment;
 
             while (!fp_edge_pair_priority_queue.empty() && !haveSegmentOnFP) {
 
                 const std::pair<int, int> fpEdgePairCur = fp_edge_pair_priority_queue.top();
                 fp_edge_pair_priority_queue.pop();
 
-                const mcut::math::vec2 fpEdge0Midpoint = fp_get_edge_midpoint(fpEdgePairCur.first);
-                const mcut::math::vec2 fpEdge1Midpoint = fp_get_edge_midpoint(fpEdgePairCur.second);
+                const mcut::vec2 fpEdge0Midpoint = fp_get_edge_midpoint(fpEdgePairCur.first);
+                const mcut::vec2 fpEdge1Midpoint = fp_get_edge_midpoint(fpEdgePairCur.second);
 
                 // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
                 // if the line intersects/passes through a vertex in "origin_face" or a vertex in
                 // the floating polygon then try another edge pair.
 
                 auto anyPointIsOnLine = [&](
-                                            const mcut::math::vec2& segStart,
-                                            const mcut::math::vec2& segEnd,
-                                            const std::vector<mcut::math::vec2>& polyVerts) -> bool {
+                                            const mcut::vec2& segStart,
+                                            const mcut::vec2& segEnd,
+                                            const std::vector<mcut::vec2>& polyVerts) -> bool {
                     double predResult(0xdeadbeef);
-                    for (std::vector<mcut::math::vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it) {
+                    for (std::vector<mcut::vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it) {
 
-                        bool are_collinear = mcut::geom::collinear(segStart, segEnd, (*it), predResult);
+                        bool are_collinear = mcut::collinear(segStart, segEnd, (*it), predResult);
                         // last ditch attempt to prevent the possibility of creating a partitioning
                         // edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
                         // see: test41
@@ -1427,7 +1427,7 @@ void resolve_floating_polygons(
                     // order of halfedges_around_face(origin_face)
                     int,
                     std::pair<
-                        mcut::math::vec2, // intersection point coords
+                        mcut::vec2, // intersection point coords
                         double //  parameter value (t) of intersection point along our edge (used to recover 3D coords)
                         >>>
                 originFaceIntersectedEdgeInfo;
@@ -1442,16 +1442,16 @@ void resolve_floating_polygons(
             // for each edge in "origin_face"
             for (int origFaceEdgeIter = 0; origFaceEdgeIter < originFaceEdgeCount; ++origFaceEdgeIter) {
 
-                const mcut::math::vec2& origFaceEdgeV0 = origin_face_vertices_2d.at(((size_t)origFaceEdgeIter) + 0);
-                const mcut::math::vec2& origFaceEdgeV1 = origin_face_vertices_2d.at(((origFaceEdgeIter) + 1) % originFaceVertexCount);
+                const mcut::vec2& origFaceEdgeV0 = origin_face_vertices_2d.at(((size_t)origFaceEdgeIter) + 0);
+                const mcut::vec2& origFaceEdgeV1 = origin_face_vertices_2d.at(((origFaceEdgeIter) + 1) % originFaceVertexCount);
 
                 const double garbageVal(0xdeadbeef);
-                mcut::math::vec2 intersectionPoint(garbageVal);
+                mcut::vec2 intersectionPoint(garbageVal);
 
                 double origFaceEdgeParam;
                 double fpEdgeParam;
 
-                char intersectionResult = mcut::geom::compute_segment_intersection(
+                char intersectionResult = mcut::compute_segment_intersection(
                     origFaceEdgeV0, origFaceEdgeV1, fpSegment.first, fpSegment.second, intersectionPoint, origFaceEdgeParam, fpEdgeParam);
 
                 // These assertion must hold since, by construction, "fpSegment" (computed from two edges
@@ -1474,7 +1474,7 @@ void resolve_floating_polygons(
 
             // compute mid-point of "fpSegment", which we will used to find closest intersection points
 
-            const mcut::math::vec2 fpSegmentMidPoint(
+            const mcut::vec2 fpSegmentMidPoint(
                 (fpSegment.first.x() + fpSegment.second.x()) * double(0.5), //
                 (fpSegment.first.y() + fpSegment.second.y()) * double(0.5));
 
@@ -1485,10 +1485,10 @@ void resolve_floating_polygons(
             // and that they are technically not usable (i.e. they are outside "origin_face").
 
             std::sort(originFaceIntersectedEdgeInfo.begin(), originFaceIntersectedEdgeInfo.end(),
-                [&](const std::pair<int, std::pair<mcut::math::vec2, double>>& a, //
-                    const std::pair<int, std::pair<mcut::math::vec2, double>>& b) {
+                [&](const std::pair<int, std::pair<mcut::vec2, double>>& a, //
+                    const std::pair<int, std::pair<mcut::vec2, double>>& b) {
                     double aDist(std::numeric_limits<double>::max()); // bias toward points inside polygon
-                    // char aOnEdge = mcut::geom::compute_point_in_polygon_test(
+                    // char aOnEdge = mcut::compute_point_in_polygon_test(
                     //     a.second.first,
                     //     origin_face_vertices_2d.data(),
                     //     (int)origin_face_vertices_2d.size());
@@ -1497,19 +1497,19 @@ void resolve_floating_polygons(
                     // for (int i = 0; i < (int)origin_face_vertices_2d.size(); ++i) {
                     //     int i0 = i;
                     //     int i1 = (i0 + 1) % (int)origin_face_vertices_2d.size();
-                    //     if (mcut::geom::collinear(origin_face_vertices_2d[i0], origin_face_vertices_2d[i1], a.second.first)) {
+                    //     if (mcut::collinear(origin_face_vertices_2d[i0], origin_face_vertices_2d[i1], a.second.first)) {
                     //          aOnEdge = true;
                     //          break;
                     //     }
                     // }
 
                     if (aOnEdge) {
-                        const mcut::math::vec2 aVec = a.second.first - fpSegmentMidPoint;
-                        aDist = mcut::math::squared_length(aVec);
+                        const mcut::vec2 aVec = a.second.first - fpSegmentMidPoint;
+                        aDist = mcut::squared_length(aVec);
                     }
 
                     double bDist(std::numeric_limits<double>::max());
-                    // char bOnEdge = mcut::geom::compute_point_in_polygon_test(
+                    // char bOnEdge = mcut::compute_point_in_polygon_test(
                     //     b.second.first,
                     //     origin_face_vertices_2d.data(),
                     //     (int)origin_face_vertices_2d.size());
@@ -1518,15 +1518,15 @@ void resolve_floating_polygons(
                     // for (int i = 0; i < (int)origin_face_vertices_2d.size(); ++i) {
                     //     int i0 = i;
                     //     int i1 = (i0 + 1) % (int)origin_face_vertices_2d.size();
-                    //     if (mcut::geom::collinear(origin_face_vertices_2d[i0], origin_face_vertices_2d[i1], b.second.first)) {
+                    //     if (mcut::collinear(origin_face_vertices_2d[i0], origin_face_vertices_2d[i1], b.second.first)) {
                     //         bOnEdge = true;
                     //         break;
                     //     }
                     // }
 
                     if (bOnEdge) {
-                        const mcut::math::vec2 bVec = b.second.first - fpSegmentMidPoint;
-                        bDist = mcut::math::squared_length(bVec);
+                        const mcut::vec2 bVec = b.second.first - fpSegmentMidPoint;
+                        bDist = mcut::squared_length(bVec);
                     }
 
                     return aDist < bDist;
@@ -1545,7 +1545,7 @@ void resolve_floating_polygons(
             // origFaceEdge0: This is the first edge in the list after sorting.
             // ---------------------------------------------------------------
 
-            const std::pair<int, std::pair<mcut::math::vec2, double>>& originFaceIntersectedEdge0Info = originFaceIntersectedEdgeInfo[0]; // first elem
+            const std::pair<int, std::pair<mcut::vec2, double>>& originFaceIntersectedEdge0Info = originFaceIntersectedEdgeInfo[0]; // first elem
             const int origFaceEdge0Idx = originFaceIntersectedEdge0Info.first;
             const double& origFaceEdge0IntPointEqnParam = originFaceIntersectedEdge0Info.second.second;
 
@@ -1559,12 +1559,12 @@ void resolve_floating_polygons(
             const mcut::vd_t origFaceEdge0HalfedgeTgtDescr = parent_face_hmesh_ptr->target(origFaceEdge0Halfedge);
 
             // query src and tgt coords and build edge vector (i.e. "tgt - src"), which is in 3d
-            const mcut::math::vec3& origFaceEdge0HalfedgeSrc = parent_face_hmesh_ptr->vertex(origFaceEdge0HalfedgeSrcDescr);
-            const mcut::math::vec3& origFaceEdge0HalfedgeTgt = parent_face_hmesh_ptr->vertex(origFaceEdge0HalfedgeTgtDescr);
+            const mcut::vec3& origFaceEdge0HalfedgeSrc = parent_face_hmesh_ptr->vertex(origFaceEdge0HalfedgeSrcDescr);
+            const mcut::vec3& origFaceEdge0HalfedgeTgt = parent_face_hmesh_ptr->vertex(origFaceEdge0HalfedgeTgtDescr);
 
             // infer 3D intersection point along edge using "origFaceEdge0IntPointEqnParam"
-            const mcut::math::vec3 origFaceEdge0Vec = (origFaceEdge0HalfedgeTgt - origFaceEdge0HalfedgeSrc);
-            const mcut::math::vec3 origFaceEdge0IntPoint3d = origFaceEdge0HalfedgeSrc + (origFaceEdge0Vec * origFaceEdge0IntPointEqnParam);
+            const mcut::vec3 origFaceEdge0Vec = (origFaceEdge0HalfedgeTgt - origFaceEdge0HalfedgeSrc);
+            const mcut::vec3 origFaceEdge0IntPoint3d = origFaceEdge0HalfedgeSrc + (origFaceEdge0Vec * origFaceEdge0IntPointEqnParam);
             // TODO: ensure that "origFaceEdge0IntPoint3d" lies on the plane of "origFace", this is a source of many problems"""
             const mcut::hd_t origFaceEdge0HalfedgeOpp = parent_face_hmesh_ptr->opposite(origFaceEdge0Halfedge);
             const mcut::fd_t origFaceEdge0HalfedgeOppFace = parent_face_hmesh_ptr->face(origFaceEdge0HalfedgeOpp);
@@ -1581,7 +1581,7 @@ void resolve_floating_polygons(
             // origFaceEdge1: This is the second edge in the list after sorting.
             // ---------------------------------------------------------------
 
-            const std::pair<int, std::pair<mcut::math::vec2, double>>& originFaceIntersectedEdge1Info = originFaceIntersectedEdgeInfo[1]; // second elem
+            const std::pair<int, std::pair<mcut::vec2, double>>& originFaceIntersectedEdge1Info = originFaceIntersectedEdgeInfo[1]; // second elem
             const int origFaceEdge1Idx = originFaceIntersectedEdge1Info.first;
             const double& origFaceEdge1IntPointEqnParam = originFaceIntersectedEdge1Info.second.second;
 
@@ -1593,12 +1593,12 @@ void resolve_floating_polygons(
             const mcut::vd_t origFaceEdge1HalfedgeTgtDescr = parent_face_hmesh_ptr->target(origFaceEdge1Halfedge);
 
             // query src and tgt positions and build vector tgt - src
-            const mcut::math::vec3& origFaceEdge1HalfedgeSrc = parent_face_hmesh_ptr->vertex(origFaceEdge1HalfedgeSrcDescr);
-            const mcut::math::vec3& origFaceEdge1HalfedgeTgt = parent_face_hmesh_ptr->vertex(origFaceEdge1HalfedgeTgtDescr);
+            const mcut::vec3& origFaceEdge1HalfedgeSrc = parent_face_hmesh_ptr->vertex(origFaceEdge1HalfedgeSrcDescr);
+            const mcut::vec3& origFaceEdge1HalfedgeTgt = parent_face_hmesh_ptr->vertex(origFaceEdge1HalfedgeTgtDescr);
 
             // infer intersection point in 3d using "origFaceEdge0IntPointEqnParam"
-            const mcut::math::vec3 origFaceEdge1Vec = (origFaceEdge1HalfedgeTgt - origFaceEdge1HalfedgeSrc);
-            const mcut::math::vec3 origFaceEdge1IntPoint3d = origFaceEdge1HalfedgeSrc + (origFaceEdge1Vec * origFaceEdge1IntPointEqnParam);
+            const mcut::vec3 origFaceEdge1Vec = (origFaceEdge1HalfedgeTgt - origFaceEdge1HalfedgeSrc);
+            const mcut::vec3 origFaceEdge1IntPoint3d = origFaceEdge1HalfedgeSrc + (origFaceEdge1Vec * origFaceEdge1IntPointEqnParam);
 
             const mcut::hd_t origFaceEdge1HalfedgeOpp = parent_face_hmesh_ptr->opposite(origFaceEdge1Halfedge);
             const mcut::fd_t origFaceEdge1HalfedgeOppFace = parent_face_hmesh_ptr->face(origFaceEdge1HalfedgeOpp);
@@ -1894,9 +1894,9 @@ void intersect(
     context_uptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
 
 #if defined(USE_OIBVH)
-    std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> source_hmesh_BVH_aabb_array;
+    std::vector<mcut::bounding_box_t<mcut::vec3>> source_hmesh_BVH_aabb_array;
     std::vector<mcut::fd_t> source_hmesh_BVH_leafdata_array;
-    std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> source_hmesh_face_aabb_array;
+    std::vector<mcut::bounding_box_t<mcut::vec3>> source_hmesh_face_aabb_array;
     mcut::bvh::build_oibvh(source_hmesh, source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
 #else
     mcut::bvh::BoundingVolumeHierarchy source_hmesh_BVH;
@@ -1910,8 +1910,8 @@ void intersect(
     std::unordered_map<mcut::fd_t /*child face*/, mcut::fd_t /*parent face in the [user-provided] cut mesh*/> cut_hmesh_child_to_usermesh_birth_face;
     // descriptors and coordinates of new vertices that are added into an input mesh (source mesh or cut mesh)
     // in order to carry out partitioning
-    std::unordered_map<mcut::vd_t, mcut::math::vec3> source_hmesh_new_poly_partition_vertices;
-    std::unordered_map<mcut::vd_t, mcut::math::vec3> cut_hmesh_new_poly_partition_vertices;
+    std::unordered_map<mcut::vd_t, mcut::vec3> source_hmesh_new_poly_partition_vertices;
+    std::unordered_map<mcut::vd_t, mcut::vec3> cut_hmesh_new_poly_partition_vertices;
 
     // the number of faces in the source mesh from the last/previous dispatch call
     int source_hmesh_face_count_prev = source_hmesh_face_count;
@@ -1922,9 +1922,9 @@ void intersect(
     double cut_hmesh_aabb_diag(0.0);
 
 #if defined(USE_OIBVH)
-    std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> cut_hmesh_BVH_aabb_array;
+    std::vector<mcut::bounding_box_t<mcut::vec3>> cut_hmesh_BVH_aabb_array;
     std::vector<mcut::fd_t> cut_hmesh_BVH_leafdata_array;
-    std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> cut_hmesh_face_face_aabb_array;
+    std::vector<mcut::bounding_box_t<mcut::vec3>> cut_hmesh_face_face_aabb_array;
 #else
     mcut::bvh::BoundingVolumeHierarchy cut_hmesh_BVH; // built later (see below)
 #endif
@@ -1950,7 +1950,7 @@ void intersect(
     // for 2 reasons:
     // 1)   the input meshes may not be in "general position"
     // 2)   the resulting intersection between the input meshes may
-    //      produce "floating polygons" (an input mesh intersects a face the other in such a way that none of the edges of this face are severed).
+    //      produce "floating polygons" (an input mesh intersects a face of the the other in such a way that none of the edges of this face are severed).
     //
     // For each reason, we need to slightly modify the input(s) into a valid (proper intersection-permitting) configuration.
     // If general position is violated, then we apply numerical perturbation of the cut-mesh.
@@ -1979,15 +1979,16 @@ void intersect(
 
         // the (translation) vector to hold the values with which we will
         // carry out numerical perturbation of the cutting surface
-        mcut::math::vec3 perturbation(0.0, 0.0, 0.0);
+        mcut::vec3 perturbation(0.0, 0.0, 0.0);
 
         if (general_position_assumption_was_violated) { // i.e. do we need to perturb the cut-mesh?
 
             MCUT_ASSERT(floating_polygon_was_detected == false); // cannot occur at same time!
 
             if (cut_mesh_perturbation_count == MAX_PERTUBATION_ATTEMPTS) {
+
                 context_uptr->log(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_MEDIUM, kernel_output.logger.get_reason_for_failure());
-                // avoid (within reasonable limits) taking too long
+
                 throw std::runtime_error("max perturbation iteratons reached");
             }
 
@@ -2070,9 +2071,9 @@ void intersect(
                 source_hmesh_BVH_aabb_array.clear();
                 source_hmesh_BVH_leafdata_array.clear();
                 mcut::bvh::build_oibvh(
-                    source_hmesh, 
-                    source_hmesh_BVH_aabb_array, 
-                    source_hmesh_BVH_leafdata_array, 
+                    source_hmesh,
+                    source_hmesh_BVH_aabb_array,
+                    source_hmesh_BVH_leafdata_array,
                     source_hmesh_face_aabb_array);
 #else
                 source_hmesh_BVH.buildTree(source_hmesh);
@@ -2084,10 +2085,10 @@ void intersect(
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
                 mcut::bvh::build_oibvh(
-                    cut_hmesh, 
-                    cut_hmesh_BVH_aabb_array, 
-                    cut_hmesh_BVH_leafdata_array, 
-                    cut_hmesh_face_face_aabb_array, 
+                    cut_hmesh,
+                    cut_hmesh_BVH_aabb_array,
+                    cut_hmesh_BVH_leafdata_array,
+                    cut_hmesh_face_face_aabb_array,
                     numerical_perturbation_constant);
 #else
                 cut_hmesh_BVH.buildTree(cut_hmesh, numerical_perturbation_constant);
@@ -2166,6 +2167,7 @@ void intersect(
         }
 
         kernel_input.ps_face_to_potentially_intersecting_others = &ps_face_to_potentially_intersecting_others;
+
 #if defined(USE_OIBVH)
         kernel_input.source_hmesh_face_aabb_array_ptr = &source_hmesh_face_aabb_array;
         kernel_input.cut_hmesh_face_aabb_array_ptr = &cut_hmesh_face_face_aabb_array;
@@ -2216,8 +2218,9 @@ void intersect(
     // input meshes.
     // This offsetting follows a design choice used in the kernel that ("ps-faces" belonging to cut-mesh start [after] the
     // source-mesh faces).
-    // Refer to the function "halfedgeMeshToIndexArrayMesh()" on how we use this information.
+    // Refer to the function "hmesh_to_array_mesh()" on how we use this information.
     std::unordered_map<mcut::fd_t, mcut::fd_t> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = cut_hmesh_child_to_usermesh_birth_face;
+
     for (std::unordered_map<mcut::fd_t, mcut::fd_t>::iterator i = cut_hmesh_child_to_usermesh_birth_face.begin();
          i != cut_hmesh_child_to_usermesh_birth_face.end(); ++i) {
         mcut::fd_t offsettedDescr = mcut::fd_t(i->first + source_hmesh.number_of_faces());
@@ -2225,12 +2228,14 @@ void intersect(
                                                                                                                                 // i->second = mcut::fd_t(i->second + source_hmesh_face_count_prev); // apply offset
     }
 
-    std::unordered_map<mcut::vd_t, mcut::math::vec3> addedFpPartitioningVerticesOnCutMeshOFFSETTED;
-    for (std::unordered_map<mcut::vd_t, mcut::math::vec3>::const_iterator i = cut_hmesh_new_poly_partition_vertices.begin();
+    std::unordered_map<mcut::vd_t, mcut::vec3> addedFpPartitioningVerticesOnCutMeshOFFSETTED;
+
+    for (std::unordered_map<mcut::vd_t, mcut::vec3>::const_iterator i = cut_hmesh_new_poly_partition_vertices.begin();
          i != cut_hmesh_new_poly_partition_vertices.end(); ++i) {
         mcut::vd_t offsettedDescr = mcut::vd_t(i->first + source_hmesh.number_of_vertices());
         addedFpPartitioningVerticesOnCutMeshOFFSETTED[offsettedDescr] = i->second; // apply offset
     }
+
     TIMESTACK_POP();
 
     //
@@ -2260,13 +2265,20 @@ void intersect(
                 MCUT_ASSERT(asFragPtr->patchLocation != MC_PATCH_LOCATION_UNDEFINED);
                 asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
 
-                halfedgeMeshToIndexArrayMesh(
+                hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
                     context_uptr,
 #endif
-                    asFragPtr->indexArrayMesh, *k,
-                    source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                    numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                    asFragPtr->indexArrayMesh,
+                    *k,
+                    source_hmesh_new_poly_partition_vertices,
+                    source_hmesh_child_to_usermesh_birth_face,
+                    addedFpPartitioningVerticesOnCutMeshOFFSETTED,
+                    fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                    numSrcMeshVertices,
+                    source_hmesh_face_count,
+                    source_hmesh.number_of_vertices(),
+                    source_hmesh.number_of_faces());
             }
         }
     }
@@ -2291,13 +2303,20 @@ void intersect(
             asFragPtr->patchLocation = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
             asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
 
-            halfedgeMeshToIndexArrayMesh(
+            hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
                 context_uptr,
 #endif
-                asFragPtr->indexArrayMesh, *j,
-                source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                asFragPtr->indexArrayMesh, 
+                *j,
+                source_hmesh_new_poly_partition_vertices, 
+                source_hmesh_child_to_usermesh_birth_face, 
+                addedFpPartitioningVerticesOnCutMeshOFFSETTED, 
+                fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, 
+                source_hmesh_face_count, 
+                source_hmesh.number_of_vertices(), 
+                source_hmesh.number_of_faces());
         }
     }
     TIMESTACK_POP();
@@ -2317,13 +2336,20 @@ void intersect(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_INSIDE;
 
-        halfedgeMeshToIndexArrayMesh(
+        hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
-            asPatchPtr->indexArrayMesh, *it,
-            source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+            asPatchPtr->indexArrayMesh, 
+            *it,
+            source_hmesh_new_poly_partition_vertices, 
+            source_hmesh_child_to_usermesh_birth_face, 
+            addedFpPartitioningVerticesOnCutMeshOFFSETTED, 
+            fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            numSrcMeshVertices, 
+            source_hmesh_face_count, 
+            source_hmesh.number_of_vertices(), 
+            source_hmesh.number_of_faces());
     }
     TIMESTACK_POP();
 
@@ -2340,12 +2366,14 @@ void intersect(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_OUTSIDE;
 
-        halfedgeMeshToIndexArrayMesh(
+        hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
-            asPatchPtr->indexArrayMesh, *it,
-            source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+            asPatchPtr->indexArrayMesh, 
+            *it,
+            source_hmesh_new_poly_partition_vertices, 
+            source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
     }
     TIMESTACK_POP();
@@ -2365,7 +2393,7 @@ void intersect(
         seam_cc_t* asSrcMeshSeamPtr = dynamic_cast<seam_cc_t*>(context_uptr->connected_components.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
-        halfedgeMeshToIndexArrayMesh(
+        hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
@@ -2386,7 +2414,7 @@ void intersect(
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
-        halfedgeMeshToIndexArrayMesh(
+        hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
@@ -2432,7 +2460,7 @@ void intersect(
 
         omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        halfedgeMeshToIndexArrayMesh(
+        hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
@@ -2470,7 +2498,7 @@ void intersect(
 
         omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        halfedgeMeshToIndexArrayMesh(
+        hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif

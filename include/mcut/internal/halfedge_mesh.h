@@ -228,7 +228,7 @@ namespace mcut
 
     struct vertex_data_t : id_<vertex_descriptor_t>
     {
-        mcut::math::vec3 p;                             // geometry coordinates
+        mcut::vec3 p;                             // geometry coordinates
         std::vector<face_descriptor_t> m_faces;         // ... incident to vertex
         std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
     };
@@ -307,7 +307,7 @@ namespace mcut
         // finds an edge between two vertices. Returns a default constructed halfedge descriptor, if source and target are not connected.
         edge_descriptor_t edge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check = false) const;
 
-        vertex_descriptor_t add_vertex(const math::vec3 &point);
+        vertex_descriptor_t add_vertex(const vec3 &point);
 
         vertex_descriptor_t add_vertex(const double &x, const double &y, const double &z);
         // adds an edges into the mesh data structure, creating incident halfedges, and returns the
@@ -399,7 +399,7 @@ namespace mcut
             return n;
         }
 
-        const math::vec3 &vertex(const vertex_descriptor_t &vd) const;
+        const vec3 &vertex(const vertex_descriptor_t &vd) const;
         // returns vector of halfedges which point to vertex (i.e. "v" is their target)
         const std::vector<halfedge_descriptor_t> &get_halfedges_around_vertex(const vertex_descriptor_t v) const;
         std::vector<vertex_descriptor_t> get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset = 0) const;

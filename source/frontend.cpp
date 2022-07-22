@@ -627,30 +627,30 @@ void get_connected_component_data_impl(
                     // local (face) to global (cc) vertex index mapping
                     // --------------------------------------------------
                     std::vector<uint32_t> faceVertexIndices(faceSize);
-                    std::vector<mcut::math::vec3> faceVertexCoords3d(faceSize);
+                    std::vector<mcut::vec3> faceVertexCoords3d(faceSize);
                     std::unordered_map<uint32_t, uint32_t> faceLocalToGlobleVertexMap;
 
                     for (uint32_t v = 0; v < faceSize; ++v) {
                         const uint32_t vertexId = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)faceOffset + v];
                         faceVertexIndices[v] = vertexId;
                         const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)vertexId * 3);
-                        faceVertexCoords3d[v] = mcut::math::vec3(vptr[0], vptr[1], vptr[2]);
+                        faceVertexCoords3d[v] = mcut::vec3(vptr[0], vptr[1], vptr[2]);
                         faceLocalToGlobleVertexMap[v] = vertexId;
                     }
 
                     // project vertices to 2D
                     // ----------------------
-                    std::vector<mcut::math::vec2> faceVertexCoords2d;
+                    std::vector<mcut::vec2> faceVertexCoords2d;
                     {
-                        mcut::math::vec3 faceNormal;
+                        mcut::vec3 faceNormal;
                         double param_d;
-                        int largestNormalComp = mcut::geom::compute_polygon_plane_coefficients(
+                        int largestNormalComp = mcut::compute_polygon_plane_coefficients(
                             faceNormal,
                             param_d,
                             faceVertexCoords3d.data(),
                             (int)faceVertexCoords3d.size());
 
-                        mcut::geom::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
+                        mcut::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
                     }
 
                     std::vector<std::vector<std::array<double, 2>>> polygon(1);
@@ -659,7 +659,7 @@ void get_connected_component_data_impl(
                     faceVertexCoords2d_ec.resize(faceVertexCoords2d.size());
                     {
                         for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
-                            const mcut::math::vec2& v = faceVertexCoords2d[i];
+                            const mcut::vec2& v = faceVertexCoords2d[i];
                             std::array<double, 2>& a = faceVertexCoords2d_ec[i];
                             a[0] = static_cast<double>(v[0]);
                             a[1] = static_cast<double>(v[1]);
