@@ -40,7 +40,7 @@
 
 namespace frontend {
 void intersect(
-    std::unique_ptr<McDispatchContextInternal>& context_uptr,
+    std::unique_ptr<context_t>& context_uptr,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,

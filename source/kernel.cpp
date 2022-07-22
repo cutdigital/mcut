@@ -55,36 +55,36 @@ typename mcut::edge_array_iterator_t::difference_type distance(
 namespace mcut {
 
 logger_t* logger_ptr = nullptr;
-std::string to_string(const connected_component_location_t &v)
+std::string to_string(const sm_frag_location_t &v)
     {
         std::string s;
         switch (v)
         {
-        case connected_component_location_t::ABOVE:
+        case sm_frag_location_t::ABOVE:
             s = "a";
             break;
-        case connected_component_location_t::BELOW:
+        case sm_frag_location_t::BELOW:
             s = "b";
             break;
-        case connected_component_location_t::UNDEFINED:
+        case sm_frag_location_t::UNDEFINED:
             s = "u";
             break;
         }
         return s;
     }
 
-    std::string to_string(const cut_surface_patch_location_t &v)
+    std::string to_string(const cm_patch_location_t &v)
     {
         std::string s;
         switch (v)
         {
-        case cut_surface_patch_location_t::INSIDE:
+        case cm_patch_location_t::INSIDE:
             s = "i";
             break;
-        case cut_surface_patch_location_t::OUTSIDE:
+        case cm_patch_location_t::OUTSIDE:
             s = "o";
             break;
-        case cut_surface_patch_location_t::UNDEFINED:
+        case cm_patch_location_t::UNDEFINED:
             s = "u";
             break;
         }
@@ -328,7 +328,7 @@ int find_connected_components(
 }
 
 struct connected_component_info_t {
-    connected_component_location_t location = connected_component_location_t::UNDEFINED; // above/ below
+    sm_frag_location_t location = sm_frag_location_t::UNDEFINED; // above/ below
     // vertices along the cut path seam
     std::vector<vd_t> seam_vertices;
     // mapping from mesh descriptors to input mesh descriptors (vertex and face)
@@ -509,7 +509,7 @@ mesh_t extract_connected_components(
     // connected components
     std::map<std::size_t, mesh_t> ccID_to_mesh;
     // location of each connected component w.r.t cut-mesh (above | below | undefined)
-    std::map<std::size_t, connected_component_location_t> ccID_to_cs_descriptor;
+    std::map<std::size_t, sm_frag_location_t> ccID_to_cs_descriptor;
     // for each component, we have a map which relates the vertex descriptors (indices) in the
     // auxilliary halfedge data structure "mesh" to the (local) vertex descriptors in
     // the connected-component.
@@ -594,15 +594,15 @@ mesh_t extract_connected_components(
 
         if (cc_is_below_cs) {
             // try to save the fact that the current connected component is "below"
-            std::pair<std::map<std::size_t, connected_component_location_t>::iterator, bool> p = ccID_to_cs_descriptor.insert(std::make_pair(face_cc_id, connected_component_location_t::BELOW));
+            std::pair<std::map<std::size_t, sm_frag_location_t>::iterator, bool> p = ccID_to_cs_descriptor.insert(std::make_pair(face_cc_id, sm_frag_location_t::BELOW));
             // if 1) insertion did not take place (connected component already registered), and
             // 2) the existing connected component at that entry is marked as "above":
             //  --> partial cut: thus, the notion "above"/"below" is undefined
-            if (p.second == false && p.first->second == connected_component_location_t::ABOVE) {
+            if (p.second == false && p.first->second == sm_frag_location_t::ABOVE) {
                 // polygon classed as both above and below cs
                 // this is because the connected component contains polygons which are both "above"
                 // and "below" the cutting surface (we have a partial cut)
-                p.first->second = connected_component_location_t::UNDEFINED;
+                p.first->second = sm_frag_location_t::UNDEFINED;
             }
         }
 
@@ -611,12 +611,12 @@ mesh_t extract_connected_components(
 
         if (cc_is_above_cs) {
             // try to save the fact that the current connected component is tagged "above"
-            std::pair<std::map<std::size_t, connected_component_location_t>::iterator, bool> p = ccID_to_cs_descriptor.insert(std::make_pair(face_cc_id, connected_component_location_t::ABOVE));
+            std::pair<std::map<std::size_t, sm_frag_location_t>::iterator, bool> p = ccID_to_cs_descriptor.insert(std::make_pair(face_cc_id, sm_frag_location_t::ABOVE));
             // if 1) insertion did not take place (connected component is already registered), and
             // 2) the existing connected component at that entry is marked as "below":
             //--> partial cut: connected component has polygon whch are both "above" and "below"
-            if (p.second == false && p.first->second == connected_component_location_t::BELOW) {
-                p.first->second = connected_component_location_t::UNDEFINED; // polygon classed as both above and below cs
+            if (p.second == false && p.first->second == sm_frag_location_t::BELOW) {
+                p.first->second = sm_frag_location_t::UNDEFINED; // polygon classed as both above and below cs
             }
         }
 
@@ -668,11 +668,11 @@ mesh_t extract_connected_components(
     std::map<size_t, bool> ccID_to_keepFlag;
     for (std::map<size_t, mesh_t>::const_iterator it = ccID_to_mesh.cbegin(); it != ccID_to_mesh.cend(); ++it) {
         int ccID = (int)it->first;
-        std::map<std::size_t, connected_component_location_t>::iterator fiter = ccID_to_cs_descriptor.find(ccID);
+        std::map<std::size_t, sm_frag_location_t>::iterator fiter = ccID_to_cs_descriptor.find(ccID);
         const bool isSeam = (fiter == ccID_to_cs_descriptor.cend()); // Seams have no notion of "location"
-        ccID_to_keepFlag[ccID] = isSeam || ((keep_fragments_above_cutmesh && fiter->second == connected_component_location_t::ABOVE) || //
-                                     (keep_fragments_below_cutmesh && fiter->second == connected_component_location_t::BELOW) || //
-                                     (keep_fragments_partially_cut && fiter->second == connected_component_location_t::UNDEFINED));
+        ccID_to_keepFlag[ccID] = isSeam || ((keep_fragments_above_cutmesh && fiter->second == sm_frag_location_t::ABOVE) || //
+                                     (keep_fragments_below_cutmesh && fiter->second == sm_frag_location_t::BELOW) || //
+                                     (keep_fragments_partially_cut && fiter->second == sm_frag_location_t::UNDEFINED));
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -927,7 +927,7 @@ mesh_t extract_connected_components(
 
         if (proceed_to_save_mesh) {
 
-            connected_component_location_t location = connected_component_location_t::UNDEFINED;
+            sm_frag_location_t location = sm_frag_location_t::UNDEFINED;
 
             if (!sm_polygons_below_cs.empty() && !sm_polygons_above_cs.empty()) {
                 MCUT_ASSERT(ccID_to_cs_descriptor.find(cc_id) != ccID_to_cs_descriptor.cend());
@@ -8330,7 +8330,7 @@ void dispatch(output_t& output, const input_t& input)
 
     TIMESTACK_PUSH("Infer patch color to location");
 
-    std::map<char, cut_surface_patch_location_t> patch_color_label_to_location;
+    std::map<char, cm_patch_location_t> patch_color_label_to_location;
 
     // if no exterior cut-mesh polygons where found using re-entrant vertices
     if (known_exterior_cm_polygons.empty()) {
@@ -8343,7 +8343,7 @@ void dispatch(output_t& output, const input_t& input)
         // MCUT_ASSERT(patches.size() == 1);
 
         // What we will do then is assign cut-mesh polygons a value of
-        // cut_surface_patch_location_t::INSIDE since floating patches
+        // cm_patch_location_t::INSIDE since floating patches
         // are always interior
 
         const int patch_idx = patches.cbegin()->first;
@@ -8366,11 +8366,11 @@ void dispatch(output_t& output, const input_t& input)
         // associated with the floating patch corresponds to "interior"
         //
         const char color_label = color_to_ccw_patches_find_iter->first;
-        patch_color_label_to_location.insert(std::make_pair(color_label, cut_surface_patch_location_t::INSIDE));
+        patch_color_label_to_location.insert(std::make_pair(color_label, cm_patch_location_t::INSIDE));
 
         // So, given that we know what the other color label is, we can infer
         // the location associaed with the remaining color
-        patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cut_surface_patch_location_t::OUTSIDE));
+        patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cm_patch_location_t::OUTSIDE));
     } else {
         //
         // Here, we know the at least one polygon which lies on the exterior of the
@@ -8400,10 +8400,10 @@ void dispatch(output_t& output, const input_t& input)
         // thus, the color of the patch means it is an "exterior" patch because it contains an exterior
         // polygon
         const char color_label = color_to_ccw_patches_find_iter->first;
-        patch_color_label_to_location.insert(std::make_pair(color_label, cut_surface_patch_location_t::OUTSIDE));
+        patch_color_label_to_location.insert(std::make_pair(color_label, cm_patch_location_t::OUTSIDE));
 
         // infer the opposite color label's meaning
-        patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cut_surface_patch_location_t::INSIDE));
+        patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cm_patch_location_t::INSIDE));
 #else
         // for each cut-mesh polygon
         for (std::map<int, int>::const_iterator cs_poly_to_patch_idx_iter = m0_cm_poly_to_patch_idx.cbegin();
@@ -8437,10 +8437,10 @@ void dispatch(output_t& output, const input_t& input)
                 // thus, the color of the patch means it is an "exterior" patch because it contains an exterior
                 // polygon
                 const char color_label = color_to_ccw_patches_find_iter->first;
-                patch_color_label_to_location.insert(std::make_pair(color_label, cut_surface_patch_location_t::OUTSIDE));
+                patch_color_label_to_location.insert(std::make_pair(color_label, cm_patch_location_t::OUTSIDE));
 
                 // infer the opposite color label's meaning
-                patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cut_surface_patch_location_t::INSIDE));
+                patch_color_label_to_location.insert(std::make_pair(color_label == 'A' ? 'B' : 'A', cm_patch_location_t::INSIDE));
 
                 break; // done (only need to find the first exterior polygon for use to know everything else)
             }
@@ -8459,7 +8459,7 @@ void dispatch(output_t& output, const input_t& input)
         for (std::map<char, std::vector<int>>::const_iterator color_to_ccw_patches_iter = color_to_patch.cbegin(); color_to_ccw_patches_iter != color_to_patch.cend(); ++color_to_ccw_patches_iter)
         {
             const char color_label = color_to_ccw_patches_iter->first;
-            //const cut_surface_patch_location_t color_label_dye = patch_color_label_to_location.at(color_label);
+            //const cm_patch_location_t color_label_dye = patch_color_label_to_location.at(color_label);
 
             
         }
@@ -8740,9 +8740,9 @@ void dispatch(output_t& output, const input_t& input)
 
             const int cur_patch_idx = *patch_iter;
 
-            const cut_surface_patch_location_t& patch_location = patch_color_label_to_location.at(color_id);
-            if ((patch_location == cut_surface_patch_location_t::INSIDE && !input.keep_inside_patches) || //
-                (patch_location == cut_surface_patch_location_t::OUTSIDE && !input.keep_outside_patches)) {
+            const cm_patch_location_t& patch_location = patch_color_label_to_location.at(color_id);
+            if ((patch_location == cm_patch_location_t::INSIDE && !input.keep_inside_patches) || //
+                (patch_location == cm_patch_location_t::OUTSIDE && !input.keep_outside_patches)) {
                 continue;
             }
 
@@ -8894,7 +8894,7 @@ void dispatch(output_t& output, const input_t& input)
                 }
             }
 
-            if (patch_location == cut_surface_patch_location_t::INSIDE) {
+            if (patch_location == cm_patch_location_t::INSIDE) {
                 output.inside_patches[patch_descriptor].emplace_back(std::move(omi));
             } else {
                 output.outside_patches[patch_descriptor].emplace_back(std::move(omi));
@@ -9110,10 +9110,10 @@ void dispatch(output_t& output, const input_t& input)
 
         const char color_id = color_to_patches_iter->first;
 
-        const cut_surface_patch_location_t& location = patch_color_label_to_location.at(color_id);
+        const cm_patch_location_t& location = patch_color_label_to_location.at(color_id);
 
-        if ((location == cut_surface_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_exhaustive)) || //
-            (location == cut_surface_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_exhaustive))) {
+        if ((location == cm_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_exhaustive)) || //
+            (location == cm_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_exhaustive))) {
             continue; // skip stitching of exterior/ interior patches as user desires.
         }
 
@@ -10106,7 +10106,7 @@ void dispatch(output_t& output, const input_t& input)
                 // Update output (with the current polygon stitched into a cc)
                 ///////////////////////////////////////////////////////////////////////////
 
-                const std::string color_tag_stri = to_string(patch_color_label_to_location.at(color_id)); // == cut_surface_patch_location_t::OUTSIDE ? "e" : "i");
+                const std::string color_tag_stri = to_string(patch_color_label_to_location.at(color_id)); // == cm_patch_location_t::OUTSIDE ? "e" : "i");
 
                 // save meshes and dump
 
@@ -10247,7 +10247,7 @@ void dispatch(output_t& output, const input_t& input)
     // save output and finish
     ///////////////////////////////////////////////////////////////////////////
 
-    std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>>& out = output.connected_components;
+    std::map<sm_frag_location_t, std::map<cm_patch_location_t, std::vector<output_mesh_info_t>>>& out = output.connected_components;
     int idx = 0;
     for (std::map<char, std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>>::iterator color_to_separated_CCs_iter = color_to_separated_connected_ccsponents.begin();
          color_to_separated_CCs_iter != color_to_separated_connected_ccsponents.end();
@@ -10255,7 +10255,7 @@ void dispatch(output_t& output, const input_t& input)
 
         const char color_label = color_to_separated_CCs_iter->first;
         // inside or outside or undefined
-        const cut_surface_patch_location_t patchLocation = patch_color_label_to_location.at(color_label);
+        const cm_patch_location_t patchLocation = patch_color_label_to_location.at(color_label);
         std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>& separated_sealed_CCs = color_to_separated_CCs_iter->second;
 
         for (std::map<std::size_t, std::vector<std::pair<mesh_t, connected_component_info_t>>>::iterator cc_iter = separated_sealed_CCs.begin();

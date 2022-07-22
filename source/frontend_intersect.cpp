@@ -21,8 +21,8 @@ const int MAX_PERTUBATION_ATTEMPTS = 1 << 3;
 
 // this function converts an index array mesh (e.g. as recieved by the dispatch
 // function) into a halfedge mesh representation for the kernel backend.
-bool indexArrayMeshToHalfedgeMesh(
-    std::unique_ptr<McDispatchContextInternal>& context_uptr,
+bool array_to_halfedge_mesh(
+    std::unique_ptr<context_t>& context_uptr,
     mcut::mesh_t& halfedgeMesh,
     double& bboxDiagonal,
     const void* pVertices,
@@ -284,9 +284,9 @@ bool indexArrayMeshToHalfedgeMesh(
 // backend) to an index array mesh (for the user).
 void halfedgeMeshToIndexArrayMesh(
 #if defined(MCUT_MULTI_THREADED)
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr,
+    const std::unique_ptr<context_t>& context_uptr,
 #endif
-    IndexArrayMesh& indexArrayMesh,
+    array_mesh_t& indexArrayMesh,
     const mcut::output_mesh_info_t& halfedgeMeshInfo,
     const std::unordered_map<mcut::vd_t, mcut::math::vec3>& addedFpPartitioningVerticesOnCorrespondingInputSrcMesh,
     const std::unordered_map<mcut::fd_t, mcut::fd_t>& fpPartitionChildFaceToCorrespondingInputSrcMeshFace,
@@ -891,7 +891,7 @@ bool is_coplanar(const mcut::mesh_t& m, const mcut::fd_t& f, int& fv_count)
 
 // check that the halfedge-mesh version of a user-provided mesh is valid (i.e.
 // it is a non-manifold mesh containing a single connected component etc.)
-bool check_input_mesh(std::unique_ptr<McDispatchContextInternal>& context_uptr, const mcut::mesh_t& m)
+bool check_input_mesh(std::unique_ptr<context_t>& context_uptr, const mcut::mesh_t& m)
 {
     if (m.number_of_vertices() < 3) {
         context_uptr->log(
@@ -972,17 +972,17 @@ McResult convert(const mcut::status_t& v)
     return result;
 }
 
-McPatchLocation convert(const mcut::cut_surface_patch_location_t& v)
+McPatchLocation convert(const mcut::cm_patch_location_t& v)
 {
     McPatchLocation result = McPatchLocation::MC_PATCH_LOCATION_ALL;
     switch (v) {
-    case mcut::cut_surface_patch_location_t::INSIDE:
+    case mcut::cm_patch_location_t::INSIDE:
         result = McPatchLocation::MC_PATCH_LOCATION_INSIDE;
         break;
-    case mcut::cut_surface_patch_location_t::OUTSIDE:
+    case mcut::cm_patch_location_t::OUTSIDE:
         result = McPatchLocation::MC_PATCH_LOCATION_OUTSIDE;
         break;
-    case mcut::cut_surface_patch_location_t::UNDEFINED:
+    case mcut::cm_patch_location_t::UNDEFINED:
         result = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
         break;
     default:
@@ -991,17 +991,17 @@ McPatchLocation convert(const mcut::cut_surface_patch_location_t& v)
     return result;
 }
 
-McFragmentLocation convert(const mcut::connected_component_location_t& v)
+McFragmentLocation convert(const mcut::sm_frag_location_t& v)
 {
     McFragmentLocation result = McFragmentLocation::MC_FRAGMENT_LOCATION_ALL;
     switch (v) {
-    case mcut::connected_component_location_t::ABOVE:
+    case mcut::sm_frag_location_t::ABOVE:
         result = McFragmentLocation::MC_FRAGMENT_LOCATION_ABOVE;
         break;
-    case mcut::connected_component_location_t::BELOW:
+    case mcut::sm_frag_location_t::BELOW:
         result = McFragmentLocation::MC_FRAGMENT_LOCATION_BELOW;
         break;
-    case mcut::connected_component_location_t::UNDEFINED:
+    case mcut::sm_frag_location_t::UNDEFINED:
         result = McFragmentLocation::MC_FRAGMENT_LOCATION_UNDEFINED;
         break;
     default:
@@ -1011,7 +1011,7 @@ McFragmentLocation convert(const mcut::connected_component_location_t& v)
 }
 
 void intersect(
-    std::unique_ptr<McDispatchContextInternal>& context_uptr,
+    std::unique_ptr<context_t>& context_uptr,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
@@ -1026,7 +1026,7 @@ void intersect(
     mcut::mesh_t srcMeshInternal;
     double srcMeshBboxDiagonal(0.0);
 
-    if (false == indexArrayMeshToHalfedgeMesh(context_uptr, srcMeshInternal, srcMeshBboxDiagonal, pSrcMeshVertices, pSrcMeshFaceIndices, pSrcMeshFaceSizes, numSrcMeshVertices, numSrcMeshFaces)) {
+    if (false == array_to_halfedge_mesh(context_uptr, srcMeshInternal, srcMeshBboxDiagonal, pSrcMeshVertices, pSrcMeshFaceIndices, pSrcMeshFaceSizes, numSrcMeshVertices, numSrcMeshFaces)) {
         throw std::invalid_argument("invalid source-mesh arrays");
     }
 
@@ -1202,7 +1202,7 @@ void intersect(
             // "pCutMeshFaces" are simply the user provided faces
             // We must also use the newly added vertices (coords) due to polygon partitioning as "unperturbed" values
             // This will require some intricate mapping
-            if (false == indexArrayMeshToHalfedgeMesh(context_uptr, cutMeshInternal, cutMeshBboxDiagonal, pCutMeshVertices, pCutMeshFaceIndices, pCutMeshFaceSizes, numCutMeshVertices, numCutMeshFaces, ((perturbationIters == 0) ? NULL : &perturbation))) {
+            if (false == array_to_halfedge_mesh(context_uptr, cutMeshInternal, cutMeshBboxDiagonal, pCutMeshVertices, pCutMeshFaceIndices, pCutMeshFaceSizes, numCutMeshVertices, numCutMeshFaces, ((perturbationIters == 0) ? NULL : &perturbation))) {
                 throw std::invalid_argument("invalid cut-mesh arrays");
             }
 
@@ -2161,11 +2161,11 @@ void intersect(
     // sealed-fragment connected components
     //
     TIMESTACK_PUSH("store sealed-fragment connected components");
-    for (std::map<mcut::connected_component_location_t, std::map<mcut::cut_surface_patch_location_t, std::vector<mcut::output_mesh_info_t>>>::const_iterator i = backendOutput.connected_components.cbegin();
+    for (std::map<mcut::sm_frag_location_t, std::map<mcut::cm_patch_location_t, std::vector<mcut::output_mesh_info_t>>>::const_iterator i = backendOutput.connected_components.cbegin();
          i != backendOutput.connected_components.cend();
          ++i) {
 
-        for (std::map<mcut::cut_surface_patch_location_t, std::vector<mcut::output_mesh_info_t>>::const_iterator j = i->second.cbegin();
+        for (std::map<mcut::cm_patch_location_t, std::vector<mcut::output_mesh_info_t>>::const_iterator j = i->second.cbegin();
              j != i->second.cend();
              ++j) {
 
@@ -2173,10 +2173,10 @@ void intersect(
 
             for (std::vector<mcut::output_mesh_info_t>::const_iterator k = j->second.cbegin(); k != j->second.cend(); ++k) {
 
-                std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> frag = std::unique_ptr<McFragmentConnComp, void (*)(McConnCompBase*)>(new McFragmentConnComp, ccDeletorFunc<McFragmentConnComp>);
+                std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> frag = std::unique_ptr<fragment_cc_t, void (*)(connected_component_t*)>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>);
                 McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(frag.get());
                 context_uptr->connComps.emplace(clientHandle, std::move(frag));
-                McFragmentConnComp* asFragPtr = dynamic_cast<McFragmentConnComp*>(context_uptr->connComps.at(clientHandle).get());
+                fragment_cc_t* asFragPtr = dynamic_cast<fragment_cc_t*>(context_uptr->connComps.at(clientHandle).get());
                 asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
                 asFragPtr->fragmentLocation = convert(i->first);
                 asFragPtr->patchLocation = convert(j->first);
@@ -2200,16 +2200,16 @@ void intersect(
     // unsealed connected components (fragements)
     //
     TIMESTACK_PUSH("store unsealed connected components");
-    for (std::map<mcut::connected_component_location_t, std::vector<mcut::output_mesh_info_t>>::const_iterator i = backendOutput.unsealed_cc.cbegin();
+    for (std::map<mcut::sm_frag_location_t, std::vector<mcut::output_mesh_info_t>>::const_iterator i = backendOutput.unsealed_cc.cbegin();
          i != backendOutput.unsealed_cc.cend();
          ++i) { // for each cc location flag (above/below/undefined)
 
         for (std::vector<mcut::output_mesh_info_t>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) { // for each mesh
 
-            std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> unsealedFrag = std::unique_ptr<McFragmentConnComp, void (*)(McConnCompBase*)>(new McFragmentConnComp, ccDeletorFunc<McFragmentConnComp>);
+            std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> unsealedFrag = std::unique_ptr<fragment_cc_t, void (*)(connected_component_t*)>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>);
             McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(unsealedFrag.get());
             context_uptr->connComps.emplace(clientHandle, std::move(unsealedFrag));
-            McFragmentConnComp* asFragPtr = dynamic_cast<McFragmentConnComp*>(context_uptr->connComps.at(clientHandle).get());
+            fragment_cc_t* asFragPtr = dynamic_cast<fragment_cc_t*>(context_uptr->connComps.at(clientHandle).get());
             asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
             asFragPtr->fragmentLocation = convert(i->first);
             asFragPtr->patchLocation = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
@@ -2234,10 +2234,10 @@ void intersect(
          it != insidePatches.cend();
          ++it) {
 
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> patchConnComp = std::unique_ptr<McPatchConnComp, void (*)(McConnCompBase*)>(new McPatchConnComp, ccDeletorFunc<McPatchConnComp>);
+        std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> patchConnComp = std::unique_ptr<patch_cc_t, void (*)(connected_component_t*)>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(patchConnComp.get());
         context_uptr->connComps.emplace(clientHandle, std::move(patchConnComp));
-        McPatchConnComp* asPatchPtr = dynamic_cast<McPatchConnComp*>(context_uptr->connComps.at(clientHandle).get());
+        patch_cc_t* asPatchPtr = dynamic_cast<patch_cc_t*>(context_uptr->connComps.at(clientHandle).get());
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_INSIDE;
 
@@ -2257,10 +2257,10 @@ void intersect(
 
     for (std::vector<mcut::output_mesh_info_t>::const_iterator it = outsidePatches.cbegin(); it != outsidePatches.cend(); ++it) {
 
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> patchConnComp = std::unique_ptr<McPatchConnComp, void (*)(McConnCompBase*)>(new McPatchConnComp, ccDeletorFunc<McPatchConnComp>);
+        std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> patchConnComp = std::unique_ptr<patch_cc_t, void (*)(connected_component_t*)>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(patchConnComp.get());
         context_uptr->connComps.emplace(clientHandle, std::move(patchConnComp));
-        McPatchConnComp* asPatchPtr = dynamic_cast<McPatchConnComp*>(context_uptr->connComps.at(clientHandle).get());
+        patch_cc_t* asPatchPtr = dynamic_cast<patch_cc_t*>(context_uptr->connComps.at(clientHandle).get());
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_OUTSIDE;
 
@@ -2283,10 +2283,10 @@ void intersect(
 
     if (backendOutput.seamed_src_mesh.mesh.number_of_faces() > 0) {
         TIMESTACK_PUSH("store source-mesh seam");
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> srcMeshSeam = std::unique_ptr<McSeamConnComp, void (*)(McConnCompBase*)>(new McSeamConnComp, ccDeletorFunc<McSeamConnComp>);
+        std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> srcMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(srcMeshSeam.get());
         context_uptr->connComps.emplace(clientHandle, std::move(srcMeshSeam));
-        McSeamConnComp* asSrcMeshSeamPtr = dynamic_cast<McSeamConnComp*>(context_uptr->connComps.at(clientHandle).get());
+        seam_cc_t* asSrcMeshSeamPtr = dynamic_cast<seam_cc_t*>(context_uptr->connComps.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
         halfedgeMeshToIndexArrayMesh(
@@ -2303,10 +2303,10 @@ void intersect(
 
     if (backendOutput.seamed_cut_mesh.mesh.number_of_faces() > 0) {
         TIMESTACK_PUSH("store cut-mesh seam");
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> cutMeshSeam = std::unique_ptr<McSeamConnComp, void (*)(McConnCompBase*)>(new McSeamConnComp, ccDeletorFunc<McSeamConnComp>);
+        std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> cutMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(cutMeshSeam.get());
         context_uptr->connComps.emplace(clientHandle, std::move(cutMeshSeam));
-        McSeamConnComp* asCutMeshSeamPtr = dynamic_cast<McSeamConnComp*>(context_uptr->connComps.at(clientHandle).get());
+        seam_cc_t* asCutMeshSeamPtr = dynamic_cast<seam_cc_t*>(context_uptr->connComps.at(clientHandle).get());
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
@@ -2326,10 +2326,10 @@ void intersect(
     // internal cut-mesh (possibly with new faces and vertices)
     {
         TIMESTACK_PUSH("store original cut-mesh");
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> internalCutMesh = std::unique_ptr<McInputConnComp, void (*)(McConnCompBase*)>(new McInputConnComp, ccDeletorFunc<McInputConnComp>);
+        std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> internalCutMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalCutMesh.get());
         context_uptr->connComps.emplace(clientHandle, std::move(internalCutMesh));
-        McInputConnComp* asCutMeshInputPtr = dynamic_cast<McInputConnComp*>(context_uptr->connComps.at(clientHandle).get());
+        input_cc_t* asCutMeshInputPtr = dynamic_cast<input_cc_t*>(context_uptr->connComps.at(clientHandle).get());
         asCutMeshInputPtr->type = MC_CONNECTED_COMPONENT_TYPE_INPUT;
         asCutMeshInputPtr->origin = MC_INPUT_ORIGIN_CUTMESH;
 
@@ -2369,10 +2369,10 @@ void intersect(
     // internal source-mesh (possibly with new faces and vertices)
     {
         TIMESTACK_PUSH("store original src-mesh");
-        std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)> internalSrcMesh = std::unique_ptr<McInputConnComp, void (*)(McConnCompBase*)>(new McInputConnComp, ccDeletorFunc<McInputConnComp>);
+        std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> internalSrcMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalSrcMesh.get());
         context_uptr->connComps.emplace(clientHandle, std::move(internalSrcMesh));
-        McInputConnComp* asSrcMeshInputPtr = dynamic_cast<McInputConnComp*>(context_uptr->connComps.at(clientHandle).get());
+        input_cc_t* asSrcMeshInputPtr = dynamic_cast<input_cc_t*>(context_uptr->connComps.at(clientHandle).get());
         asSrcMeshInputPtr->type = MC_CONNECTED_COMPONENT_TYPE_INPUT;
         asSrcMeshInputPtr->origin = MC_INPUT_ORIGIN_SRCMESH;
 

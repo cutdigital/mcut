@@ -47,9 +47,9 @@ namespace frontend {
 // data. Information requested by a client/user via "mcGetConnectedComponentData"
 // is read from this data structure (halfedge meshes are used by the backend
 // kernel)
-struct IndexArrayMesh {
-    IndexArrayMesh() { }
-    ~IndexArrayMesh()
+struct array_mesh_t {
+    array_mesh_t() { }
+    ~array_mesh_t()
     {
     }
 
@@ -74,50 +74,50 @@ struct IndexArrayMesh {
 };
 
 // base struct from which other structs represent connected components inherit
-struct McConnCompBase {
-    virtual ~McConnCompBase() {};
+struct connected_component_t {
+    virtual ~connected_component_t() {};
     McConnectedComponentType type = (McConnectedComponentType)0;
-    IndexArrayMesh indexArrayMesh;
+    array_mesh_t indexArrayMesh;
 };
 
 // struct representing a fragment
-struct McFragmentConnComp : public McConnCompBase {
+struct fragment_cc_t : public connected_component_t {
     McFragmentLocation fragmentLocation = (McFragmentLocation)0;
     McFragmentSealType srcMeshSealType = (McFragmentSealType)0;
     McPatchLocation patchLocation = (McPatchLocation)0;
 };
 
 // struct representing a patch
-struct McPatchConnComp : public McConnCompBase {
+struct patch_cc_t : public connected_component_t {
     McPatchLocation patchLocation = (McPatchLocation)0;
 };
 
 // struct representing a seam
-struct McSeamConnComp : public McConnCompBase {
+struct seam_cc_t : public connected_component_t {
     McSeamOrigin origin = (McSeamOrigin)0;
 };
 
 // struct representing an input (user provided mesh)
-struct McInputConnComp : public McConnCompBase {
+struct input_cc_t : public connected_component_t {
     McInputOrigin origin = (McInputOrigin)0;
 };
 
 // our custome deleter function for std::unique_ptr variable of an array type
 template <typename Derived>
-void ccDeletorFunc(McConnCompBase* p)
+void fn_delete_cc(connected_component_t* p)
 {
     delete static_cast<Derived*>(p);
 }
 
 // struct defining the state of a context object
-struct McDispatchContextInternal {
+struct context_t {
 #if defined(MCUT_MULTI_THREADED)
     // work scheduling state
     mcut::thread_pool scheduler;
 #endif
 
     // the current set of connected components associated with context
-    std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>> connComps = {};
+    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>> connComps = {};
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags flags = (McFlags)0;
@@ -153,7 +153,7 @@ struct McDispatchContextInternal {
 };
 
 // list of contexts created by client/user
-extern "C" std::map<McContext, std::unique_ptr<McDispatchContextInternal>> gDispatchContexts;
+extern "C" std::map<McContext, std::unique_ptr<context_t>> g_contexts;
 
 void create_context_impl(
     McContext* pContext, McFlags flags);

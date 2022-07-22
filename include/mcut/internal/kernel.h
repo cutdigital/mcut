@@ -79,7 +79,7 @@ namespace mcut
     //
     // Position of a cut surface patch with respect to the input mesh
     //
-    enum class cut_surface_patch_location_t : unsigned char
+    enum class cm_patch_location_t : unsigned char
     {
         INSIDE,   // + : The patch is located inside the input mesh volume (i.e. it is used to seal holes)
         OUTSIDE,  // - : The patch is located outside the input mesh volume (boolean union).
@@ -89,7 +89,7 @@ namespace mcut
     //
     // Position of a connected component (CC) relative to cut-surface
     //
-    enum class connected_component_location_t : unsigned char
+    enum class sm_frag_location_t : unsigned char
     {
         ABOVE,    // + : The CC is on positive side of the cut-surface (normal direction)
         BELOW,    // - :  The CC is on negative side of the cut-surface (normal direction)
@@ -199,8 +199,8 @@ namespace mcut
 
         logger_t logger;
         // fragments
-        std::map<connected_component_location_t, std::map<cut_surface_patch_location_t, std::vector<output_mesh_info_t>>> connected_components;
-        std::map<connected_component_location_t, std::vector<output_mesh_info_t>> unsealed_cc; // connected components before hole-filling
+        std::map<sm_frag_location_t, std::map<cm_patch_location_t, std::vector<output_mesh_info_t>>> connected_components;
+        std::map<sm_frag_location_t, std::vector<output_mesh_info_t>> unsealed_cc; // connected components before hole-filling
         // patches
         std::map<cut_surface_patch_winding_order_t, std::vector<output_mesh_info_t>> inside_patches; // .. between neigbouring connected ccsponents (cs-sealing patches)
         std::map<cut_surface_patch_winding_order_t, std::vector<output_mesh_info_t>> outside_patches;
@@ -233,8 +233,8 @@ namespace mcut
     //
     // returns string equivalent value (e.g. for printing)
     //
-    std::string to_string(const connected_component_location_t &);
-    std::string to_string(const cut_surface_patch_location_t &);
+    std::string to_string(const sm_frag_location_t &);
+    std::string to_string(const cm_patch_location_t &);
     std::string to_string(const status_t &);
     std::string to_string(const cut_surface_patch_winding_order_t &);
 

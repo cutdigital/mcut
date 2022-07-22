@@ -25,14 +25,14 @@ std::atomic_bool mcut::thread_pool_terminate(false);
 
 namespace frontend {
 
-std::map<McContext, std::unique_ptr<McDispatchContextInternal>> gDispatchContexts = {};
+std::map<McContext, std::unique_ptr<context_t>> g_contexts = {};
 
 void create_context_impl(McContext* pOutContext, McFlags flags)
 {
     MCUT_ASSERT(pOutContext != nullptr);
 
     // allocate internal context object (including associated threadpool etc.)
-    std::unique_ptr<McDispatchContextInternal> context_uptr = std::unique_ptr<McDispatchContextInternal>(new McDispatchContextInternal());
+    std::unique_ptr<context_t> context_uptr = std::unique_ptr<context_t>(new context_t());
 
     // copy context configuration flags
     context_uptr->flags = flags;
@@ -40,7 +40,7 @@ void create_context_impl(McContext* pOutContext, McFlags flags)
     // create handle (ptr) which will be returned and used by client to access rest of API
     const McContext handle = reinterpret_cast<McContext>(context_uptr.get());
 
-    const std::pair<std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator, bool> insertion_result = gDispatchContexts.emplace(handle, std::move(context_uptr));
+    const std::pair<std::map<McContext, std::unique_ptr<context_t>>::iterator, bool> insertion_result = g_contexts.emplace(handle, std::move(context_uptr));
 
     const bool context_inserted_ok = insertion_result.second;
 
@@ -48,7 +48,7 @@ void create_context_impl(McContext* pOutContext, McFlags flags)
         throw std::runtime_error("failed to create context");
     }
 
-    const std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = insertion_result.first;
+    const std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = insertion_result.first;
 
     MCUT_ASSERT(handle == context_entry_iter->first);
 
@@ -63,15 +63,15 @@ void debug_message_callback_impl(
     MCUT_ASSERT(contextHandle != nullptr);
     MCUT_ASSERT(cb != nullptr);
 
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(contextHandle);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         // "contextHandle" may not be NULL but that does not mean it maps to
-        // a valid object in "gDispatchContexts"
+        // a valid object in "g_contexts"
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     // set callback function ptr, and user pointer
     context_uptr->debugCallback = cb;
@@ -125,13 +125,13 @@ void debug_message_control_impl(
     McDebugSeverity severity,
     bool enabled)
 {
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(contextHandle);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     // reset
     context_uptr->debugSource = 0;
@@ -177,13 +177,13 @@ void get_info_impl(
     void* pMem,
     uint64_t* pNumBytes)
 {
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(context);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     switch (info) {
     case MC_CONTEXT_FLAGS:
@@ -213,13 +213,13 @@ void dispatch_impl(
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces)
 {
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(context);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     context_uptr->dispatchFlags = flags;
 
@@ -244,13 +244,13 @@ void get_connected_components_impl(
     McConnectedComponent* pConnComps,
     uint32_t* numConnComps)
 {
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(context);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     if (numConnComps != nullptr) {
         (*numConnComps) = 0; // reset
@@ -258,7 +258,7 @@ void get_connected_components_impl(
 
     uint32_t gatheredConnCompCounter = 0;
 
-    for (std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>>::const_iterator i = context_uptr->connComps.cbegin();
+    for (std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator i = context_uptr->connComps.cbegin();
          i != context_uptr->connComps.cend();
          ++i) {
 
@@ -289,15 +289,15 @@ void get_connected_component_data_impl(
     uint64_t* pNumBytes)
 {
 
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(context);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
-    std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>>::const_iterator cc_entry_iter = context_uptr->connComps.find(connCompId);
+    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connComps.find(connCompId);
 
     if (cc_entry_iter == context_uptr->connComps.cend()) {
         throw std::invalid_argument("invalid connected component");
@@ -477,7 +477,7 @@ void get_connected_component_data_impl(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            McFragmentConnComp* fragPtr = dynamic_cast<McFragmentConnComp*>(cc_uptr.get());
+            fragment_cc_t* fragPtr = dynamic_cast<fragment_cc_t*>(cc_uptr.get());
             memcpy(pMem, reinterpret_cast<void*>(&fragPtr->fragmentLocation), bytes);
         }
     } break;
@@ -499,10 +499,10 @@ void get_connected_component_data_impl(
 
             const void* src = nullptr;
             if (cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT) {
-                src = reinterpret_cast<const void*>(&dynamic_cast<McFragmentConnComp*>(cc_uptr.get())->patchLocation);
+                src = reinterpret_cast<const void*>(&dynamic_cast<fragment_cc_t*>(cc_uptr.get())->patchLocation);
             } else {
                 MCUT_ASSERT(cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_PATCH);
-                src = reinterpret_cast<const void*>(&dynamic_cast<McPatchConnComp*>(cc_uptr.get())->patchLocation);
+                src = reinterpret_cast<const void*>(&dynamic_cast<patch_cc_t*>(cc_uptr.get())->patchLocation);
             }
             memcpy(pMem, src, bytes);
         }
@@ -522,7 +522,7 @@ void get_connected_component_data_impl(
             if (bytes % sizeof(McFragmentSealType) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            McFragmentConnComp* fragPtr = dynamic_cast<McFragmentConnComp*>(cc_uptr.get());
+            fragment_cc_t* fragPtr = dynamic_cast<fragment_cc_t*>(cc_uptr.get());
             memcpy(pMem, reinterpret_cast<void*>(&fragPtr->srcMeshSealType), bytes);
         }
     } break;
@@ -546,10 +546,10 @@ void get_connected_component_data_impl(
             }
 
             if (cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
-                McSeamConnComp* ptr = dynamic_cast<McSeamConnComp*>(cc_uptr.get());
+                seam_cc_t* ptr = dynamic_cast<seam_cc_t*>(cc_uptr.get());
                 memcpy(pMem, reinterpret_cast<void*>(&ptr->origin), bytes);
             } else {
-                McInputConnComp* ptr = dynamic_cast<McInputConnComp*>(cc_uptr.get());
+                input_cc_t* ptr = dynamic_cast<input_cc_t*>(cc_uptr.get());
                 memcpy(pMem, reinterpret_cast<void*>(&ptr->origin), bytes);
             }
         }
@@ -768,13 +768,13 @@ void release_connected_components_impl(
     uint32_t numConnComps,
     const McConnectedComponent* pConnComps)
 {
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(context);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<McDispatchContextInternal>& context_uptr = context_entry_iter->second;
+    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     if (numConnComps > (uint32_t)context_uptr->connComps.size()) {
         throw std::invalid_argument("invalid connected component count");
@@ -788,7 +788,7 @@ void release_connected_components_impl(
         for (int i = 0; i < (int)numConnComps; ++i) {
             McConnectedComponent connCompId = pConnComps[i];
 
-            std::map<McConnectedComponent, std::unique_ptr<McConnCompBase, void (*)(McConnCompBase*)>>::const_iterator cc_entry_iter = context_uptr->connComps.find(connCompId);
+            std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connComps.find(connCompId);
 
             if (cc_entry_iter == context_uptr->connComps.cend()) {
                 throw std::invalid_argument("invalid connected component id");
@@ -802,13 +802,13 @@ void release_connected_components_impl(
 void release_context_impl(
     McContext context)
 {
-    std::map<McContext, std::unique_ptr<McDispatchContextInternal>>::iterator context_entry_iter = gDispatchContexts.find(context);
+    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
-    if (context_entry_iter == gDispatchContexts.end()) {
+    if (context_entry_iter == g_contexts.end()) {
         throw std::invalid_argument("invalid context");
     }
 
-    gDispatchContexts.erase(context_entry_iter);
+    g_contexts.erase(context_entry_iter);
 }
 
 } // namespace frontend{
