@@ -320,6 +320,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
+    
     if (context == nullptr) {
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     }
