@@ -80,33 +80,33 @@ namespace mcut
     }
 
     //
-    // mesh_t
+    // hmesh_t
     //
 
-    mesh_t::mesh_t()
+    hmesh_t::hmesh_t()
     {
     }
-    mesh_t::~mesh_t() {}
+    hmesh_t::~hmesh_t() {}
 
     // static member functions
     // -----------------------
 
-    vertex_descriptor_t mesh_t::null_vertex()
+    vertex_descriptor_t hmesh_t::null_vertex()
     {
         return vertex_descriptor_t();
     }
 
-    halfedge_descriptor_t mesh_t::null_halfedge()
+    halfedge_descriptor_t hmesh_t::null_halfedge()
     {
         return halfedge_descriptor_t();
     }
 
-    edge_descriptor_t mesh_t::null_edge()
+    edge_descriptor_t hmesh_t::null_edge()
     {
         return edge_descriptor_t();
     }
 
-    face_descriptor_t mesh_t::null_face()
+    face_descriptor_t hmesh_t::null_face()
     {
         return face_descriptor_t();
     }
@@ -114,27 +114,27 @@ namespace mcut
     // regular member functions
     // ------------------------
 
-    int mesh_t::number_of_vertices() const
+    int hmesh_t::number_of_vertices() const
     {
         return number_of_internal_vertices() - number_of_vertices_removed();
     }
 
-    int mesh_t::number_of_edges() const
+    int hmesh_t::number_of_edges() const
     {
         return number_of_internal_edges() - number_of_edges_removed();
     }
 
-    int mesh_t::number_of_halfedges() const
+    int hmesh_t::number_of_halfedges() const
     {
         return number_of_internal_halfedges() - number_of_halfedges_removed();
     }
 
-    int mesh_t::number_of_faces() const
+    int hmesh_t::number_of_faces() const
     {
         return number_of_internal_faces() - number_of_faces_removed();
     }
 
-    vertex_descriptor_t mesh_t::source(const halfedge_descriptor_t &h) const
+    vertex_descriptor_t hmesh_t::source(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*h != null_halfedge()*/);
         const halfedge_data_t &hd = m_halfedges.at(h);
@@ -143,7 +143,7 @@ namespace mcut
         return ohd.t;
     }
 
-    vertex_descriptor_t mesh_t::target(const halfedge_descriptor_t &h) const
+    vertex_descriptor_t hmesh_t::target(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -151,7 +151,7 @@ namespace mcut
         return hd.t;
     }
 
-    halfedge_descriptor_t mesh_t::opposite(const halfedge_descriptor_t &h) const
+    halfedge_descriptor_t hmesh_t::opposite(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -163,7 +163,7 @@ namespace mcut
 #endif
     }
 
-    halfedge_descriptor_t mesh_t::prev(const halfedge_descriptor_t &h) const
+    halfedge_descriptor_t hmesh_t::prev(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -171,7 +171,7 @@ namespace mcut
         return hd.p;
     }
 
-    halfedge_descriptor_t mesh_t::next(const halfedge_descriptor_t &h) const
+    halfedge_descriptor_t hmesh_t::next(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -179,7 +179,7 @@ namespace mcut
         return hd.n;
     }
 
-    void mesh_t::set_next(const halfedge_descriptor_t &h, const halfedge_descriptor_t &nxt)
+    void hmesh_t::set_next(const halfedge_descriptor_t &h, const halfedge_descriptor_t &nxt)
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT(nxt != null_halfedge());
@@ -189,7 +189,7 @@ namespace mcut
         set_previous(nxt, h);
     }
 
-    void mesh_t::set_previous(const halfedge_descriptor_t &h, const halfedge_descriptor_t &prev)
+    void hmesh_t::set_previous(const halfedge_descriptor_t &h, const halfedge_descriptor_t &prev)
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT(prev != null_halfedge());
@@ -198,7 +198,7 @@ namespace mcut
         hd.p = prev;
     }
 
-    edge_descriptor_t mesh_t::edge(const halfedge_descriptor_t &h) const
+    edge_descriptor_t hmesh_t::edge(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -210,7 +210,7 @@ namespace mcut
 #endif
     }
 
-    face_descriptor_t mesh_t::face(const halfedge_descriptor_t &h) const
+    face_descriptor_t hmesh_t::face(const halfedge_descriptor_t &h) const
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
@@ -218,7 +218,7 @@ namespace mcut
         return hd.f;
     }
 
-    vertex_descriptor_t mesh_t::vertex(const edge_descriptor_t e, const int v) const
+    vertex_descriptor_t hmesh_t::vertex(const edge_descriptor_t e, const int v) const
     {
         MCUT_ASSERT(e != null_edge());
         MCUT_ASSERT(v == 0 || v == 1);
@@ -244,13 +244,13 @@ namespace mcut
 #endif
     }
 
-    bool mesh_t::is_border(const halfedge_descriptor_t h)
+    bool hmesh_t::is_border(const halfedge_descriptor_t h)
     {
         MCUT_ASSERT(h != null_halfedge());
         return face(h) == null_face();
     }
 
-    bool mesh_t::is_border(const edge_descriptor_t e)
+    bool hmesh_t::is_border(const edge_descriptor_t e)
     {
         MCUT_ASSERT(e != null_edge());
         halfedge_descriptor_t h0 = halfedge(e, 0);
@@ -261,7 +261,7 @@ namespace mcut
         return is_border(h0) || is_border(h1);
     }
 
-    halfedge_descriptor_t mesh_t::halfedge(const edge_descriptor_t e, const int i) const
+    halfedge_descriptor_t hmesh_t::halfedge(const edge_descriptor_t e, const int i) const
     {
         MCUT_ASSERT(i == 0 || i == 1);
         MCUT_ASSERT(e != null_edge());
@@ -288,7 +288,7 @@ namespace mcut
 #endif
     }
 
-    halfedge_descriptor_t mesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
+    halfedge_descriptor_t hmesh_t::halfedge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
     {
         MCUT_ASSERT((size_t)s < m_vertices.size()); // MCUT_ASSERT(m_vertices.count(s) == 1);
         const vertex_data_t &svd = m_vertices.at(s);
@@ -333,13 +333,13 @@ namespace mcut
         return result;
     }
 
-    edge_descriptor_t mesh_t::edge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
+    edge_descriptor_t hmesh_t::edge(const vertex_descriptor_t s, const vertex_descriptor_t t, bool strict_check) const
     {
         halfedge_descriptor_t h = halfedge(s, t, strict_check);
-        return (h == mesh_t::null_halfedge() ? mesh_t::null_edge() : edge(h));
+        return (h == hmesh_t::null_halfedge() ? hmesh_t::null_edge() : edge(h));
     }
 
-    vertex_descriptor_t mesh_t::add_vertex(const math::vec3 &point)
+    vertex_descriptor_t hmesh_t::add_vertex(const math::vec3 &point)
     {
         const double x = point.x();
         const double y = point.y();
@@ -347,9 +347,9 @@ namespace mcut
         return add_vertex(x, y, z);
     }
 
-    vertex_descriptor_t mesh_t::add_vertex(const double &x, const double &y, const double &z)
+    vertex_descriptor_t hmesh_t::add_vertex(const double &x, const double &y, const double &z)
     {
-        vertex_descriptor_t vd = mesh_t::null_vertex();
+        vertex_descriptor_t vd = hmesh_t::null_vertex();
         vertex_data_t *data_ptr = nullptr;
         bool reusing_removed_descr = (!m_vertices_removed.empty());
 
@@ -370,14 +370,14 @@ namespace mcut
             data_ptr = &m_vertices.back(); // &ret.first->second;
         }
 
-        MCUT_ASSERT(vd != mesh_t::null_vertex());
+        MCUT_ASSERT(vd != hmesh_t::null_vertex());
 
         data_ptr->p = math::vec3(x, y, z);
 
         return vd;
     }
 
-    halfedge_descriptor_t mesh_t::add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1)
+    halfedge_descriptor_t hmesh_t::add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1)
     {
         MCUT_ASSERT(v0 != null_vertex());
         MCUT_ASSERT(v1 != null_vertex());
@@ -505,7 +505,7 @@ namespace mcut
         return static_cast<halfedge_descriptor_t>(h0_idx); // return halfedge whose target is v1
     }
 
-    face_descriptor_t mesh_t::add_face(const std::vector<vertex_descriptor_t> &vi)
+    face_descriptor_t hmesh_t::add_face(const std::vector<vertex_descriptor_t> &vi)
     {
         const int face_vertex_count = static_cast<int>(vi.size());
         MCUT_ASSERT(face_vertex_count >= 3);
@@ -622,7 +622,7 @@ namespace mcut
         return new_face_idx;
     }
 
-    const math::vec3 &mesh_t::vertex(const vertex_descriptor_t &vd) const
+    const math::vec3 &hmesh_t::vertex(const vertex_descriptor_t &vd) const
     {
         MCUT_ASSERT(vd != null_vertex());
         MCUT_ASSERT((size_t)vd < m_vertices.size());
@@ -630,7 +630,7 @@ namespace mcut
         return vdata.p;
     }
 
-    std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset) const
+    std::vector<vertex_descriptor_t> hmesh_t::get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset) const
     {
         MCUT_ASSERT(f != null_face());
 
@@ -646,7 +646,7 @@ namespace mcut
         return vertex_descriptors;
     }
 
-    std::vector<vertex_descriptor_t> mesh_t::get_vertices_around_vertex(const vertex_descriptor_t v) const
+    std::vector<vertex_descriptor_t> hmesh_t::get_vertices_around_vertex(const vertex_descriptor_t v) const
     {
         MCUT_ASSERT(v != null_vertex());
         // halfedges whoe target is 'v'
@@ -660,14 +660,14 @@ namespace mcut
         return out;
     }
 
-    const std::vector<halfedge_descriptor_t> &mesh_t::get_halfedges_around_face(const face_descriptor_t f) const
+    const std::vector<halfedge_descriptor_t> &hmesh_t::get_halfedges_around_face(const face_descriptor_t f) const
     {
         MCUT_ASSERT(f != null_face());
         MCUT_ASSERT((size_t)f < m_faces.size() /*m_faces.count(f) == 1*/);
         return m_faces.at(f).m_halfedges;
     }
 
-    const std::vector<face_descriptor_t> mesh_t::get_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t> *halfedges_around_face_) const
+    const std::vector<face_descriptor_t> hmesh_t::get_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t> *halfedges_around_face_) const
     {
         MCUT_ASSERT(f != null_face());
 
@@ -695,16 +695,16 @@ namespace mcut
         return faces_around_face;
     }
 
-    const std::vector<halfedge_descriptor_t> &mesh_t::get_halfedges_around_vertex(const vertex_descriptor_t v) const
+    const std::vector<halfedge_descriptor_t> &hmesh_t::get_halfedges_around_vertex(const vertex_descriptor_t v) const
     {
-        MCUT_ASSERT(v != mesh_t::null_vertex());
+        MCUT_ASSERT(v != hmesh_t::null_vertex());
         MCUT_ASSERT((size_t)v < m_vertices.size());
         const vertex_data_t &vd = m_vertices.at(v);
         const std::vector<halfedge_descriptor_t> &incoming_halfedges = vd.m_halfedges;
         return incoming_halfedges;
     }
 
-    vertex_array_iterator_t mesh_t::vertices_begin(bool account_for_removed_elems) const
+    vertex_array_iterator_t hmesh_t::vertices_begin(bool account_for_removed_elems) const
     {
         vertex_array_t::const_iterator it = m_vertices.cbegin();
         if (account_for_removed_elems)
@@ -718,12 +718,12 @@ namespace mcut
         return vertex_array_iterator_t(it, this);
     }
 
-    vertex_array_iterator_t mesh_t::vertices_end() const
+    vertex_array_iterator_t hmesh_t::vertices_end() const
     {
         return vertex_array_iterator_t(m_vertices.cend(), this);
     }
 
-    edge_array_iterator_t mesh_t::edges_begin(bool account_for_removed_elems) const
+    edge_array_iterator_t hmesh_t::edges_begin(bool account_for_removed_elems) const
     {
         edge_array_t::const_iterator it = m_edges.cbegin();
         if (account_for_removed_elems)
@@ -737,12 +737,12 @@ namespace mcut
         return edge_array_iterator_t(it, this);
     }
 
-    edge_array_iterator_t mesh_t::edges_end() const
+    edge_array_iterator_t hmesh_t::edges_end() const
     {
         return edge_array_iterator_t(m_edges.cend(), this);
     }
 
-    halfedge_array_iterator_t mesh_t::halfedges_begin(bool account_for_removed_elems) const
+    halfedge_array_iterator_t hmesh_t::halfedges_begin(bool account_for_removed_elems) const
     {
         halfedge_array_t::const_iterator it = m_halfedges.cbegin();
         if (account_for_removed_elems)
@@ -756,12 +756,12 @@ namespace mcut
         return halfedge_array_iterator_t(it, this);
     }
 
-    halfedge_array_iterator_t mesh_t::halfedges_end() const
+    halfedge_array_iterator_t hmesh_t::halfedges_end() const
     {
         return halfedge_array_iterator_t(m_halfedges.cend(), this);
     }
 
-    face_array_iterator_t mesh_t::faces_begin(bool account_for_removed_elems) const
+    face_array_iterator_t hmesh_t::faces_begin(bool account_for_removed_elems) const
     {
         face_array_t::const_iterator it = m_faces.cbegin();
         if (account_for_removed_elems)
@@ -775,13 +775,13 @@ namespace mcut
         return face_array_iterator_t(it, this);
     }
 
-    face_array_iterator_t mesh_t::faces_end() const
+    face_array_iterator_t hmesh_t::faces_end() const
     {
         return face_array_iterator_t(m_faces.cend(), this);
     }
 
     // also disassociates (not remove) any halfedges(s) and vertices incident to face
-    void mesh_t::remove_face(const face_descriptor_t f)
+    void hmesh_t::remove_face(const face_descriptor_t f)
     {
         MCUT_ASSERT(f != null_face());
         MCUT_ASSERT(std::find(m_faces_removed.cbegin(), m_faces_removed.cend(), f) == m_faces_removed.cend());
@@ -844,7 +844,7 @@ namespace mcut
     }
 
     // also disassociates (not remove) the halfedges(s) and vertex incident to this halfedge
-    void mesh_t::remove_halfedge(halfedge_descriptor_t h)
+    void hmesh_t::remove_halfedge(halfedge_descriptor_t h)
     {
         MCUT_ASSERT(h != null_halfedge());
         MCUT_ASSERT(std::find(m_halfedges_removed.cbegin(), m_halfedges_removed.cend(), h) == m_halfedges_removed.cend());
@@ -898,7 +898,7 @@ namespace mcut
     }
 
     // also disassociates (not remove) any face(s) incident to edge via its halfedges, and also disassociates the halfedges
-    void mesh_t::remove_edge(const edge_descriptor_t e, bool remove_halfedges)
+    void hmesh_t::remove_edge(const edge_descriptor_t e, bool remove_halfedges)
     {
         MCUT_ASSERT(e != null_edge());
         MCUT_ASSERT(std::find(m_edges_removed.cbegin(), m_edges_removed.cend(), e) == m_edges_removed.cend());
@@ -926,7 +926,7 @@ namespace mcut
         m_edges_removed.push_back(e);
     }
 
-    void mesh_t::remove_vertex(const vertex_descriptor_t v)
+    void hmesh_t::remove_vertex(const vertex_descriptor_t v)
     {
         MCUT_ASSERT(v != null_vertex());
         MCUT_ASSERT((size_t)v < m_vertices.size());
@@ -937,7 +937,7 @@ namespace mcut
         m_vertices_removed.push_back(v);
     }
 
-    void mesh_t::remove_elements()
+    void hmesh_t::remove_elements()
     {
         for (face_array_iterator_t i = faces_begin(); i != faces_end(); ++i)
         {
@@ -960,7 +960,7 @@ namespace mcut
         }
     }
 
-    void mesh_t::reset()
+    void hmesh_t::reset()
     {
         m_vertices.clear();
         m_vertices.shrink_to_fit();
@@ -980,88 +980,88 @@ namespace mcut
         m_faces_removed.shrink_to_fit();
     }
 
-    int mesh_t::number_of_internal_faces() const
+    int hmesh_t::number_of_internal_faces() const
     {
         return static_cast<int>(m_faces.size());
     }
 
-    int mesh_t::number_of_internal_edges() const
+    int hmesh_t::number_of_internal_edges() const
     {
         return static_cast<int>(m_edges.size());
     }
 
-    int mesh_t::number_of_internal_halfedges() const
+    int hmesh_t::number_of_internal_halfedges() const
     {
         return static_cast<int>(m_halfedges.size());
     }
 
-    int mesh_t::number_of_internal_vertices() const
+    int hmesh_t::number_of_internal_vertices() const
     {
         return static_cast<int>(m_vertices.size());
     }
 
     //
-    int mesh_t::number_of_vertices_removed() const
+    int hmesh_t::number_of_vertices_removed() const
     {
         return (int)this->m_vertices_removed.size();
     }
 
-    int mesh_t::number_of_edges_removed() const
+    int hmesh_t::number_of_edges_removed() const
     {
         return (int)this->m_edges_removed.size();
     }
 
-    int mesh_t::number_of_halfedges_removed() const
+    int hmesh_t::number_of_halfedges_removed() const
     {
         return (int)this->m_halfedges_removed.size();
     }
 
-    int mesh_t::number_of_faces_removed() const
+    int hmesh_t::number_of_faces_removed() const
     {
         return (int)this->m_faces_removed.size();
     }
 
-    bool mesh_t::is_removed(face_descriptor_t f) const
+    bool hmesh_t::is_removed(face_descriptor_t f) const
     {
         return std::find(m_faces_removed.cbegin(), m_faces_removed.cend(), f) != m_faces_removed.cend();
     }
 
-    bool mesh_t::is_removed(edge_descriptor_t e) const
+    bool hmesh_t::is_removed(edge_descriptor_t e) const
     {
         return std::find(m_edges_removed.cbegin(), m_edges_removed.cend(), e) != m_edges_removed.cend();
     }
 
-    bool mesh_t::is_removed(halfedge_descriptor_t h) const
+    bool hmesh_t::is_removed(halfedge_descriptor_t h) const
     {
         return std::find(m_halfedges_removed.cbegin(), m_halfedges_removed.cend(), h) != m_halfedges_removed.cend();
     }
 
-    bool mesh_t::is_removed(vertex_descriptor_t v) const
+    bool hmesh_t::is_removed(vertex_descriptor_t v) const
     {
         return std::find(m_vertices_removed.cbegin(), m_vertices_removed.cend(), v) != m_vertices_removed.cend();
     }
 
-    void mesh_t::reserve_for_additional_vertices(std::uint32_t n)
+    void hmesh_t::reserve_for_additional_vertices(std::uint32_t n)
     {
         m_vertices.reserve((std::uint64_t)number_of_internal_vertices() + n);
     }
 
-    void mesh_t::reserve_for_additional_edges(std::uint32_t n)
+    void hmesh_t::reserve_for_additional_edges(std::uint32_t n)
     {
         m_edges.reserve((std::uint64_t)number_of_internal_edges() + n);
     }
 
-    void mesh_t::reserve_for_additional_halfedges(std::uint32_t n)
+    void hmesh_t::reserve_for_additional_halfedges(std::uint32_t n)
     {
         m_halfedges.reserve((std::uint64_t)number_of_internal_halfedges() + n);
     }
 
-    void mesh_t::reserve_for_additional_faces(std::uint32_t n)
+    void hmesh_t::reserve_for_additional_faces(std::uint32_t n)
     {
         m_faces.reserve((std::uint64_t)number_of_internal_faces() + n);
     }
 
-    void mesh_t::reserve_for_additional_elements(std::uint32_t n)
+    void hmesh_t::reserve_for_additional_elements(std::uint32_t n)
     {
         const std::uint32_t nv = n;
         reserve_for_additional_vertices(nv);
@@ -1073,67 +1073,67 @@ namespace mcut
         reserve_for_additional_halfedges(nh);
     }
 
-    const std::vector<vertex_descriptor_t> &mesh_t::get_removed_elements(id_<array_iterator_t<vertex_array_t>>) const
+    const std::vector<vertex_descriptor_t> &hmesh_t::get_removed_elements(id_<array_iterator_t<vertex_array_t>>) const
     {
         return get_removed_vertices();
     }
 
-    const std::vector<edge_descriptor_t> &mesh_t::get_removed_elements(id_<array_iterator_t<edge_array_t>>) const
+    const std::vector<edge_descriptor_t> &hmesh_t::get_removed_elements(id_<array_iterator_t<edge_array_t>>) const
     {
         return get_removed_edges();
     }
 
-    const std::vector<halfedge_descriptor_t> &mesh_t::get_removed_elements(id_<array_iterator_t<halfedge_array_t>>) const
+    const std::vector<halfedge_descriptor_t> &hmesh_t::get_removed_elements(id_<array_iterator_t<halfedge_array_t>>) const
     {
         return get_removed_halfedges();
     }
 
-    const std::vector<face_descriptor_t> &mesh_t::get_removed_elements(id_<array_iterator_t<face_array_t>>) const
+    const std::vector<face_descriptor_t> &hmesh_t::get_removed_elements(id_<array_iterator_t<face_array_t>>) const
     {
         return get_removed_faces();
     }
 
-    const std::vector<vertex_descriptor_t> &mesh_t::get_removed_vertices() const
+    const std::vector<vertex_descriptor_t> &hmesh_t::get_removed_vertices() const
     {
         return m_vertices_removed;
     }
 
-    const std::vector<edge_descriptor_t> &mesh_t::get_removed_edges() const
+    const std::vector<edge_descriptor_t> &hmesh_t::get_removed_edges() const
     {
         return m_edges_removed;
     }
 
-    const std::vector<halfedge_descriptor_t> &mesh_t::get_removed_halfedges() const
+    const std::vector<halfedge_descriptor_t> &hmesh_t::get_removed_halfedges() const
     {
         return m_halfedges_removed;
     }
 
-    const std::vector<face_descriptor_t> &mesh_t::get_removed_faces() const
+    const std::vector<face_descriptor_t> &hmesh_t::get_removed_faces() const
     {
         return m_faces_removed;
     }
 
-    const vertex_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<vertex_array_t>>, bool account_for_removed_elems) const
+    const vertex_array_iterator_t hmesh_t::elements_begin_(id_<array_iterator_t<vertex_array_t>>, bool account_for_removed_elems) const
     {
         return vertices_begin(account_for_removed_elems);
     }
 
-    const edge_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<edge_array_t>>, bool account_for_removed_elems) const
+    const edge_array_iterator_t hmesh_t::elements_begin_(id_<array_iterator_t<edge_array_t>>, bool account_for_removed_elems) const
     {
         return edges_begin(account_for_removed_elems);
     }
 
-    const halfedge_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<halfedge_array_t>>, bool account_for_removed_elems) const
+    const halfedge_array_iterator_t hmesh_t::elements_begin_(id_<array_iterator_t<halfedge_array_t>>, bool account_for_removed_elems) const
     {
         return halfedges_begin(account_for_removed_elems);
     }
 
-    const face_array_iterator_t mesh_t::elements_begin_(id_<array_iterator_t<face_array_t>>, bool account_for_removed_elems) const
+    const face_array_iterator_t hmesh_t::elements_begin_(id_<array_iterator_t<face_array_t>>, bool account_for_removed_elems) const
     {
         return faces_begin(account_for_removed_elems);
     }
 
-    void write_off(const char *fpath, const mcut::mesh_t &mesh)
+    void write_off(const char *fpath, const mcut::hmesh_t &mesh)
     {
 
         std::ofstream outfile(fpath);
@@ -1169,10 +1169,10 @@ namespace mcut
         //
 
 #if 0
-    for (typename mesh_t::edge_iterator_t iter = mesh.edges_begin(); iter != mesh.edges_end(); ++iter) {
-        const mesh_t::edge_descriptor_t ed = iter.first;
-        const mesh_t::vertex_descriptor_t& v0 = vertex(ed, 0);
-        const mesh_t::vertex_descriptor_t& v1 = vertex(ed, 1);
+    for (typename hmesh_t::edge_iterator_t iter = mesh.edges_begin(); iter != mesh.edges_end(); ++iter) {
+        const hmesh_t::edge_descriptor_t ed = iter.first;
+        const hmesh_t::vertex_descriptor_t& v0 = vertex(ed, 0);
+        const hmesh_t::vertex_descriptor_t& v1 = vertex(ed, 1);
         // TODO
     }
 #endif
@@ -1182,7 +1182,7 @@ namespace mcut
         //
         for (mcut::face_array_iterator_t iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter)
         {
-            //const typename mesh_t::face_descriptor_t& fd = iter.first;
+            //const typename hmesh_t::face_descriptor_t& fd = iter.first;
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(*iter);
 
             MCUT_ASSERT(!vertices_around_face.empty());
@@ -1199,7 +1199,7 @@ namespace mcut
         outfile.close();
     }
 
-    void read_off(mcut::mesh_t &mesh, const char *fpath)
+    void read_off(mcut::hmesh_t &mesh, const char *fpath)
     {
         auto next_line = [&](std::ifstream &f, std::string &s) -> bool
         {

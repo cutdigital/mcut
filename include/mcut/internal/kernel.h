@@ -99,7 +99,7 @@ namespace mcut
     //
     // The winding order of the polygons of a cut surface patch
     //
-    enum class cut_surface_patch_winding_order_t : unsigned char
+    enum class cm_patch_winding_order_t : unsigned char
     {
         DEFAULT, // + : The polygons of the patch have the [same] winding order as the cut-surface (e.g. CCW)
         REVERSE, // - : The polygons of the patch have the [opposite] winding order as the cut-surface (e.g. CW)
@@ -122,17 +122,17 @@ namespace mcut
 #if defined(MCUT_MULTI_THREADED)
         thread_pool *scheduler = nullptr;
 #endif
-        const mesh_t *src_mesh = nullptr;
-        const mesh_t *cut_mesh = nullptr;
+        const hmesh_t *src_mesh = nullptr;
+        const hmesh_t *cut_mesh = nullptr;
         // NOTE: we use std::map because it is beneficial that keys are sorted when
         // extracting edge-face intersection pairs
         const std::map<mcut::fd_t, std::vector<mcut::fd_t>> *ps_face_to_potentially_intersecting_others = nullptr;
 #if defined(USE_OIBVH)
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *srcMeshFaceBboxes = nullptr;
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *cutMeshFaceBboxes = nullptr;
+        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *source_hmesh_face_aabb_array_ptr = nullptr;
+        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *cut_hmesh_face_aabb_array_ptr = nullptr;
 #else
-        bvh::BoundingVolumeHierarchy *srcMeshBVH;
-        bvh::BoundingVolumeHierarchy *cutMeshBVH;
+        bvh::BoundingVolumeHierarchy *source_hmesh_BVH;
+        bvh::BoundingVolumeHierarchy *cut_hmesh_BVH;
 #endif
         bool verbose = true;
         //bool keep_partially_sealed_connected_components = false;
@@ -180,7 +180,7 @@ namespace mcut
 
     struct output_mesh_info_t
     {
-        mesh_t mesh;
+        hmesh_t mesh;
         std::vector<vd_t> seam_vertices;
         output_mesh_data_maps_t data_maps;
     };
@@ -202,8 +202,8 @@ namespace mcut
         std::map<sm_frag_location_t, std::map<cm_patch_location_t, std::vector<output_mesh_info_t>>> connected_components;
         std::map<sm_frag_location_t, std::vector<output_mesh_info_t>> unsealed_cc; // connected components before hole-filling
         // patches
-        std::map<cut_surface_patch_winding_order_t, std::vector<output_mesh_info_t>> inside_patches; // .. between neigbouring connected ccsponents (cs-sealing patches)
-        std::map<cut_surface_patch_winding_order_t, std::vector<output_mesh_info_t>> outside_patches;
+        std::map<cm_patch_winding_order_t, std::vector<output_mesh_info_t>> inside_patches; // .. between neigbouring connected ccsponents (cs-sealing patches)
+        std::map<cm_patch_winding_order_t, std::vector<output_mesh_info_t>> outside_patches;
         // the input meshes which also include the edges that define the cut path
         // NOTE: not always defined (depending on the arising cutpath configurations)
         output_mesh_info_t seamed_src_mesh;
@@ -224,11 +224,11 @@ namespace mcut
     // internal main
     void dispatch(output_t &out, const input_t &in);
 
-    int find_connected_components(std::vector<int> &fccmap, const mesh_t &mesh, std::vector<int> &cc_to_vertex_count,
+    int find_connected_components(std::vector<int> &fccmap, const hmesh_t &mesh, std::vector<int> &cc_to_vertex_count,
                                   std::vector<int> &cc_to_face_count);
 
     // return true if point p lies on the plane of every three vertices of f
-    bool point_on_face_plane(const mcut::mesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count);
+    bool point_on_face_plane(const mcut::hmesh_t &m, const mcut::fd_t &f, const mcut::math::vec3 &p, int &fv_count);
 
     //
     // returns string equivalent value (e.g. for printing)
@@ -236,7 +236,7 @@ namespace mcut
     std::string to_string(const sm_frag_location_t &);
     std::string to_string(const cm_patch_location_t &);
     std::string to_string(const status_t &);
-    std::string to_string(const cut_surface_patch_winding_order_t &);
+    std::string to_string(const cm_patch_winding_order_t &);
 
 } // namespace mcut
 

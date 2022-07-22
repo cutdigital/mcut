@@ -202,8 +202,8 @@ namespace bvh {
         return (xx * 4 + yy * 2 + zz);
     };
 
-    void constructOIBVH(
-        const mcut::mesh_t& mesh,
+    void build_oibvh(
+        const mcut::hmesh_t& mesh,
         std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& bvhAABBs,
         std::vector<mcut::fd_t>& bvhLeafNodeFaces,
         std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& face_bboxes,
@@ -414,7 +414,7 @@ void intersectOIBVHs(
         const int sm_bvh_node_level_idx = mcut::bvh::get_level_from_implicit_idx(sm_bvh_node_implicit_idx);
         const bool sm_bvh_node_is_leaf = sm_bvh_node_level_idx == sm_bvh_leaf_level_idx;
         const int sm_bvh_node_level_leftmost_node = mcut::bvh::get_level_leftmost_node(sm_bvh_node_level_idx);
-        mcut::fd_t sm_node_face = mcut::mesh_t::null_face();
+        mcut::fd_t sm_node_face = mcut::hmesh_t::null_face();
         const int sm_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(sm_bvh_rightmost_real_leaf, sm_bvh_leaf_level_idx, sm_bvh_node_level_idx);
         const int sm_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
             sm_bvh_node_implicit_idx,
@@ -434,7 +434,7 @@ void intersectOIBVHs(
         const int cs_bvh_node_level_idx = mcut::bvh::get_level_from_implicit_idx(cs_bvh_node_implicit_idx);
         const int cs_bvh_node_level_leftmost_node = mcut::bvh::get_level_leftmost_node(cs_bvh_node_level_idx);
         const bool cs_bvh_node_is_leaf = cs_bvh_node_level_idx == cs_bvh_leaf_level_idx;
-        mcut::fd_t cs_node_face = mcut::mesh_t::null_face();
+        mcut::fd_t cs_node_face = mcut::hmesh_t::null_face();
         const int cs_bvh_node_level_rightmost_node = mcut::bvh::get_level_rightmost_real_node(cs_bvh_rightmost_real_leaf, cs_bvh_leaf_level_idx, cs_bvh_node_level_idx);
         const int cs_bvh_node_mem_idx = mcut::bvh::get_node_mem_index(
             cs_bvh_node_implicit_idx,
@@ -456,8 +456,8 @@ void intersectOIBVHs(
 
             if (cs_bvh_node_is_leaf && sm_bvh_node_is_leaf)
             {
-                MCUT_ASSERT(cs_node_face != mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
+                MCUT_ASSERT(cs_node_face != mcut::hmesh_t::null_face());
+                MCUT_ASSERT(sm_node_face != mcut::hmesh_t::null_face());
 
                 mcut::fd_t cs_node_face_offsetted = mcut::fd_t(cs_node_face + numSrcMeshFaces);
 
@@ -466,8 +466,8 @@ void intersectOIBVHs(
             }
             else if (sm_bvh_node_is_leaf && !cs_bvh_node_is_leaf)
             {
-                MCUT_ASSERT(cs_node_face == mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face != mcut::mesh_t::null_face());
+                MCUT_ASSERT(cs_node_face == mcut::hmesh_t::null_face());
+                MCUT_ASSERT(sm_node_face != mcut::hmesh_t::null_face());
 
                 const int cs_bvh_node_left_child_implicit_idx = (cs_bvh_node_implicit_idx * 2) + 1;
                 const int cs_bvh_node_right_child_implicit_idx = (cs_bvh_node_implicit_idx * 2) + 2;
@@ -485,8 +485,8 @@ void intersectOIBVHs(
             else if (!sm_bvh_node_is_leaf && cs_bvh_node_is_leaf)
             {
 
-                MCUT_ASSERT(cs_node_face != mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face == mcut::mesh_t::null_face());
+                MCUT_ASSERT(cs_node_face != mcut::hmesh_t::null_face());
+                MCUT_ASSERT(sm_node_face == mcut::hmesh_t::null_face());
 
                 const int sm_bvh_node_left_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 1;
                 const int sm_bvh_node_right_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 2;
@@ -503,8 +503,8 @@ void intersectOIBVHs(
             }
             else
             { // both nodes are internal
-                MCUT_ASSERT(cs_node_face == mcut::mesh_t::null_face());
-                MCUT_ASSERT(sm_node_face == mcut::mesh_t::null_face());
+                MCUT_ASSERT(cs_node_face == mcut::hmesh_t::null_face());
+                MCUT_ASSERT(sm_node_face == mcut::hmesh_t::null_face());
 
                 const int sm_bvh_node_left_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 1;
                 const int sm_bvh_node_right_child_implicit_idx = (sm_bvh_node_implicit_idx * 2) + 2;
@@ -549,7 +549,7 @@ void intersectOIBVHs(
     BoundingVolumeHierarchy::~BoundingVolumeHierarchy() { }
 
     // three stages to BVH construction
-    void BoundingVolumeHierarchy::buildTree(const mesh_t& mesh_,
+    void BoundingVolumeHierarchy::buildTree(const hmesh_t& mesh_,
         const math::fixed_precision_number_t& enlargementEps_,
         uint32_t mp_,
         const SplitMethod& sm_)

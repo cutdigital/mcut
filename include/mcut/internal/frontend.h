@@ -44,9 +44,10 @@
 namespace frontend {
 
 // internal frontend data structure which we use to store connected component
-// data. Information requested by a client/user via "mcGetConnectedComponentData"
-// is read from this data structure (halfedge meshes are used by the backend
-// kernel)
+// data that is computed by the kernel and requested by a client via the 
+// "mcGetConnectedComponentData" function. So the "mcGetConnectedComponentData"
+// function will read from this data structure (because halfedge meshes are only 
+// used by the backend kernel for resolving the intersections). 
 struct array_mesh_t {
     array_mesh_t() { }
     ~array_mesh_t()
@@ -117,7 +118,7 @@ struct context_t {
 #endif
 
     // the current set of connected components associated with context
-    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>> connComps = {};
+    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>> connected_components = {};
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags flags = (McFlags)0;

@@ -258,8 +258,8 @@ void get_connected_components_impl(
 
     uint32_t gatheredConnCompCounter = 0;
 
-    for (std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator i = context_uptr->connComps.cbegin();
-         i != context_uptr->connComps.cend();
+    for (std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator i = context_uptr->connected_components.cbegin();
+         i != context_uptr->connected_components.cend();
          ++i) {
 
         bool includeConnComp = (i->second->type & connectedComponentType) != 0;
@@ -297,9 +297,9 @@ void get_connected_component_data_impl(
 
     const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
-    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connComps.find(connCompId);
+    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
 
-    if (cc_entry_iter == context_uptr->connComps.cend()) {
+    if (cc_entry_iter == context_uptr->connected_components.cend()) {
         throw std::invalid_argument("invalid connected component");
     }
 
@@ -776,25 +776,25 @@ void release_connected_components_impl(
 
     const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
-    if (numConnComps > (uint32_t)context_uptr->connComps.size()) {
+    if (numConnComps > (uint32_t)context_uptr->connected_components.size()) {
         throw std::invalid_argument("invalid connected component count");
     }
 
     bool freeAll = numConnComps == 0 && pConnComps == NULL;
 
     if (freeAll) {
-        context_uptr->connComps.clear();
+        context_uptr->connected_components.clear();
     } else {
         for (int i = 0; i < (int)numConnComps; ++i) {
             McConnectedComponent connCompId = pConnComps[i];
 
-            std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connComps.find(connCompId);
+            std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
 
-            if (cc_entry_iter == context_uptr->connComps.cend()) {
+            if (cc_entry_iter == context_uptr->connected_components.cend()) {
                 throw std::invalid_argument("invalid connected component id");
             }
 
-            context_uptr->connComps.erase(cc_entry_iter);
+            context_uptr->connected_components.erase(cc_entry_iter);
         }
     }
 }

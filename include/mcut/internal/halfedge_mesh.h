@@ -256,16 +256,16 @@ namespace mcut
         Internally it is put in a free list, and when you add elements to the surface mesh, they are taken from the free list in case it is not empty.
         
         For all elements there is a function to obtain the number of used elements, as well as the number of used [and] removed elements. 
-        For vertices the functions are mesh_t::number_of_vertices() and mesh_t::number_of_internal_vertices(), respectively. 
+        For vertices the functions are hmesh_t::number_of_vertices() and hmesh_t::number_of_internal_vertices(), respectively. 
         The first function is slightly different from the free function num_vertices(const G&) of the BGL package. 
         
-        Iterators such as mesh_t::vertex_iterator_t only enumerate elements that are not marked as deleted.
+        Iterators such as hmesh_t::vertex_iterator_t only enumerate elements that are not marked as deleted.
     */
-    class mesh_t
+    class hmesh_t
     {
     public:
-        mesh_t();
-        ~mesh_t();
+        hmesh_t();
+        ~hmesh_t();
 
         // static member functions
         // -----------------------
@@ -442,20 +442,20 @@ namespace mcut
         std::vector<halfedge_descriptor_t> m_halfedges_removed;
         std::vector<vertex_descriptor_t> m_vertices_removed;
 
-    }; // class mesh_t {
+    }; // class hmesh_t {
 
     typedef vertex_descriptor_t vd_t;
     typedef halfedge_descriptor_t hd_t;
     typedef edge_descriptor_t ed_t;
     typedef face_descriptor_t fd_t;
 
-    void write_off(const char *fpath, const mcut::mesh_t &mesh);
-    void read_off(mcut::mesh_t &mesh, const char *fpath);
+    void write_off(const char *fpath, const mcut::hmesh_t &mesh);
+    void read_off(mcut::hmesh_t &mesh, const char *fpath);
 
     template <typename V = face_array_t>
     class array_iterator_t : public V::const_iterator
     {
-        const mesh_t *mesh_ptr;
+        const hmesh_t *mesh_ptr;
         typedef typename V::const_iterator std_iterator_base_class;
         typedef typename V::value_type::type element_descriptor_type;
         typename V::value_type *operator->() = delete;
@@ -463,12 +463,12 @@ namespace mcut
     public:
         array_iterator_t()
             : V::const_iterator(), mesh_ptr(nullptr){};
-        array_iterator_t(typename V::const_iterator it_, const mesh_t *const mesh)
+        array_iterator_t(typename V::const_iterator it_, const hmesh_t *const mesh)
             : V::const_iterator(it_), mesh_ptr(mesh)
         {
         }
 
-        const mcut::mesh_t *get_mesh_ptr() const
+        const mcut::hmesh_t *get_mesh_ptr() const
         {
             return mesh_ptr;
         }
@@ -615,8 +615,8 @@ namespace std
 #if 0
     template <>
     void advance(
-        mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t> &iter,
-        typename std::iterator_traits<mcut::mesh_t::array_iterator_t<mcut::mesh_t::edge_array_t>>::difference_type n);
+        mcut::hmesh_t::array_iterator_t<mcut::hmesh_t::edge_array_t> &iter,
+        typename std::iterator_traits<mcut::hmesh_t::array_iterator_t<mcut::hmesh_t::edge_array_t>>::difference_type n);
 #endif
 
     template <>

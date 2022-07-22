@@ -100,8 +100,8 @@ namespace bvh {
         const int bvh_data_base_offset,
         const int rightmostRealNodeImplicitIndexOnNodeLevel);
 
-    extern void constructOIBVH(
-        const mcut::mesh_t& mesh,
+    extern void build_oibvh(
+        const mcut::hmesh_t& mesh,
         std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& bvhAABBs,
         std::vector<mcut::fd_t>& bvhLeafNodeFaces,
         std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& face_bboxes,
@@ -271,7 +271,7 @@ namespace bvh {
         ~BoundingVolumeHierarchy();
 
         // three stages to BVH construction
-        void buildTree(const mesh_t& mesh_,
+        void buildTree(const hmesh_t& mesh_,
             const math::fixed_precision_number_t& enlargementEps_ = math::fixed_precision_number_t(0.0),
             uint32_t mp_ = 1,
             const SplitMethod& sm_ = SplitMethod::SPLIT_MIDDLE);
@@ -310,7 +310,7 @@ namespace bvh {
             const uint32_t primitiveOffsetB);
 
     private:
-        const mesh_t* mesh;
+        const hmesh_t* mesh;
         int maxPrimsInNode;
         SplitMethod splitMethod;
         math::fixed_precision_number_t enlargementEps; // used to slight enlarge BVH (with bounds of max cut-mesh perturbation magnitude)
