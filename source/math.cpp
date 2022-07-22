@@ -807,8 +807,9 @@ namespace mcut {
         return '0';
     }
 
-    char compute_segment_intersection(const vec2& a, const vec2& b, const vec2& c, const vec2& d,
-        vec2& p, double& s, double& t)
+    char compute_segment_intersection(
+        const vec2& a, const vec2& b, const vec2& c, 
+        const vec2& d, vec2& p, double& s, double& t)
     {
         // double s, t; /* The two parameters of the parametric eqns. */
         double num, denom; /* Numerator and denominator of equations. */

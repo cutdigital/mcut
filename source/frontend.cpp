@@ -23,7 +23,9 @@
 std::atomic_bool mcut::thread_pool_terminate(false);
 #endif
 
-namespace frontend {
+#if defined(PROFILING_BUILD)
+std::stack<std::unique_ptr<mcut::mini_timer>> g_timestack = std::stack<std::unique_ptr<mcut::mini_timer>>();
+#endif
 
 std::map<McContext, std::unique_ptr<context_t>> g_contexts = {};
 
@@ -810,5 +812,3 @@ void release_context_impl(
 
     g_contexts.erase(context_entry_iter);
 }
-
-} // namespace frontend{

@@ -41,8 +41,6 @@
 #include <map>
 #include <memory>
 
-namespace frontend {
-
 // internal frontend data structure which we use to store connected component
 // data that is computed by the kernel and requested by a client via the 
 // "mcGetConnectedComponentData" function. So the "mcGetConnectedComponentData"
@@ -156,29 +154,29 @@ struct context_t {
 // list of contexts created by client/user
 extern "C" std::map<McContext, std::unique_ptr<context_t>> g_contexts;
 
-void create_context_impl(
+extern "C" void create_context_impl(
     McContext* pContext, McFlags flags);
 
-void debug_message_callback_impl(
+extern "C" void debug_message_callback_impl(
     McContext context,
     pfn_mcDebugOutput_CALLBACK cb,
     const void* userParam);
 
-void debug_message_control_impl(
+extern "C" void debug_message_control_impl(
     McContext context,
     McDebugSource source,
     McDebugType type,
     McDebugSeverity severity,
     bool enabled);
 
-void get_info_impl(
+extern "C" void get_info_impl(
     const McContext context,
     McFlags info,
     uint64_t bytes,
     void* pMem,
     uint64_t* pNumBytes);
 
-void dispatch_impl(
+extern "C" void dispatch_impl(
     McContext context,
     McFlags flags,
     const void* pSrcMeshVertices,
@@ -192,14 +190,14 @@ void dispatch_impl(
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces);
 
-void get_connected_components_impl(
+extern "C" void get_connected_components_impl(
     const McContext context,
     const McConnectedComponentType connectedComponentType,
     const uint32_t numEntries,
     McConnectedComponent* pConnComps,
     uint32_t* numConnComps);
 
-void get_connected_component_data_impl(
+extern "C" void get_connected_component_data_impl(
     const McContext context,
     const McConnectedComponent connCompId,
     McFlags flags,
@@ -207,14 +205,12 @@ void get_connected_component_data_impl(
     void* pMem,
     uint64_t* pNumBytes);
 
-void release_connected_components_impl(
+extern "C" void release_connected_components_impl(
     const McContext context,
     uint32_t numConnComps,
     const McConnectedComponent* pConnComps);
 
-void release_context_impl(
+extern "C" void release_context_impl(
     McContext context);
-
-} // namespace frontend{
 
 #endif // #ifndef _FRONTEND_H_

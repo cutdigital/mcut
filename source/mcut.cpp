@@ -73,7 +73,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags c
         return_value = McResult::MC_INVALID_VALUE;
     } else {
         try {
-            frontend::create_context_impl(pOutContext, contextFlags);
+            create_context_impl(pOutContext, contextFlags);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -96,7 +96,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mc
         per_thread_api_log_str = "callback function ptr (param1) undef (NULL)";
     } else {
         try {
-            frontend::debug_message_callback_impl(pContext, cb, userParam);
+            debug_message_callback_impl(pContext, cb, userParam);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -140,7 +140,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
         per_thread_api_log_str = "debug severity val (param3) invalid";
     } else {
         try {
-            frontend::debug_message_control_impl(pContext, source, type, severity, enabled);
+            debug_message_control_impl(pContext, source, type, severity, enabled);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -172,7 +172,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
     } else {
         try {
-            frontend::get_info_impl(context, info, bytes, pMem, pNumBytes);
+            get_info_impl(context, info, bytes, pMem, pNumBytes);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -242,7 +242,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         per_thread_api_log_str = "invalid cut-mesh vertex count";
     } else {
         try {
-            frontend::dispatch_impl(
+            dispatch_impl(
                 context,
                 dispatchFlags,
                 pSrcMeshVertices,
@@ -292,7 +292,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
         per_thread_api_log_str = "output parameters undef (param3 & param4)";
     } else {
         try {
-            frontend::get_connected_components_impl(context, connectedComponentType, numEntries, pConnComps, numConnComps);
+            get_connected_components_impl(context, connectedComponentType, numEntries, pConnComps, numConnComps);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -332,7 +332,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
         per_thread_api_log_str = "null parameter (param3 & param4)";
     } else {
         try {
-            frontend::get_connected_component_data_impl(context, connCompId, queryFlags, bytes, pMem, pNumBytes);
+            get_connected_component_data_impl(context, connCompId, queryFlags, bytes, pMem, pNumBytes);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -366,7 +366,7 @@ McResult MCAPI_CALL mcReleaseConnectedComponents(
         per_thread_api_log_str = "number of connected components not set";
     } else {
         try {
-            frontend::release_connected_components_impl(context, numConnComps, pConnComps);
+            release_connected_components_impl(context, numConnComps, pConnComps);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -393,7 +393,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcReleaseContext(const McContext context)
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     } else {
         try {
-            frontend::release_context_impl(context);
+            release_context_impl(context);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }

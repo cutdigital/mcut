@@ -210,6 +210,7 @@ namespace bvh {
         const double& slightEnlargmentEps)
     {
         TIMESTACK_PUSH(__FUNCTION__);
+        
         const int meshFaceCount = mesh.number_of_faces();
         const int bvhNodeCount = mcut::bvh::get_ostensibly_implicit_bvh_size(meshFaceCount);
 
