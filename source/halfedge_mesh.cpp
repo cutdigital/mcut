@@ -341,13 +341,13 @@ namespace mcut
 
     vertex_descriptor_t mesh_t::add_vertex(const math::vec3 &point)
     {
-        const math::real_number_t x = point.x();
-        const math::real_number_t y = point.y();
-        const math::real_number_t z = point.z();
+        const double x = point.x();
+        const double y = point.y();
+        const double z = point.z();
         return add_vertex(x, y, z);
     }
 
-    vertex_descriptor_t mesh_t::add_vertex(const math::real_number_t &x, const math::real_number_t &y, const math::real_number_t &z)
+    vertex_descriptor_t mesh_t::add_vertex(const double &x, const double &y, const double &z)
     {
         vertex_descriptor_t vd = mesh_t::null_vertex();
         vertex_data_t *data_ptr = nullptr;

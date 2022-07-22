@@ -30,7 +30,6 @@
 #include <memory>
 #include <vector>
 
-#include "mcut/internal/number.h"
 #include "mcut/internal/utils.h"
 
 namespace mcut
@@ -49,7 +48,7 @@ enum sign_t
     POSITIVE = ON_POSITIVE_SIDE,
 };
 
-template <typename T = real_number_t> class vec2_
+template <typename T = double> class vec2_
 {
   public:
     typedef T element_type;
@@ -130,11 +129,9 @@ template <typename T = real_number_t> class vec2_
 }; // vec2_
 
 typedef vec2_<> vec2;
-typedef vec2_<fixed_precision_number_t> fast_vec2;
 
-template <typename T = real_number_t> class vec3_ : public vec2_<T>
+template <typename T = double> class vec3_ : public vec2_<T>
 {
-
   public:
     vec3_() : vec2_<T>(0.0, 0.0), m_z(0.0)
     {
@@ -190,16 +187,6 @@ template <typename T = real_number_t> class vec3_ : public vec2_<T>
         }
     }
 
-    // intended for converting from arb-prec to fast vec
-
-    operator vec3_<mcut::math::fixed_precision_number_t>() const
-    {
-        return vec3_<mcut::math::fixed_precision_number_t>(
-            static_cast<mcut::math::fixed_precision_number_t>(this->m_x),
-            static_cast<mcut::math::fixed_precision_number_t>(this->m_y),
-            static_cast<mcut::math::fixed_precision_number_t>(this->m_z));
-    }
-
     vec3_ operator-(const vec3_ &other) const
     {
         return vec3_(this->m_x - other.m_x, this->m_y - other.m_y, this->m_z - other.m_z);
@@ -230,7 +217,6 @@ template <typename T = real_number_t> class vec3_ : public vec2_<T>
 }; // vec3_
 
 typedef vec3_<> vec3;
-typedef vec3_<fixed_precision_number_t> fast_vec3;
 
 template <typename T = int> class matrix_t
 {
@@ -273,7 +259,7 @@ template <typename T = int> class matrix_t
         return result;
     }
 
-    matrix_t<T> operator*(const real_number_t &s) const
+    matrix_t<T> operator*(const double &s) const
     {
         matrix_t<T> result(m_rows, m_cols);
 
@@ -288,7 +274,7 @@ template <typename T = int> class matrix_t
         return result;
     }
 
-    matrix_t<T> operator/(const real_number_t &s) const
+    matrix_t<T> operator/(const double &s) const
     {
         matrix_t<T> result(m_rows, m_cols);
 
@@ -325,7 +311,7 @@ template <typename T = int> class matrix_t
     math::vec2 operator*(const math::vec3&v) const
     {
         MCUT_ASSERT(this->cols() == math::vec3::cardinality());
-        math::vec2 result(math::real_number_t(0.0));
+        math::vec2 result(double(0.0));
         MCUT_ASSERT(this->rows() == math::vec2::cardinality());
 
         for (int col = 0; col < this->cols(); ++col)
@@ -367,9 +353,9 @@ template <typename T = int> class matrix_t
     std::vector<T> m_entries;
 };
 
-extern real_number_t square_root(const real_number_t &number);
-extern real_number_t absolute_value(const real_number_t &number);
-extern sign_t sign(const real_number_t &number);
+extern double square_root(const double &number);
+extern double absolute_value(const double &number);
+extern sign_t sign(const double &number);
 extern std::ostream &operator<<(std::ostream &os, const vec3 &v);
 
 template <typename U> std::ostream &operator<<(std::ostream &os, const matrix_t<U> &m)
@@ -418,9 +404,9 @@ template <typename T> vec3_<T> compwise_max(const vec3_<T> &a, const vec3_<T> &b
 
 extern vec3 cross_product(const vec3 &a, const vec3 &b);
 
-template <typename vector_type> math::real_number_t dot_product(const vector_type &a, const vector_type &b)
+template <typename vector_type> double dot_product(const vector_type &a, const vector_type &b)
 {
-    math::real_number_t out(0.0);
+    double out(0.0);
     for (int i = 0; i < vector_type::cardinality(); ++i)
     {
         out += (a[i] * b[i]);
@@ -464,12 +450,12 @@ math::matrix_t<typename vector_type::element_type> outer_product(const vector_ty
     return out;
 }
 
-template <typename vector_type> typename math::real_number_t squared_length(const vector_type &v)
+template <typename vector_type>  double squared_length(const vector_type &v)
 {
     return dot_product(v, v);
 }
 
-template <typename vector_type> typename math::real_number_t length(const vector_type &v)
+template <typename vector_type>  double length(const vector_type &v)
 {
     return square_root(squared_length(v));
 }

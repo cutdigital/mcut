@@ -309,7 +309,7 @@ namespace mcut
 
         vertex_descriptor_t add_vertex(const math::vec3 &point);
 
-        vertex_descriptor_t add_vertex(const math::real_number_t &x, const math::real_number_t &y, const math::real_number_t &z);
+        vertex_descriptor_t add_vertex(const double &x, const double &y, const double &z);
         // adds an edges into the mesh data structure, creating incident halfedges, and returns the
         // halfedge whole target is "v1"
         halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);

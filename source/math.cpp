@@ -26,7 +26,7 @@
 namespace mcut {
 namespace math {
 
-    real_number_t square_root(const real_number_t& number)
+    double square_root(const double& number)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::sqrt(number);
@@ -37,21 +37,21 @@ namespace math {
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
-    real_number_t absolute_value(const real_number_t& number)
+    double absolute_value(const double& number)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::fabs(number);
 #else
-        real_number_t out(number);
+        double out(number);
         mpfr_abs(out.get_mpfr_handle(), number.get_mpfr_handle(), arbitrary_precision_number_t::get_default_rounding_mode());
         return out;
 #endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
-    sign_t sign(const real_number_t& number)
+    sign_t sign(const double& number)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-        int s = (real_number_t(0) < number) - (number < real_number_t(0));
+        int s = (double(0) < number) - (number < double(0));
         sign_t result = sign_t::ZERO;
         if (s > 0) {
             result = sign_t::POSITIVE;
@@ -60,7 +60,7 @@ namespace math {
         }
         return result;
 #else
-        real_number_t out(number);
+        double out(number);
         int s = mpfr_sgn(number.get_mpfr_handle());
         sign_t result = sign_t::ZERO;
         if (s > 0) {

@@ -102,19 +102,19 @@ namespace bvh {
 
     extern void constructOIBVH(
         const mcut::mesh_t& mesh,
-        std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& bvhAABBs,
+        std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& bvhAABBs,
         std::vector<mcut::fd_t>& bvhLeafNodeFaces,
-        std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& face_bboxes,
-        const mcut::math::real_number_t& slightEnlargmentEps = mcut::math::real_number_t(0.0));
+        std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& face_bboxes,
+        const double& slightEnlargmentEps = double(0.0));
 
     extern void intersectOIBVHs(
         std::map<mcut::fd_t, std::vector<mcut::fd_t>>& ps_face_to_potentially_intersecting_others,
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& srcMeshBvhAABBs,
+        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& srcMeshBvhAABBs,
         const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& cutMeshBvhAABBs,
+        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& cutMeshBvhAABBs,
         const std::vector<mcut::fd_t>& cutMeshBvhLeafNodeFaces);
 #else
-    typedef mcut::geom::bounding_box_t<mcut::math::fast_vec3> BBox;
+    typedef mcut::geom::bounding_box_t<mcut::math::vec3> BBox;
     static inline BBox Union(const BBox& a, const BBox& b)
     {
         BBox out = a;
@@ -122,7 +122,7 @@ namespace bvh {
         return out;
     }
 
-    static inline BBox Union(const BBox& a, const math::fast_vec3& b)
+    static inline BBox Union(const BBox& a, const math::vec3& b)
     {
         BBox out = a;
         out.expand(b);
@@ -147,8 +147,8 @@ namespace bvh {
         }
 
         int primitiveNumber;
-        math::fast_vec3 centroid;
-        geom::bounding_box_t<math::fast_vec3> bounds;
+        math::vec3 centroid;
+        geom::bounding_box_t<math::vec3> bounds;
     };
 
     // Each BVHBuildNode represents a node of the BVH. All nodes store a BBox, which stores
@@ -189,13 +189,13 @@ namespace bvh {
             nPrimitives = 0;
         }
 
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3> bounds;
+        mcut::geom::bounding_box_t<mcut::math::vec3> bounds;
         std::shared_ptr<BVHBuildNode> children[2];
         uint32_t splitAxis, firstPrimOffset, nPrimitives;
     };
 
     struct CompareToMid {
-        CompareToMid(int d, math::real_number_t m)
+        CompareToMid(int d, double m)
         {
             dim = d;
             mid = m;

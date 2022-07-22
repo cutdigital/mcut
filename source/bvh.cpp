@@ -204,10 +204,10 @@ namespace bvh {
 
     void constructOIBVH(
         const mcut::mesh_t& mesh,
-        std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& bvhAABBs,
+        std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& bvhAABBs,
         std::vector<mcut::fd_t>& bvhLeafNodeFaces,
-        std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>>& face_bboxes,
-        const mcut::math::real_number_t& slightEnlargmentEps)
+        std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>>& face_bboxes,
+        const double& slightEnlargmentEps)
     {
         TIMESTACK_PUSH(__FUNCTION__);
         const int meshFaceCount = mesh.number_of_faces();
@@ -216,8 +216,8 @@ namespace bvh {
         // compute mesh-face bounding boxes and their centers
         // ::::::::::::::::::::::::::::::::::::::::::::::::::
 
-        face_bboxes.resize(meshFaceCount); //, mcut::geom::bounding_box_t<mcut::math::fast_vec3>());
-        std::vector<mcut::math::fast_vec3> face_bbox_centers(meshFaceCount, mcut::math::fast_vec3());
+        face_bboxes.resize(meshFaceCount); //, mcut::geom::bounding_box_t<mcut::math::vec3>());
+        std::vector<mcut::math::vec3> face_bbox_centers(meshFaceCount, mcut::math::vec3());
 
         // for each face in mesh
         for (mcut::face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f) {
@@ -226,13 +226,13 @@ namespace bvh {
 
             // for each vertex on face
             for (std::vector<mcut::vd_t>::const_iterator v = vertices_on_face.cbegin(); v != vertices_on_face.cend(); ++v) {
-                const mcut::math::fast_vec3 coords = mesh.vertex(*v);
+                const mcut::math::vec3 coords = mesh.vertex(*v);
                 face_bboxes[faceIdx].expand(coords);
             }
 
-            mcut::geom::bounding_box_t<mcut::math::fast_vec3>& bbox = face_bboxes[faceIdx];
+            mcut::geom::bounding_box_t<mcut::math::vec3>& bbox = face_bboxes[faceIdx];
 
-            if (slightEnlargmentEps > mcut::math::real_number_t(0.0)) {
+            if (slightEnlargmentEps > double(0.0)) {
                 bbox.enlarge(slightEnlargmentEps);
             }
 
@@ -244,7 +244,7 @@ namespace bvh {
         // :::::::::::::::::::::::::
 
         bvhAABBs.resize(bvhNodeCount);
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3>& meshBbox = bvhAABBs.front(); // root bounding box
+        mcut::geom::bounding_box_t<mcut::math::vec3>& meshBbox = bvhAABBs.front(); // root bounding box
 
         // for each vertex in mesh
         for (mcut::vertex_array_iterator_t v = mesh.vertices_begin(); v != mesh.vertices_end(); ++v) {
@@ -260,9 +260,9 @@ namespace bvh {
         for (mcut::face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f) {
             const uint32_t faceIdx = static_cast<uint32_t>(*f);
 
-            const mcut::math::fast_vec3& face_aabb_centre = face_bbox_centers.at(faceIdx);
-            const mcut::math::fast_vec3 offset = face_aabb_centre - meshBbox.minimum();
-            const mcut::math::fast_vec3 dims = meshBbox.maximum() - meshBbox.minimum();
+            const mcut::math::vec3& face_aabb_centre = face_bbox_centers.at(faceIdx);
+            const mcut::math::vec3 offset = face_aabb_centre - meshBbox.minimum();
+            const mcut::math::vec3 dims = meshBbox.maximum() - meshBbox.minimum();
 
             const unsigned int mortion_code = mcut::bvh::morton3D(
                 static_cast<float>(offset.x() / dims.x()),
@@ -303,7 +303,7 @@ namespace bvh {
                 0,
                 rightmost_real_node_on_leaf_level);
 
-            const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& face_bbox = face_bboxes[(uint32_t)it->first];
+            const mcut::geom::bounding_box_t<mcut::math::vec3>& face_bbox = face_bboxes[(uint32_t)it->first];
             bvhAABBs[memory_idx] = face_bbox;
         }
 
@@ -328,20 +328,20 @@ namespace bvh {
                 const int leftmost_real_node_on_child_level = mcut::bvh::get_level_leftmost_node(level_index + 1);
                 const bool right_child_exists = (right_child_implicit_idx <= rightmost_real_node_on_child_level);
 
-                mcut::geom::bounding_box_t<mcut::math::fast_vec3> node_bbox;
+                mcut::geom::bounding_box_t<mcut::math::vec3> node_bbox;
 
                 if (is_penultimate_level) { // both children are leaves
 
                     const int left_child_index_on_level = left_child_implicit_idx - leftmost_real_node_on_child_level;
                     const mcut::fd_t& left_child_face = bvhLeafNodeFaces.at(left_child_index_on_level);
-                    const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& left_child_bbox = face_bboxes.at(left_child_face);
+                    const mcut::geom::bounding_box_t<mcut::math::vec3>& left_child_bbox = face_bboxes.at(left_child_face);
 
                     node_bbox.expand(left_child_bbox);
 
                     if (right_child_exists) {
                         const int right_child_index_on_level = right_child_implicit_idx - leftmost_real_node_on_child_level;
                         const mcut::fd_t& right_child_face = bvhLeafNodeFaces.at(right_child_index_on_level);
-                        const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& right_child_bbox = face_bboxes.at(right_child_face);
+                        const mcut::geom::bounding_box_t<mcut::math::vec3>& right_child_bbox = face_bboxes.at(right_child_face);
                         node_bbox.expand(right_child_bbox);
                     }
                 } else { // remaining internal node levels
@@ -351,7 +351,7 @@ namespace bvh {
                         leftmost_real_node_on_child_level,
                         0,
                         rightmost_real_node_on_child_level);
-                    const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& left_child_bbox = bvhAABBs.at(left_child_memory_idx);
+                    const mcut::geom::bounding_box_t<mcut::math::vec3>& left_child_bbox = bvhAABBs.at(left_child_memory_idx);
 
                     node_bbox.expand(left_child_bbox);
 
@@ -361,7 +361,7 @@ namespace bvh {
                             leftmost_real_node_on_child_level,
                             0,
                             rightmost_real_node_on_child_level);
-                        const mcut::geom::bounding_box_t<mcut::math::fast_vec3>& right_child_bbox = bvhAABBs.at(right_child_memory_idx);
+                        const mcut::geom::bounding_box_t<mcut::math::vec3>& right_child_bbox = bvhAABBs.at(right_child_memory_idx);
                         node_bbox.expand(right_child_bbox);
                     }
                 }
@@ -381,9 +381,9 @@ namespace bvh {
 
 void intersectOIBVHs(
     std::map<mcut::fd_t, std::vector<mcut::fd_t>> &ps_face_to_potentially_intersecting_others,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &srcMeshBvhAABBs,
+    const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> &srcMeshBvhAABBs,
     const std::vector<mcut::fd_t> &srcMeshBvhLeafNodeFaces,
-    const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> &cutMeshBvhAABBs,
+    const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> &cutMeshBvhAABBs,
     const std::vector<mcut::fd_t> &cutMeshBvhLeafNodeFaces)
 {
     TIMESTACK_PUSH(__FUNCTION__);
@@ -406,8 +406,8 @@ void intersectOIBVHs(
     {
         mcut::bvh::node_pair_t ct_front_node = traversalQueue.front();
 
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3> sm_bvh_node_bbox;
-        mcut::geom::bounding_box_t<mcut::math::fast_vec3> cs_bvh_node_bbox;
+        mcut::geom::bounding_box_t<mcut::math::vec3> sm_bvh_node_bbox;
+        mcut::geom::bounding_box_t<mcut::math::vec3> cs_bvh_node_bbox;
 
         // sm
         const int sm_bvh_node_implicit_idx = ct_front_node.m_left;
@@ -584,10 +584,10 @@ void intersectOIBVHs(
 
             const std::vector<mcut::vd_t> vertices_on_face = mesh->get_vertices_around_face(*f);
 
-            mcut::geom::bounding_box_t<mcut::math::fast_vec3> bbox;
+            mcut::geom::bounding_box_t<mcut::math::vec3> bbox;
             // for each vertex on face
             for (std::vector<mcut::vd_t>::const_iterator v = vertices_on_face.cbegin(); v != vertices_on_face.cend(); ++v) {
-                const mcut::math::fast_vec3 coords = mesh->vertex(*v);
+                const mcut::math::vec3 coords = mesh->vertex(*v);
                 bbox.expand(coords);
             }
 

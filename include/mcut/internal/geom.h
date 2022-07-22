@@ -41,13 +41,13 @@ namespace mcut
 namespace geom
 {
 
-mcut::math::real_number_t orient2d(const mcut::math::vec2 &pa, const mcut::math::vec2 &pb, const mcut::math::vec2 &pc);
-mcut::math::real_number_t orient3d(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,
+double orient2d(const mcut::math::vec2 &pa, const mcut::math::vec2 &pb, const mcut::math::vec2 &pc);
+double orient3d(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,
                                    const mcut::math::vec3 &pd);
 
 // Compute a polygon's plane coefficients (i.e. normal and d parameters).
 // The computed normal is not normalized. This function returns the largest component of the normal.
-int compute_polygon_plane_coefficients(math::vec3 &normal, math::real_number_t &d_coeff,
+int compute_polygon_plane_coefficients(math::vec3 &normal, double &d_coeff,
                                        const math::vec3 *polygon_vertices, const int polygon_vertex_count);
 
 // Compute the intersection point between a line (not a segment) and a plane defined by a polygon.
@@ -79,7 +79,7 @@ char compute_line_plane_intersection(math::vec3 &p, // intersection point
 // 'r' : The(second) r endpoint is on the plane (but not 'p').
 // '0' : The segment lies strictly to one side or the other of the plane.
 // '1': The segment intersects the plane, and none of {p, q, r} hold.
-char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal, const math::real_number_t &d_coeff,
+char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal, const double &d_coeff,
                                         const math::vec3 &q, const math::vec3 &r);
 
 // Similar to "compute_segment_plane_intersection" but simply checks the [type] of intersection using
@@ -124,7 +124,7 @@ void project2D(std::vector<math::vec2> &out, const std::vector<math::vec3> &poly
 bool coplaner(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,
               const mcut::math::vec3 &pd);
 
-bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, math::real_number_t &predResult);
+bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, double &predResult);
 
 bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c);
 
@@ -146,7 +146,7 @@ Return values:
 '0': The segments do not intersect (i.e., they share no points); '0' stands for FALSE
 */
 char compute_segment_intersection(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, const math::vec2 &d,
-                                  math::vec2 &p, math::real_number_t &s, math::real_number_t &t);
+                                  math::vec2 &p, double &s, double &t);
 
 template <typename vector_type> struct bounding_box_t
 {

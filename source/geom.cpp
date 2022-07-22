@@ -29,7 +29,7 @@ namespace mcut
 namespace geom
 {
 
-mcut::math::real_number_t orient2d(const mcut::math::vec2 &pa, const mcut::math::vec2 &pb, const mcut::math::vec2 &pc)
+double orient2d(const mcut::math::vec2 &pa, const mcut::math::vec2 &pb, const mcut::math::vec2 &pc)
 {
     const double pa_[2] = {static_cast<double>(pa.x()), static_cast<double>(pa.y())};
     const double pb_[2] = {static_cast<double>(pb.x()), static_cast<double>(pb.y())};
@@ -38,7 +38,7 @@ mcut::math::real_number_t orient2d(const mcut::math::vec2 &pa, const mcut::math:
     return ::orient2d(pa_, pb_, pc_); // shewchuk predicate
 }
 
-mcut::math::real_number_t orient3d(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,
+double orient3d(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,
                                    const mcut::math::vec3 &pd)
 {
     const double pa_[3] = {static_cast<double>(pa.x()), static_cast<double>(pa.y()), static_cast<double>(pa.z())};
@@ -61,7 +61,7 @@ mcut::math::real_number_t orient3d(const mcut::math::vec3 &pa, const mcut::math:
     }
 #endif
 
-int compute_polygon_plane_coefficients(math::vec3 &normal, math::real_number_t &d_coeff,
+int compute_polygon_plane_coefficients(math::vec3 &normal, double &d_coeff,
                                        const math::vec3 *polygon_vertices, const int polygon_vertex_count)
 {
     // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
@@ -78,8 +78,8 @@ int compute_polygon_plane_coefficients(math::vec3 &normal, math::real_number_t &
 
     d_coeff = math::dot_product(polygon_vertices[0], normal);
 
-    math::real_number_t largest_component(0.0);
-    math::real_number_t tmp(0.0);
+    double largest_component(0.0);
+    double tmp(0.0);
     int largest_component_idx = 0;
 
     for (int i = 0; i < 3; ++i)
@@ -103,22 +103,22 @@ int compute_polygon_plane_coefficients(math::vec3 &normal, math::real_number_t &
 // 'r' : The(second) r endpoint is on the plane (but not 'p').
 // '0' : The segment lies strictly to one side or the other of the plane.
 // '1': The segment intersects the plane, and none of {p, q, r} hold.
-char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal, const math::real_number_t &d_coeff,
+char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal, const double &d_coeff,
                                         const math::vec3 &q, const math::vec3 &r)
 {
 
     // math::vec3 planeNormal;
-    // math::real_number_t planeDCoeff;
+    // double planeDCoeff;
     // planeNormalLargestComponent = compute_polygon_plane_coefficients(planeNormal, planeDCoeff, polygonVertices,
     // polygonVertexCount);
 
-    math::real_number_t num = d_coeff - math::dot_product(q, normal);
+    double num = d_coeff - math::dot_product(q, normal);
     const math::vec3 rq = (r - q);
-    math::real_number_t denom = math::dot_product(rq, normal);
+    double denom = math::dot_product(rq, normal);
 
-    if (denom == mcut::math::real_number_t(0.0) /* Segment is parallel to plane.*/)
+    if (denom == double(0.0) /* Segment is parallel to plane.*/)
     {
-        if (num == mcut::math::real_number_t(0.0))
+        if (num == double(0.0))
         {               // 'q' is on plane.
             return 'p'; // The segment lies wholly within the plane
         }
@@ -128,18 +128,18 @@ char compute_segment_plane_intersection(math::vec3 &p, const math::vec3 &normal,
         }
     }
 
-    math::real_number_t t = num / denom;
+    double t = num / denom;
 
     for (int i = 0; i < 3; ++i)
     {
         p[i] = q[i] + t * (r[i] - q[i]);
     }
 
-    if ((mcut::math::real_number_t(0.0) < t) && (t < mcut::math::real_number_t(1.0)))
+    if ((double(0.0) < t) && (t < double(1.0)))
     {
         return '1'; // The segment intersects the plane, and none of {p, q, r} hold
     }
-    else if (num == mcut::math::real_number_t(0.0)) // t==0
+    else if (num == double(0.0)) // t==0
     {
         return 'q'; // The (first) q endpoint is on the plane (but not 'p').
     }
@@ -181,7 +181,7 @@ bool determine_three_noncollinear_vertices(int &i, int &j, int &k, const std::ve
     i = 0;
     j = i + 1;
     k = j + 1;
-    std::vector<std::tuple<int, int, int, math::real_number_t>> non_colinear_triplets;
+    std::vector<std::tuple<int, int, int, double>> non_colinear_triplets;
     
     for (; i < polygon_vertex_count; ++i)
     {
@@ -189,7 +189,7 @@ bool determine_three_noncollinear_vertices(int &i, int &j, int &k, const std::ve
         {
             for (; k < polygon_vertex_count; ++k)
             {
-                math::real_number_t predRes;
+                double predRes;
                 if (!collinear(x[i], x[j], x[k], predRes))
                 {
                     non_colinear_triplets.emplace_back(std::make_tuple(i,j,k,predRes));
@@ -199,11 +199,11 @@ bool determine_three_noncollinear_vertices(int &i, int &j, int &k, const std::ve
     }
 
     std::sort(non_colinear_triplets.begin(), non_colinear_triplets.end(), 
-    [](const std::tuple<int, int, int, math::real_number_t>& a, const std::tuple<int, int, int, math::real_number_t>& b){
+    [](const std::tuple<int, int, int, double>& a, const std::tuple<int, int, int, double>& b){
         return std::fabs(std::get<3>(a)) > std::fabs(std::get<3>(b)); 
     });
 
-    std::tuple<int, int, int, math::real_number_t> best_triplet = non_colinear_triplets.front(); // maximising non-colinearity
+    std::tuple<int, int, int, double> best_triplet = non_colinear_triplets.front(); // maximising non-colinearity
 
     i = std::get<0>(best_triplet);
     j = std::get<1>(best_triplet);
@@ -235,23 +235,23 @@ char compute_segment_plane_intersection_type(const math::vec3 &q, const math::ve
         }
     }
 
-    mcut::math::real_number_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-    mcut::math::real_number_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+    double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+    double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-    if (qRes == mcut::math::real_number_t(0.0) && rRes == mcut::math::real_number_t(0.0))
+    if (qRes == double(0.0) && rRes == double(0.0))
     {
         return 'p';
     }
-    else if (qRes == mcut::math::real_number_t(0.0))
+    else if (qRes == double(0.0))
     {
         return 'q';
     }
-    else if (rRes == mcut::math::real_number_t(0.0))
+    else if (rRes == double(0.0))
     {
         return 'r';
     }
-    else if ((rRes < mcut::math::real_number_t(0.0) && qRes < mcut::math::real_number_t(0.0)) ||
-             (rRes > mcut::math::real_number_t(0.0) && qRes > mcut::math::real_number_t(0.0)))
+    else if ((rRes < double(0.0) && qRes < double(0.0)) ||
+             (rRes > double(0.0) && qRes > double(0.0)))
     {
         return '0';
     }
@@ -283,10 +283,10 @@ char compute_segment_line_plane_intersection_type(const math::vec3 &q, const mat
         }
     }
 
-    mcut::math::real_number_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-    mcut::math::real_number_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+    double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+    double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-    if (qRes == mcut::math::real_number_t(0.0) && rRes == mcut::math::real_number_t(0.0))
+    if (qRes == double(0.0) && rRes == double(0.0))
     {
         // both points used to define line lie on plane therefore we have an in-plane intersection
         // or the polygon is a degenerate triangle
@@ -294,15 +294,15 @@ char compute_segment_line_plane_intersection_type(const math::vec3 &q, const mat
     }
     else
     {
-        if ((rRes < mcut::math::real_number_t(0.0) && qRes < mcut::math::real_number_t(0.0)) ||
-            (rRes > mcut::math::real_number_t(0.0) && qRes > mcut::math::real_number_t(0.0)))
+        if ((rRes < double(0.0) && qRes < double(0.0)) ||
+            (rRes > double(0.0) && qRes > double(0.0)))
         { // both points used to define line lie on same side of plane
             // check if line is parallel to plane
-            // const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
+            // const double num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
             const math::vec3 rq = (r - q);
-            const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
+            const double denom = math::dot_product(rq, polygon_plane_normal);
 
-            if (denom == mcut::math::real_number_t(0.0) /* Segment is parallel to plane.*/)
+            if (denom == double(0.0) /* Segment is parallel to plane.*/)
             {
                 // MCUT_ASSERT(num != 0.0); // implies 'q' is on plane (see: "compute_segment_plane_intersection(...)")
                 // but we have already established that q and r are on same side.
@@ -336,7 +336,7 @@ char compute_line_plane_intersection(math::vec3 &p, // intersection point
                                      const math::vec3 &q, const math::vec3 &r,
                                      const std::vector<math::vec3> &polygon_vertices, const int polygon_normal_max_comp,
                                      const math::vec3 &polygon_plane_normal,
-                                     const math::real_number_t &polygon_plane_d_coeff)
+                                     const double &polygon_plane_d_coeff)
 {
 
     const int polygon_vertex_count = (int)polygon_vertices.size();
@@ -355,24 +355,24 @@ char compute_line_plane_intersection(math::vec3 &p, // intersection point
         }
     }
 
-    mcut::math::real_number_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-    mcut::math::real_number_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+    double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+    double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-    if (qRes == mcut::math::real_number_t(0.) && rRes == mcut::math::real_number_t(0.))
+    if (qRes == double(0.) && rRes == double(0.))
     {
         return 'p'; // both points used to define line lie on plane therefore we have an in-plane intersection
     }
     else
     {
 
-        const math::real_number_t num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
+        const double num = polygon_plane_d_coeff - math::dot_product(q, polygon_plane_normal);
         const math::vec3 rq = (r - q);
-        const math::real_number_t denom = math::dot_product(rq, polygon_plane_normal);
+        const double denom = math::dot_product(rq, polygon_plane_normal);
 
-        if ((rRes < mcut::math::real_number_t(0.) && qRes < mcut::math::real_number_t(0.)) ||
-            (rRes > mcut::math::real_number_t(0.) && qRes > mcut::math::real_number_t(0.)))
+        if ((rRes < double(0.) && qRes < double(0.)) ||
+            (rRes > double(0.) && qRes > double(0.)))
         { // both q an r are on same side of plane
-            if (denom == mcut::math::real_number_t(0.) /* line is parallel to plane.*/)
+            if (denom == double(0.) /* line is parallel to plane.*/)
             {
                 return '0';
             }
@@ -381,7 +381,7 @@ char compute_line_plane_intersection(math::vec3 &p, // intersection point
         // q and r are on difference sides of the plane, therefore we have an intersection
 
         // compute the intersection point
-        const math::real_number_t t = num / denom;
+        const double t = num / denom;
 
         for (int it = 0; it < 3; ++it)
         {
@@ -406,15 +406,15 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
 #if 0 // Algorithm 1 in :
       // https://pdf.sciencedirectassets.com/271512/1-s2.0-S0925772100X00545/1-s2.0-S0925772101000128/main.pdf?X-Amz-Security-Token=IQoJb3JpZ2luX2VjEAEaCXVzLWVhc3QtMSJHMEUCIBr6Fu%2F%2FtscErn%2Fl4pn2UGNA45sAw9vggQscK7Tnl0ssAiEAzfnyy4B4%2BXkZp8xcEk7utDBrxgmGyH7pyqk0efKOUEoq%2BgMIKhAEGgwwNTkwMDM1NDY4NjUiDHQT4kOfk4%2B6kBB0xCrXAzd8SWlnELJbM5l93HSvv4nUgtO85%2FGyx5%2BOoHmYoUuVwJjCXChmLJmlz%2BxYUQE%2Fr8vQa2hPlUEPfiTVGgoHaK8NkSMP6LRs%2F3WjyZ9OxzHbqSwZixNceW34OAkq0E1QgYLdGVjpPKxNK1haXDfBTMN6bF2IOU9dKi9wTv3uTlep0kHDa1BNNl6M6yZk5QlF2bPF9XmNjjZCpFQLhr%2BPoHo%2Bx4xy39aH8hCkkTqGdy2KrKGN6lv0%2FduIaItyZfqalYS%2BwW6cll2F5G11g0tSu7yKu6mug94LUTzsRmzD0UhzeGl2WV6Ev2qhw26mwFEKgnTMqGst8XAHjFjjAQyMzXNHCQqNBRIevHIzVWuUY4QZMylSRsodo0dfwwCFhzl0%2BJA1ZXb0%2BoyB8c11meQBO8FpMSshngNcbiAYUtIOFcHNCTCUMk0JPOZ%2FxvANsopnivbrPARL71zU4PaTujg5jfC2zoO6ZDUL8E6Vn%2BNtfb%2BuQV7DwtIH51Bv%2F%2F1m6h5mjbpRiGYcH%2F5SDD%2Fk%2BpHfKRQzKu7jJc%2B0XO0bQvoLSrAte0Qk10PwOvDl5jMIMdmxTBDDiDGErRykYxMQhq5EwjyiWPXzM3ll9uK59Vy0bAEj5Qemj5by1jCDht6IBjqlAV4okAPQO5wWdWojCYeKvluKfXCvudrUxrLhsxb7%2BTZNMODTG%2Fn%2Fbw875Yr6fOQ42u40pOsnPB%2FTP3cWwjiB%2BEHzDqN8AhCVQyoedw7QrU3OBWlSl6lB%2BGLAVqrhcizgFUiM2nj3HaVP2m7S%2FXqpv%2FoWlEXt4gR8iI9XsIlh6L6SBE22FqbsU5ewCxXaqip19VXhAGnlvjTihXUg6yZGWhExHj%2BKcA%3D%3D&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20210814T103958Z&X-Amz-SignedHeaders=host&X-Amz-Expires=300&X-Amz-Credential=ASIAQ3PHCVTY3PPQSW2L%2F20210814%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=94403dce5c12ede9507e9612c000db5772607e59a2134d30d4e5b44212056dc7&hash=cada083b165f9786e6042e21d3d22147ec08b1e2c8fa2572ceeb2445cb5e730a&host=68042c943591013ac2b2430a89b270f6af2c76d8dfd086a07176afe7c76c2c61&pii=S0925772101000128&tid=spdf-f9e7c4b7-808d-4a8e-a474-6430ff687798&sid=8dddff5b32fff2499908bf6501965aec3d0fgxrqb&type=client
 
-            const math::real_number_t zero(0.0);
+            const double zero(0.0);
             int i = 0;
             int k = 0;
 
-            math::real_number_t f = zero;
-            math::real_number_t u1 = 0.0;
-            math::real_number_t v1 = 0.0;
-            math::real_number_t u2 = 0.0;
-            math::real_number_t v2 = 0.0;
+            double f = zero;
+            double u1 = 0.0;
+            double v1 = 0.0;
+            double u2 = 0.0;
+            double v2 = 0.0;
             const int n = polygon_vertex_count;
             for (i = 0; i < n; ++i)
             {
@@ -498,9 +498,9 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
     {
         for (int d = 0; d < 2; d++)
         {
-            const mcut::math::real_number_t &a = polygon_vertices[i][d];
-            const mcut::math::real_number_t &b = q[d];
-            mcut::math::real_number_t &c = vertices[i][d];
+            const double &a = polygon_vertices[i][d];
+            const double &b = q[d];
+            double &c = vertices[i][d];
             c = a - b;
         }
     }
@@ -513,7 +513,7 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
     {
 
         /* First check if q = (0, 0) is a vertex. */
-        if (vertices[i].x() == mcut::math::real_number_t(0.) && vertices[i].y() == mcut::math::real_number_t(0.))
+        if (vertices[i].x() == double(0.) && vertices[i].y() == double(0.))
         {
             return 'v';
         }
@@ -525,9 +525,9 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
         // Rstrad is TRUE iff one endpoint of e is strictly above the x axis and the other is not (i.e., the other is on
         // or below)
         bool Rstrad =
-            (vertices[i].y() > mcut::math::real_number_t(0.)) != (vertices[il].y() > mcut::math::real_number_t(0.));
+            (vertices[i].y() > double(0.)) != (vertices[il].y() > double(0.));
         bool Lstrad =
-            (vertices[i].y() < mcut::math::real_number_t(0.)) != (vertices[il].y() < mcut::math::real_number_t(0.));
+            (vertices[i].y() < double(0.)) != (vertices[il].y() < double(0.));
 
         if (Rstrad || Lstrad)
         {
@@ -535,13 +535,13 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
 
             // The computation of x is needed whenever either of these straddle variables is TRUE, which
             // only excludes edges passing through q = (0, 0) (and incidentally protects against division by 0).
-            math::real_number_t x = (vertices[i].x() * vertices[il].y() - vertices[il].x() * vertices[i].y()) /
+            double x = (vertices[i].x() * vertices[il].y() - vertices[il].x() * vertices[i].y()) /
                                     (vertices[il].y() - vertices[i].y());
-            if (Rstrad && x > mcut::math::real_number_t(0.))
+            if (Rstrad && x > double(0.))
             {
                 Rcross++;
             }
-            if (Lstrad && x < mcut::math::real_number_t(0.))
+            if (Lstrad && x < double(0.))
             {
                 Lcross++;
             }
@@ -570,10 +570,10 @@ char compute_point_in_polygon_test(const math::vec2 &q, const std::vector<math::
 // a matrix P that will project any 3D vertex to 2D by removing the 3D component that
 // corresponds to the largest component of the normal..
 // https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d/2672702#2672702
-math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3 &polygon_normal,
+math::matrix_t<double> calculate_projection_matrix(const math::vec3 &polygon_normal,
                                                                 const int polygon_normal_largest_component)
 {
-    MCUT_ASSERT(math::squared_length(polygon_normal) > math::real_number_t(0.0));
+    MCUT_ASSERT(math::squared_length(polygon_normal) > double(0.0));
     MCUT_ASSERT(polygon_normal_largest_component >= 0);
     MCUT_ASSERT(polygon_normal_largest_component <= 2);
 
@@ -581,21 +581,21 @@ math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3
     const math::vec3 a = math::normalize(polygon_normal);
     // unit length basis vector corresponding to the largest component of the normal vector
     const math::vec3 b = [&]() {
-        math::vec3 x(math::real_number_t(0.0));
+        math::vec3 x(double(0.0));
         const math::sign_t s = math::sign(polygon_normal[polygon_normal_largest_component]);
         MCUT_ASSERT(s != math::sign_t::ZERO); // implies that the normal vector has a magnitude of zero
         // The largest component of the normal is the one we will "remove"
         // NOTE: we multiple by the sign here to ensure that "a_plus_b" below is not zero when a == b
-        x[polygon_normal_largest_component] = math::real_number_t((1.0) * static_cast<long double>(s));
+        x[polygon_normal_largest_component] = double((1.0) * static_cast<long double>(s));
         return x;
     }();
 
-    math::matrix_t<math::real_number_t> I(3, 3); // 3x3 identity
+    math::matrix_t<double> I(3, 3); // 3x3 identity
     I(0, 0) = 1.0;
     I(1, 1) = 1.0;
     I(2, 2) = 1.0;
 
-    math::matrix_t<math::real_number_t> R = I;
+    math::matrix_t<double> R = I;
 
     // NOTE: While this will map vectors a to b, it can add a lot of unnecessary "twist".
     // For example, if a=b=e_{z} this formula will produce a 180-degree rotation about the z-axis rather
@@ -603,13 +603,13 @@ math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3
     if ((a[0] != b[0]) || (a[1] != b[1]) || (a[2] != b[2])) // a != b
     {
         const math::vec3 a_plus_b = a + b;
-        const math::real_number_t a_dot_b = math::dot_product(a, b);
+        const double a_dot_b = math::dot_product(a, b);
 
         // this will never be zero because we set 'b' as the canonical basis vector
         // that has the largest projection onto the normal
-        MCUT_ASSERT(a_dot_b != math::real_number_t(0.0));
+        MCUT_ASSERT(a_dot_b != double(0.0));
 
-        const math::matrix_t<math::real_number_t> outer = math::outer_product(a_plus_b, a_plus_b);
+        const math::matrix_t<double> outer = math::outer_product(a_plus_b, a_plus_b);
 
         // compute the 3x3 rotation matrix R to orient the polygon into the canonical axes "i" and "j",
         //  where "i" and "j" != "polygon_normal_largest_component"
@@ -618,7 +618,7 @@ math::matrix_t<math::real_number_t> calculate_projection_matrix(const math::vec3
 
     // compute the 2x3 selector matrix K to select the polygon-vertex components that correspond
     // to canonical axes "i" and "j".
-    math::matrix_t<math::real_number_t> K = math::matrix_t<math::real_number_t>(2, 3);
+    math::matrix_t<double> K = math::matrix_t<double>(2, 3);
 
     if (polygon_normal_largest_component == 0) // project by removing x-component
     {
@@ -666,7 +666,7 @@ void project2D(std::vector<math::vec2> &out, const std::vector<math::vec3> &poly
 
 #if 1
     // 3x3 matrix for projecting a point to 2D
-    math::matrix_t<math::real_number_t> P =
+    math::matrix_t<double> P =
         calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
     for (int i = 0; i < polygon_vertex_count; ++i)
     { // for each vertex
@@ -711,7 +711,7 @@ char compute_point_in_polygon_test(const math::vec3 &p, const std::vector<math::
     }
 #endif
 
-    const math::matrix_t<math::real_number_t> P =
+    const math::matrix_t<double> P =
         calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
 
     pp = P * p;
@@ -759,7 +759,7 @@ inline bool Between(const math::vec2 &a, const math::vec2 &b, const math::vec2 &
 bool coplaner(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut::math::vec3 &pc,
               const mcut::math::vec3 &pd)
 {
-    const math::real_number_t val = orient3d(pa, pb, pc, pd);
+    const double val = orient3d(pa, pb, pc, pd);
     //typedef std::numeric_limits<double> dbl;
 
     // double d = 3.14159265358979;
@@ -772,18 +772,18 @@ bool coplaner(const mcut::math::vec3 &pa, const mcut::math::vec3 &pb, const mcut
     // Thus, general advise is for user to ensure that the input polygons are really
     // co-planer. It might be possible for MCUT to help here (see eps used during poly
     // partitioning).
-    return math::absolute_value(val) <= math::real_number_t(4e-7);
+    return math::absolute_value(val) <= double(4e-7);
 }
 
-bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, math::real_number_t &predResult)
+bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, double &predResult)
 {
     predResult = mcut::geom::orient2d(a, b, c);
-    return predResult == mcut::math::real_number_t(0.);
+    return predResult == double(0.);
 }
 
 bool collinear(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c)
 {
-    return mcut::geom::orient2d(a, b, c) == mcut::math::real_number_t(0.);
+    return mcut::geom::orient2d(a, b, c) == double(0.);
 }
 
 char Parallellnt(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, const math::vec2 &d, math::vec2 &p)
@@ -821,10 +821,10 @@ char Parallellnt(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, 
 }
 
 char compute_segment_intersection(const math::vec2 &a, const math::vec2 &b, const math::vec2 &c, const math::vec2 &d,
-                                  math::vec2 &p, math::real_number_t &s, math::real_number_t &t)
+                                  math::vec2 &p, double &s, double &t)
 {
-    // math::real_number_t s, t; /* The two parameters of the parametric eqns. */
-    math::real_number_t num, denom; /* Numerator and denominator of equations. */
+    // double s, t; /* The two parameters of the parametric eqns. */
+    double num, denom; /* Numerator and denominator of equations. */
     char code = '?';                /* Return char characterizing intersection.*/
 
     denom = a[0] * (d[1] - c[1]) + //
@@ -833,7 +833,7 @@ char compute_segment_intersection(const math::vec2 &a, const math::vec2 &b, cons
             c[0] * (a[1] - b[1]);
 
     /* If denom is zero, then segments are parallel: handle separately. */
-    if (denom == math::real_number_t(0.0))
+    if (denom == double(0.0))
     {
         return Parallellnt(a, b, c, d, p);
     }
@@ -842,7 +842,7 @@ char compute_segment_intersection(const math::vec2 &a, const math::vec2 &b, cons
           c[0] * (a[1] - d[1]) + //
           d[0] * (c[1] - a[1]);
 
-    if ((num == math::real_number_t(0.0)) || (num == denom))
+    if ((num == double(0.0)) || (num == denom))
     {
         code = 'v';
     }
@@ -853,20 +853,20 @@ char compute_segment_intersection(const math::vec2 &a, const math::vec2 &b, cons
             b[0] * (a[1] - c[1]) + //
             c[0] * (b[1] - a[1]));
 
-    if ((num == math::real_number_t(0.0)) || (num == denom))
+    if ((num == double(0.0)) || (num == denom))
     {
         code = 'v';
     }
 
     t = num / denom;
 
-    if ((math::real_number_t(0.0) < s) && (s < math::real_number_t(1.0)) && (math::real_number_t(0.0) < t) &&
-        (t < math::real_number_t(1.0)))
+    if ((double(0.0) < s) && (s < double(1.0)) && (double(0.0) < t) &&
+        (t < double(1.0)))
     {
         code = '1';
     }
-    else if ((math::real_number_t(0.0) > s) || (s > math::real_number_t(1.0)) || (math::real_number_t(0.0) > t) ||
-             (t > math::real_number_t(1.0)))
+    else if ((double(0.0) > s) || (s > double(1.0)) || (double(0.0) > t) ||
+             (t > double(1.0)))
     {
         code = '0';
     }

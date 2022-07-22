@@ -128,8 +128,8 @@ namespace mcut
         // extracting edge-face intersection pairs
         const std::map<mcut::fd_t, std::vector<mcut::fd_t>> *ps_face_to_potentially_intersecting_others = nullptr;
 #if defined(USE_OIBVH)
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *srcMeshFaceBboxes = nullptr;
-        const std::vector<mcut::geom::bounding_box_t<mcut::math::fast_vec3>> *cutMeshFaceBboxes = nullptr;
+        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *srcMeshFaceBboxes = nullptr;
+        const std::vector<mcut::geom::bounding_box_t<mcut::math::vec3>> *cutMeshFaceBboxes = nullptr;
 #else
         bvh::BoundingVolumeHierarchy *srcMeshBVH;
         bvh::BoundingVolumeHierarchy *cutMeshBVH;
@@ -159,8 +159,8 @@ namespace mcut
         bool keep_fragments_sealed_inside = false;
         bool keep_fragments_sealed_outside = false;
         // bool include_fragment_sealed_partial = false; // See: variable above "keep_partially_sealed_connected_components"
-        bool keep_fragments_sealed_inside_exhaustive = false;
-        bool keep_fragments_sealed_outside_exhaustive = false;
+        bool keep_fragments_sealed_inside_exhaustive = false; // TODO remove
+        bool keep_fragments_sealed_outside_exhaustive = false; // TODO remove
         // NOTE TO SELF: if the user simply wants patches, then kernel should not have to proceed to stitching!!!
     };
 
