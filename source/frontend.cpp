@@ -1,5 +1,5 @@
 #include "mcut/internal/frontend.h"
-#include "mcut/internal/preprocess.h"
+#include "mcut/internal/preproc_dispatch.h"
 
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
@@ -19,11 +19,11 @@
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/scheduler.h"
 
-std::atomic_bool mcut::thread_pool_terminate(false);
+std::atomic_bool thread_pool_terminate(false);
 #endif
 
 #if defined(PROFILING_BUILD)
-std::stack<std::unique_ptr<mcut::mini_timer>> g_timestack = std::stack<std::unique_ptr<mcut::mini_timer>>();
+std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr<mini_timer>>();
 #endif
 
 std::map<McContext, std::unique_ptr<context_t>> g_contexts = {};
@@ -224,7 +224,7 @@ void dispatch_impl(
 
     context_uptr->dispatchFlags = flags;
 
-    intersect(
+    preproc_dispatch(
         context_uptr,
         pSrcMeshVertices,
         pSrcMeshFaceIndices,
@@ -628,30 +628,30 @@ void get_connected_component_data_impl(
                     // local (face) to global (cc) vertex index mapping
                     // --------------------------------------------------
                     std::vector<uint32_t> faceVertexIndices(faceSize);
-                    std::vector<mcut::vec3> faceVertexCoords3d(faceSize);
+                    std::vector<vec3> faceVertexCoords3d(faceSize);
                     std::unordered_map<uint32_t, uint32_t> faceLocalToGlobleVertexMap;
 
                     for (uint32_t v = 0; v < faceSize; ++v) {
                         const uint32_t vertexId = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)faceOffset + v];
                         faceVertexIndices[v] = vertexId;
                         const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)vertexId * 3);
-                        faceVertexCoords3d[v] = mcut::vec3(vptr[0], vptr[1], vptr[2]);
+                        faceVertexCoords3d[v] = vec3(vptr[0], vptr[1], vptr[2]);
                         faceLocalToGlobleVertexMap[v] = vertexId;
                     }
 
                     // project vertices to 2D
                     // ----------------------
-                    std::vector<mcut::vec2> faceVertexCoords2d;
+                    std::vector<vec2> faceVertexCoords2d;
                     {
-                        mcut::vec3 faceNormal;
+                        vec3 faceNormal;
                         double param_d;
-                        int largestNormalComp = mcut::compute_polygon_plane_coefficients(
+                        int largestNormalComp = compute_polygon_plane_coefficients(
                             faceNormal,
                             param_d,
                             faceVertexCoords3d.data(),
                             (int)faceVertexCoords3d.size());
 
-                        mcut::project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
+                        project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
                     }
 
                     std::vector<std::vector<std::array<double, 2>>> polygon(1);
@@ -660,7 +660,7 @@ void get_connected_component_data_impl(
                     faceVertexCoords2d_ec.resize(faceVertexCoords2d.size());
                     {
                         for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
-                            const mcut::vec2& v = faceVertexCoords2d[i];
+                            const vec2& v = faceVertexCoords2d[i];
                             std::array<double, 2>& a = faceVertexCoords2d_ec[i];
                             a[0] = static_cast<double>(v[0]);
                             a[1] = static_cast<double>(v[1]);

@@ -463,9 +463,9 @@ template <typename vector_type> vector_type normalize(const vector_type &v)
 }
 
 
-double orient2d(const mcut::vec2 &pa, const mcut::vec2 &pb, const mcut::vec2 &pc);
-double orient3d(const mcut::vec3 &pa, const mcut::vec3 &pb, const mcut::vec3 &pc,
-                                   const mcut::vec3 &pd);
+double orient2d(const vec2 &pa, const vec2 &pb, const vec2 &pc);
+double orient3d(const vec3 &pa, const vec3 &pb, const vec3 &pc,
+                                   const vec3 &pd);
 
 // Compute a polygon's plane coefficients (i.e. normal and d parameters).
 // The computed normal is not normalized. This function returns the largest component of the normal.
@@ -543,8 +543,8 @@ void project2D(std::vector<vec2> &out, const std::vector<vec3> &polygon_vertices
 , const int polygon_normal_largest_component
 );
 
-bool coplaner(const mcut::vec3 &pa, const mcut::vec3 &pb, const mcut::vec3 &pc,
-              const mcut::vec3 &pd);
+bool coplaner(const vec3 &pa, const vec3 &pb, const vec3 &pc,
+              const vec3 &pd);
 
 bool collinear(const vec2 &a, const vec2 &b, const vec2 &c, double &predResult);
 

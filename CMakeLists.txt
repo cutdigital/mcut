@@ -156,14 +156,12 @@ message(STATUS "[MCUT] extra_libs=${extra_libs}")
 set (	project_source_files  
 		${CMAKE_CURRENT_SOURCE_DIR}/source/mcut.cpp 
 		${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp 
-		${CMAKE_CURRENT_SOURCE_DIR}/source/halfedge_mesh.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/hmesh.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/math.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/geom.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/bvh.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/shewchuk.c
-		${CMAKE_CURRENT_SOURCE_DIR}/source/utility.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/frontend.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/frontend_intersect.cpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/source/preproc_dispatch.cpp)
 
 #
 # Create MCUT target(s)

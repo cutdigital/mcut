@@ -101,20 +101,20 @@ namespace bvh {
         const int rightmostRealNodeImplicitIndexOnNodeLevel);
 
     extern void build_oibvh(
-        const mcut::hmesh_t& mesh,
-        std::vector<mcut::bounding_box_t<mcut::vec3>>& bvhAABBs,
-        std::vector<mcut::fd_t>& bvhLeafNodeFaces,
-        std::vector<mcut::bounding_box_t<mcut::vec3>>& face_bboxes,
+        const hmesh_t& mesh,
+        std::vector<bounding_box_t<vec3>>& bvhAABBs,
+        std::vector<fd_t>& bvhLeafNodeFaces,
+        std::vector<bounding_box_t<vec3>>& face_bboxes,
         const double& slightEnlargmentEps = double(0.0));
 
     extern void intersectOIBVHs(
-        std::map<mcut::fd_t, std::vector<mcut::fd_t>>& ps_face_to_potentially_intersecting_others,
-        const std::vector<mcut::bounding_box_t<mcut::vec3>>& srcMeshBvhAABBs,
-        const std::vector<mcut::fd_t>& srcMeshBvhLeafNodeFaces,
-        const std::vector<mcut::bounding_box_t<mcut::vec3>>& cutMeshBvhAABBs,
-        const std::vector<mcut::fd_t>& cutMeshBvhLeafNodeFaces);
+        std::map<fd_t, std::vector<fd_t>>& ps_face_to_potentially_intersecting_others,
+        const std::vector<bounding_box_t<vec3>>& srcMeshBvhAABBs,
+        const std::vector<fd_t>& srcMeshBvhLeafNodeFaces,
+        const std::vector<bounding_box_t<vec3>>& cutMeshBvhAABBs,
+        const std::vector<fd_t>& cutMeshBvhLeafNodeFaces);
 #else
-    typedef mcut::bounding_box_t<mcut::vec3> BBox;
+    typedef bounding_box_t<vec3> BBox;
     static inline BBox Union(const BBox& a, const BBox& b)
     {
         BBox out = a;
@@ -189,7 +189,7 @@ namespace bvh {
             nPrimitives = 0;
         }
 
-        mcut::bounding_box_t<mcut::vec3> bounds;
+        bounding_box_t<vec3> bounds;
         std::shared_ptr<BVHBuildNode> children[2];
         uint32_t splitAxis, firstPrimOffset, nPrimitives;
     };
@@ -303,7 +303,7 @@ namespace bvh {
 #if defined(MCUT_MULTI_THREADED)
             thread_pool& scheduler,
 #endif
-            std::map<mcut::fd_t, std::vector<mcut::fd_t>>& symmetric_intersecting_pairs,
+            std::map<fd_t, std::vector<fd_t>>& symmetric_intersecting_pairs,
             const BoundingVolumeHierarchy& bvhA,
             const BoundingVolumeHierarchy& bvhB,
             const uint32_t primitiveOffsetA,

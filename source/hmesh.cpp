@@ -1133,7 +1133,7 @@ namespace mcut
         return faces_begin(account_for_removed_elems);
     }
 
-    void write_off(const char *fpath, const mcut::hmesh_t &mesh)
+    void write_off(const char *fpath, const hmesh_t &mesh)
     {
 
         std::ofstream outfile(fpath);
@@ -1157,7 +1157,7 @@ namespace mcut
         //
         // vertices
         //
-        for (mcut::vertex_array_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter)
+        for (vertex_array_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter)
         {
             //const vertex_data_t& vdata = iter.second;
             const vec3 &point = mesh.vertex(*iter);
@@ -1180,7 +1180,7 @@ namespace mcut
         //
         // faces
         //
-        for (mcut::face_array_iterator_t iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter)
+        for (face_array_iterator_t iter = mesh.faces_begin(); iter != mesh.faces_end(); ++iter)
         {
             //const typename hmesh_t::face_descriptor_t& fd = iter.first;
             const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(*iter);
@@ -1199,7 +1199,7 @@ namespace mcut
         outfile.close();
     }
 
-    void read_off(mcut::hmesh_t &mesh, const char *fpath)
+    void read_off(hmesh_t &mesh, const char *fpath)
     {
         auto next_line = [&](std::ifstream &f, std::string &s) -> bool
         {

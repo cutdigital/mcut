@@ -228,7 +228,7 @@ namespace mcut
 
     struct vertex_data_t : id_<vertex_descriptor_t>
     {
-        mcut::vec3 p;                             // geometry coordinates
+        vec3 p;                             // geometry coordinates
         std::vector<face_descriptor_t> m_faces;         // ... incident to vertex
         std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
     };
@@ -449,8 +449,8 @@ namespace mcut
     typedef edge_descriptor_t ed_t;
     typedef face_descriptor_t fd_t;
 
-    void write_off(const char *fpath, const mcut::hmesh_t &mesh);
-    void read_off(mcut::hmesh_t &mesh, const char *fpath);
+    void write_off(const char *fpath, const hmesh_t &mesh);
+    void read_off(hmesh_t &mesh, const char *fpath);
 
     template <typename V = face_array_t>
     class array_iterator_t : public V::const_iterator
@@ -468,7 +468,7 @@ namespace mcut
         {
         }
 
-        const mcut::hmesh_t *get_mesh_ptr() const
+        const hmesh_t *get_mesh_ptr() const
         {
             return mesh_ptr;
         }
@@ -593,13 +593,13 @@ namespace std
 {
 #if 1
     template <>
-    inline typename mcut::edge_array_iterator_t::difference_type distance(
-        mcut::edge_array_iterator_t first,
-        mcut::edge_array_iterator_t last)
+    inline typename edge_array_iterator_t::difference_type distance(
+        edge_array_iterator_t first,
+        edge_array_iterator_t last)
     {
         MCUT_ASSERT(first.get_mesh_ptr() == last.get_mesh_ptr());
-        mcut::edge_array_iterator_t it = first;
-        mcut::edge_array_iterator_t::difference_type dist = last - first;
+        edge_array_iterator_t it = first;
+        edge_array_iterator_t::difference_type dist = last - first;
 
         uint32_t r = it.get_mesh_ptr()->count_removed_elements_in_range(first, last);
         if (r > 0)
@@ -615,43 +615,43 @@ namespace std
 #if 0
     template <>
     void advance(
-        mcut::hmesh_t::array_iterator_t<mcut::hmesh_t::edge_array_t> &iter,
-        typename std::iterator_traits<mcut::hmesh_t::array_iterator_t<mcut::hmesh_t::edge_array_t>>::difference_type n);
+        hmesh_t::array_iterator_t<hmesh_t::edge_array_t> &iter,
+        typename std::iterator_traits<hmesh_t::array_iterator_t<hmesh_t::edge_array_t>>::difference_type n);
 #endif
 
     template <>
-    struct hash<mcut::vertex_descriptor_t>
+    struct hash<vertex_descriptor_t>
     {
-        std::size_t operator()(const mcut::vertex_descriptor_t &k) const
+        std::size_t operator()(const vertex_descriptor_t &k) const
         {
-            return std::hash<typename mcut::vertex_descriptor_t::index_type>()(static_cast<typename mcut::vertex_descriptor_t::index_type>(k));
+            return std::hash<typename vertex_descriptor_t::index_type>()(static_cast<typename vertex_descriptor_t::index_type>(k));
         }
     };
 
     template <>
-    struct hash<mcut::edge_descriptor_t>
+    struct hash<edge_descriptor_t>
     {
-        std::size_t operator()(const mcut::edge_descriptor_t &k) const
+        std::size_t operator()(const edge_descriptor_t &k) const
         {
-            return std::hash<typename mcut::edge_descriptor_t::index_type>()(static_cast<typename mcut::edge_descriptor_t::index_type>(k));
+            return std::hash<typename edge_descriptor_t::index_type>()(static_cast<typename edge_descriptor_t::index_type>(k));
         }
     };
 
     template <>
-    struct hash<mcut::halfedge_descriptor_t>
+    struct hash<halfedge_descriptor_t>
     {
-        std::size_t operator()(const mcut::halfedge_descriptor_t &k) const
+        std::size_t operator()(const halfedge_descriptor_t &k) const
         {
-            return std::hash<typename mcut::halfedge_descriptor_t::index_type>()(static_cast<typename mcut::halfedge_descriptor_t::index_type>(k));
+            return std::hash<typename halfedge_descriptor_t::index_type>()(static_cast<typename halfedge_descriptor_t::index_type>(k));
         }
     };
 
     template <>
-    struct hash<mcut::face_descriptor_t>
+    struct hash<face_descriptor_t>
     {
-        std::size_t operator()(const mcut::face_descriptor_t &k) const
+        std::size_t operator()(const face_descriptor_t &k) const
         {
-            return std::hash<typename mcut::face_descriptor_t::index_type>()(static_cast<typename mcut::face_descriptor_t::index_type>(k));
+            return std::hash<typename face_descriptor_t::index_type>()(static_cast<typename face_descriptor_t::index_type>(k));
         }
     };
 }

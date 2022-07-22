@@ -38,7 +38,7 @@
 
 #include "mcut/internal/frontend.h"
 
-extern "C" void intersect(
+extern "C" void preproc_dispatch(
     std::unique_ptr<context_t>& context_uptr,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
@@ -50,6 +50,5 @@ extern "C" void intersect(
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces);
-
 
 #endif // #ifndef _FRONTEND_INTERSECT_H_

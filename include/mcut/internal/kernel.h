@@ -115,7 +115,7 @@ namespace mcut
     };
 
     //
-    // settings for how to execute the function "mcut::dispatch(...)"
+    // settings for how to execute the function "dispatch(...)"
     //
     struct input_t
     {
@@ -126,10 +126,10 @@ namespace mcut
         const hmesh_t *cut_mesh = nullptr;
         // NOTE: we use std::map because it is beneficial that keys are sorted when
         // extracting edge-face intersection pairs
-        const std::map<mcut::fd_t, std::vector<mcut::fd_t>> *ps_face_to_potentially_intersecting_others = nullptr;
+        const std::map<fd_t, std::vector<fd_t>> *ps_face_to_potentially_intersecting_others = nullptr;
 #if defined(USE_OIBVH)
-        const std::vector<mcut::bounding_box_t<mcut::vec3>> *source_hmesh_face_aabb_array_ptr = nullptr;
-        const std::vector<mcut::bounding_box_t<mcut::vec3>> *cut_hmesh_face_aabb_array_ptr = nullptr;
+        const std::vector<bounding_box_t<vec3>> *source_hmesh_face_aabb_array_ptr = nullptr;
+        const std::vector<bounding_box_t<vec3>> *cut_hmesh_face_aabb_array_ptr = nullptr;
 #else
         bvh::BoundingVolumeHierarchy *source_hmesh_BVH;
         bvh::BoundingVolumeHierarchy *cut_hmesh_BVH;
@@ -186,7 +186,7 @@ namespace mcut
     };
 
     //
-    // the output returned from the function "mcut::dispatch"
+    // the output returned from the function "dispatch"
     //
     struct output_t
     {
@@ -228,7 +228,7 @@ namespace mcut
                                   std::vector<int> &cc_to_face_count);
 
     // return true if point p lies on the plane of every three vertices of f
-    bool point_on_face_plane(const mcut::hmesh_t &m, const mcut::fd_t &f, const mcut::vec3 &p, int &fv_count);
+    bool point_on_face_plane(const hmesh_t &m, const fd_t &f, const vec3 &p, int &fv_count);
 
     //
     // returns string equivalent value (e.g. for printing)

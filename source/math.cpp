@@ -91,7 +91,7 @@ namespace mcut {
             a.x() * b.y() - a.y() * b.x());
     }
 
-    double orient2d(const mcut::vec2& pa, const mcut::vec2& pb, const mcut::vec2& pc)
+    double orient2d(const vec2& pa, const vec2& pb, const vec2& pc)
     {
         const double pa_[2] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()) };
         const double pb_[2] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()) };
@@ -100,8 +100,8 @@ namespace mcut {
         return ::orient2d(pa_, pb_, pc_); // shewchuk predicate
     }
 
-    double orient3d(const mcut::vec3& pa, const mcut::vec3& pb, const mcut::vec3& pc,
-        const mcut::vec3& pd)
+    double orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
+        const vec3& pd)
     {
         const double pa_[3] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()), static_cast<double>(pa.z()) };
         const double pb_[3] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()), static_cast<double>(pb.z()) };
@@ -748,8 +748,8 @@ namespace mcut {
                 ((a[1] >= c[1]) && (c[1] >= b[1]));
     }
 
-    bool coplaner(const mcut::vec3& pa, const mcut::vec3& pb, const mcut::vec3& pc,
-        const mcut::vec3& pd)
+    bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
+        const vec3& pd)
     {
         const double val = orient3d(pa, pb, pc, pd);
         // typedef std::numeric_limits<double> dbl;
@@ -769,13 +769,13 @@ namespace mcut {
 
     bool collinear(const vec2& a, const vec2& b, const vec2& c, double& predResult)
     {
-        predResult = mcut::orient2d(a, b, c);
+        predResult = orient2d(a, b, c);
         return predResult == double(0.);
     }
 
     bool collinear(const vec2& a, const vec2& b, const vec2& c)
     {
-        return mcut::orient2d(a, b, c) == double(0.);
+        return orient2d(a, b, c) == double(0.);
     }
 
     char Parallellnt(const vec2& a, const vec2& b, const vec2& c, const vec2& d, vec2& p)

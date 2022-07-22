@@ -112,7 +112,7 @@ void fn_delete_cc(connected_component_t* p)
 struct context_t {
 #if defined(MCUT_MULTI_THREADED)
     // work scheduling state
-    mcut::thread_pool scheduler;
+    thread_pool scheduler;
 #endif
 
     // the current set of connected components associated with context
