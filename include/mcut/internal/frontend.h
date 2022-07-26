@@ -41,6 +41,10 @@
 #include <map>
 #include <memory>
 
+#if defined(MCUT_MULTI_THREADED)
+#include "mcut/internal/tpool.h"
+#endif
+
 // internal frontend data structure which we use to store connected component
 // data that is computed by the kernel and requested by a client via the 
 // "mcGetConnectedComponentData" function. So the "mcGetConnectedComponentData"

@@ -38,7 +38,7 @@
 
 #include "mcut/internal/frontend.h"
 
-extern "C" void preproc_dispatch(
+extern "C" void preproc(
     std::unique_ptr<context_t>& context_uptr,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,

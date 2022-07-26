@@ -1803,13 +1803,13 @@ void resolve_floating_polygons(
     } // for (std::vector<floating_polygon_info_t>::const_iterator detected_floating_polygons_iter = kernel_output.detected_floating_polygons.cbegin(); ...
 }
 
-void intersect(
+extern "C" void preproc(
     std::unique_ptr<context_t>& context_uptr,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
-    uint32_t source_hmesh_face_count,
+    uint32_t numSrcMeshFaces,
     const void* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
@@ -1819,7 +1819,7 @@ void intersect(
     hmesh_t source_hmesh;
     double source_hmesh_aabb_diag(0.0);
 
-    if (false == client_input_arrays_to_hmesh(context_uptr, source_hmesh, source_hmesh_aabb_diag, pSrcMeshVertices, pSrcMeshFaceIndices, pSrcMeshFaceSizes, numSrcMeshVertices, source_hmesh_face_count)) {
+    if (false == client_input_arrays_to_hmesh(context_uptr, source_hmesh, source_hmesh_aabb_diag, pSrcMeshVertices, pSrcMeshFaceIndices, pSrcMeshFaceSizes, numSrcMeshVertices, numSrcMeshFaces)) {
         throw std::invalid_argument("invalid source-mesh arrays");
     }
 
@@ -1894,9 +1894,9 @@ void intersect(
     std::vector<bounding_box_t<vec3>> source_hmesh_BVH_aabb_array;
     std::vector<fd_t> source_hmesh_BVH_leafdata_array;
     std::vector<bounding_box_t<vec3>> source_hmesh_face_aabb_array;
-    bvh::build_oibvh(source_hmesh, source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
+    build_oibvh(source_hmesh, source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
 #else
-    bvh::BoundingVolumeHierarchy source_hmesh_BVH;
+    BoundingVolumeHierarchy source_hmesh_BVH;
     source_hmesh_BVH.buildTree(source_hmesh);
 #endif
     context_uptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
@@ -1911,7 +1911,8 @@ void intersect(
     std::unordered_map<vd_t, vec3> cut_hmesh_new_poly_partition_vertices;
 
     // the number of faces in the source mesh from the last/previous dispatch call
-    int source_hmesh_face_count_prev = source_hmesh_face_count;
+    const uint32_t source_hmesh_face_count = numSrcMeshFaces; 
+    uint32_t source_hmesh_face_count_prev = source_hmesh_face_count;
 
     output_t kernel_output;
 
@@ -1923,7 +1924,7 @@ void intersect(
     std::vector<fd_t> cut_hmesh_BVH_leafdata_array;
     std::vector<bounding_box_t<vec3>> cut_hmesh_face_face_aabb_array;
 #else
-    bvh::BoundingVolumeHierarchy cut_hmesh_BVH; // built later (see below)
+    BoundingVolumeHierarchy cut_hmesh_BVH; // built later (see below)
 #endif
 
     bool source_or_cut_hmesh_BVH_rebuilt = true; // i.e. used to determine whether we should retraverse BVHs
@@ -2030,7 +2031,7 @@ void intersect(
 #if defined(USE_OIBVH)
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
-                bvh::build_oibvh(cut_hmesh, cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array, cut_hmesh_face_face_aabb_array, numerical_perturbation_constant);
+                build_oibvh(cut_hmesh, cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array, cut_hmesh_face_face_aabb_array, numerical_perturbation_constant);
 #else
                 cut_hmesh_BVH.buildTree(cut_hmesh, numerical_perturbation_constant);
 #endif
@@ -2067,7 +2068,7 @@ void intersect(
 #if defined(USE_OIBVH)
                 source_hmesh_BVH_aabb_array.clear();
                 source_hmesh_BVH_leafdata_array.clear();
-                bvh::build_oibvh(
+                build_oibvh(
                     source_hmesh,
                     source_hmesh_BVH_aabb_array,
                     source_hmesh_BVH_leafdata_array,
@@ -2081,7 +2082,7 @@ void intersect(
 #if defined(USE_OIBVH)
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
-                bvh::build_oibvh(
+                build_oibvh(
                     cut_hmesh,
                     cut_hmesh_BVH_aabb_array,
                     cut_hmesh_BVH_leafdata_array,
@@ -2125,9 +2126,9 @@ void intersect(
 
             ps_face_to_potentially_intersecting_others.clear();
 #if defined(USE_OIBVH)
-            bvh::intersectOIBVHs(ps_face_to_potentially_intersecting_others, source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array);
+            intersectOIBVHs(ps_face_to_potentially_intersecting_others, source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array);
 #else
-            bvh::BoundingVolumeHierarchy::intersectBVHTrees(
+            BoundingVolumeHierarchy::intersectBVHTrees(
 #if defined(MCUT_MULTI_THREADED)
                 context_uptr->scheduler,
 #endif

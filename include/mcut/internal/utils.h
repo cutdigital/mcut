@@ -108,8 +108,6 @@
 #define TIMESTACK_RESET()
 #endif
 
-namespace mcut
-{
 
 #if defined(PROFILING_BUILD)
     class mini_timer
@@ -272,6 +270,6 @@ namespace mcut
 #if defined(PROFILING_BUILD)
     extern std::stack<std::unique_ptr<mini_timer>> g_timestack;
 #endif // #if defined(PROFILING_BUILD)
-} // namespace mcut
+
 
 #endif // MCUT_UTILS_H_

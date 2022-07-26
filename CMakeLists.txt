@@ -110,7 +110,7 @@ if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TESTS)
 	option(MCUT_BUILD_TESTS "Configure to build tests" ON)
 endif()
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
-option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" ON)
+option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" OFF)
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS)
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
@@ -161,7 +161,7 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/source/bvh.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/shewchuk.c
 		${CMAKE_CURRENT_SOURCE_DIR}/source/frontend.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/preproc_dispatch.cpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/source/preproc.cpp)
 
 #
 # Create MCUT target(s)

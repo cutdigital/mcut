@@ -1,5 +1,5 @@
 #include "mcut/internal/frontend.h"
-#include "mcut/internal/preproc_dispatch.h"
+#include "mcut/internal/preproc.h"
 
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
@@ -18,7 +18,6 @@
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/scheduler.h"
-
 std::atomic_bool thread_pool_terminate(false);
 #endif
 
@@ -224,7 +223,7 @@ void dispatch_impl(
 
     context_uptr->dispatchFlags = flags;
 
-    preproc_dispatch(
+    preproc(
         context_uptr,
         pSrcMeshVertices,
         pSrcMeshFaceIndices,

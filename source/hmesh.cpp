@@ -27,8 +27,6 @@
 
 #define ENABLE_EDGE_DESCRIPTOR_TRICK 1
 
-namespace mcut
-{
     //
     // array_iterator_t
     //
@@ -1318,4 +1316,3 @@ namespace mcut
         infile.close();
     }
 
-} // namespace mcut

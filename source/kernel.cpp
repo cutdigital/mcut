@@ -19,15 +19,7 @@
  *
  * Author(s)     : Floyd M. Chitalu
  */
-
-#include "mcut/internal/kernel.h"
-#include "mcut/internal/bvh.h"
-#include "mcut/internal/geom.h"
-#include "mcut/internal/halfedge_mesh.h"
-#include "mcut/internal/math.h"
-#include "mcut/internal/utils.h"
 #include <algorithm>
-//#include <fstream>
 #include <functional>
 #include <numeric> // std::iota
 #include <queue>
@@ -35,6 +27,12 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+
+#include "mcut/internal/kernel.h"
+#include "mcut/internal/bvh.h"
+#include "mcut/internal/hmesh.h"
+#include "mcut/internal/math.h"
+#include "mcut/internal/utils.h"
 
 #ifndef LICENSE_PURCHASED
 #define lmsg() printf("NOTE: MCUT is copyrighted and may not be sold or included in commercial products without a license.\n")
@@ -52,90 +50,83 @@ typename edge_array_iterator_t::difference_type distance(
     edge_array_iterator_t last);
 }
 
-namespace mcut {
-
 logger_t* logger_ptr = nullptr;
-std::string to_string(const sm_frag_location_t &v)
-    {
-        std::string s;
-        switch (v)
-        {
-        case sm_frag_location_t::ABOVE:
-            s = "a";
-            break;
-        case sm_frag_location_t::BELOW:
-            s = "b";
-            break;
-        case sm_frag_location_t::UNDEFINED:
-            s = "u";
-            break;
-        }
-        return s;
+std::string to_string(const sm_frag_location_t& v)
+{
+    std::string s;
+    switch (v) {
+    case sm_frag_location_t::ABOVE:
+        s = "a";
+        break;
+    case sm_frag_location_t::BELOW:
+        s = "b";
+        break;
+    case sm_frag_location_t::UNDEFINED:
+        s = "u";
+        break;
     }
+    return s;
+}
 
-    std::string to_string(const cm_patch_location_t &v)
-    {
-        std::string s;
-        switch (v)
-        {
-        case cm_patch_location_t::INSIDE:
-            s = "i";
-            break;
-        case cm_patch_location_t::OUTSIDE:
-            s = "o";
-            break;
-        case cm_patch_location_t::UNDEFINED:
-            s = "u";
-            break;
-        }
-        return s;
+std::string to_string(const cm_patch_location_t& v)
+{
+    std::string s;
+    switch (v) {
+    case cm_patch_location_t::INSIDE:
+        s = "i";
+        break;
+    case cm_patch_location_t::OUTSIDE:
+        s = "o";
+        break;
+    case cm_patch_location_t::UNDEFINED:
+        s = "u";
+        break;
     }
+    return s;
+}
 
-    std::string to_string(const status_t &v)
-    {
-        std::string s;
-        switch (v)
-        {
-        case status_t::SUCCESS:
-            s = "SUCCESS";
-            break;
-        case status_t::INVALID_SRC_MESH:
-            s = "INVALID_SRC_MESH";
-            break;
-        case status_t::INVALID_CUT_MESH:
-            s = "INVALID_CUT_MESH";
-            break;
-        case status_t::INVALID_MESH_INTERSECTION:
-            s = "INVALID_MESH_INTERSECTION";
-            break;
-        case status_t::GENERAL_POSITION_VIOLATION:
-            s = "GENERAL_POSITION_VIOLATION";
-            break;
-        case status_t::DETECTED_FLOATING_POLYGON:
-            s = "DETECTED_FLOATING_POLYGON";
-            break;
-            //case status_t::FACE_VERTEX_INTERSECTION:
-            //    s = "FACE_VERTEX_INTERSECTION";
-            //    break;
-        }
-        return s;
+std::string to_string(const status_t& v)
+{
+    std::string s;
+    switch (v) {
+    case status_t::SUCCESS:
+        s = "SUCCESS";
+        break;
+    case status_t::INVALID_SRC_MESH:
+        s = "INVALID_SRC_MESH";
+        break;
+    case status_t::INVALID_CUT_MESH:
+        s = "INVALID_CUT_MESH";
+        break;
+    case status_t::INVALID_MESH_INTERSECTION:
+        s = "INVALID_MESH_INTERSECTION";
+        break;
+    case status_t::GENERAL_POSITION_VIOLATION:
+        s = "GENERAL_POSITION_VIOLATION";
+        break;
+    case status_t::DETECTED_FLOATING_POLYGON:
+        s = "DETECTED_FLOATING_POLYGON";
+        break;
+        // case status_t::FACE_VERTEX_INTERSECTION:
+        //     s = "FACE_VERTEX_INTERSECTION";
+        //     break;
     }
+    return s;
+}
 
-    std::string to_string(const cm_patch_winding_order_t &v)
-    {
-        std::string s;
-        switch (v)
-        {
-        case cm_patch_winding_order_t::DEFAULT:
-            s = "def";
-            break;
-        case cm_patch_winding_order_t::REVERSE:
-            s = "rev";
-            break;
-        }
-        return s;
+std::string to_string(const cm_patch_winding_order_t& v)
+{
+    std::string s;
+    switch (v) {
+    case cm_patch_winding_order_t::DEFAULT:
+        s = "def";
+        break;
+    case cm_patch_winding_order_t::REVERSE:
+        s = "rev";
+        break;
     }
-
+    return s;
+}
 
 int wrap_integer(int x, const int lo, const int hi)
 {
@@ -2843,7 +2834,7 @@ void dispatch(output_t& output, const input_t& input)
                     fd_t face_pqr = tested_edge_face; // the face which is incident to halfedge-pq
                     fd_t face_xyz = tested_face; // the face which is intersected with halfedge-pq
                     fd_t face_pqs = tested_edge_face == tested_edge_h0_face ? tested_edge_h1_face : hmesh_t::null_face(); // ps.face(halfedge_pq_opp); // the face which is incident to the halfedge opposite to halfedge-pq
-                                                                                                                         // fd_t face_pqX = hmesh_t::null_face(); // a virtual face pqX (where X denotes an unspecified auxiliary point)
+                                                                                                                          // fd_t face_pqX = hmesh_t::null_face(); // a virtual face pqX (where X denotes an unspecified auxiliary point)
 
 #if 0
                     // add vertex if it does not exist.
@@ -10300,5 +10291,3 @@ void dispatch(output_t& output, const input_t& input)
 
     return;
 } // dispatch
-
-} // namespace mcut

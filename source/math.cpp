@@ -25,7 +25,6 @@
 #include <cstdlib>
 #include <tuple> // std::make_tuple std::get<>
 
-namespace mcut {
 
     double square_root(const double& number)
     {
@@ -878,4 +877,4 @@ namespace mcut {
         }
     }
 
-} // namespace mcut {
+
