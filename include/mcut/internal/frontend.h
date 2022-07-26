@@ -40,6 +40,7 @@
 
 #include <map>
 #include <memory>
+#include <string>
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
