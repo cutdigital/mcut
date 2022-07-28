@@ -11,7 +11,7 @@ The project is called "MCUT" (short for 'mesh cutting'), and it provides functio
 
 <p align="center">
   <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true">
-  Figure 1: Generate, slice and perform Booleans without errors. Competitive with the best solids and polygon Boolean tools on the market.
+  Figure 1: Generate, slice and perform Booleans without errors.
 </p>
 
 
