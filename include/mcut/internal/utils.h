@@ -80,6 +80,12 @@
 #include <iostream>
 #include <sstream>
 
+#if MCUT_BUILD_WINDOWS
+#define EXCEPTION_THROWN throw()
+#else
+#define EXCEPTION_THROWN 
+#endif
+
 //#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
@@ -88,17 +94,17 @@
 #include <memory>
 
 #define TIMESTACK_PUSH(name) \
-    mcut::g_timestack.push(std::unique_ptr<mcut::mini_timer>(new mcut::mini_timer(name)))
+    g_timestack.push(std::unique_ptr<mini_timer>(new mini_timer(name)))
 #define TIMESTACK_POP() \
-    mcut::g_timestack.pop()
+    g_timestack.pop()
 #define TIMESTACK_RESET()                       \
-    while (!mcut::g_timestack.empty())          \
+    while (!g_timestack.empty())          \
     {                                           \
-        mcut::g_timestack.top()->set_invalid(); \
-        mcut::g_timestack.pop();                \
+        g_timestack.top()->set_invalid(); \
+        g_timestack.pop();                \
     }
  #define SCOPED_TIMER(name) \
-     mcut::mini_timer _1mt(name) 
+     mini_timer _1mt(name) 
 
 
 #else
@@ -108,8 +114,6 @@
 #define TIMESTACK_RESET()
 #endif
 
-namespace mcut
-{
 
 #if defined(PROFILING_BUILD)
     class mini_timer
@@ -270,8 +274,8 @@ namespace mcut
     }
 
 #if defined(PROFILING_BUILD)
-    extern std::stack<std::unique_ptr<mcut::mini_timer>> g_timestack;
+    extern std::stack<std::unique_ptr<mini_timer>> g_timestack;
 #endif // #if defined(PROFILING_BUILD)
-} // namespace mcut
+
 
 #endif // MCUT_UTILS_H_

@@ -10,6 +10,7 @@ jobs:
         cxx: [g++-4.8, g++-10, clang++-9]
         build_type: [Debug, Release]
         std: [11]
+        multithreading: [ON,OFF]
         os: [ubuntu-18.04]
         include:
           - cxx: g++-4.8
@@ -56,6 +57,7 @@ jobs:
       run: |
         cmake -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.shared}} \
               -DCMAKE_CXX_STANDARD=${{matrix.std}}  \
+              -DMCUT_BUILD_WITH_MULTITHREADING=${{matrix.multithreading}} \
               $GITHUB_WORKSPACE
     - name: Build
       working-directory: ${{runner.workspace}}/build

@@ -91,12 +91,15 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   # main CMakeLists.
   include(CTest)
 
-  # Docs only available if this is the main app
-  find_package(Doxygen)
-  if(Doxygen_FOUND)
-    add_subdirectory(docs)
-  else()
-    message(STATUS "Doxygen not found, not building docs")
+  if(MCUT_BUILD_DOCUMENTATION)
+	# Docs only available if this is the main app
+	find_package(Doxygen)
+
+	if(Doxygen_FOUND)
+		add_subdirectory(docs)
+	else()
+		message(STATUS "Doxygen not found, not building docs")
+	endif()
   endif()
 endif()
 
@@ -110,7 +113,7 @@ if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TESTS)
 	option(MCUT_BUILD_TESTS "Configure to build tests" ON)
 endif()
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
-option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" ON)
+option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" OFF)
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS)
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
@@ -156,13 +159,12 @@ message(STATUS "[MCUT] extra_libs=${extra_libs}")
 set (	project_source_files  
 		${CMAKE_CURRENT_SOURCE_DIR}/source/mcut.cpp 
 		${CMAKE_CURRENT_SOURCE_DIR}/source/kernel.cpp 
-		${CMAKE_CURRENT_SOURCE_DIR}/source/halfedge_mesh.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/hmesh.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/math.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/geom.cpp
-		${CMAKE_CURRENT_SOURCE_DIR}/source/number.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/bvh.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/shewchuk.c
-		${CMAKE_CURRENT_SOURCE_DIR}/source/utility.cpp)
+		${CMAKE_CURRENT_SOURCE_DIR}/source/frontend.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/preproc.cpp)
 
 #
 # Create MCUT target(s)

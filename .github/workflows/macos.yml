@@ -9,6 +9,7 @@ jobs:
       matrix:
         os: [macOS-10.15, macOS-11, macOS-12]
         build_type: [Debug, Release]
+        multithreading: [ON,OFF]
         include:
           - shared: -DMCUT_BUILD_AS_SHARED_LIB=ON
 
@@ -22,6 +23,7 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         cmake -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.shared}} \
+              -DMCUT_BUILD_WITH_MULTITHREADING=${{matrix.multithreading}} \
               $GITHUB_WORKSPACE
 
     - name: Build

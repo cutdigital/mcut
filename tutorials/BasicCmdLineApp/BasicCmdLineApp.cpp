@@ -258,7 +258,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-void mcDebugOutput(McDebugSource source,
+void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
     McDebugSeverity severity,
