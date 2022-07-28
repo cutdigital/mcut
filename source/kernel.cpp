@@ -4582,7 +4582,7 @@ void dispatch(output_t& output, const input_t& input)
             }
         } else { // this is the more complex case where we add minimal set of non overlapping edges between 3 vertices
 
-            MCUT_ASSERT(ps_intersecting_edges_iter->second[0].size() == 1);
+            MCUT_ASSERT(ps_intersecting_edges_iter->second.size() == 1);
 
             const vd_t& first = ps_v0;//vertices_on_ps_edge[0];
             const vd_t& second =ps_v1;//vertices_on_ps_edge[1];
@@ -7805,7 +7805,7 @@ void dispatch(output_t& output, const input_t& input)
         patch.reserve(cs_face_count);
         
         MCUT_ASSERT(flood_fill_queue.size() == 0);
-        
+
         flood_fill_queue.push(std::get<1>(graph_interior_ihalfedge_pool)); // first polygon
         patch_poly_enqueued[std::get<1>(graph_interior_ihalfedge_pool)] = true;
 
