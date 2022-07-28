@@ -49,6 +49,6 @@ extern "C" void preproc(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces);
+    uint32_t numCutMeshFaces) noexcept(false);
 
 #endif // #ifndef _FRONTEND_INTERSECT_H_

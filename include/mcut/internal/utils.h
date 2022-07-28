@@ -80,6 +80,12 @@
 #include <iostream>
 #include <sstream>
 
+#if MCUT_BUILD_WINDOWS
+#define EXCEPTION_THROWN throw()
+#else
+#define EXCEPTION_THROWN 
+#endif
+
 //#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)

@@ -160,26 +160,26 @@ struct context_t {
 extern "C" std::map<McContext, std::unique_ptr<context_t>> g_contexts;
 
 extern "C" void create_context_impl(
-    McContext* pContext, McFlags flags);
+    McContext* pContext, McFlags flags) noexcept(false);
 
 extern "C" void debug_message_callback_impl(
     McContext context,
     pfn_mcDebugOutput_CALLBACK cb,
-    const void* userParam);
+    const void* userParam) noexcept(false);
 
 extern "C" void debug_message_control_impl(
     McContext context,
     McDebugSource source,
     McDebugType type,
     McDebugSeverity severity,
-    bool enabled);
+    bool enabled) noexcept(false);
 
 extern "C" void get_info_impl(
     const McContext context,
     McFlags info,
     uint64_t bytes,
     void* pMem,
-    uint64_t* pNumBytes);
+    uint64_t* pNumBytes) noexcept(false);
 
 extern "C" void dispatch_impl(
     McContext context,
@@ -193,14 +193,14 @@ extern "C" void dispatch_impl(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces);
+    uint32_t numCutMeshFaces) noexcept(false);
 
 extern "C" void get_connected_components_impl(
     const McContext context,
     const McConnectedComponentType connectedComponentType,
     const uint32_t numEntries,
     McConnectedComponent* pConnComps,
-    uint32_t* numConnComps);
+    uint32_t* numConnComps) noexcept(false);
 
 extern "C" void get_connected_component_data_impl(
     const McContext context,
@@ -208,14 +208,14 @@ extern "C" void get_connected_component_data_impl(
     McFlags flags,
     uint64_t bytes,
     void* pMem,
-    uint64_t* pNumBytes);
+    uint64_t* pNumBytes) noexcept(false);
 
 extern "C" void release_connected_components_impl(
     const McContext context,
     uint32_t numConnComps,
-    const McConnectedComponent* pConnComps);
+    const McConnectedComponent* pConnComps) noexcept(false);
 
 extern "C" void release_context_impl(
-    McContext context);
+    McContext context) noexcept(false);
 
 #endif // #ifndef _FRONTEND_H_
