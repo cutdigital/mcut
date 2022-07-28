@@ -81,7 +81,7 @@ The following images show more examples of what users can achieve with MCUT:
   Figure 11: An example of sectioning with a flat plane, which can be used to eliminate material/volume on either side of this plane or create hollow carve-outs.
 </p>
 
-## Source code and test applications
+# Source code and test applications
 
 The source code is available for your perusal and evaluation. You can access right here on Github. This is an opportunity for you to trial and experiment with MCUT for you needs. Here is a quick example of how you clone and build the library:
 
@@ -93,11 +93,8 @@ The source code is available for your perusal and evaluation. You can access rig
 
 Next, try out one of the tutorials!
 
-## Licensing
+# Licensing
 
 MCUT is available under an Open Source license as well as a commercial license. Users choosing to use MCUT under the free-of-charge Open Source license (e.g. for academic purposes) simply need to comply to its terms, otherwise a commercial license is required. The Open Source license is the "GNU General Public License" (GPL). In cases where the constraints of the Open source license prevent you from using MCUT, a commercial license can be purchased. The library is licensed with an attractively low price which is a one-off sum, requiring no further loyalty fees with guarranteed future updates for free.   
 
 _For more information about this library, you can refer to the project page [here](https://cutdigital.github.io/mcut.site/) or [email](floyd.m.chitalu@gmail.com) the author_.
-
-|:warning: MCUT may not be sold or included in commercial products without a license. |
-| --- |
