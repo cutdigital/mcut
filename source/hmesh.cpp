@@ -637,15 +637,9 @@
         MCUT_ASSERT(f != null_face());
 
         const std::vector<halfedge_descriptor_t> &halfedges_on_face = get_halfedges_around_face(f);
-<<<<<<< HEAD:source/hmesh.cpp
+
         std::vector<vertex_descriptor_t> vertex_descriptors(halfedges_on_face.size());
 
-=======
-        static thread_local std::vector<vertex_descriptor_t> vertex_descriptors;
-
-        vertex_descriptors.resize(halfedges_on_face.size());
-        
->>>>>>> minor opts to kernel.cpp:source/halfedge_mesh.cpp
         for (int i = 0; i < (int)halfedges_on_face.size(); ++i)
         {
             const halfedge_descriptor_t h = halfedges_on_face[i];
@@ -698,12 +692,8 @@
         MCUT_ASSERT(f != null_face());
 
         static thread_local std::vector<face_descriptor_t> faces_around_face;
-<<<<<<< HEAD:source/hmesh.cpp
         faces_around_face.clear();
 
-=======
-        faces_around_face.resize(0);
->>>>>>> minor opts to kernel.cpp:source/halfedge_mesh.cpp
         const std::vector<halfedge_descriptor_t> &halfedges_on_face = (halfedges_around_face_ != nullptr) ? *halfedges_around_face_ : get_halfedges_around_face(f);
 
         for (int i = 0; i < (int)halfedges_on_face.size(); ++i)

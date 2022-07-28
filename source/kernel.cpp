@@ -1581,7 +1581,7 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     const int ps_vtx_cnt = ps.number_of_vertices();
-    const int ps_face_cnt = ps.number_of_faces();
+    //const int ps_face_cnt = ps.number_of_faces();
 
     //
 
@@ -1708,7 +1708,7 @@ void dispatch(output_t& output, const input_t& input)
             std::back_inserter(unvisited_ps_ifaces),
             [](const std::pair<fd_t, std::vector<fd_t>>& kv) { return kv.first; });
 
-        std::vector<bool> ps_iface_enqueued(ps_face_cnt, false);
+        std::vector<bool> ps_iface_enqueued(ps.number_of_faces(), false);
 
         std::vector<bool> ps_edge_visited(ps.number_of_edges(), false);
         // initially null
@@ -6029,7 +6029,7 @@ void dispatch(output_t& output, const input_t& input)
     // cutting algorithm i.e when duplicating intersection points, creating cut-mesh patches, stitching (hole
     // filling), and more.
 
-    MCUT_ASSERT((int)m0_polygons.size() >= ps_face_cnt);
+    MCUT_ASSERT((int)m0_polygons.size() >= ps.number_of_faces());
 
     const std::vector<traced_polygon_t>::iterator traced_sm_polygons_iter_end = m0_polygons.begin() + traced_sm_polygon_count;
     // const std::vector<traced_polygon_t>::iterator& traced_cs_polygons_iter_begin = traced_sm_polygons_iter_end;
@@ -9135,6 +9135,8 @@ void dispatch(output_t& output, const input_t& input)
 
         m1_colored.reserve_for_additional_elements(cs_face_count);
 
+        m1_colored.reserve_for_additional_elements(cs_face_count);
+
         // create entry
         color_to_m0_to_m1_he_instances.insert(std::make_pair(color_id, std::unordered_map<hd_t, std::map<int, hd_t>>()));
         // ref to entry
@@ -9934,19 +9936,13 @@ void dispatch(output_t& output, const input_t& input)
 
                     if (is_ambiguious_interior_edge_case) {
                         MCUT_ASSERT((size_t)m0_cur_patch_cur_poly_cur_he_src - ps_vtx_cnt < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_src) != m0_ivtx_to_intersection_registry_entry.cend()*/);
-<<<<<<< HEAD
+
                         const std::pair<ed_t, fd_t>& m0_cur_patch_cur_poly_cur_he_src_ipair = m0_ivtx_to_intersection_registry_entry.at((std::size_t)m0_cur_patch_cur_poly_cur_he_src - ps_vtx_cnt);
                         const ed_t src_ps_edge = m0_cur_patch_cur_poly_cur_he_src_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_src); //ps.edge(src_coincident_ps_halfedge);
 
                         MCUT_ASSERT((size_t)m0_cur_patch_cur_poly_cur_he_tgt - ps_vtx_cnt < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
                         const std::pair<ed_t, fd_t>& m0_cur_patch_cur_poly_cur_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry.at((std::size_t)m0_cur_patch_cur_poly_cur_he_tgt - ps_vtx_cnt);
-=======
-                        const std::pair<ed_t, fd_t>& m0_cur_patch_cur_poly_cur_he_src_ipair = m0_ivtx_to_intersection_registry_entry[(std::size_t)m0_cur_patch_cur_poly_cur_he_src - ps_vtx_cnt];
-                        const ed_t src_ps_edge = m0_cur_patch_cur_poly_cur_he_src_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_src); //ps.edge(src_coincident_ps_halfedge);
 
-                        MCUT_ASSERT((size_t)m0_cur_patch_cur_poly_cur_he_tgt - ps_vtx_cnt < m0_ivtx_to_intersection_registry_entry.size() /*m0_ivtx_to_intersection_registry_entry.find(m0_cur_patch_cur_poly_cur_he_tgt) != m0_ivtx_to_intersection_registry_entry.cend()*/);
-                        const std::pair<ed_t, fd_t>& m0_cur_patch_cur_poly_cur_he_tgt_ipair = m0_ivtx_to_intersection_registry_entry[(std::size_t)m0_cur_patch_cur_poly_cur_he_tgt - ps_vtx_cnt];
->>>>>>> minor opts to kernel.cpp
                         const ed_t tgt_ps_edge = m0_cur_patch_cur_poly_cur_he_tgt_ipair.first; // m0_ivtx_to_ps_edge.at(m0_cur_patch_cur_poly_cur_he_tgt); //ps.edge(tgt_ps_h);
 
                         bool is_valid_ambiguious_interior_edge = (src_ps_edge != tgt_ps_edge);
