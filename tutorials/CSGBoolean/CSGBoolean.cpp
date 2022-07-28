@@ -49,16 +49,15 @@ This tutorial shows how to compute boolean operations using MCUT.
 #include <Eigen/Core>
 #include <igl/barycentric_coordinates.h>
 #include <igl/barycentric_interpolation.h>
-#include <igl/readOBJ.h>
+#include <igl/read_triangle_mesh.h>
 #include <igl/writeOBJ.h>
 
 struct InputMesh
 {
     // variables for reading .obj file data with libigl
-    std::vector<std::vector<double>> V, TC, N;
-    std::vector<std::vector<int>> F, FTC, FN;
-    std::vector<std::tuple<std::string, unsigned, unsigned>> FM;
-
+    std::vector<std::vector<double>> V;
+    std::vector<std::vector<int>> F;
+    
     // variables for mesh data in a format suited for MCUT
     std::string fpath;                      // path to mesh file
     std::vector<uint32_t> faceSizesArray;   // vertices per face
@@ -66,14 +65,34 @@ struct InputMesh
     std::vector<double> vertexCoordsArray;  // vertex coords
 };
 
-int main()
+int main(int argc, const char* argv[] )
 {
     // load meshes.
     // -----------------
     InputMesh srcMesh;
 
-    srcMesh.fpath = DATA_DIR "/cube.obj";
-    bool srcMeshLoaded = igl::readOBJ(srcMesh.fpath, srcMesh.V, srcMesh.TC, srcMesh.N, srcMesh.F, srcMesh.FTC, srcMesh.FN);
+    const bool user_provided_meshes = argc > 1;
+    if(user_provided_meshes && argc != 4)
+    {
+        fprintf(stderr, "usage: <exec> <srcmesh/path> <cutmesh/path> <boolOp>\n"
+            "The possible values for the <boolOp> arguments are:\n"
+            "\t-u (for union)\n"
+            "\t-i (for intersection)\n"
+            "\t-ds (for difference i.e. source-mesh NOT cut-mesh)\n"
+            "\t-dc (for difference i.e. cut-mesh NOT source-mesh)\n"
+            "\t-a (for all ops)\n");
+            return 1;
+    }
+    else if(user_provided_meshes)
+    {
+        printf("NOTE: using user provided meshes meshes\n");
+    }
+    else{
+        printf("NOTE: using default meshes\n");
+    }
+
+    srcMesh.fpath = user_provided_meshes ? argv[1] : DATA_DIR "/cube.obj";
+    bool srcMeshLoaded = igl::read_triangle_mesh(srcMesh.fpath, srcMesh.V, srcMesh.F);
 
     if (!srcMeshLoaded)
     {
@@ -106,8 +125,8 @@ int main()
     printf("source mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)srcMesh.V.size(), (int)srcMesh.F.size());
 
     InputMesh cutMesh;
-    cutMesh.fpath = DATA_DIR "/torus.obj";
-    bool cutMeshLoaded = igl::readOBJ(cutMesh.fpath, cutMesh.V, cutMesh.TC, cutMesh.N, cutMesh.F, cutMesh.FTC, cutMesh.FN);
+    cutMesh.fpath = user_provided_meshes ? argv[2] : DATA_DIR "/torus.obj";
+    bool cutMeshLoaded = igl::read_triangle_mesh(cutMesh.fpath, cutMesh.V, cutMesh.F);
 
     if (!cutMeshLoaded)
     {
@@ -139,6 +158,33 @@ int main()
 
     printf("cut mesh:\n\tvertices=%d\n\tfaces=%d\n", (int)cutMesh.V.size(), (int)cutMesh.F.size());
 
+    std::string boolOpStr;
+
+    if(strcmp(argv[3], "-u") == 0)
+    {
+        boolOpStr = "UNION";
+    }
+    else if(strcmp(argv[3], "-i") == 0)
+    {
+        boolOpStr = "INTERSECTION";
+    }
+    else if(strcmp(argv[3], "-ds") == 0)
+    {
+        boolOpStr = "A_NOT_B";
+    }
+    else if(strcmp(argv[3], "-dc") == 0)
+    {
+        boolOpStr = "B_NOT_A";
+    }
+    else if(strcmp(argv[3], "-a") == 0)
+    {
+        boolOpStr = "*";
+    }
+    else{
+        fprintf(stderr, "invalid boolOp argument value\n");
+        return 1;
+    }
+
     // create a context
     // -------------------
     McContext context = MC_NULL_HANDLE;
@@ -146,8 +192,8 @@ int main()
     my_assert(err == MC_NO_ERROR);
 
     //  do the cutting (boolean ops)
-    // -------------------------------
-    printf("\nInputs: \n\tShape A = 'cube.obj'.\n\tShape B = 'torus.obj'\n\n");
+    // -----------------------------
+    printf("\nInputs: \n\tShape A = %s'.\n\tShape B = '%s'\n\n", srcMesh.fpath.c_str(), cutMesh.fpath.c_str());
 
     // We can either let MCUT compute all possible meshes (including patches etc.), or we can
     // constrain the library to compute exactly the boolean op mesh we want. This 'constrained' case
@@ -161,6 +207,11 @@ int main()
 
     for (std::map<std::string, McFlags>::const_iterator boolOpIter = booleanOps.cbegin(); boolOpIter != booleanOps.cend(); ++boolOpIter)
     {
+        if(boolOpIter->first != boolOpStr && boolOpStr != "*")
+        {
+            continue;
+        }
+
         const McFlags boolOpFlags = boolOpIter->second;
         const std::string boolOpName = boolOpIter->first;
 
@@ -274,7 +325,17 @@ int main()
         // save cc mesh to .obj file
         // -------------------------
 
-        std::string fpath(OUTPUT_DIR "/" + boolOpName + ".obj");
+        auto extract_fname = [](const std::string& full_path)
+        {
+            // get filename
+            std::string base_filename = full_path.substr(full_path.find_last_of("/\\") + 1);
+            // remove extension from filename
+            std::string::size_type const p(base_filename.find_last_of('.'));
+            std::string file_without_extension = base_filename.substr(0, p);
+            return file_without_extension;
+        };
+
+        std::string fpath(OUTPUT_DIR "/" + extract_fname(srcMesh.fpath) + "_" + extract_fname(cutMesh.fpath) + "_" +  boolOpName + ".obj");
 
         printf("write file: %s\n", fpath.c_str());
 
