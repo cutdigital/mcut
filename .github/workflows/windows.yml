@@ -9,10 +9,11 @@ jobs:
       matrix:
         # windows-2016 and windows-2019 have MSVC 2017 and 2019 installed
         # respectively: https://github.com/actions/virtual-environments.
-        os: [windows-2019, windows-2022]
+        os: [windows-2019]
         platform: [Win32, x64]
         build_type: [Debug, Release]
-        standard: [11, 17, 20]
+        standard: [11] # [11, 17, 20]
+        multithreading: [ON,OFF]
 
     steps:
     - uses: actions/checkout@v2
@@ -27,6 +28,7 @@ jobs:
       run: |
         cmake -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.shared}} \
               -A ${{matrix.platform}} \
+              -DMCUT_BUILD_WITH_MULTITHREADING=${{matrix.multithreading}} \
               -DCMAKE_CXX_STANDARD=${{matrix.standard}} \
               $GITHUB_WORKSPACE
 
