@@ -44,7 +44,7 @@ struct DebugContextConfig {
     McContext context_;
 };
 
-MCAPI_ATTR void MCAPI_PTR mcDebugOutput(McDebugSource source,
+void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
     McDebugSeverity severity,
