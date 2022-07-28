@@ -17,7 +17,7 @@
 #include "mcut/internal/tri/tri.h"
 
 #if defined(MCUT_MULTI_THREADED)
-#include "mcut/internal/scheduler.h"
+#include "mcut/internal/tpool.h"
 std::atomic_bool thread_pool_terminate(false);
 #endif
 

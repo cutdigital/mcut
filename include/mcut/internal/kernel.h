@@ -25,7 +25,7 @@
 #include <mcut/internal/bvh.h>
 #include <mcut/internal/hmesh.h>
 #if defined(MCUT_MULTI_THREADED)
-#include <mcut/internal/scheduler.h>
+#include <mcut/internal/tpool.h>
 #endif
 
 #include <map>

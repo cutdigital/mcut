@@ -26,7 +26,7 @@
 #include "mcut/internal/math.h"
 
 #if defined(MCUT_MULTI_THREADED)
-#include "mcut/internal/scheduler.h"
+#include "mcut/internal/tpool.h"
 #endif
 
 // OIBVH is over 2-3x faster than the alternative (classic) BVH approaches.

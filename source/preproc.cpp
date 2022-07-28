@@ -174,7 +174,7 @@ bool client_input_arrays_to_hmesh(
             futures);
 
         auto add_faces = [&](InputStorageIteratorType block_start_,
-                             InputStorageIteratorType block_end_) -> McResult {
+                             InputStorageIteratorType block_end_) -> bool {
             for (InputStorageIteratorType face_iter = block_start_;
                  face_iter != block_end_; ++face_iter) {
                 uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), face_iter);
@@ -182,19 +182,17 @@ bool client_input_arrays_to_hmesh(
                 fd_t fd = halfedgeMesh.add_face(faceVertices);
 
                 if (fd == hmesh_t::null_face()) {
-                    result = McResult::MC_INVALID_VALUE;
-                    if (result != McResult::MC_NO_ERROR) {
-                        context_uptr->log( //
-                            MC_DEBUG_SOURCE_API, //
-                            MC_DEBUG_TYPE_ERROR, //
-                            0, //
-                            MC_DEBUG_SEVERITY_HIGH, //
-                            "invalid vertices on face - " + std::to_string(faceID));
-                        return result;
-                    }
+
+                    context_uptr->log( //
+                        MC_DEBUG_SOURCE_API, //
+                        MC_DEBUG_TYPE_ERROR, //
+                        0, //
+                        MC_DEBUG_SEVERITY_HIGH, //
+                        "invalid vertices on face - " + std::to_string(faceID));
+                    return false;
                 }
             }
-            return McResult::MC_NO_ERROR;
+            return true;
         };
 
         bool okay = true;
@@ -209,24 +207,26 @@ bool client_input_arrays_to_hmesh(
                 continue; // just go on (to next iteration) in order to at-least wait for all tasks to finish before we return to user
             }
 
-            result = add_faces(future_res.first, future_res.second);
-            okay = okay && result == McResult::MC_NO_ERROR;
+            bool result = add_faces(future_res.first, future_res.second);
+            okay = okay && result == true;
         }
 
         if (!okay) {
-            return McResult::MC_INVALID_VALUE;
+            return false;
         }
 
         // add lastly in order to maintain order
-        result = add_faces(partial_res.first, partial_res.second);
-        if (result != McResult::MC_NO_ERROR) {
-            return result;
+        bool result = add_faces(partial_res.first, partial_res.second);
+        if (!result) {
+            return false;
         }
     }
 #else // #if defined(MCUT_MULTI_THREADED)
     int faceSizeOffset = 0;
+    std::vector<vd_t> faceVertices;
+
     for (uint32_t i = 0; i < numFaces; ++i) {
-        std::vector<vd_t> faceVertices;
+        faceVertices.clear();
         int face_vertex_count = 3; // triangle
 
         face_vertex_count = ((uint32_t*)pFaceSizes)[i];
@@ -237,8 +237,6 @@ bool client_input_arrays_to_hmesh(
 
             return false;
         }
-
-        faceVertices.reserve(face_vertex_count);
 
         for (int j = 0; j < face_vertex_count; ++j) {
 
@@ -1911,7 +1909,7 @@ extern "C" void preproc(
     std::unordered_map<vd_t, vec3> cut_hmesh_new_poly_partition_vertices;
 
     // the number of faces in the source mesh from the last/previous dispatch call
-    const uint32_t source_hmesh_face_count = numSrcMeshFaces; 
+    const uint32_t source_hmesh_face_count = numSrcMeshFaces;
     uint32_t source_hmesh_face_count_prev = source_hmesh_face_count;
 
     output_t kernel_output;
@@ -2223,7 +2221,7 @@ extern "C" void preproc(
          i != cut_hmesh_child_to_usermesh_birth_face.end(); ++i) {
         fd_t offsettedDescr = fd_t(i->first + source_hmesh.number_of_faces());
         fpPartitionChildFaceToInputCutMeshFaceOFFSETTED[offsettedDescr] = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
-                                                                                                                                // i->second = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
+                                                                                                                          // i->second = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
     }
 
     std::unordered_map<vd_t, vec3> addedFpPartitioningVerticesOnCutMeshOFFSETTED;
@@ -2305,15 +2303,15 @@ extern "C" void preproc(
 #if defined(MCUT_MULTI_THREADED)
                 context_uptr,
 #endif
-                asFragPtr->indexArrayMesh, 
+                asFragPtr->indexArrayMesh,
                 *j,
-                source_hmesh_new_poly_partition_vertices, 
-                source_hmesh_child_to_usermesh_birth_face, 
-                addedFpPartitioningVerticesOnCutMeshOFFSETTED, 
+                source_hmesh_new_poly_partition_vertices,
+                source_hmesh_child_to_usermesh_birth_face,
+                addedFpPartitioningVerticesOnCutMeshOFFSETTED,
                 fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-                numSrcMeshVertices, 
-                source_hmesh_face_count, 
-                source_hmesh.number_of_vertices(), 
+                numSrcMeshVertices,
+                source_hmesh_face_count,
+                source_hmesh.number_of_vertices(),
                 source_hmesh.number_of_faces());
         }
     }
@@ -2338,15 +2336,15 @@ extern "C" void preproc(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
-            asPatchPtr->indexArrayMesh, 
+            asPatchPtr->indexArrayMesh,
             *it,
-            source_hmesh_new_poly_partition_vertices, 
-            source_hmesh_child_to_usermesh_birth_face, 
-            addedFpPartitioningVerticesOnCutMeshOFFSETTED, 
+            source_hmesh_new_poly_partition_vertices,
+            source_hmesh_child_to_usermesh_birth_face,
+            addedFpPartitioningVerticesOnCutMeshOFFSETTED,
             fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, 
-            source_hmesh_face_count, 
-            source_hmesh.number_of_vertices(), 
+            numSrcMeshVertices,
+            source_hmesh_face_count,
+            source_hmesh.number_of_vertices(),
             source_hmesh.number_of_faces());
     }
     TIMESTACK_POP();
@@ -2368,9 +2366,9 @@ extern "C" void preproc(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
 #endif
-            asPatchPtr->indexArrayMesh, 
+            asPatchPtr->indexArrayMesh,
             *it,
-            source_hmesh_new_poly_partition_vertices, 
+            source_hmesh_new_poly_partition_vertices,
             source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
             numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
     }
