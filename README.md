@@ -1,23 +1,23 @@
-# What is this?
+# Overview
 
-_A simple and fast C++ library for mesh booleans and more..._ 
+Gist: _A simple and fast C++ library for mesh booleans and more..._ 
 
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
 [![MacOS](https://github.com/cutdigital/mcut/actions/workflows/macos.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/macos.yml) [![Linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
 
-This project is designed for a broad range of real-world problems relating to structural-design tasks. Application areas include aerospace and automotive engineering, mining, civil and mechanical engineering amongst others. 
+This is a software project designed for a broad range of real-world problems relating to structural-design tasks. Application areas include aerospace and automotive engineering, mining, civil and mechanical engineering amongst others. 
 
-The software solution is called "MCUT", and ut provides functionality to perform fast and robust geometry operations, as shown below (images rendered with Blender):
+The project is called "MCUT", and it provides functionality to perform fast and robust geometry operations, as shown below (images rendered with Blender):
 
 <p align="center">
   <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true">
+  Figure 1: Generate, slice and perform Booleans without errors. Competitive with the best solids and polygon Boolean tools on the market (for example, [Deswik.CAD](https://www.deswik.com/product-detail/deswik-cad/)).
 </p>
 
-Figure 1: Generate, slice and perform Booleans without errors. Competitive with the best solids and polygon Boolean tools on the market (for example, [Deswik.CAD](https://www.deswik.com/product-detail/deswik-cad/)).
 
 The repo provides a comprehensive tool for ensuring that computer-aided planning tasks for e.g. mine-design, rock strata boring (e.g. underground-tunnel excavations), oil-well drilling and general 3D modelling for animation are achievable with robustness. The tool is developed to take advantage of modern high-performance parallel computing hardware for you, and is demonstrably robust by using precise geometric algorithms that are implemented in C++ and accessed through an intuitive API that resembles the all-familiar C programming language.
 
-## Capabilities
+# Capabilities
 
 MCUT is a tool for partitioning meshes that represent solids or open surfaces: It is a code library for cutting 3D mesh objects using their geometry to produce crisp fragments at fine scale, which is useful for operations like slicing and boolean operations (union, subtraction and intersection). Supported features include (see images below):
 
