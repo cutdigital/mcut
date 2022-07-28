@@ -1718,7 +1718,7 @@ void dispatch(output_t& output, const input_t& input)
         ps_iface_enqueued[next_ps_cc_face->first] = true;
 
          // an element of this queue is an iterator/ptr to an element of "input.ps_face_to_potentially_intersecting_others"
-            std::queue<std::map<mcut::fd_t, std::vector<mcut::fd_t>>::const_iterator> adj_ps_face_queue;
+            std::queue<std::map<fd_t, std::vector<fd_t>>::const_iterator> adj_ps_face_queue;
 
         do { // each iteration will find a set of edges that belong to a connected-component patch of intersectng faces (of sm or cm) in ps
             cur_ps_cc_face = next_ps_cc_face;
