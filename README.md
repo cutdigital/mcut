@@ -95,6 +95,8 @@ Next, try out one of the tutorials!
 
 # Licensing
 
-MCUT is available under an Open Source license as well as a commercial license. Users choosing to use MCUT under the free-of-charge Open Source license (e.g. for academic purposes) simply need to comply to its terms, otherwise a commercial license is required. The Open Source license is the "GNU General Public License" (GPL). In cases where the constraints of the Open source license prevent you from using MCUT, a commercial license can be purchased. The library is licensed with an attractively low price which is a one-off sum, requiring no further loyalty fees with guarranteed future updates for free.   
+MCUT is available under an Open Source license as well as a commercial license. Users choosing to use MCUT under the free-of-charge Open Source license (e.g. for academic purposes) simply need to comply to its terms, otherwise a commercial license is required. The Open Source license is the "GNU General Public License" (GPL). In cases where the constraints of the Open source license prevent you from using MCUT, a commercial license can be purchased. The library is licensed with an attractively low price which is a one-off sum, requiring no further loyalty fees with guarranteed future updates for free. 
 
-_For more information about this library, you can refer to the project page [here](https://cutdigital.github.io/mcut.site/) or [email](floyd.m.chitalu@gmail.com) the author_.
+These options protect the project's commercial value and thus make it possible for the author to guarantee long term support, maintenance and further development of the code for the benefit of the project and its users.
+
+_Feel free to send an [email](floyd.m.chitalu@gmail.com) to the author_.
