@@ -4534,7 +4534,6 @@ void dispatch(output_t& output, const input_t& input)
 
 #else
 
-    //std::vector<vd_t> vertices_on_ps_edge;
     // for each ps-edge
     for (edge_array_iterator_t iter_ps_edge = ps.edges_begin(); iter_ps_edge != ps.edges_end(); ++iter_ps_edge) {
 
@@ -4547,22 +4546,20 @@ void dispatch(output_t& output, const input_t& input)
         const vd_t ps_v1 = ps.vertex(ps_edge, 1);
 
         MCUT_ASSERT((int)(ps_v0) < (int)ps_to_m0_vtx.size() /*ps_to_m0_vtx.find(ps_v0) != ps_to_m0_vtx.cend())*/);
-        const vd_t m0_v0 = ps_to_m0_vtx[ps_v0];
+        const vd_t m0_v0 = ps_to_m0_vtx.at(ps_v0);
         MCUT_ASSERT((int)(ps_v1) < (int)ps_to_m0_vtx.size() /*ps_to_m0_vtx.find(ps_v1) != ps_to_m0_vtx.cend()*/);
-        const vd_t m0_v1 = ps_to_m0_vtx[ps_v1];
-        //vertices_on_ps_edge.clear();
-        //vertices_on_ps_edge = { ps_v0, ps_v1 }; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx
-        //vertices_on_ps_edge.emplace_back(ps_v0);
-        //vertices_on_ps_edge.emplace_back(ps_v1);
-        std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator ps_intersecting_edges_iter = ps_intersecting_edges.find(ps_edge);
-        //if () {
-        //    vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), ps_intersecting_edges_iter->second.cbegin(), ps_intersecting_edges_iter->second.cend());
-        //}
+        const vd_t m0_v1 = ps_to_m0_vtx.at(ps_v1);
 
-        if (ps_intersecting_edges_iter == ps_intersecting_edges.cend()) // simple case (edge did not intersect with any polygon)
+        std::vector<vd_t> vertices_on_ps_edge = { ps_v0, ps_v1 }; // get_vertices_on_ps_edge(*iter_ps_edge, m0_ivtx_to_ps_edge, ps, m0_to_ps_vtx);
+        std::unordered_map<ed_t, std::vector<vd_t>>::const_iterator ps_intersecting_edges_iter = ps_intersecting_edges.find(ps_edge);
+        if (ps_intersecting_edges_iter != ps_intersecting_edges.cend()) {
+            vertices_on_ps_edge.insert(vertices_on_ps_edge.end(), ps_intersecting_edges_iter->second.cbegin(), ps_intersecting_edges_iter->second.cend());
+        }
+
+        if (vertices_on_ps_edge.size() == 2) // simple case (edge did not intersect with any polygon)
         {
 
-            const hd_t h = m0.add_edge(ps_v1, ps_v0);
+            const hd_t h = m0.add_edge(vertices_on_ps_edge.back(), vertices_on_ps_edge.front());
 
             MCUT_ASSERT(h != hmesh_t::null_halfedge());
 
@@ -4582,11 +4579,11 @@ void dispatch(output_t& output, const input_t& input)
             }
         } else { // this is the more complex case where we add minimal set of non overlapping edges between 3 vertices
 
-            MCUT_ASSERT(ps_intersecting_edges_iter->second[0].size() == 1);
+            MCUT_ASSERT(vertices_on_ps_edge.size() == 3);
 
-            const vd_t& first = ps_v0;//vertices_on_ps_edge[0];
-            const vd_t& second =ps_v1;//vertices_on_ps_edge[1];
-            const vd_t& third = ps_intersecting_edges_iter->second[0];//vertices_on_ps_edge[2];
+            const vd_t first = vertices_on_ps_edge[0];
+            const vd_t second = vertices_on_ps_edge[1];
+            const vd_t third = vertices_on_ps_edge[2];
 
             hd_t h0;
             hd_t h1;
