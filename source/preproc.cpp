@@ -1812,7 +1812,7 @@ extern "C" void preproc(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces)
+    uint32_t numCutMeshFaces) noexcept(false)
 {
     hmesh_t source_hmesh;
     double source_hmesh_aabb_diag(0.0);
