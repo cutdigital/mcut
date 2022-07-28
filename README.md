@@ -5,7 +5,7 @@ Gist: _A simple and fast C++ library for mesh booleans and more..._
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
 [![MacOS](https://github.com/cutdigital/mcut/actions/workflows/macos.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/macos.yml) [![Linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
 
-This is a software project designed for a broad range of real-world problems relating to structural-design tasks. Application areas include aerospace and automotive engineering, mining, civil and mechanical engineering amongst others. 
+This is a software project designed for a broad range of real-world problems relating to 3D modelling and design tasks. Application areas include computer animation, aerospace and automotive engineering, mining, civil and mechanical engineering amongst others. 
 
 The project is called "MCUT", and it provides functionality to perform fast and robust geometry operations, as shown below:
 
