@@ -27,6 +27,10 @@ MCUT is a tool for partitioning meshes that represent solids or open surfaces: I
 * **Concatenation**: merging a solids or open-surfaces with another.
 * **Sectioning**: elimination of material/volume on one side of a specified surface (e.g. a plane) 
 * **Splitting**: partitioning one mesh using another that might be open or solid. 
+* **Cross-platform**: tested on Windows, Linux (Ubuntu), and macOS
+* **Bloat-free**: no external dependencies.
+* **Performant**: continuously profiled, and optimized.
+* **Numerically robust**: Algorithms rely on robust geometric predicates.
 
 What is being offered is a general solution to the problem of resolving solid- and/or open-mesh intersections. It is a solution that is sought by many companies, researchers, and private individuals for its ability to address extremely difficult problems relating to computational geometry in 3D. A classic application is constructive solid geometry (CSG) i.e. the “boolean operation”, which is shown below, where the resulting meshes/objects are produced with MCUT:
 
