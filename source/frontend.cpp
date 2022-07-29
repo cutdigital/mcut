@@ -3,6 +3,7 @@
 
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
+#include "mcut/internal/hmesh.h"
 
 #include <algorithm>
 #include <array>
@@ -14,7 +15,7 @@
 #include <string.h>
 #include <unordered_map>
 
-#include "mcut/internal/tri/tri.h"
+#include "mcut/internal/cdt/CDT.h"
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
@@ -653,39 +654,73 @@ void get_connected_component_data_impl(
                         project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
                     }
 
-                    std::vector<std::vector<std::array<double, 2>>> polygon(1);
-                    std::vector<std::array<double, 2>>& faceVertexCoords2d_ec = polygon.back();
-                    // convert 2d vertices into format acceptable by earcut
-                    faceVertexCoords2d_ec.resize(faceVertexCoords2d.size());
+                    /////
+                    CDT::Triangulation<double> cdt;
+
+                    /////
+                    hmesh_t hm;
+
+                    std::vector<CDT::V2d<double>> polygon;
                     {
                         for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
                             const vec2& v = faceVertexCoords2d[i];
-                            std::array<double, 2>& a = faceVertexCoords2d_ec[i];
-                            a[0] = static_cast<double>(v[0]);
-                            a[1] = static_cast<double>(v[1]);
+                            polygon.emplace_back(CDT::V2d<double>::make(v[0], v[1]));
+                            hm.add_vertex(vec3(v[0], v[1], 0.0));
+                        }
+                    }
+                    std::vector<CDT::Edge> polygon_edges;
+                    {
+                        for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
+                            polygon_edges.emplace_back(CDT::Edge(i, (i + 1)%faceVertexCoords2d.size()));
                         }
                     }
 
-                    // triangulate face
-                    std::vector<uint32_t> faceTriangleIndices = mapbox::earcut(polygon);
+                    cdt.insertVertices(polygon);
+                    cdt.insertEdges(polygon_edges);
+                    cdt.eraseOuterTrianglesAndHoles();
 
-                    if (faceTriangleIndices.empty()) {
+                    // add face wchich contain the opposite winding oreder of the
+                    // polygon to be triangulated (we will use this to prevent inserted
+                    // flipped triangles)
+                    std::vector<vd_t> non_tri_face_reversed;
+
+                    for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
+                        non_tri_face_reversed.push_back(vd_t((faceVertexCoords2d.size()-1) - i));
+                    }
+
+                    fd_t fd = hm.add_face(non_tri_face_reversed);
+                    MCUT_ASSERT(fd != hmesh_t::null_face());
+
+                    // triangulate face
+                    std::vector<uint32_t> faceTriangleIndices; // = mapbox::earcut(polygon);
+
+                    if (cdt.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
                             MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
                     }
 
-                    // The winding order after triangulation is not consistent.
-                    // So need to to check whether to reverse "faceTriangleIndices"
-                    // or not. There is a simple rule to know whether to reverse:
-                    // Whether or not an input polygon (to earcut) is CW or CCW, the local
-                    // indexing of the input points follows 0, 1, 2 ... etc. (because that is how
-                    // they are recieved from the mesh, even if mesh has CCW faces)
-                    // Thus, to check whether we need to reverse the list, we just need to
-                    // check if any index in "faceTriangleIndices" has a larger value the next element,
-                    // where (faceTriangleIndices[i] - faceTriangleIndices[i+1 % N]) == 1
-                    bool is_ccw_triangulation = true;
+                    for (int tri = 0; tri < (int)cdt.triangles.size(); ++tri) {
+                        const CDT::Triangle& t = cdt.triangles[tri];
+
+                        std::vector<vd_t> face = {vd_t(t.vertices[0]), vd_t(t.vertices[1]), vd_t(t.vertices[2])};
+                        fd = hm.add_face(face);
+                        
+                        if(fd == hmesh_t::null_face()) // tried to insert face with opposite winding order
+                        {
+                            std::reverse(face.begin(), face.end());
+                            fd = hm.add_face(face);
+                            MCUT_ASSERT(fd != hmesh_t::null_face());
+                        }
+                        
+                        faceTriangleIndices.push_back(face[0]);
+                        faceTriangleIndices.push_back(face[1]);
+                        faceTriangleIndices.push_back(face[2]);
+                    }
+
+#if 0
+                    
                     const int index_count = (int)faceTriangleIndices.size();
 
                     for (int i = 0; i < index_count; ++i) {
@@ -705,7 +740,7 @@ void get_connected_component_data_impl(
                         // Output triangles are clockwise, so we reverse the list
                         std::reverse(faceTriangleIndices.begin(), faceTriangleIndices.end());
                     }
-
+#endif
                     // used to check that all indices where used in the triangulation. if not, then there will be a hole
                     std::vector<bool> usedVertexIndicators(faceLocalToGlobleVertexMap.size(), false);
                     // remap local triangle indices to global values and save
@@ -717,8 +752,8 @@ void get_connected_component_data_impl(
                     }
 
                     ccTriangleIndices.insert(ccTriangleIndices.end(), faceTriangleIndices.begin(), faceTriangleIndices.end());
-
-                    for (int i = 0; i < (int)usedVertexIndicators.size(); ++i) {
+                    for (int i = 0; i < (int)usedVertexIndicators.size(); ++i)
+                    {
                         if (usedVertexIndicators[i] == false) {
                             context_uptr->log(
                                 MC_DEBUG_SOURCE_KERNEL,
