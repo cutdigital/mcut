@@ -83,7 +83,7 @@ The following images show more examples of what users can achieve with MCUT:
 
 # Source code and test applications
 
-The source code is available for your perusal and evaluation. You can access right here on Github. This is an opportunity for you to trial and experiment with MCUT for you needs. Here is a quick example of how you clone and build the library:
+The source code is available for your perusal and evaluation. You can access right here on Github. This is an opportunity for you to trial and experiment with MCUT for your needs. Here is a quick example of how you clone and build the library:
 
 * `git clone https://github.com/cutdigital/mcut.git` 
 * `mkdir build`
