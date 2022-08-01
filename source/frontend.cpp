@@ -1,9 +1,9 @@
 #include "mcut/internal/frontend.h"
 #include "mcut/internal/preproc.h"
 
+#include "mcut/internal/hmesh.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
-#include "mcut/internal/hmesh.h"
 
 #include <algorithm>
 #include <array>
@@ -611,169 +611,205 @@ void get_connected_component_data_impl(
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
         if (cc_uptr->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not yet available
         {
-            uint32_t faceOffset = 0;
-            std::vector<uint32_t> ccTriangleIndices;
-            ccTriangleIndices.reserve(cc_uptr->indexArrayMesh.numFaces);
+            uint32_t face_indices_offset = 0;
+            std::vector<uint32_t> tri_face_indices;
+            tri_face_indices.reserve(cc_uptr->indexArrayMesh.numFaces);
+
+            const uint32_t nontri_cc_face_count = cc_uptr->indexArrayMesh.numFaces;
+
+            // -----
+            std::vector<vec3> face_vertex_coords_3d;
+            std::vector<vec2> face_vertex_coords_2d;
+            // temp halfedge data structure whose in-built unctionality helps us ensure that
+            // the winding order that is computed by the constrained delaunay triangulator
+            // is consistent with that of the connected component we are triangulating.
+            hmesh_t winding_order_enforcer;
+
+            // add the face which contain the opposite winding order of the
+            // current face to be triangulated (we will use this to prevent inserting
+            // flipped triangles). This is guarranteed to work because all triangles
+            // are adjacent to the border for a constrained triangulation.
+            // This is not true for a conforming triangulation.
+            std::vector<vd_t> face_reversed;
+
+            std::vector<CDT::V2d<double>> face_polygon_vertices;
+            std::vector<CDT::Edge> face_polygon_edges;
+            // list of indices which define all triangles that result from the CDT
+            std::vector<uint32_t> face_triangulation_indices;
+            // used to check that all indices where used in the triangulation. if not, then there will be a hole
+            std::vector<bool> vertex_is_used;
+            // -----
 
             // for each face (TODO: make parallel)
-            for (uint32_t f = 0; f < cc_uptr->indexArrayMesh.numFaces; ++f) {
-                const uint32_t faceSize = cc_uptr->indexArrayMesh.pFaceSizes[f];
-                if (faceSize == 3) {
-                    for (uint32_t v = 0; v < faceSize; ++v) {
-                        const uint32_t vertexId = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)faceOffset + v];
-                        ccTriangleIndices.push_back(vertexId);
-                    }
-                } else {
-                    // get face vertices (their coordinates) and compute
-                    // local (face) to global (cc) vertex index mapping
-                    // --------------------------------------------------
-                    std::vector<uint32_t> faceVertexIndices(faceSize);
-                    std::vector<vec3> faceVertexCoords3d(faceSize);
-                    std::unordered_map<uint32_t, uint32_t> faceLocalToGlobleVertexMap;
+            for (uint32_t f = 0; f < nontri_cc_face_count; ++f) {
 
-                    for (uint32_t v = 0; v < faceSize; ++v) {
-                        const uint32_t vertexId = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)faceOffset + v];
-                        faceVertexIndices[v] = vertexId;
-                        const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)vertexId * 3);
-                        faceVertexCoords3d[v] = vec3(vptr[0], vptr[1], vptr[2]);
-                        faceLocalToGlobleVertexMap[v] = vertexId;
+                const uint32_t face_vertex_count = cc_uptr->indexArrayMesh.pFaceSizes[f];
+                const bool face_is_triangle = (face_vertex_count == 3);
+                const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
+
+                if (face_is_triangle) {
+
+                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
+                        const uint32_t face_vertex_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
+                        tri_face_indices.push_back(face_vertex_idx);
                     }
 
-                    // project vertices to 2D
-                    // ----------------------
-                    std::vector<vec2> faceVertexCoords2d;
-                    {
-                        vec3 faceNormal;
-                        double param_d;
-                        int largestNormalComp = compute_polygon_plane_coefficients(
-                            faceNormal,
-                            param_d,
-                            faceVertexCoords3d.data(),
-                            (int)faceVertexCoords3d.size());
+                }else if(!face_is_triangle && is_adjacent_to_intersection_curve){
+                    // TODO: This is when we should actually do triangulation 
+                    //
+                    // NOTE: the feature of "performing triangulation only for faces
+                    // next to the intersection curve" or "triangulating all non-tri faces"
+                    // should be controlled via a flag e.g. MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_LOCAL and MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_GLOBAL
+                } 
+                else {
 
-                        project2D(faceVertexCoords2d, faceVertexCoords3d, faceNormal, largestNormalComp);
+                    //
+                    // init vars
+                    //
+                    face_vertex_coords_3d.resize(face_vertex_count);
+                    face_vertex_coords_2d.clear(); // resized by project2D(...)
+                    winding_order_enforcer.reset();
+                    face_reversed.resize(face_vertex_count);
+                    face_polygon_edges.clear();//.resize(face_vertex_count); // |edges| == |vertices|
+                    face_polygon_vertices.resize(face_vertex_count);
+                    face_triangulation_indices.clear();
+
+                    // copy/get face vertices and save mapping
+                    // =======================================
+
+                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
+
+                        const uint32_t face_vertex_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
+
+                        const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)face_vertex_idx * 3);
+
+                        vec3& coord_3d = face_vertex_coords_3d[v];
+                        coord_3d[0] = vptr[0];
+                        coord_3d[1] = vptr[1];
+                        coord_3d[2] = vptr[2];
                     }
 
-                    /////
-                    CDT::Triangulation<double> cdt;
+                    // project face vertices to 2D (NOTE: area is unchanged)
+                    // =====================================================
 
-                    /////
-                    hmesh_t hm;
+                    vec3 face_normal;
+                    double param_d;
+                    int face_normal_largest_component = compute_polygon_plane_coefficients(
+                        face_normal,
+                        param_d,
+                        face_vertex_coords_3d.data(),
+                        (int)face_vertex_count);
 
-                    std::vector<CDT::V2d<double>> polygon;
-                    {
-                        for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
-                            const vec2& v = faceVertexCoords2d[i];
-                            polygon.emplace_back(CDT::V2d<double>::make(v[0], v[1]));
-                            hm.add_vertex(vec3(v[0], v[1], 0.0));
-                        }
-                    }
-                    std::vector<CDT::Edge> polygon_edges;
-                    {
-                        for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
-                            polygon_edges.emplace_back(CDT::Edge(i, (i + 1)%faceVertexCoords2d.size()));
-                        }
-                    }
+                    project2D(face_vertex_coords_2d, face_vertex_coords_3d, face_normal, face_normal_largest_component);
 
-                    cdt.insertVertices(polygon);
-                    cdt.insertEdges(polygon_edges);
-                    cdt.eraseOuterTrianglesAndHoles();
+                    CDT::Triangulation<double> constrained_delaunay_triangulator(CDT::VertexInsertionOrder::AsProvided); // memory is alway reallocated for this
 
-                    // add face wchich contain the opposite winding oreder of the
-                    // polygon to be triangulated (we will use this to prevent inserted
-                    // flipped triangles)
-                    std::vector<vd_t> non_tri_face_reversed;
+                    // convert face vertex format & compute revered face
+                    // =================================================
 
-                    for (int i = 0; i < (int)faceVertexCoords2d.size(); ++i) {
-                        non_tri_face_reversed.push_back(vd_t((faceVertexCoords2d.size()-1) - i));
+                    for (uint32_t i = 0; i < face_vertex_count; ++i) {
+
+                        const vec2& coords = face_vertex_coords_2d[i];
+
+                        face_polygon_vertices[i] = CDT::V2d<double>::make(coords[0], coords[1]);
+
+                        winding_order_enforcer.add_vertex(vec3(coords[0], coords[1], 0.0 /*dont care since polygon is 2D*/)); // .. in fact even the coordinates dont matter for the purposes of hmesh_t here
+
+                        face_reversed[i] = vd_t((face_vertex_count - 1) - i);
                     }
 
-                    fd_t fd = hm.add_face(non_tri_face_reversed);
+                    // save reversed face
+                    // ==================
+
+                    fd_t fd = winding_order_enforcer.add_face(face_reversed);
                     MCUT_ASSERT(fd != hmesh_t::null_face());
 
-                    // triangulate face
-                    std::vector<uint32_t> faceTriangleIndices; // = mapbox::earcut(polygon);
+                    // create edges (constraints)
+                    // ==========================
 
-                    if (cdt.triangles.empty()) {
+                    for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                        face_polygon_edges.emplace_back(CDT::Edge(i, (i + 1) % face_vertex_count));
+                    }
+
+                    // prepare and do constrained delaunay triangulation
+                    // =================================================
+
+                    constrained_delaunay_triangulator.insertVertices(face_polygon_vertices);
+                    constrained_delaunay_triangulator.insertEdges(face_polygon_edges);
+                    constrained_delaunay_triangulator.eraseOuterTriangles(); // triangulation done here!
+
+                    if (constrained_delaunay_triangulator.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
                             MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
                     }
 
-                    for (int tri = 0; tri < (int)cdt.triangles.size(); ++tri) {
-                        const CDT::Triangle& t = cdt.triangles[tri];
+                    // save the triangulation
+                    // ======================
 
-                        std::vector<vd_t> face = {vd_t(t.vertices[0]), vd_t(t.vertices[1]), vd_t(t.vertices[2])};
-                        fd = hm.add_face(face);
+                    const uint32_t face_resulting_triangle_count = (uint32_t)constrained_delaunay_triangulator.triangles.size();
+
+                    for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
                         
-                        if(fd == hmesh_t::null_face()) // tried to insert face with opposite winding order
+                        // a triangle computed from CDT
+                        const CDT::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
+                        
+                        // convert to local descriptors
+                        std::vector<vd_t> triangle_descriptors = {
+                            vd_t(triangle.vertices[0]),
+                            vd_t(triangle.vertices[1]),
+                            vd_t(triangle.vertices[2])
+                        };
+
+                        // check that the winding order matches the triangulated face's order
+                        fd = winding_order_enforcer.add_face(triangle_descriptors);
+
+                        if (fd == hmesh_t::null_face()) // tried to insert face with opposite winding order from what is expected
                         {
-                            std::reverse(face.begin(), face.end());
-                            fd = hm.add_face(face);
+                            std::reverse(triangle_descriptors.begin(), triangle_descriptors.end());
+                            fd = winding_order_enforcer.add_face(triangle_descriptors);
                             MCUT_ASSERT(fd != hmesh_t::null_face());
+
+                            // reversed
+                            face_triangulation_indices.emplace_back(triangle.vertices[2]);
+                            face_triangulation_indices.emplace_back(triangle.vertices[1]);
+                            face_triangulation_indices.emplace_back(triangle.vertices[0]);
                         }
-                        
-                        faceTriangleIndices.push_back(face[0]);
-                        faceTriangleIndices.push_back(face[1]);
-                        faceTriangleIndices.push_back(face[2]);
+                        else{
+
+                            // as given
+                            face_triangulation_indices.emplace_back(triangle.vertices[0]);
+                            face_triangulation_indices.emplace_back(triangle.vertices[1]);
+                            face_triangulation_indices.emplace_back(triangle.vertices[2]);
+                        }                        
                     }
 
-#if 0
+                    // swap local triangle indices to global index values (in CC) and save
+                    // ===================================================================
                     
-                    const int index_count = (int)faceTriangleIndices.size();
+                    const uint32_t face_triangulation_indices_count = (uint32_t)face_triangulation_indices.size();
 
-                    for (int i = 0; i < index_count; ++i) {
-                        const int cur = faceTriangleIndices[i];
-                        const int nxt = faceTriangleIndices[(i + 1) % index_count];
-                        const bool is_consecutive = std::abs(nxt - cur) == 1; // implies along border/edge of triangulatd polygon
-                        if (is_consecutive) {
-                            const bool is_reversed = cur > nxt;
-                            if (is_reversed) {
-                                is_ccw_triangulation = false;
-                                break;
-                            }
-                        }
+                    for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
+                        const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
+                        const uint32_t global_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx]; 
+                        
+                        face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
                     }
 
-                    if (!is_ccw_triangulation) {
-                        // Output triangles are clockwise, so we reverse the list
-                        std::reverse(faceTriangleIndices.begin(), faceTriangleIndices.end());
-                    }
-#endif
-                    // used to check that all indices where used in the triangulation. if not, then there will be a hole
-                    std::vector<bool> usedVertexIndicators(faceLocalToGlobleVertexMap.size(), false);
-                    // remap local triangle indices to global values and save
-                    for (int i = 0; i < (int)faceTriangleIndices.size(); ++i) {
-                        const uint32_t triangleLocalVertexIndex = faceTriangleIndices[i]; // id local within the current face that we are triangulating
-                        const uint32_t triangleGlobalVertexIndex = faceLocalToGlobleVertexMap.at(triangleLocalVertexIndex);
-                        faceTriangleIndices[i] = triangleGlobalVertexIndex; // id in the mesh
-                        usedVertexIndicators[triangleLocalVertexIndex] = true;
-                    }
+                    tri_face_indices.insert(tri_face_indices.end(), face_triangulation_indices.begin(), face_triangulation_indices.end());
 
-                    ccTriangleIndices.insert(ccTriangleIndices.end(), faceTriangleIndices.begin(), faceTriangleIndices.end());
-                    for (int i = 0; i < (int)usedVertexIndicators.size(); ++i)
-                    {
-                        if (usedVertexIndicators[i] == false) {
-                            context_uptr->log(
-                                MC_DEBUG_SOURCE_KERNEL,
-                                MC_DEBUG_TYPE_OTHER, 0,
-                                MC_DEBUG_SEVERITY_NOTIFICATION, "Found unused vertex on face " + std::to_string(f) + " for triangulation");
-                            break;
-                        }
-                    }
+                } //  if (face_vertex_count == 3)
 
-                } //  if (faceSize == 3)
-
-                faceOffset += faceSize;
+                face_indices_offset += face_vertex_count;
             }
 
-            MCUT_ASSERT(ccTriangleIndices.size() >= 3);
+            MCUT_ASSERT(tri_face_indices.size() >= 3);
 
-            cc_uptr->indexArrayMesh.numTriangleIndices = (uint32_t)ccTriangleIndices.size();
+            cc_uptr->indexArrayMesh.numTriangleIndices = (uint32_t)tri_face_indices.size();
             cc_uptr->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[cc_uptr->indexArrayMesh.numTriangleIndices]);
 
-            memcpy(reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pTriangleIndices.get()), ccTriangleIndices.data(), ccTriangleIndices.size() * sizeof(uint32_t));
+            memcpy(reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pTriangleIndices.get()), tri_face_indices.data(), tri_face_indices.size() * sizeof(uint32_t));
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
         if (pMem == nullptr) // client pointer is null (asking for size)
