@@ -17,6 +17,8 @@ The project is called "MCUT" (short for 'mesh cutting'), and it provides functio
 
 The codebase provides a comprehensive tool for ensuring that computer-aided planning tasks for e.g. mine-design, rock strata boring (e.g. underground-tunnel excavations), oil-well drilling and general 3D modelling for animation are achievable with robustness. The tool is developed to take advantage of modern high-performance parallel computing hardware for you, and is demonstrably robust by using precise geometric algorithms that are implemented in C++ and accessed through an intuitive API that resembles the all-familiar C programming language.
 
+Importantly, MCUT is designed with the philosophy that users don't know or don't care about esoteric problems with floating point arithmetic.
+
 # Capabilities
 
 MCUT is a tool for partitioning meshes that represent solids or open surfaces: It is a code library for cutting 3D mesh objects using their geometry to produce crisp fragments at fine scale, which is useful for operations like slicing and boolean operations (union, subtraction and intersection). Supported features include (see images below):
