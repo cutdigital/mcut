@@ -216,7 +216,7 @@ struct face_data_t : id_<face_descriptor_t> {
 
 struct vertex_data_t : id_<vertex_descriptor_t> {
     vec3 p; // geometry coordinates
-    std::vector<face_descriptor_t> m_faces; // ... incident to vertex
+    std::vector<face_descriptor_t> m_faces; // ... incident to vertex // TODO: this is not needed (can be inferred from "m_halfedges")
     std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
 };
 

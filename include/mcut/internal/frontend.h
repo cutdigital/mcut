@@ -46,6 +46,7 @@
 #include "mcut/internal/tpool.h"
 #endif
 
+#if 0
 // internal frontend data structure which we use to store connected component
 // data that is computed by the kernel and requested by a client via the 
 // "mcGetConnectedComponentData" function. So the "mcGetConnectedComponentData"
@@ -76,12 +77,14 @@ struct array_mesh_t {
     uint32_t numFaceAdjFaceIndices = 0;
     uint32_t numTriangleIndices = 0;
 };
+#endif
 
 // base struct from which other structs represent connected components inherit
 struct connected_component_t {
     virtual ~connected_component_t() {};
     McConnectedComponentType type = (McConnectedComponentType)0;
-    array_mesh_t indexArrayMesh;
+    //array_mesh_t indexArrayMesh;
+    hmesh_t mesh;
 };
 
 // struct representing a fragment
