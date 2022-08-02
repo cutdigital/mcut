@@ -654,14 +654,13 @@ void get_connected_component_data_impl(
                         tri_face_indices.push_back(face_vertex_idx);
                     }
 
-                }else if(!face_is_triangle && is_adjacent_to_intersection_curve){
-                    // TODO: This is when we should actually do triangulation 
+                } else if (!face_is_triangle && is_adjacent_to_intersection_curve) {
+                    // TODO: This is when we should actually do triangulation
                     //
                     // NOTE: the feature of "performing triangulation only for faces
                     // next to the intersection curve" or "triangulating all non-tri faces"
                     // should be controlled via a flag e.g. MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_LOCAL and MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_GLOBAL
-                } 
-                else {
+                } else {
 
                     //
                     // init vars
@@ -670,7 +669,7 @@ void get_connected_component_data_impl(
                     face_vertex_coords_2d.clear(); // resized by project2D(...)
                     winding_order_enforcer.reset();
                     face_reversed.resize(face_vertex_count);
-                    face_polygon_edges.clear();//.resize(face_vertex_count); // |edges| == |vertices|
+                    face_polygon_edges.clear(); //.resize(face_vertex_count); // |edges| == |vertices|
                     face_polygon_vertices.resize(face_vertex_count);
                     face_triangulation_indices.clear();
 
@@ -751,10 +750,10 @@ void get_connected_component_data_impl(
                     const uint32_t face_resulting_triangle_count = (uint32_t)constrained_delaunay_triangulator.triangles.size();
 
                     for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
-                        
+
                         // a triangle computed from CDT
                         const CDT::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
-                        
+
                         // convert to local descriptors
                         std::vector<vd_t> triangle_descriptors = {
                             vd_t(triangle.vertices[0]),
@@ -762,38 +761,33 @@ void get_connected_component_data_impl(
                             vd_t(triangle.vertices[2])
                         };
 
+                        face_triangulation_indices.emplace_back(triangle.vertices[0]);
+                        face_triangulation_indices.emplace_back(triangle.vertices[1]);
+                        face_triangulation_indices.emplace_back(triangle.vertices[2]);
+
                         // check that the winding order matches the triangulated face's order
-                        fd = winding_order_enforcer.add_face(triangle_descriptors);
+                        const bool is_insertible = winding_order_enforcer.is_insertable(triangle_descriptors);
 
-                        if (fd == hmesh_t::null_face()) // tried to insert face with opposite winding order from what is expected
-                        {
+                        if (!is_insertible) {
                             std::reverse(triangle_descriptors.begin(), triangle_descriptors.end());
-                            fd = winding_order_enforcer.add_face(triangle_descriptors);
-                            MCUT_ASSERT(fd != hmesh_t::null_face());
-
-                            // reversed
-                            face_triangulation_indices.emplace_back(triangle.vertices[2]);
-                            face_triangulation_indices.emplace_back(triangle.vertices[1]);
-                            face_triangulation_indices.emplace_back(triangle.vertices[0]);
+                            const size_t N = face_triangulation_indices.size();
+                            std::swap(face_triangulation_indices[N - 1], face_triangulation_indices[N - 3]); // reverse last added triangle's indices
                         }
-                        else{
 
-                            // as given
-                            face_triangulation_indices.emplace_back(triangle.vertices[0]);
-                            face_triangulation_indices.emplace_back(triangle.vertices[1]);
-                            face_triangulation_indices.emplace_back(triangle.vertices[2]);
-                        }                        
+                        fd = winding_order_enforcer.add_face(triangle_descriptors); // keep track of added faces
+
+                        MCUT_ASSERT(fd != hmesh_t::null_face());
                     }
 
                     // swap local triangle indices to global index values (in CC) and save
                     // ===================================================================
-                    
+
                     const uint32_t face_triangulation_indices_count = (uint32_t)face_triangulation_indices.size();
 
                     for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
                         const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx]; 
-                        
+                        const uint32_t global_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
+
                         face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
                     }
 

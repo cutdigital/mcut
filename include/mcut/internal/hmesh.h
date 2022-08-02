@@ -299,6 +299,10 @@ public:
     // halfedge whole target is "v1"
     halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);
     face_descriptor_t add_face(const std::vector<vertex_descriptor_t>& vi);
+    // checks whether adding this face will violate 2-manifoldness (i.e. halfedge 
+    // construction rules) which would lead to creating a non-manifold edge 
+    // (one that is referenced by more than 2 faces which is illegal). 
+    bool is_insertable(const std::vector<vertex_descriptor_t> &vi) const;
 
     // also disassociates (not remove) any halfedges(s) and vertices incident to face
     void remove_face(const face_descriptor_t f);
