@@ -657,6 +657,15 @@ const vec3& hmesh_t::vertex(const vertex_descriptor_t& vd) const
     return vdata.p;
 }
 
+uint32_t hmesh_t::get_num_vertices_around_face(const face_descriptor_t f) const
+{
+    MCUT_ASSERT(f != null_face());
+
+    const std::vector<halfedge_descriptor_t>& halfedges_on_face = get_halfedges_around_face(f);
+
+    return (uint32_t)halfedges_on_face.size();
+}
+
 std::vector<vertex_descriptor_t> hmesh_t::get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset) const
 {
     MCUT_ASSERT(f != null_face());
@@ -713,7 +722,7 @@ const std::vector<face_descriptor_t> hmesh_t::get_faces_around_face(const face_d
 {
     MCUT_ASSERT(f != null_face());
 
-    static thread_local std::vector<face_descriptor_t> faces_around_face;
+    std::vector<face_descriptor_t> faces_around_face;
     faces_around_face.clear();
 
     const std::vector<halfedge_descriptor_t>& halfedges_on_face = (halfedges_around_face_ != nullptr) ? *halfedges_around_face_ : get_halfedges_around_face(f);
@@ -734,6 +743,61 @@ const std::vector<face_descriptor_t> hmesh_t::get_faces_around_face(const face_d
         }
     }
     return faces_around_face;
+}
+// NOTE: we have a lot of dupication here
+void hmesh_t::get_faces_around_face(std::vector<face_descriptor_t>& faces_around_face, const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_) const
+{
+    MCUT_ASSERT(f != null_face());
+
+    faces_around_face.clear();
+
+    const std::vector<halfedge_descriptor_t>& halfedges_on_face = (halfedges_around_face_ != nullptr) ? *halfedges_around_face_ : get_halfedges_around_face(f);
+
+    for (int i = 0; i < (int)halfedges_on_face.size(); ++i) {
+
+        const halfedge_descriptor_t h = halfedges_on_face[i];
+        MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
+        const halfedge_data_t& hd = m_halfedges[h];
+
+        if (hd.o != null_halfedge()) {
+            MCUT_ASSERT((size_t)hd.o < m_halfedges.size() /*m_halfedges.count(hd.o) == 1*/);
+            const halfedge_data_t& ohd = m_halfedges[hd.o];
+
+            if (ohd.f != null_face()) {
+                faces_around_face.emplace_back(ohd.f);
+            }
+        }
+    }
+}
+
+uint32_t hmesh_t::get_num_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_) const
+{
+    MCUT_ASSERT(f != null_face());
+
+    uint32_t num_faces_around_face = 0;
+
+    const std::vector<halfedge_descriptor_t>& halfedges_on_face = (halfedges_around_face_ != nullptr) ? *halfedges_around_face_ : get_halfedges_around_face(f);
+
+    for (uint32_t i = 0; i < (uint32_t)halfedges_on_face.size(); ++i) {
+
+        const halfedge_descriptor_t h = halfedges_on_face[i];
+        
+        MCUT_ASSERT((size_t)h < m_halfedges.size() /*m_halfedges.count(h) == 1*/);
+        
+        const halfedge_data_t& hd = m_halfedges[h];
+
+        if (hd.o != null_halfedge()) {
+            
+            MCUT_ASSERT((size_t)hd.o < m_halfedges.size() /*m_halfedges.count(hd.o) == 1*/);
+            
+            const halfedge_data_t& ohd = m_halfedges[hd.o];
+
+            if (ohd.f != null_face()) {
+                ++num_faces_around_face;
+            }
+        }
+    }
+    return num_faces_around_face;
 }
 
 const std::vector<halfedge_descriptor_t>& hmesh_t::get_halfedges_around_vertex(const vertex_descriptor_t v) const

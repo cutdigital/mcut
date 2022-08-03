@@ -45,6 +45,7 @@
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
 #endif
+#include "mcut/internal/kernel.h"
 
 #if 0
 // internal frontend data structure which we use to store connected component
@@ -79,12 +80,14 @@ struct array_mesh_t {
 };
 #endif
 
+
 // base struct from which other structs represent connected components inherit
 struct connected_component_t {
     virtual ~connected_component_t() {};
     McConnectedComponentType type = (McConnectedComponentType)0;
     //array_mesh_t indexArrayMesh;
     hmesh_t mesh;
+    output_mesh_info_t mesh_info;
 };
 
 // struct representing a fragment

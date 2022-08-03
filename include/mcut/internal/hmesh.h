@@ -391,9 +391,12 @@ public:
     std::vector<vertex_descriptor_t> get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset = 0) const;
     void get_vertices_around_face(std::vector<vertex_descriptor_t>& vertex_descriptors, const face_descriptor_t f, uint32_t prepend_offset=0) const;
     std::vector<vertex_descriptor_t> get_vertices_around_vertex(const vertex_descriptor_t v) const;
+    uint32_t get_num_vertices_around_face(const face_descriptor_t f) const;
     const std::vector<halfedge_descriptor_t>& get_halfedges_around_face(const face_descriptor_t f) const;
     const std::vector<face_descriptor_t> get_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_ = nullptr) const;
-
+    void get_faces_around_face( std::vector<face_descriptor_t>& faces_around_face, const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_ = nullptr) const;
+    uint32_t get_num_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_) const;
+    
     // iterators
     // ---------
 

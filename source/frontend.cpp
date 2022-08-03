@@ -304,94 +304,138 @@ void get_connected_component_data_impl(
         throw std::invalid_argument("invalid connected component");
     }
 
-    auto& cc_uptr = cc_entry_iter->second;
+    const std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>& cc_uptr = cc_entry_iter->second;
 
     switch (flags) {
 
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT: {
-        const uint64_t allocatedBytes = cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const uint64_t allocated_bytes = cc_uptr->mesh.number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+
         if (pMem == nullptr) {
-            *pNumBytes = allocatedBytes;
+            *pNumBytes = allocated_bytes;
         } else { // copy mem to client ptr
 
-            if (bytes > allocatedBytes) {
+            if (bytes > allocated_bytes) {
                 throw std::invalid_argument("out of bounds memory access");
             } // if
 
-            uint64_t off = 0;
-            float* outPtr = reinterpret_cast<float*>(pMem);
-            uint64_t nelems = (uint64_t)(bytes / sizeof(float));
+            // an element is a component
+            const uint64_t nelems = (uint64_t)(bytes / sizeof(float));
 
             if (nelems % 3 != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            for (uint32_t i = 0; i < nelems; ++i) {
-                const double& val = cc_uptr->indexArrayMesh.pVertices[i];
+            const uint64_t num_vertices_to_copy = (nelems / 3);
+            uint64_t elem_offset = 0;
+            float* casted_ptr = reinterpret_cast<float*>(pMem);
 
-                const float val_ = static_cast<float>(val);
+            for (vertex_array_iterator_t viter = cc_uptr->mesh.vertices_begin(); viter != cc_uptr->mesh.vertices_end(); ++viter) {
+                const vec3& coords = cc_uptr->mesh.vertex(*viter);
 
-                memcpy(outPtr + off, reinterpret_cast<const void*>(&val_), sizeof(float));
-                off += 1;
+                for (int i = 0; i < 3; ++i) {
+                    const float val = static_cast<float>(coords[i]);
+                    *(casted_ptr + elem_offset) = val;
+                    elem_offset += 1;
+                }
+
+                if ((elem_offset / 3) == num_vertices_to_copy) {
+                    break;
+                }
             }
 
-            MCUT_ASSERT((off * sizeof(float)) == allocatedBytes);
+            MCUT_ASSERT((elem_offset * sizeof(float)) <= allocated_bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE: {
-        const uint64_t allocatedBytes = cc_uptr->indexArrayMesh.numVertices * sizeof(double) * 3;
+        const uint64_t allocated_bytes = cc_uptr->mesh.number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+
         if (pMem == nullptr) {
-            *pNumBytes = allocatedBytes;
+            *pNumBytes = allocated_bytes;
         } else { // copy mem to client ptr
 
-            if (bytes > allocatedBytes) {
+            if (bytes > allocated_bytes) {
                 throw std::invalid_argument("out of bounds memory access");
             } // if
 
-            uint64_t byteOffset = 0;
-            double* outPtr = reinterpret_cast<double*>(pMem);
-
-            uint64_t nelems = (uint64_t)(bytes / sizeof(double));
+            // an element is a component
+            const int64_t nelems = (uint64_t)(bytes / sizeof(double));
 
             if (nelems % 3 != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            // uint32_t verticesToCopy = (uint32_t)(nelems / 3);
+            const uint64_t num_vertices_to_copy = (nelems / 3);
+            uint64_t elem_offset = 0;
+            double* casted_ptr = reinterpret_cast<double*>(pMem);
 
-            for (uint32_t i = 0; i < nelems; ++i) {
-                const double& val = cc_uptr->indexArrayMesh.pVertices[i];
+            for (vertex_array_iterator_t viter = cc_uptr->mesh.vertices_begin(); viter != cc_uptr->mesh.vertices_end(); ++viter) {
+                const vec3& coords = cc_uptr->mesh.vertex(*viter);
 
-                const double val_ = static_cast<double>(val);
+                for (int i = 0; i < 3; ++i) {
+                    *(casted_ptr + elem_offset) = coords[i];
+                    elem_offset += 1;
+                }
 
-                memcpy(outPtr + byteOffset, reinterpret_cast<const void*>(&val_), sizeof(double));
-                byteOffset += 1;
+                if ((elem_offset / 3) == num_vertices_to_copy) {
+                    break;
+                }
             }
 
-            MCUT_ASSERT((byteOffset * sizeof(double)) == allocatedBytes);
+            MCUT_ASSERT((elem_offset * sizeof(float)) <= allocated_bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
         if (pMem == nullptr) {
-            MCUT_ASSERT(cc_uptr->indexArrayMesh.numFaceIndices > 0);
-            *pNumBytes = cc_uptr->indexArrayMesh.numFaceIndices * sizeof(uint32_t);
-        } else {
-            if (bytes > cc_uptr->indexArrayMesh.numFaceIndices * sizeof(uint32_t)) {
-                throw std::invalid_argument("out of bounds memory access");
+            uint32_t num_indices = 0;
+
+            // TODO: make parallel
+            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+                const uint32_t num_vertices_around_face = cc_uptr->mesh.get_num_vertices_around_face(*fiter);
+
+                MCUT_ASSERT(num_vertices_around_face >= 3);
+
+                num_indices += num_vertices_around_face;
             }
 
+            MCUT_ASSERT(num_indices >= 3); // min is a triangle
+
+            *pNumBytes = num_indices * sizeof(uint32_t);
+        } else {
             if (bytes % sizeof(uint32_t) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pFaceIndices.get()), bytes);
+            uint32_t num_indices = 0;
+
+            std::vector<vd_t> vertices_around_face;
+
+            uint64_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // TODO: make parallel
+            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+                vertices_around_face.clear();
+                cc_uptr->mesh.get_vertices_around_face(vertices_around_face, *fiter);
+                const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
+
+                MCUT_ASSERT(num_vertices_around_face >= 3u);
+
+                for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
+                    const uint32_t vertex_idx = (uint32_t)vertices_around_face[i];
+                    *(casted_ptr + elem_offset) = vertex_idx;
+                    ++elem_offset;
+                }
+
+                num_indices += num_vertices_around_face;
+            }
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_SIZE: { // non-triangulated only (don't want to store redundant information)
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->indexArrayMesh.numFaces * sizeof(uint32_t); // each face has a size (num verts)
+            *pNumBytes = cc_uptr->mesh.number_of_faces() * sizeof(uint32_t); // each face has a size (num verts)
         } else {
-            if (bytes > cc_uptr->indexArrayMesh.numFaces * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->mesh.number_of_faces() * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -399,30 +443,68 @@ void get_connected_component_data_impl(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pFaceSizes.get()), bytes);
+            uint64_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // TODO: make parallel
+            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+                const uint32_t num_vertices_around_face = cc_uptr->mesh.get_num_vertices_around_face(*fiter);
+
+                MCUT_ASSERT(num_vertices_around_face >= 3);
+
+                *(casted_ptr + elem_offset) = num_vertices_around_face;
+                ++elem_offset;
+            }
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE: {
         if (pMem == nullptr) {
-            MCUT_ASSERT(cc_uptr->indexArrayMesh.numFaceAdjFaceIndices > 0);
-            *pNumBytes = cc_uptr->indexArrayMesh.numFaceAdjFaceIndices * sizeof(uint32_t);
-        } else {
-            if (bytes > cc_uptr->indexArrayMesh.numFaceAdjFaceIndices * sizeof(uint32_t)) {
-                throw std::invalid_argument("out of bounds memory access");
+
+            MCUT_ASSERT(pNumBytes != nullptr);
+
+            uint32_t num_face_adjacent_face_indices = 0;
+
+            // TODO: make parallel
+            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+                const uint32_t num_faces_around_face = cc_uptr->mesh.get_num_faces_around_face(*fiter, nullptr);
+                num_face_adjacent_face_indices += num_faces_around_face;
             }
+
+            *pNumBytes = num_face_adjacent_face_indices * sizeof(uint32_t);
+        } else {
+            // if (bytes > cc_uptr->indexArrayMesh.numFaceAdjFaceIndices * sizeof(uint32_t)) {
+            //     throw std::invalid_argument("out of bounds memory access");
+            // }
 
             if (bytes % sizeof(uint32_t) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pFaceAdjFaces.get()), bytes);
+            uint64_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            std::vector<fd_t> faces_around_face;
+            // TODO: make parallel
+            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+                faces_around_face.clear();
+                cc_uptr->mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
+
+                if (!faces_around_face.empty()) {
+                    for (uint32_t i = 0; i < (uint32_t)faces_around_face.size(); ++i) {
+                        *(casted_ptr + elem_offset) = (uint32_t)faces_around_face[i];
+                        elem_offset++;
+                    }
+                }
+            }
+
+            MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->indexArrayMesh.numFaces * sizeof(uint32_t); // each face has a size (num adjacent faces)
+            *pNumBytes = cc_uptr->mesh.number_of_faces() * sizeof(uint32_t); // each face has a size value (num adjacent faces)
         } else {
-            if (bytes > cc_uptr->indexArrayMesh.numFaces * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->mesh.number_of_faces() * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -430,22 +512,47 @@ void get_connected_component_data_impl(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pFaceAdjFacesSizes.get()), bytes);
+            uint64_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // TODO: make parallel
+            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+                const uint32_t num_faces_around_face = cc_uptr->mesh.get_num_faces_around_face(*fiter, nullptr);
+                *(casted_ptr + elem_offset) = num_faces_around_face;
+                elem_offset++;
+            }
+
+            MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
         }
     } break;
 
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->indexArrayMesh.numEdgeIndices * sizeof(uint32_t); // each face has a size (num verts)
+            *pNumBytes = cc_uptr->mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices 
         } else {
-            if (bytes > cc_uptr->indexArrayMesh.numEdgeIndices * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->mesh.number_of_edges() * 2  * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
             if (bytes % (sizeof(uint32_t) * 2) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pEdges.get()), bytes);
+            
+            uint64_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // TODO: make parallel
+            for (edge_array_iterator_t eiter = cc_uptr->mesh.edges_begin(); eiter != cc_uptr->mesh.edges_end(); ++eiter) {
+                const vertex_descriptor_t v0 = cc_uptr->mesh.vertex(*eiter, 0);
+                *(casted_ptr + elem_offset) = (uint32_t)v0;
+                elem_offset++;
+
+                const vertex_descriptor_t v1 = cc_uptr->mesh.vertex(*eiter, 1);
+                *(casted_ptr + elem_offset) = (uint32_t)v1;
+                elem_offset++;
+            }
+
+            MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_TYPE: {
@@ -620,7 +727,7 @@ void get_connected_component_data_impl(
             // -----
             std::vector<vec3> face_vertex_coords_3d;
             std::vector<vec2> face_vertex_coords_2d;
-            // temp halfedge data structure whose in-built unctionality helps us ensure that
+            // temp halfedge data structure whose in-built functionality helps us ensure that
             // the winding order that is computed by the constrained delaunay triangulator
             // is consistent with that of the connected component we are triangulating.
             hmesh_t winding_order_enforcer;
