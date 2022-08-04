@@ -769,14 +769,27 @@ void get_connected_component_data_impl(
                         const bool is_insertible = winding_order_enforcer.is_insertable(triangle_descriptors);
 
                         if (!is_insertible) {
-                            std::reverse(triangle_descriptors.begin(), triangle_descriptors.end());
+                            // converting to uint32_t because i have not implement assignment operation in descriptor classes
+                            // and std::swap (or std::reverse) is inneffective
+                            uint32_t a = (uint32_t)triangle_descriptors[0];
+                            uint32_t c = (uint32_t)triangle_descriptors[2];
+                            std::swap(a, c); 
+                            triangle_descriptors[0] = vd_t(a); 
+                            triangle_descriptors[2] = vd_t(c); 
                             const size_t N = face_triangulation_indices.size();
                             std::swap(face_triangulation_indices[N - 1], face_triangulation_indices[N - 3]); // reverse last added triangle's indices
                         }
 
                         fd = winding_order_enforcer.add_face(triangle_descriptors); // keep track of added faces
 
-                        MCUT_ASSERT(fd != hmesh_t::null_face());
+                        if (fd == hmesh_t::null_face()) {
+                            printf("is_insertible=%d\n", (int)is_insertible);
+                            fprintf(stderr, "error: could not insert triangle %d\n", i);
+
+                            face_triangulation_indices.pop_back();
+                            face_triangulation_indices.pop_back();
+                            face_triangulation_indices.pop_back();
+                        }
                     }
 
                     // swap local triangle indices to global index values (in CC) and save
