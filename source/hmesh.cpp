@@ -593,12 +593,14 @@ face_descriptor_t hmesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         MCUT_ASSERT(target(v1_h) == v1);
 
         if (v1_hd_ptr->f != null_face()) {
+            #if 0 // used for debugging triangulation
             printf("face f%d uses halfedge: v%d v%d\n", (int)v1_hd_ptr->f, (int)v0, (int)v1);
             const auto verts = get_vertices_around_face(v1_hd_ptr->f);
             for (auto v : verts)
                 printf("p%d ", (int)v);
             printf("\n");
             printf("h%d.opp = h%d; =%d \n", (int)v1_h, (int)opposite(v1_h), (int)face(opposite(v1_h)));
+            #endif
             return null_face(); // face is incident to a non-manifold edge
         }
 
@@ -652,6 +654,7 @@ bool hmesh_t::is_insertable(const std::vector<vertex_descriptor_t>& vi) const
             const halfedge_data_t* const v1_hd_ptr = &m_halfedges[v1_h];
 
             if (v1_hd_ptr->f != null_face()) {
+                //printf("h%d(v%d -> v%d) = f%d\n", (int)v1_h, (int)v0, (int)v1, (int)v1_hd_ptr->f);
                 return false; // face is incident to a non-manifold edge
             }
         }
