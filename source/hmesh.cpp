@@ -310,7 +310,7 @@ halfedge_descriptor_t hmesh_t::halfedge(const vertex_descriptor_t s, const verte
         edge_descriptor_t s_edge = edge(*i);
         if (std::find(t_edges.cbegin(), t_edges.cend(), s_edge) != t_edges.cend()) // belong to same edge?
         {
-            result = *i; // assume source(*i) and target(*i) match "s" and "t"
+            
 
             // check if we need to return the opposite halfedge
             if ((source(*i) == s && target(*i) == t) == false) {
@@ -319,11 +319,21 @@ halfedge_descriptor_t hmesh_t::halfedge(const vertex_descriptor_t s, const verte
 
                 halfedge_descriptor_t h = opposite(*i);
 
-                if (face(h) != null_face() || strict_check) { // "strict_check" ensures that we return the halfedge matching the input vertices
+                if (strict_check || face(h) != null_face()) { // "strict_check" ensures that we return the halfedge matching the input vertices
                     result = h;
-                    break;
                 }
             }
+            else
+            {
+                MCUT_ASSERT(source(*i) == s); // confirm our assumption
+                MCUT_ASSERT(target(*i) == t);
+
+                if (strict_check || face(*i) != null_face()) { // "strict_check" ensures that we return the halfedge matching the input vertices
+                    result = *i;  // assume source(*i) and target(*i) match "s" and "t"
+                }
+                
+            }
+            break;
         }
     }
     return result;
@@ -583,12 +593,14 @@ face_descriptor_t hmesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         MCUT_ASSERT(target(v1_h) == v1);
 
         if (v1_hd_ptr->f != null_face()) {
-            printf("face f%d uses edge: v%d v%d\n", (int)v1_hd_ptr->f, (int)v0, (int)v1);
+            #if 0 // used for debugging triangulation
+            printf("face f%d uses halfedge: v%d v%d\n", (int)v1_hd_ptr->f, (int)v0, (int)v1);
             const auto verts = get_vertices_around_face(v1_hd_ptr->f);
             for (auto v : verts)
                 printf("p%d ", (int)v);
             printf("\n");
             printf("h%d.opp = h%d; =%d \n", (int)v1_h, (int)opposite(v1_h), (int)face(opposite(v1_h)));
+            #endif
             return null_face(); // face is incident to a non-manifold edge
         }
 
@@ -630,7 +642,7 @@ bool hmesh_t::is_insertable(const std::vector<vertex_descriptor_t>& vi) const
         MCUT_ASSERT(v1 != null_vertex());
 
         // halfedge from v0 to v1
-        const halfedge_descriptor_t v1_h = halfedge(v0, v1, true);
+        const halfedge_descriptor_t v1_h = halfedge(v0, v1, false);
         const bool connecting_edge_exists = v1_h != null_halfedge();
 
         // we use v1 in the following since v1 is the target (vertices are associated with halfedges which point to them)
@@ -642,6 +654,7 @@ bool hmesh_t::is_insertable(const std::vector<vertex_descriptor_t>& vi) const
             const halfedge_data_t* const v1_hd_ptr = &m_halfedges[v1_h];
 
             if (v1_hd_ptr->f != null_face()) {
+                //printf("h%d(v%d -> v%d) = f%d\n", (int)v1_h, (int)v0, (int)v1, (int)v1_hd_ptr->f);
                 return false; // face is incident to a non-manifold edge
             }
         }

@@ -16,6 +16,7 @@
 #include <unordered_map>
 
 #include "mcut/internal/cdt/CDT.h"
+#include "mcut/internal/cdt/VerifyTopology.h"
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
@@ -813,6 +814,7 @@ void get_connected_component_data_impl(
                     // convert face vertex format & compute revered face
                     // =================================================
 
+                    // the vertices are in counter-clockwise order (user provided order)
                     for (uint32_t i = 0; i < face_vertex_count; ++i) {
 
                         const vec2& coords = face_vertex_coords_2d[i];
@@ -821,7 +823,7 @@ void get_connected_component_data_impl(
 
                         winding_order_enforcer.add_vertex(vec3(coords[0], coords[1], 0.0 /*dont care since polygon is 2D*/)); // .. in fact even the coordinates dont matter for the purposes of hmesh_t here
 
-                        face_reversed[i] = vd_t((face_vertex_count - 1) - i);
+                        face_reversed[i] = vd_t(face_vertex_count - 1 - i);
                     }
 
                     // save reversed face
@@ -840,15 +842,37 @@ void get_connected_component_data_impl(
                     // prepare and do constrained delaunay triangulation
                     // =================================================
 
+                    const CDT::DuplicatesInfo duplInfo = CDT::RemoveDuplicates(face_polygon_vertices);
+                    if (!duplInfo.duplicates.empty()) {
+                        fprintf(stderr, "triangulation has duplicates\n");
+                        // TODO: do stuff with "duplInfo"
+                    }
+
                     constrained_delaunay_triangulator.insertVertices(face_polygon_vertices);
+
                     constrained_delaunay_triangulator.insertEdges(face_polygon_edges);
-                    constrained_delaunay_triangulator.eraseOuterTriangles(); // triangulation done here!
+
+                    // triangulation done here!
+                    // NOTE: it seems that the triangulation can be either CW or CCW.
+                    constrained_delaunay_triangulator.eraseOuterTrianglesAndHoles();
+
+                    const CDT::unordered_map<CDT::Edge, CDT::EdgeVec> tmp = CDT::EdgeToPiecesMapping(constrained_delaunay_triangulator.pieceToOriginals);
+                    const CDT::unordered_map<CDT::Edge, std::vector<CDT::VertInd>>
+                        edgeToSplitVerts = CDT::EdgeToSplitVertices(tmp, constrained_delaunay_triangulator.vertices);
+
+                    if (!CDT::verifyTopology(constrained_delaunay_triangulator)) {
+
+                        context_uptr->log(
+                            MC_DEBUG_SOURCE_KERNEL,
+                            MC_DEBUG_TYPE_OTHER, 0,
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(f) + "has wrong topology");
+                    }
 
                     if (constrained_delaunay_triangulator.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "cannot triangulate face " + std::to_string(f));
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(f) + "produced zero faces");
                     }
 
                     // save the triangulation
@@ -876,14 +900,85 @@ void get_connected_component_data_impl(
                         const bool is_insertible = winding_order_enforcer.is_insertable(triangle_descriptors);
 
                         if (!is_insertible) {
-                            std::reverse(triangle_descriptors.begin(), triangle_descriptors.end());
+                            // flip the winding order
+                            uint32_t a = triangle_descriptors[0];
+                            uint32_t c = triangle_descriptors[2];
+                            std::swap(a, c);
+                            triangle_descriptors[0] = vd_t(a);
+                            triangle_descriptors[2] = vd_t(c);
                             const size_t N = face_triangulation_indices.size();
                             std::swap(face_triangulation_indices[N - 1], face_triangulation_indices[N - 3]); // reverse last added triangle's indices
                         }
 
+                        // add face into our WO enforcer
                         fd = winding_order_enforcer.add_face(triangle_descriptors); // keep track of added faces
 
-                        MCUT_ASSERT(fd != hmesh_t::null_face());
+                        // if this fails then CDT gave us a strange triangulation e.g.
+                        // duplicate triangles with opposite winding order
+                        if (fd == hmesh_t::null_face()) {
+// simply remove/ignore the offending triangle
+#if 0
+                            uint32_t a = triangle_descriptors[0];
+                            uint32_t b = triangle_descriptors[1];
+                            uint32_t c = triangle_descriptors[2];
+                            printf("inserted face: %u %u %u\n", a, b, c);
+                            
+                            std::ofstream f("triangulation.obj");
+
+                            for (int i = 0; i < constrained_delaunay_triangulator.vertices.size(); ++i) {
+                                auto vert = constrained_delaunay_triangulator.vertices[i];
+                                f << "v " << vert.x << " " << vert.y << " " << 0.0 << "\n";
+                            }
+
+                            for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
+                                // a triangle computed from CDT
+                                const CDT::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
+                                f << "f " << triangle.vertices[0]+1 << " " << triangle.vertices[1]+1 << " " << triangle.vertices[2]+1 << "\n";
+                            }
+
+                            f.close();
+
+                            std::ofstream g("polygon.off");
+                            g << "OFF\n";
+                            g << face_vertex_count << " 1 0\n"; 
+                            for (int i = 0; i < face_vertex_count; ++i) {
+                                auto vert = face_vertex_coords_3d[i];
+                                g << vert[0] << " " << vert[1] << " " << vert[2] << "\n";
+                            }
+                            g << face_vertex_count << " "; 
+                            for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                                // a triangle computed from CDT
+                                
+                                g << i << " ";
+                            }
+                            g << "\n";
+
+                            g.close();
+
+                            std::ofstream h("polygon2d.txt");
+                            h << face_vertex_count << " " << face_vertex_count << "\n"; 
+                            for (int i = 0; i < face_vertex_count; ++i) {
+                                auto vert = face_vertex_coords_2d[i];
+                                h << vert[0] << " " << vert[1] << "\n";
+                            }
+                            for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                                // a triangle computed from CDT
+                                
+                                h << i << " " << (i+1) % face_vertex_count <<"\n";
+                            }
+
+                            h.close();
+
+
+                            printf("is_insertible=%d\n", (int)is_insertible);
+                            fprintf(stderr, "error: could not insert triangle %d\n", i);
+                            std::exit(1);
+#endif
+
+                            face_triangulation_indices.pop_back();
+                            face_triangulation_indices.pop_back();
+                            face_triangulation_indices.pop_back();
+                        }
                     }
 
                     // swap local triangle indices to global index values (in CC) and save
