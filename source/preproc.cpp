@@ -1899,14 +1899,38 @@ extern "C" void preproc(
 #endif
     context_uptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
+    /*
+        NOTE: All variables declared as shared pointers here represent variables that live (on the heap)
+        until all connected components (that are created during the current mcDispatch call) are destroyed.
+        Thus, each such connected component will maintain its own (reference counted) pointer.
+
+        These variables are used when populating client output arrays during ´mcGetConnectedComponentData´.
+        One example of this usage is when the client requests a connected component´s face map. In the cases
+        where polygon partitioning occurs during the respective mcDispatch call then some of these shared_ptrs like
+        ´source_hmesh_child_to_usermesh_birth_face´ will be used to generate the correct mapping from
+        the faces of the connected component  to the
+        client mesh (which will be internally modified due to polygon partitioning). Here the client mesh 
+        corresponds to the input source mesh if the connected component is a fragment, and the cut mesh otherwise.
+    */
+
     // mapping variables from a child face to the parent face in the corresponding input-hmesh face.
     // This child face is produced as a result of polygon partition.
-    std::unordered_map<fd_t /*child face*/, fd_t /*parent face in the [user-provided] source mesh*/> source_hmesh_child_to_usermesh_birth_face;
-    std::unordered_map<fd_t /*child face*/, fd_t /*parent face in the [user-provided] cut mesh*/> cut_hmesh_child_to_usermesh_birth_face;
+    std::shared_ptr< //
+        std::unordered_map< //
+            fd_t /*child face*/, 
+            fd_t /*parent face in the [user-provided] source mesh*/
+        > //
+    > source_hmesh_child_to_usermesh_birth_face = std::shared_ptr< std::unordered_map<fd_t, fd_t >>(new std::unordered_map<fd_t, fd_t >);
+    std::shared_ptr < //
+        std::unordered_map< //
+            fd_t /*child face*/, 
+            fd_t /*parent face in the [user-provided] cut mesh*/
+        >
+    > cut_hmesh_child_to_usermesh_birth_face = std::shared_ptr < std::unordered_map<fd_t, fd_t>>(new std::unordered_map<fd_t, fd_t>);
     // descriptors and coordinates of new vertices that are added into an input mesh (source mesh or cut mesh)
     // in order to carry out partitioning
-    std::unordered_map<vd_t, vec3> source_hmesh_new_poly_partition_vertices;
-    std::unordered_map<vd_t, vec3> cut_hmesh_new_poly_partition_vertices;
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices = std::shared_ptr < std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices = std::shared_ptr < std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
 
     // the number of faces in the source mesh from the last/previous dispatch call
     const uint32_t source_hmesh_face_count = numSrcMeshFaces;
@@ -1948,9 +1972,9 @@ extern "C" void preproc(
     // 2)   the resulting intersection between the input meshes may
     //      produce "floating polygons" (an input mesh intersects a face of the the other in such a way that none of the edges of this face are severed).
     //
-    // For each reason, we need to slightly modify the input(s) into a valid (proper intersection-permitting) configuration.
+    // For each reason, we need to modify the input(s) in order to have a valid (proper intersection-permitting) configuration.
     // If general position is violated, then we apply numerical perturbation of the cut-mesh.
-    // And if floating polygons arise, then we partition the suspected face into two new faces witha an edge that is guaranteed to be
+    // And if floating polygons arise, then we partition the suspected face into two new faces with an edge that is guaranteed to be
     // severed during the cut.
     do {
         kernel_invocation_counter++;
@@ -1979,7 +2003,7 @@ extern "C" void preproc(
 
         if (general_position_assumption_was_violated) { // i.e. do we need to perturb the cut-mesh?
 
-            MCUT_ASSERT(floating_polygon_was_detected == false); // cannot occur at same time!
+            MCUT_ASSERT(floating_polygon_was_detected == false); // cannot occur at same time! (see kernel)
 
             if (cut_mesh_perturbation_count == MAX_PERTUBATION_ATTEMPTS) {
 
@@ -1988,7 +2012,7 @@ extern "C" void preproc(
                 throw std::runtime_error("max perturbation iteratons reached");
             }
 
-            // use by the kernel track if the most-recent perturbation causes the cut-mesh and src-mesh to
+            // used by the kernel track if the most-recent perturbation causes the cut-mesh and src-mesh to
             // not intersect at all, which means we need to perturb again.
             kernel_input.general_position_enforcement_count = cut_mesh_perturbation_count;
 
@@ -2209,27 +2233,27 @@ extern "C" void preproc(
 
     TIMESTACK_PUSH("create face partition maps");
     // NOTE: face descriptors in "cut_hmesh_child_to_usermesh_birth_face", need to be offsetted
-    // by the number of internal source-mesh faces/vertices. This is to ensure consistency with the kernel's data-mapping and make
-    // it easier for us to map vertex and face descriptors in connected components to the correct instance in the user-provided
-    // input meshes.
-    // This offsetting follows a design choice used in the kernel that ("ps-faces" belonging to cut-mesh start [after] the
-    // source-mesh faces).
+    // by the number of [internal] source-mesh faces/vertices. This is to ensure consistency with 
+    // the kernel's data-mapping and make it easier for us to map vertex and face descriptors in 
+    // connected components to the correct instance in the client input meshes.
+    // This offsetting follows a design choice used in the kernel that ("ps-faces" belonging to 
+    // cut-mesh start [after] the source-mesh faces).
     // Refer to the function "hmesh_to_array_mesh()" on how we use this information.
-    std::unordered_map<fd_t, fd_t> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = cut_hmesh_child_to_usermesh_birth_face;
+    std::shared_ptr< std::unordered_map<fd_t, fd_t>> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = cut_hmesh_child_to_usermesh_birth_face;
 
     for (std::unordered_map<fd_t, fd_t>::iterator i = cut_hmesh_child_to_usermesh_birth_face.begin();
          i != cut_hmesh_child_to_usermesh_birth_face.end(); ++i) {
         fd_t offsettedDescr = fd_t(i->first + source_hmesh.number_of_faces());
-        fpPartitionChildFaceToInputCutMeshFaceOFFSETTED[offsettedDescr] = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
+        (fpPartitionChildFaceToInputCutMeshFaceOFFSETTED.get()[0])[offsettedDescr] = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
                                                                                                                           // i->second = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
     }
 
-    std::unordered_map<vd_t, vec3> addedFpPartitioningVerticesOnCutMeshOFFSETTED;
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> addedFpPartitioningVerticesOnCutMeshOFFSETTED = std::shared_ptr < std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
 
     for (std::unordered_map<vd_t, vec3>::const_iterator i = cut_hmesh_new_poly_partition_vertices.begin();
          i != cut_hmesh_new_poly_partition_vertices.end(); ++i) {
         vd_t offsettedDescr = vd_t(i->first + source_hmesh.number_of_vertices());
-        addedFpPartitioningVerticesOnCutMeshOFFSETTED[offsettedDescr] = i->second; // apply offset
+        (addedFpPartitioningVerticesOnCutMeshOFFSETTED.get()[0])[offsettedDescr] = i->second; // apply offset
     }
 
     TIMESTACK_POP();

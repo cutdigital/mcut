@@ -668,56 +668,192 @@ void get_connected_component_data_impl(
             throw std::invalid_argument("cannot query seam vertices on input connected component");
         }
 
+        const uint32_t seam_vertex_count = cc_uptr->mesh_info.seam_vertices.size();
+
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->indexArrayMesh.numSeamVertexIndices * sizeof(uint32_t); // each face has a size (num verts)
+            *pNumBytes = seam_vertex_count * sizeof(uint32_t);
         } else {
-            if (bytes > cc_uptr->indexArrayMesh.numSeamVertexIndices * sizeof(uint32_t)) {
+            if ((bytes > seam_vertex_count) * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
-            if (bytes % (sizeof(uint32_t)) != 0) {
+            if ((bytes % (sizeof(uint32_t))) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pSeamVertexIndices.get()), bytes);
+
+            const uint32_t elems_to_copy = bytes / sizeof(uint32_t);
+            uint32_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+            
+            // TODO: make parallel
+            for (int i = 0; i < elems_to_copy; ++i)
+            {
+                const uint32_t seam_vertex_idx = cc_uptr->mesh_info.seam_vertices[i];
+                *(casted_ptr + elem_offset) = seam_vertex_idx;
+                elem_offset++;
+            }
+
+            MCUT_ASSERT((uint32_t)(elem_offset * sizeof(uint32_t)) <= seam_vertex_count);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {
-        if ((context_uptr->dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP) == 0) {
-            throw std::invalid_argument("dispatch flags not set");
+
+        const uint32_t vertex_map_size = cc_uptr->mesh_info.data_maps.vertex_map.size();
+
+        if (vertex_map_size == 0) {
+            throw std::invalid_argument("vertex map not available"); // user probably forgot to set the dispatch flag
         }
+
+        MCUT_ASSERT(vertex_map_size == cc_uptr->mesh.number_of_vertices());
+
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->indexArrayMesh.numVertices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+            *pNumBytes = (vertex_map_size * sizeof(uint32_t)); // each each vertex has a map value (intersection point == uint_max)
         } else {
-            if (bytes > cc_uptr->indexArrayMesh.numVertices * sizeof(uint32_t)) {
+            if (bytes > (vertex_map_size * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
             if (bytes % (sizeof(uint32_t)) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pVertexMapIndices.get()), bytes);
+
+            const uint32_t elems_to_copy = (bytes / sizeof(uint32_t));
+            uint32_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // TODO: make parallel
+            for (int i = 0; i < elems_to_copy; ++i) // ... for each vertex in CC
+            {
+                // Here we use whatever index value was assigned to the current vertex by the kernel, where the 
+                // the kernel does not necessarilly know that the input meshes it was given where modified by
+                // the frontend (in this case via polygon partitioning) 
+                // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
+                uint32_t internal_input_mesh_vertex_idx = cc_uptr->mesh_info.data_maps.vertex_map[i];
+                // We use the same default value as that used by the kernel for intersection
+                // points (intersection points at mapped to uint_max i.e. null_vertex())
+                uint32_t client_input_mesh_vertex_idx = UINT32_MAX;
+                // This is true only for polygon intersection points computed by the kernel
+                const bool internal_input_mesh_vertex_is_intersection_point = (internal_input_mesh_vertex_idx == UINT32_MAX);
+
+                if (!internal_input_mesh_vertex_is_intersection_point) { // i.e. a client-mesh vertex or vertex that is added due to face-partitioning
+                    // NOTE: The kernel will assign/map a 'proper' index value to vertices that exist due to face partitioning.
+                    // 'proper' here means that the kernel treats these vertices as 'original vertices' from a client-provided input
+                    // mesh. In reality, the frontend added such vertices in order to partition a face. i.e. the kernel is not aware
+                    // that a given input mesh it is working with is modified by the frontend (it assumes that the meshes is exactly as was 
+                    // provided by the client).
+                    // So, here we have to fix that mapping information to correctly state that "any vertex added due to face
+                    // partitioning was not in the user provided input mesh" and should therefore be treated/labelled as an intersection
+                    // point i.e. it should map to UINT32_MAX because it does not map to any vertex in the client-provided input mesh.
+                    bool vertex_exists_due_to_face_partitioning = false;
+                    // this flag tells us whether the current vertex maps to one in the internal version of the source mesh
+                    // i.e. it does not map to the internal version cut-mesh 
+                    const bool internal_input_mesh_vertex_is_for_source_mesh = (internal_input_mesh_vertex_idx < cc_uptr->internalSrcMeshVertexCount);
+
+                    if (internal_input_mesh_vertex_is_for_source_mesh) {
+                        const std::unordered_map<vd_t, vec3>::const_iterator fiter = cc_uptr->source_hmesh_new_poly_partition_vertices->find(vd_t(internal_input_mesh_vertex_idx));
+                        vertex_exists_due_to_face_partitioning = (fiter != cc_uptr->source_hmesh_new_poly_partition_vertices->cend());
+                    }
+                    else // i.e. internal_input_mesh_vertex_is_for_cut_mesh
+                    {
+                        std::unordered_map<vd_t, vec3>::const_iterator fiter = cc_uptr->cut_hmesh_new_poly_partition_vertices->find(vd_t(internal_input_mesh_vertex_idx));
+                        vertex_exists_due_to_face_partitioning = (fiter != cc_uptr->cut_hmesh_new_poly_partition_vertices->cend());
+                    }
+
+                    if (!vertex_exists_due_to_face_partitioning) { // i.e. is a client-mesh vertex (an original vertex)
+
+                        MCUT_ASSERT(cc_uptr->internalSrcMeshVertexCount > 0);
+
+                        if (!internal_input_mesh_vertex_is_for_source_mesh) // is it a cut-mesh vertex discriptor ..?
+                        {
+                            // vertices added due to face-partitioning will have an offsetted index/descriptor that is >= userSrcMeshVertexCount
+                            const uint32_t internal_input_mesh_vertex_idx_without_offset = (internal_input_mesh_vertex_idx - cc_uptr->internalSrcMeshVertexCount);
+                            client_input_mesh_vertex_idx = (internal_input_mesh_vertex_idx_without_offset + cc_uptr->userSrcMeshVertexCount); // ensure that we offset using number of [user-provided mesh] vertices
+                        }
+                        else {
+                            client_input_mesh_vertex_idx = internal_input_mesh_vertex_idx; // src-mesh vertices have no offset unlike cut-mesh vertices
+                        }
+                    }
+                }
+
+                *(casted_ptr + elem_offset) = client_input_mesh_vertex_idx;
+                elem_offset++;
+            }
+
+            MCUT_ASSERT((uint32_t)(elem_offset * sizeof(uint32_t)) <= vertex_map_size);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
-        if ((context_uptr->dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP) == 0) {
-            throw std::invalid_argument("dispatch flags not set");
+        const uint32_t face_map_size = cc_uptr->mesh_info.data_maps.face_map.size();
+
+        if (face_map_size == 0) {
+            throw std::invalid_argument("face map not available"); // user probably forgot to set the dispatch flag
         }
 
+        MCUT_ASSERT(face_map_size == cc_uptr->mesh.number_of_faces());
+
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->indexArrayMesh.numFaces * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
-        } else {
-            if (bytes > cc_uptr->indexArrayMesh.numFaces * sizeof(uint32_t)) {
+            *pNumBytes = face_map_size * sizeof(uint32_t); // each face has a map value (intersection point == uint_max)
+        }
+        else {
+            if ((bytes > face_map_size) * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
-            if (bytes % (sizeof(uint32_t)) != 0) {
+            if ((bytes % sizeof(uint32_t)) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pFaceMapIndices.get()), bytes);
+
+            const uint32_t elems_to_copy = (bytes / sizeof(uint32_t));
+            uint32_t elem_offset = 0;
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // TODO: make parallel
+            for (int i = 0; i < elems_to_copy; ++i) // ... for each vertex (to copy) in CC
+            {
+                uint32_t internalInputMeshFaceDescr = (uint32_t)cc_uptr->mesh_info.data_maps.face_map[i];
+                uint32_t userInputMeshFaceDescr = INT32_MAX;
+                const bool internalInputMeshFaceDescrIsForSrcMesh = (internalInputMeshFaceDescr < cc_uptr->internalSrcMeshFaceCount);
+
+                if (internalInputMeshFaceDescrIsForSrcMesh) {
+
+                    std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->source_hmesh_child_to_usermesh_birth_face->find(fd_t(internalInputMeshFaceDescr));
+                    
+                    if (fiter != cc_uptr->source_hmesh_child_to_usermesh_birth_face->cend()) {
+                        userInputMeshFaceDescr = fiter->second;
+                    }
+                    else {
+                        userInputMeshFaceDescr = internalInputMeshFaceDescr;
+                    }
+                    MCUT_ASSERT(userInputMeshFaceDescr < cc_uptr->userSrcMeshFaceCount);
+                }
+                else // internalInputMeshVertexDescrIsForCutMesh
+                {
+                    std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->cut_hmesh_child_to_usermesh_birth_face->find(fd_t(internalInputMeshFaceDescr));
+                    
+                    if (fiter != cc_uptr->cut_hmesh_child_to_usermesh_birth_face->cend()) {
+                        uint32_t unoffsettedDescr = (fiter->second - cc_uptr->internalSrcMeshFaceCount);
+                        userInputMeshFaceDescr = unoffsettedDescr + cc_uptr->userSrcMeshFaceCount;
+                    }
+                    else {
+                        uint32_t unoffsettedDescr = (internalInputMeshFaceDescr - cc_uptr->internalSrcMeshFaceCount);
+                        userInputMeshFaceDescr = unoffsettedDescr + cc_uptr->userSrcMeshFaceCount;
+                    }
+                }
+
+                MCUT_ASSERT(userInputMeshFaceDescr != INT32_MAX);
+
+                //indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
+                //
+
+                *(casted_ptr + elem_offset) = userInputMeshFaceDescr;
+                elem_offset++;
+            }
+
+            MCUT_ASSERT((uint32_t)(elem_offset * sizeof(uint32_t)) <= face_map_size);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
-        if (cc_uptr->indexArrayMesh.numTriangleIndices == 0) // compute triangulation if not yet available
+        if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
         {
             uint32_t face_indices_offset = 0;
             std::vector<uint32_t> tri_face_indices;
@@ -730,14 +866,14 @@ void get_connected_component_data_impl(
             std::vector<vec2> face_vertex_coords_2d;
             // temp halfedge data structure whose in-built functionality helps us ensure that
             // the winding order that is computed by the constrained delaunay triangulator
-            // is consistent with that of the connected component we are triangulating.
+            // is consistent with that of the connected component face we are triangulating.
             hmesh_t winding_order_enforcer;
 
-            // add the face which contain the opposite winding order of the
-            // current face to be triangulated (we will use this to prevent inserting
-            // flipped triangles). This is guarranteed to work because all triangles
-            // are adjacent to the border for a constrained triangulation.
-            // This is not true for a conforming triangulation.
+            // add the face which contains the opposite winding order of the
+            // connected component face face we are triangulating (we will use this to prevent inserting
+            // reversed triangles). This is guarranteed to work because all triangles
+            // are adjacent to the border for a constrained delaunay triangulation.
+            // This is not true for a conforming delaunay triangulation.
             std::vector<vd_t> face_reversed;
 
             std::vector<CDT::V2d<double>> face_polygon_vertices;

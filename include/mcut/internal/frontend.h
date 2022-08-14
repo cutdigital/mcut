@@ -88,6 +88,42 @@ struct connected_component_t {
     //array_mesh_t indexArrayMesh;
     hmesh_t mesh;
     output_mesh_info_t mesh_info;
+
+    // 
+    std::shared_ptr< //
+        std::unordered_map< //
+        fd_t /*child face*/,
+        fd_t /*parent face in the [user-provided] source mesh*/
+        > //
+    > source_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputSrcMeshFace
+    std::shared_ptr < //
+        std::unordered_map< //
+        fd_t /*child face*/,
+        fd_t /*parent face in the [user-provided] cut mesh*/
+        >
+    > cut_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputCutMeshFace
+    // descriptors and coordinates of new vertices that are added into an input mesh (source mesh or cut mesh)
+    // in order to carry out partitioning
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputSrcMesh
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputCutMesh
+    uint32_t internalSrcMeshVertexCount; // init from source_hmesh.number_of_vertices()
+    uint32_t userSrcMeshVertexCount; // init from numSrcMeshVertices
+    uint32_t internalSrcMeshFaceCount; // init from source_hmesh.number_of_faces()
+    uint32_t userSrcMeshFaceCount; // init from source_hmesh_face_count OR numSrcMeshFaces
+    // Stores the contiguous array of unsigned integers that define
+    // a triangulation of all [non-triangle faces] of the connected component. 
+    // This vector is only populated if client invokes mcGetConnectedComponnentData
+    // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
+    // triangulating every non-triangle face in the connected component.
+    // NOTE: Only the indices of the triangulations on N-Gon faces are stored in here.
+    // They are stored according to the order in which they are encountered while iterating
+    // over the faces of the connected component. For example, if face ´12´ is the first 
+    // encountered N-Gon face while iterating (e.g. a quad) such that its triangulation produces two 
+    // triangles then these triangles will come first in this array. The format in which
+    // this index information is stored is [<N>,<N*3 indices>, <M>, <M*3 indices>, <P>, <P*3 indices>, ...]
+    // This format helps us to save memory by only storing the triangulation (of NGon faces) indices
+    // since the remaining already triangulated faces are store in "mesh".
+    std::vector<uint32_t> constrained_delaunay_triangulation_indices;
 };
 
 // struct representing a fragment
