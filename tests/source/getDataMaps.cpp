@@ -298,7 +298,7 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
                         uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                         if (!vertexIsFromSrcMesh) {
-                            imVertexIdx = (imVertexIdxRaw - srcMeshVertexCount); // account for offset
+                            imVertexIdx = (imVertexIdxRaw - srcMeshVertexCount); // account for offset (i.e. where the input msh is the cutmesh)
                             ASSERT_LT((int)imVertexIdx, (int)cutMeshVertexCount);
                         } else {
                             ASSERT_LT((int)imVertexIdx, (int)srcMeshVertexCount);

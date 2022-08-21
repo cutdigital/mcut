@@ -310,7 +310,7 @@ void get_connected_component_data_impl(
     switch (flags) {
 
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT: {
-        const uint64_t allocated_bytes = cc_uptr->mesh.number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
 
         if (pMem == nullptr) {
             *pNumBytes = allocated_bytes;
@@ -331,8 +331,8 @@ void get_connected_component_data_impl(
             uint64_t elem_offset = 0;
             float* casted_ptr = reinterpret_cast<float*>(pMem);
 
-            for (vertex_array_iterator_t viter = cc_uptr->mesh.vertices_begin(); viter != cc_uptr->mesh.vertices_end(); ++viter) {
-                const vec3& coords = cc_uptr->mesh.vertex(*viter);
+            for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
+                const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
                     const float val = static_cast<float>(coords[i]);
@@ -349,7 +349,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE: {
-        const uint64_t allocated_bytes = cc_uptr->mesh.number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
 
         if (pMem == nullptr) {
             *pNumBytes = allocated_bytes;
@@ -370,8 +370,8 @@ void get_connected_component_data_impl(
             uint64_t elem_offset = 0;
             double* casted_ptr = reinterpret_cast<double*>(pMem);
 
-            for (vertex_array_iterator_t viter = cc_uptr->mesh.vertices_begin(); viter != cc_uptr->mesh.vertices_end(); ++viter) {
-                const vec3& coords = cc_uptr->mesh.vertex(*viter);
+            for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
+                const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
                     *(casted_ptr + elem_offset) = coords[i];
@@ -391,8 +391,8 @@ void get_connected_component_data_impl(
             uint32_t num_indices = 0;
 
             // TODO: make parallel
-            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
-                const uint32_t num_vertices_around_face = cc_uptr->mesh.get_num_vertices_around_face(*fiter);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+                const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(*fiter);
 
                 MCUT_ASSERT(num_vertices_around_face >= 3);
 
@@ -415,9 +415,9 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             // TODO: make parallel
-            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
                 vertices_around_face.clear();
-                cc_uptr->mesh.get_vertices_around_face(vertices_around_face, *fiter);
+                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *fiter);
                 const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
 
                 MCUT_ASSERT(num_vertices_around_face >= 3u);
@@ -434,9 +434,9 @@ void get_connected_component_data_impl(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_SIZE: { // non-triangulated only (don't want to store redundant information)
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->mesh.number_of_faces() * sizeof(uint32_t); // each face has a size (num verts)
+            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t); // each face has a size (num verts)
         } else {
-            if (bytes > cc_uptr->mesh.number_of_faces() * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -448,8 +448,8 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             // TODO: make parallel
-            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
-                const uint32_t num_vertices_around_face = cc_uptr->mesh.get_num_vertices_around_face(*fiter);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+                const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(*fiter);
 
                 MCUT_ASSERT(num_vertices_around_face >= 3);
 
@@ -466,8 +466,8 @@ void get_connected_component_data_impl(
             uint32_t num_face_adjacent_face_indices = 0;
 
             // TODO: make parallel
-            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
-                const uint32_t num_faces_around_face = cc_uptr->mesh.get_num_faces_around_face(*fiter, nullptr);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+                const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
                 num_face_adjacent_face_indices += num_faces_around_face;
             }
 
@@ -486,9 +486,9 @@ void get_connected_component_data_impl(
 
             std::vector<fd_t> faces_around_face;
             // TODO: make parallel
-            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
                 faces_around_face.clear();
-                cc_uptr->mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
+                cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
 
                 if (!faces_around_face.empty()) {
                     for (uint32_t i = 0; i < (uint32_t)faces_around_face.size(); ++i) {
@@ -503,9 +503,9 @@ void get_connected_component_data_impl(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->mesh.number_of_faces() * sizeof(uint32_t); // each face has a size value (num adjacent faces)
+            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t); // each face has a size value (num adjacent faces)
         } else {
-            if (bytes > cc_uptr->mesh.number_of_faces() * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -517,8 +517,8 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             // TODO: make parallel
-            for (face_array_iterator_t fiter = cc_uptr->mesh.faces_begin(); fiter != cc_uptr->mesh.faces_end(); ++fiter) {
-                const uint32_t num_faces_around_face = cc_uptr->mesh.get_num_faces_around_face(*fiter, nullptr);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+                const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
                 *(casted_ptr + elem_offset) = num_faces_around_face;
                 elem_offset++;
             }
@@ -529,9 +529,9 @@ void get_connected_component_data_impl(
 
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices 
+            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices 
         } else {
-            if (bytes > cc_uptr->mesh.number_of_edges() * 2  * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2  * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -543,12 +543,12 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             // TODO: make parallel
-            for (edge_array_iterator_t eiter = cc_uptr->mesh.edges_begin(); eiter != cc_uptr->mesh.edges_end(); ++eiter) {
-                const vertex_descriptor_t v0 = cc_uptr->mesh.vertex(*eiter, 0);
+            for (edge_array_iterator_t eiter = cc_uptr->kernel_hmesh_data.mesh.edges_begin(); eiter != cc_uptr->kernel_hmesh_data.mesh.edges_end(); ++eiter) {
+                const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data.mesh.vertex(*eiter, 0);
                 *(casted_ptr + elem_offset) = (uint32_t)v0;
                 elem_offset++;
 
-                const vertex_descriptor_t v1 = cc_uptr->mesh.vertex(*eiter, 1);
+                const vertex_descriptor_t v1 = cc_uptr->kernel_hmesh_data.mesh.vertex(*eiter, 1);
                 *(casted_ptr + elem_offset) = (uint32_t)v1;
                 elem_offset++;
             }
@@ -668,12 +668,12 @@ void get_connected_component_data_impl(
             throw std::invalid_argument("cannot query seam vertices on input connected component");
         }
 
-        const uint32_t seam_vertex_count = cc_uptr->mesh_info.seam_vertices.size();
-
+        const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data.seam_vertices.size();
+        
         if (pMem == nullptr) {
             *pNumBytes = seam_vertex_count * sizeof(uint32_t);
         } else {
-            if ((bytes > seam_vertex_count) * sizeof(uint32_t)) {
+            if (bytes > (seam_vertex_count * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -686,25 +686,25 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
             
             // TODO: make parallel
-            for (int i = 0; i < elems_to_copy; ++i)
+            for (uint32_t i = 0; i < elems_to_copy; ++i)
             {
-                const uint32_t seam_vertex_idx = cc_uptr->mesh_info.seam_vertices[i];
+                const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data.seam_vertices[i];
                 *(casted_ptr + elem_offset) = seam_vertex_idx;
                 elem_offset++;
             }
 
-            MCUT_ASSERT((uint32_t)(elem_offset * sizeof(uint32_t)) <= seam_vertex_count);
+            MCUT_ASSERT(elem_offset <= seam_vertex_count);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {
 
-        const uint32_t vertex_map_size = cc_uptr->mesh_info.data_maps.vertex_map.size();
+        const uint32_t vertex_map_size = cc_uptr->kernel_hmesh_data.data_maps.vertex_map.size();
 
         if (vertex_map_size == 0) {
             throw std::invalid_argument("vertex map not available"); // user probably forgot to set the dispatch flag
         }
 
-        MCUT_ASSERT(vertex_map_size == cc_uptr->mesh.number_of_vertices());
+        MCUT_ASSERT(vertex_map_size == (uint32_t)cc_uptr->kernel_hmesh_data.mesh.number_of_vertices());
 
         if (pMem == nullptr) {
             *pNumBytes = (vertex_map_size * sizeof(uint32_t)); // each each vertex has a map value (intersection point == uint_max)
@@ -718,17 +718,21 @@ void get_connected_component_data_impl(
             }
 
             const uint32_t elems_to_copy = (bytes / sizeof(uint32_t));
+
+            MCUT_ASSERT(elems_to_copy <= vertex_map_size);
+
             uint32_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             // TODO: make parallel
-            for (int i = 0; i < elems_to_copy; ++i) // ... for each vertex in CC
+            for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each vertex in CC
             {
                 // Here we use whatever index value was assigned to the current vertex by the kernel, where the 
                 // the kernel does not necessarilly know that the input meshes it was given where modified by
                 // the frontend (in this case via polygon partitioning) 
                 // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-                uint32_t internal_input_mesh_vertex_idx = cc_uptr->mesh_info.data_maps.vertex_map[i];
+                
+                uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data.data_maps.vertex_map[i];
                 // We use the same default value as that used by the kernel for intersection
                 // points (intersection points at mapped to uint_max i.e. null_vertex())
                 uint32_t client_input_mesh_vertex_idx = UINT32_MAX;
@@ -779,23 +783,23 @@ void get_connected_component_data_impl(
                 elem_offset++;
             }
 
-            MCUT_ASSERT((uint32_t)(elem_offset * sizeof(uint32_t)) <= vertex_map_size);
+            MCUT_ASSERT(elem_offset <= vertex_map_size);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
-        const uint32_t face_map_size = cc_uptr->mesh_info.data_maps.face_map.size();
+        const uint32_t face_map_size = cc_uptr->kernel_hmesh_data.data_maps.face_map.size();
 
         if (face_map_size == 0) {
             throw std::invalid_argument("face map not available"); // user probably forgot to set the dispatch flag
         }
 
-        MCUT_ASSERT(face_map_size == cc_uptr->mesh.number_of_faces());
+        MCUT_ASSERT(face_map_size == (uint32_t)cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
 
         if (pMem == nullptr) {
             *pNumBytes = face_map_size * sizeof(uint32_t); // each face has a map value (intersection point == uint_max)
         }
         else {
-            if ((bytes > face_map_size) * sizeof(uint32_t)) {
+            if (bytes > (face_map_size * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -808,9 +812,9 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             // TODO: make parallel
-            for (int i = 0; i < elems_to_copy; ++i) // ... for each vertex (to copy) in CC
+            for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each vertex (to copy) in CC
             {
-                uint32_t internalInputMeshFaceDescr = (uint32_t)cc_uptr->mesh_info.data_maps.face_map[i];
+                uint32_t internalInputMeshFaceDescr = (uint32_t)cc_uptr->kernel_hmesh_data.data_maps.face_map[i];
                 uint32_t userInputMeshFaceDescr = INT32_MAX;
                 const bool internalInputMeshFaceDescrIsForSrcMesh = (internalInputMeshFaceDescr < cc_uptr->internalSrcMeshFaceCount);
 
@@ -849,17 +853,17 @@ void get_connected_component_data_impl(
                 elem_offset++;
             }
 
-            MCUT_ASSERT((uint32_t)(elem_offset * sizeof(uint32_t)) <= face_map_size);
+            MCUT_ASSERT(elem_offset <= face_map_size);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
         if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
         {
             uint32_t face_indices_offset = 0;
-            std::vector<uint32_t> tri_face_indices;
-            tri_face_indices.reserve(cc_uptr->indexArrayMesh.numFaces);
+            //std::vector<uint32_t> tri_face_indices;
+            cc_uptr->constrained_delaunay_triangulation_indices.reserve(cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
 
-            const uint32_t nontri_cc_face_count = cc_uptr->indexArrayMesh.numFaces;
+            //const uint32_t nontri_cc_face_count = (uint32_t)cc_uptr->kernel_hmesh_data.mesh.number_of_faces();//cc_uptr->indexArrayMesh.numFaces;
 
             // -----
             std::vector<vec3> face_vertex_coords_3d;
@@ -885,17 +889,24 @@ void get_connected_component_data_impl(
             // -----
 
             // for each face (TODO: make parallel)
-            for (uint32_t f = 0; f < nontri_cc_face_count; ++f) {
+            std::vector<vertex_descriptor_t> vertices_around_face;
 
-                const uint32_t face_vertex_count = cc_uptr->indexArrayMesh.pFaceSizes[f];
+            for (face_array_iterator_t f = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); f != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++f) {
+                
+                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *f);
+
+                const uint32_t face_vertex_count = (uint32_t)vertices_around_face.size(); //->indexArrayMesh.pFaceSizes[f];
+                
+                MCUT_ASSERT(face_vertex_count >= 3);
+
                 const bool face_is_triangle = (face_vertex_count == 3);
                 const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
 
                 if (face_is_triangle) {
 
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
-                        const uint32_t face_vertex_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
-                        tri_face_indices.push_back(face_vertex_idx);
+                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v];// cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
+                        cc_uptr->constrained_delaunay_triangulation_indices.push_back(face_vertex_idx);
                     }
 
                 } else if (!face_is_triangle && is_adjacent_to_intersection_curve) {
@@ -922,14 +933,11 @@ void get_connected_component_data_impl(
 
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
 
-                        const uint32_t face_vertex_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
+                        const vertex_descriptor_t face_vertex_idx((uint32_t)vertices_around_face[v]);//cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
 
-                        const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)face_vertex_idx * 3);
+                        //const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)face_vertex_idx * 3);
 
-                        vec3& coord_3d = face_vertex_coords_3d[v];
-                        coord_3d[0] = vptr[0];
-                        coord_3d[1] = vptr[1];
-                        coord_3d[2] = vptr[2];
+                        face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(face_vertex_idx);// face_vertex_coords_3d[v];
                     }
 
                     // project face vertices to 2D (NOTE: area is unchanged)
@@ -1001,14 +1009,14 @@ void get_connected_component_data_impl(
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(f) + "has wrong topology");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(*f) + "has wrong topology");
                     }
 
                     if (constrained_delaunay_triangulator.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(f) + "produced zero faces");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(*f) + "produced zero faces");
                     }
 
                     // save the triangulation
@@ -1124,33 +1132,39 @@ void get_connected_component_data_impl(
 
                     for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
                         const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
+                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];//cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
 
                         face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
                     }
 
-                    tri_face_indices.insert(tri_face_indices.end(), face_triangulation_indices.begin(), face_triangulation_indices.end());
+                    cc_uptr->constrained_delaunay_triangulation_indices.insert(
+                        cc_uptr->constrained_delaunay_triangulation_indices.end(), 
+                        face_triangulation_indices.begin(), 
+                        face_triangulation_indices.end());
 
                 } //  if (face_vertex_count == 3)
 
                 face_indices_offset += face_vertex_count;
             }
 
-            MCUT_ASSERT(tri_face_indices.size() >= 3);
+            MCUT_ASSERT(cc_uptr->constrained_delaunay_triangulation_indices.size() >= 3);
 
-            cc_uptr->indexArrayMesh.numTriangleIndices = (uint32_t)tri_face_indices.size();
-            cc_uptr->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[cc_uptr->indexArrayMesh.numTriangleIndices]);
+            //cc_uptr->indexArrayMesh.numTriangleIndices = (uint32_t)tri_face_indices.size();
+            //cc_uptr->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[cc_uptr->indexArrayMesh.numTriangleIndices]);
 
-            memcpy(reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pTriangleIndices.get()), tri_face_indices.data(), tri_face_indices.size() * sizeof(uint32_t));
+            //memcpy(reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pTriangleIndices.get()), tri_face_indices.data(), tri_face_indices.size() * sizeof(uint32_t));
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
+
+        const uint32_t num_triangulation_indices= (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
 
         if (pMem == nullptr) // client pointer is null (asking for size)
         {
-            MCUT_ASSERT(cc_uptr->indexArrayMesh.pTriangleIndices.get() != nullptr);
-            *pNumBytes = cc_uptr->indexArrayMesh.numTriangleIndices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+            MCUT_ASSERT(num_triangulation_indices >= 3);
+            *pNumBytes = num_triangulation_indices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
         } else {
-            MCUT_ASSERT(cc_uptr->indexArrayMesh.numTriangleIndices >= 3);
-            if (bytes > cc_uptr->indexArrayMesh.numTriangleIndices * sizeof(uint32_t)) {
+            MCUT_ASSERT(num_triangulation_indices >= 3);
+
+            if (bytes > num_triangulation_indices * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -1158,7 +1172,7 @@ void get_connected_component_data_impl(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pTriangleIndices.get()), bytes);
+            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->constrained_delaunay_triangulation_indices.data()), bytes);
         }
     } break;
     default:

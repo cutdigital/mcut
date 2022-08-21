@@ -274,6 +274,7 @@ bool client_input_arrays_to_hmesh(
     return true;
 }
 
+#if 0
 // this function converts a halfedge mesh representation (from the kernel
 // backend) to an index array mesh (for the user).
 void hmesh_to_array_mesh(
@@ -851,6 +852,7 @@ void hmesh_to_array_mesh(
 #endif
     TIMESTACK_POP();
 }
+#endif
 
 bool is_coplanar(const hmesh_t& m, const fd_t& f, int& fv_count)
 {
@@ -1904,12 +1906,12 @@ extern "C" void preproc(
         until all connected components (that are created during the current mcDispatch call) are destroyed.
         Thus, each such connected component will maintain its own (reference counted) pointer.
 
-        These variables are used when populating client output arrays during ´mcGetConnectedComponentData´.
-        One example of this usage is when the client requests a connected component´s face map. In the cases
+        These variables are used when populating client output arrays during ï¿½mcGetConnectedComponentDataï¿½.
+        One example of this usage is when the client requests a connected componentï¿½s face map. In the cases
         where polygon partitioning occurs during the respective mcDispatch call then some of these shared_ptrs like
-        ´source_hmesh_child_to_usermesh_birth_face´ will be used to generate the correct mapping from
+        ï¿½source_hmesh_child_to_usermesh_birth_faceï¿½ will be used to generate the correct mapping from
         the faces of the connected component  to the
-        client mesh (which will be internally modified due to polygon partitioning). Here the client mesh 
+        client mesh (which will be internally modified due to polygon partitioning). Here the client mesh
         corresponds to the input source mesh if the connected component is a fragment, and the cut mesh otherwise.
     */
 
@@ -1917,20 +1919,21 @@ extern "C" void preproc(
     // This child face is produced as a result of polygon partition.
     std::shared_ptr< //
         std::unordered_map< //
-            fd_t /*child face*/, 
+            fd_t /*child face*/,
             fd_t /*parent face in the [user-provided] source mesh*/
-        > //
-    > source_hmesh_child_to_usermesh_birth_face = std::shared_ptr< std::unordered_map<fd_t, fd_t >>(new std::unordered_map<fd_t, fd_t >);
-    std::shared_ptr < //
-        std::unordered_map< //
-            fd_t /*child face*/, 
-            fd_t /*parent face in the [user-provided] cut mesh*/
+            > //
         >
-    > cut_hmesh_child_to_usermesh_birth_face = std::shared_ptr < std::unordered_map<fd_t, fd_t>>(new std::unordered_map<fd_t, fd_t>);
+        source_hmesh_child_to_usermesh_birth_face = std::shared_ptr<std::unordered_map<fd_t, fd_t>>(new std::unordered_map<fd_t, fd_t>);
+    
+        std::unordered_map< //
+            fd_t /*child face*/,
+            fd_t /*parent face in the [user-provided] cut mesh*/
+            >
+        cut_hmesh_child_to_usermesh_birth_face ;
     // descriptors and coordinates of new vertices that are added into an input mesh (source mesh or cut mesh)
     // in order to carry out partitioning
-    std::shared_ptr < std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices = std::shared_ptr < std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
-    std::shared_ptr < std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices = std::shared_ptr < std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
+    std::shared_ptr<std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices = std::shared_ptr<std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
+    std::unordered_map<vd_t, vec3> cut_hmesh_new_poly_partition_vertices;
 
     // the number of faces in the source mesh from the last/previous dispatch call
     const uint32_t source_hmesh_face_count = numSrcMeshFaces;
@@ -2078,9 +2081,9 @@ extern "C" void preproc(
                 source_hmesh_face_count_prev,
                 source_hmesh,
                 cut_hmesh,
-                source_hmesh_child_to_usermesh_birth_face,
+                source_hmesh_child_to_usermesh_birth_face.get()[0],
                 cut_hmesh_child_to_usermesh_birth_face,
-                source_hmesh_new_poly_partition_vertices,
+                source_hmesh_new_poly_partition_vertices.get()[0],
                 cut_hmesh_new_poly_partition_vertices);
 
             // ::::::::::::::::::::::::::::::::::::::::::::
@@ -2233,27 +2236,27 @@ extern "C" void preproc(
 
     TIMESTACK_PUSH("create face partition maps");
     // NOTE: face descriptors in "cut_hmesh_child_to_usermesh_birth_face", need to be offsetted
-    // by the number of [internal] source-mesh faces/vertices. This is to ensure consistency with 
-    // the kernel's data-mapping and make it easier for us to map vertex and face descriptors in 
+    // by the number of [internal] source-mesh faces/vertices. This is to ensure consistency with
+    // the kernel's data-mapping and make it easier for us to map vertex and face descriptors in
     // connected components to the correct instance in the client input meshes.
-    // This offsetting follows a design choice used in the kernel that ("ps-faces" belonging to 
+    // This offsetting follows a design choice used in the kernel that ("ps-faces" belonging to
     // cut-mesh start [after] the source-mesh faces).
     // Refer to the function "hmesh_to_array_mesh()" on how we use this information.
-    std::shared_ptr< std::unordered_map<fd_t, fd_t>> fpPartitionChildFaceToInputCutMeshFaceOFFSETTED = cut_hmesh_child_to_usermesh_birth_face;
+    std::shared_ptr<std::unordered_map<fd_t, fd_t>> cut_hmesh_child_to_usermesh_birth_face_OFFSETTED = std::shared_ptr<std::unordered_map<fd_t, fd_t>>(new std::unordered_map<fd_t, fd_t>);//cut_hmesh_child_to_usermesh_birth_face;
 
     for (std::unordered_map<fd_t, fd_t>::iterator i = cut_hmesh_child_to_usermesh_birth_face.begin();
          i != cut_hmesh_child_to_usermesh_birth_face.end(); ++i) {
         fd_t offsettedDescr = fd_t(i->first + source_hmesh.number_of_faces());
-        (fpPartitionChildFaceToInputCutMeshFaceOFFSETTED.get()[0])[offsettedDescr] = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
-                                                                                                                          // i->second = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
+        (cut_hmesh_child_to_usermesh_birth_face_OFFSETTED.get()[0])[offsettedDescr] = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
+                                                                                                                                     // i->second = fd_t(i->second + source_hmesh_face_count_prev); // apply offset
     }
 
-    std::shared_ptr < std::unordered_map<vd_t, vec3>> addedFpPartitioningVerticesOnCutMeshOFFSETTED = std::shared_ptr < std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
+    std::shared_ptr<std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices_OFFSETTED = std::shared_ptr<std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
 
     for (std::unordered_map<vd_t, vec3>::const_iterator i = cut_hmesh_new_poly_partition_vertices.begin();
          i != cut_hmesh_new_poly_partition_vertices.end(); ++i) {
         vd_t offsettedDescr = vd_t(i->first + source_hmesh.number_of_vertices());
-        (addedFpPartitioningVerticesOnCutMeshOFFSETTED.get()[0])[offsettedDescr] = i->second; // apply offset
+        (cut_hmesh_new_poly_partition_vertices_OFFSETTED.get()[0])[offsettedDescr] = i->second; // apply offset
     }
 
     TIMESTACK_POP();
@@ -2283,8 +2286,21 @@ extern "C" void preproc(
                 asFragPtr->patchLocation = convert(j->first);
 
                 MCUT_ASSERT(asFragPtr->patchLocation != MC_PATCH_LOCATION_UNDEFINED);
-                asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
 
+                asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_COMPLETE;
+                asFragPtr->kernel_hmesh_data = std::move(*k);
+
+                asFragPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+                asFragPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+                asFragPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+                asFragPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+                asFragPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+                asFragPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+                asFragPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+                asFragPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+
+#if 0
                 hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
                     context_uptr,
@@ -2299,6 +2315,7 @@ extern "C" void preproc(
                     source_hmesh_face_count,
                     source_hmesh.number_of_vertices(),
                     source_hmesh.number_of_faces());
+#endif
             }
         }
     }
@@ -2323,6 +2340,20 @@ extern "C" void preproc(
             asFragPtr->patchLocation = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
             asFragPtr->srcMeshSealType = McFragmentSealType::MC_FRAGMENT_SEAL_TYPE_NONE;
 
+            asFragPtr->kernel_hmesh_data = std::move(*j);
+
+            asFragPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+                asFragPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+                asFragPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+                asFragPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+                asFragPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+                asFragPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+                asFragPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+                asFragPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+
+           
+#if 0
             hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
                 context_uptr,
@@ -2337,6 +2368,8 @@ extern "C" void preproc(
                 source_hmesh_face_count,
                 source_hmesh.number_of_vertices(),
                 source_hmesh.number_of_faces());
+
+#endif
         }
     }
     TIMESTACK_POP();
@@ -2356,6 +2389,19 @@ extern "C" void preproc(
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_INSIDE;
 
+        asPatchPtr->kernel_hmesh_data = std::move(*it);
+
+        asPatchPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+                asPatchPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+                asPatchPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+                asPatchPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+                asPatchPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+                asPatchPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+                asPatchPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+                asPatchPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+
+#if 0
         hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
             context_uptr,
@@ -2370,6 +2416,7 @@ extern "C" void preproc(
             source_hmesh_face_count,
             source_hmesh.number_of_vertices(),
             source_hmesh.number_of_faces());
+#endif
     }
     TIMESTACK_POP();
 
@@ -2385,16 +2432,29 @@ extern "C" void preproc(
         patch_cc_t* asPatchPtr = dynamic_cast<patch_cc_t*>(context_uptr->connected_components.at(clientHandle).get());
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_OUTSIDE;
+        asPatchPtr->kernel_hmesh_data = std::move(*it);
 
-        hmesh_to_array_mesh(
+        asPatchPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+        asPatchPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+        asPatchPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+        asPatchPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+        asPatchPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+        asPatchPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+        asPatchPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+        asPatchPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+
+#if 0
+            hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
-            context_uptr,
+                context_uptr,
 #endif
-            asPatchPtr->indexArrayMesh,
-            *it,
-            source_hmesh_new_poly_partition_vertices,
-            source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                asPatchPtr->indexArrayMesh,
+                *it,
+                source_hmesh_new_poly_partition_vertices,
+                source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+#endif
     }
     TIMESTACK_POP();
 
@@ -2413,13 +2473,27 @@ extern "C" void preproc(
         seam_cc_t* asSrcMeshSeamPtr = dynamic_cast<seam_cc_t*>(context_uptr->connected_components.at(clientHandle).get());
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
-        hmesh_to_array_mesh(
+
+        asSrcMeshSeamPtr->kernel_hmesh_data = std::move(kernel_output.seamed_src_mesh);
+
+        asSrcMeshSeamPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+        asSrcMeshSeamPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+        asSrcMeshSeamPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+        asSrcMeshSeamPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+        asSrcMeshSeamPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+        asSrcMeshSeamPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+        asSrcMeshSeamPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+        asSrcMeshSeamPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+#if 0
+            hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
-            context_uptr,
+                context_uptr,
 #endif
-            asSrcMeshSeamPtr->indexArrayMesh, kernel_output.seamed_src_mesh,
-            source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                asSrcMeshSeamPtr->indexArrayMesh, kernel_output.seamed_src_mesh,
+                source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+#endif
         TIMESTACK_POP();
     }
 
@@ -2427,6 +2501,7 @@ extern "C" void preproc(
 
     if (kernel_output.seamed_cut_mesh.mesh.number_of_faces() > 0) {
         TIMESTACK_PUSH("store cut-mesh seam");
+
         std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> cutMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(cutMeshSeam.get());
         context_uptr->connected_components.emplace(clientHandle, std::move(cutMeshSeam));
@@ -2434,13 +2509,26 @@ extern "C" void preproc(
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
-        hmesh_to_array_mesh(
+        asCutMeshSeamPtr->kernel_hmesh_data = std::move(kernel_output.seamed_cut_mesh);
+
+        asCutMeshSeamPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+        asCutMeshSeamPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+        asCutMeshSeamPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+        asCutMeshSeamPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+        asCutMeshSeamPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+        asCutMeshSeamPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+        asCutMeshSeamPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+        asCutMeshSeamPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+#if 0
+            hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
-            context_uptr,
+                context_uptr,
 #endif
-            asCutMeshSeamPtr->indexArrayMesh, kernel_output.seamed_cut_mesh,
-            source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                asCutMeshSeamPtr->indexArrayMesh, kernel_output.seamed_cut_mesh,
+                source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+#endif
         TIMESTACK_POP();
     }
 
@@ -2466,6 +2554,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_vertex_maps) {
             omi.data_maps.vertex_map.resize(cut_hmesh.number_of_vertices());
+            // TODO: make parallel
             for (vertex_array_iterator_t i = cut_hmesh.vertices_begin(); i != cut_hmesh.vertices_end(); ++i) {
                 omi.data_maps.vertex_map[*i] = vd_t((*i) + source_hmesh.number_of_vertices()); // apply offset like kernel does
             }
@@ -2473,6 +2562,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_face_maps) {
             omi.data_maps.face_map.resize(cut_hmesh.number_of_faces());
+            // TODO: make parallel
             for (face_array_iterator_t i = cut_hmesh.faces_begin(); i != cut_hmesh.faces_end(); ++i) {
                 omi.data_maps.face_map[*i] = fd_t((*i) + source_hmesh.number_of_faces()); // apply offset like kernel does
             }
@@ -2480,13 +2570,28 @@ extern "C" void preproc(
 
         omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        hmesh_to_array_mesh(
+        asCutMeshInputPtr->kernel_hmesh_data = std::move(omi);
+
+        asCutMeshInputPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+        asCutMeshInputPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+        asCutMeshInputPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+        asCutMeshInputPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+        asCutMeshInputPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+        asCutMeshInputPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+        asCutMeshInputPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+        asCutMeshInputPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+
+#if 0
+            hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
-            context_uptr,
+                context_uptr,
 #endif
-            asCutMeshInputPtr->indexArrayMesh, omi,
-            source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                asCutMeshInputPtr->indexArrayMesh, omi,
+                source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+#endif
+
         TIMESTACK_POP();
     }
 
@@ -2502,8 +2607,10 @@ extern "C" void preproc(
 
         output_mesh_info_t omi;
         omi.mesh = source_hmesh; // naive copy
+
         if (kernel_input.populate_vertex_maps) {
             omi.data_maps.vertex_map.resize(source_hmesh.number_of_vertices());
+            // TODO: make parallel
             for (vertex_array_iterator_t i = source_hmesh.vertices_begin(); i != source_hmesh.vertices_end(); ++i) {
                 omi.data_maps.vertex_map[*i] = *i; // one to one mapping
             }
@@ -2511,6 +2618,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_face_maps) {
             omi.data_maps.face_map.resize(source_hmesh.number_of_faces());
+            // TODO: make parallel
             for (face_array_iterator_t i = source_hmesh.faces_begin(); i != source_hmesh.faces_end(); ++i) {
                 omi.data_maps.face_map[*i] = *i; // one to one mapping
             }
@@ -2518,13 +2626,28 @@ extern "C" void preproc(
 
         omi.seam_vertices = {}; // empty. an input connected component has no polygon intersection points
 
-        hmesh_to_array_mesh(
+        asSrcMeshInputPtr->kernel_hmesh_data = std::move(omi);
+
+        asSrcMeshInputPtr->source_hmesh_child_to_usermesh_birth_face = source_hmesh_child_to_usermesh_birth_face;
+        asSrcMeshInputPtr->cut_hmesh_child_to_usermesh_birth_face = cut_hmesh_child_to_usermesh_birth_face_OFFSETTED;
+        asSrcMeshInputPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
+        asSrcMeshInputPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
+
+        asSrcMeshInputPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
+        asSrcMeshInputPtr->userSrcMeshVertexCount = numSrcMeshVertices;
+        asSrcMeshInputPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
+        asSrcMeshInputPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+
+#if 0
+            hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
-            context_uptr,
+                context_uptr,
 #endif
-            asSrcMeshInputPtr->indexArrayMesh, omi,
-            source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
-            numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+                asSrcMeshInputPtr->indexArrayMesh, omi,
+                source_hmesh_new_poly_partition_vertices, source_hmesh_child_to_usermesh_birth_face, addedFpPartitioningVerticesOnCutMeshOFFSETTED, fpPartitionChildFaceToInputCutMeshFaceOFFSETTED,
+                numSrcMeshVertices, source_hmesh_face_count, source_hmesh.number_of_vertices(), source_hmesh.number_of_faces());
+#endif
+
         TIMESTACK_POP();
     }
 }
