@@ -95,7 +95,7 @@
 #endif
 
 
-#define PROFILING_BUILD
+//#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
 #include <chrono>
@@ -143,7 +143,7 @@
                 const std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
                 const std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_start);
                 unsigned long long elapsed_ = elapsed.count();
-                printf("[PROFILE]: %s (%llums)\n", m_name.c_str(), elapsed_);
+                printf("[PROF]: %s (%llums)\n", m_name.c_str(), elapsed_);
             }
         }
         void set_invalid()
