@@ -10,7 +10,7 @@ jobs:
         # windows-2016 and windows-2019 have MSVC 2017 and 2019 installed
         # respectively: https://github.com/actions/virtual-environments.
         os: [windows-2019]
-        platform: [Win32, x64]
+        platform: [x64] # Win32
         build_type: [Debug, Release]
         standard: [11] # [11, 17, 20]
         multithreading: [ON,OFF]
