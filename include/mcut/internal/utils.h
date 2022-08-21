@@ -89,9 +89,9 @@
 #define PEDANTIC_SUBSCRIPT_ACCESS 1
 
 #if defined(PEDANTIC_SUBSCRIPT_ACCESS)
-#define SUBSCRIPT_ACCESS(x, i) x.at(i)
+#define SAFE_ACCESS(var, iter) var.at(i)
 #else
-#define SUBSCRIPT_ACCESS(x, i) x[i]
+#define SAFE_ACCESS(var, iter) var[i]
 #endif
 
 
