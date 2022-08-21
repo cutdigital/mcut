@@ -287,10 +287,10 @@ void hmesh_to_array_mesh(
     const std::unordered_map<fd_t, fd_t>& fpPartitionChildFaceToCorrespondingInputSrcMeshFace,
     const std::unordered_map<vd_t, vec3>& addedFpPartitioningVerticesOnCorrespondingInputCutMesh,
     const std::unordered_map<fd_t, fd_t>& fpPartitionChildFaceToCorrespondingInputCutMeshFace,
-    const int userSrcMeshVertexCount,
-    const int userSrcMeshFaceCount,
-    const int internalSrcMeshVertexCount,
-    const int internalSrcMeshFaceCount)
+    const int client_sourcemesh_vertex_count,
+    const int client_sourcemesh_face_count,
+    const int internal_sourcemesh_vertex_count,
+    const int internal_sourcemesh_face_count)
 {
     SCOPED_TIMER(__FUNCTION__);
 
@@ -336,7 +336,7 @@ void hmesh_to_array_mesh(
 
                     if (!internalInputMeshVertexDescrIsForIntersectionPoint) { // user-mesh vertex or vertex that is added due to face-partitioning
                         bool vertexExistsDueToFacePartition = false;
-                        const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internalSrcMeshVertexCount);
+                        const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internal_sourcemesh_vertex_count);
 
                         if (internalInputMeshVertexDescrIsForSrcMesh) {
                             std::unordered_map<vd_t, vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(vd_t(internalInputMeshVertexDescr));
@@ -349,12 +349,12 @@ void hmesh_to_array_mesh(
 
                         if (!vertexExistsDueToFacePartition) { // user-mesh vertex
 
-                            MCUT_ASSERT(internalSrcMeshVertexCount > 0);
+                            MCUT_ASSERT(internal_sourcemesh_vertex_count > 0);
 
                             if (!internalInputMeshVertexDescrIsForSrcMesh) // is it a cut-mesh vertex discriptor ..?
                             {
-                                const uint32_t internalInputMeshVertexDescrNoOffset = (internalInputMeshVertexDescr - internalSrcMeshVertexCount);
-                                userInputMeshVertexDescr = (internalInputMeshVertexDescrNoOffset + userSrcMeshVertexCount); // ensure that we offset using number of [user-provided mesh] vertices
+                                const uint32_t internalInputMeshVertexDescrNoOffset = (internalInputMeshVertexDescr - internal_sourcemesh_vertex_count);
+                                userInputMeshVertexDescr = (internalInputMeshVertexDescrNoOffset + client_sourcemesh_vertex_count); // ensure that we offset using number of [user-provided mesh] vertices
                             } else {
                                 userInputMeshVertexDescr = internalInputMeshVertexDescr; // src-mesh vertices have no offset unlike cut-mesh vertices
                             }
@@ -423,7 +423,7 @@ void hmesh_to_array_mesh(
                 // partitioning was not in the user provided input mesh" and should therefore be treated/labelled as an intersection
                 // point i.e. it should map to UINT32_MAX because it does not map to any vertex in the user provided input mesh.
                 bool vertexExistsDueToFacePartition = false;
-                const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internalSrcMeshVertexCount);
+                const bool internalInputMeshVertexDescrIsForSrcMesh = ((int)internalInputMeshVertexDescr < internal_sourcemesh_vertex_count);
 
                 if (internalInputMeshVertexDescrIsForSrcMesh) {
                     std::unordered_map<vd_t, vec3>::const_iterator fiter = addedFpPartitioningVerticesOnCorrespondingInputSrcMesh.find(vd_t(internalInputMeshVertexDescr));
@@ -436,21 +436,21 @@ void hmesh_to_array_mesh(
 
                 if (!vertexExistsDueToFacePartition) { // user-mesh vertex
 
-                    MCUT_ASSERT(internalSrcMeshVertexCount > 0);
+                    MCUT_ASSERT(internal_sourcemesh_vertex_count > 0);
 
                     if (!internalInputMeshVertexDescrIsForSrcMesh) // is it a cut-mesh vertex discriptor ..?
                     {
 
-                        // vertices added due to face-partitioning will have an unoffsetted index/descr that is >= userSrcMeshVertexCount
-                        const uint32_t internalInputMeshVertexDescrNoOffset = (internalInputMeshVertexDescr - internalSrcMeshVertexCount);
+                        // vertices added due to face-partitioning will have an unoffsetted index/descr that is >= client_sourcemesh_vertex_count
+                        const uint32_t internalInputMeshVertexDescrNoOffset = (internalInputMeshVertexDescr - internal_sourcemesh_vertex_count);
 
                         // if (internalInputMeshVertexDescrNoOffset < userCutMeshVertexCount) {
-                        // const int offset_descrepancy = (internalSrcMeshVertexCount - userSrcMeshVertexCount);
-                        userInputMeshVertexDescr = (internalInputMeshVertexDescrNoOffset + userSrcMeshVertexCount); // ensure that we offset using number of [user-provided mesh] vertices
+                        // const int offset_descrepancy = (internal_sourcemesh_vertex_count - client_sourcemesh_vertex_count);
+                        userInputMeshVertexDescr = (internalInputMeshVertexDescrNoOffset + client_sourcemesh_vertex_count); // ensure that we offset using number of [user-provided mesh] vertices
                         //}
                     } else {
-                        // if (internalInputMeshVertexDescr < userSrcMeshVertexCount) {
-                        // const int offset_descrepancy = (internalSrcMeshVertexCount - userSrcMeshVertexCount);
+                        // if (internalInputMeshVertexDescr < client_sourcemesh_vertex_count) {
+                        // const int offset_descrepancy = (internal_sourcemesh_vertex_count - client_sourcemesh_vertex_count);
                         userInputMeshVertexDescr = internalInputMeshVertexDescr; // src-mesh vertices have no offset unlike cut-mesh vertices
                         //}
                     }
@@ -530,33 +530,33 @@ void hmesh_to_array_mesh(
                 if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
                     MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
 
-                    uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
-                    uint32_t userInputMeshFaceDescr = INT32_MAX;
-                    const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
+                    uint32_t internal_inputmesh_face_idx = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+                    uint32_t client_inputmesh_face_idx = INT32_MAX;
+                    const bool internal_inputmesh_face_idx_is_for_src_mesh = ((int)internal_inputmesh_face_idx < internal_sourcemesh_face_count);
 
-                    if (internalInputMeshFaceDescrIsForSrcMesh) {
-                        std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputSrcMeshFace.find(fd_t(internalInputMeshFaceDescr));
+                    if (internal_inputmesh_face_idx_is_for_src_mesh) {
+                        std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputSrcMeshFace.find(fd_t(internal_inputmesh_face_idx));
                         if (fiter != fpPartitionChildFaceToCorrespondingInputSrcMeshFace.cend()) {
-                            userInputMeshFaceDescr = fiter->second;
+                            client_inputmesh_face_idx = fiter->second;
                         } else {
-                            userInputMeshFaceDescr = internalInputMeshFaceDescr;
+                            client_inputmesh_face_idx = internal_inputmesh_face_idx;
                         }
-                        MCUT_ASSERT((int)userInputMeshFaceDescr < (int)userSrcMeshFaceCount);
+                        MCUT_ASSERT((int)client_inputmesh_face_idx < (int)client_sourcemesh_face_count);
                     } else // internalInputMeshVertexDescrIsForCutMesh
                     {
-                        std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(fd_t(internalInputMeshFaceDescr));
+                        std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(fd_t(internal_inputmesh_face_idx));
                         if (fiter != fpPartitionChildFaceToCorrespondingInputCutMeshFace.cend()) {
-                            uint32_t unoffsettedDescr = (fiter->second - internalSrcMeshFaceCount);
-                            userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                            uint32_t index_without_offset = (fiter->second - internal_sourcemesh_face_count);
+                            client_inputmesh_face_idx = index_without_offset + client_sourcemesh_face_count;
                         } else {
-                            uint32_t unoffsettedDescr = (internalInputMeshFaceDescr - internalSrcMeshFaceCount);
-                            userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                            uint32_t index_without_offset = (internal_inputmesh_face_idx - internal_sourcemesh_face_count);
+                            client_inputmesh_face_idx = index_without_offset + client_sourcemesh_face_count;
                         }
                     }
 
-                    MCUT_ASSERT(userInputMeshFaceDescr != INT32_MAX);
+                    MCUT_ASSERT(client_inputmesh_face_idx != INT32_MAX);
 
-                    indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
+                    indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = client_inputmesh_face_idx;
                 } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
             }
             return 0;
@@ -611,33 +611,33 @@ void hmesh_to_array_mesh(
         if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
             MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
 
-            uint32_t internalInputMeshFaceDescr = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
-            uint32_t userInputMeshFaceDescr = INT32_MAX;
-            const bool internalInputMeshFaceDescrIsForSrcMesh = ((int)internalInputMeshFaceDescr < internalSrcMeshFaceCount);
+            uint32_t internal_inputmesh_face_idx = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+            uint32_t client_inputmesh_face_idx = INT32_MAX;
+            const bool internal_inputmesh_face_idx_is_for_src_mesh = ((int)internal_inputmesh_face_idx < internal_sourcemesh_face_count);
 
-            if (internalInputMeshFaceDescrIsForSrcMesh) {
-                std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputSrcMeshFace.find(fd_t(internalInputMeshFaceDescr));
+            if (internal_inputmesh_face_idx_is_for_src_mesh) {
+                std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputSrcMeshFace.find(fd_t(internal_inputmesh_face_idx));
                 if (fiter != fpPartitionChildFaceToCorrespondingInputSrcMeshFace.cend()) {
-                    userInputMeshFaceDescr = fiter->second;
+                    client_inputmesh_face_idx = fiter->second;
                 } else {
-                    userInputMeshFaceDescr = internalInputMeshFaceDescr;
+                    client_inputmesh_face_idx = internal_inputmesh_face_idx;
                 }
-                MCUT_ASSERT((int)userInputMeshFaceDescr < (int)userSrcMeshFaceCount);
+                MCUT_ASSERT((int)client_inputmesh_face_idx < (int)client_sourcemesh_face_count);
             } else // internalInputMeshVertexDescrIsForCutMesh
             {
-                std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(fd_t(internalInputMeshFaceDescr));
+                std::unordered_map<fd_t, fd_t>::const_iterator fiter = fpPartitionChildFaceToCorrespondingInputCutMeshFace.find(fd_t(internal_inputmesh_face_idx));
                 if (fiter != fpPartitionChildFaceToCorrespondingInputCutMeshFace.cend()) {
-                    uint32_t unoffsettedDescr = (fiter->second - internalSrcMeshFaceCount);
-                    userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                    uint32_t index_without_offset = (fiter->second - internal_sourcemesh_face_count);
+                    client_inputmesh_face_idx = index_without_offset + client_sourcemesh_face_count;
                 } else {
-                    uint32_t unoffsettedDescr = (internalInputMeshFaceDescr - internalSrcMeshFaceCount);
-                    userInputMeshFaceDescr = unoffsettedDescr + userSrcMeshFaceCount;
+                    uint32_t index_without_offset = (internal_inputmesh_face_idx - internal_sourcemesh_face_count);
+                    client_inputmesh_face_idx = index_without_offset + client_sourcemesh_face_count;
                 }
             }
 
-            MCUT_ASSERT(userInputMeshFaceDescr != INT32_MAX);
+            MCUT_ASSERT(client_inputmesh_face_idx != INT32_MAX);
 
-            indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = userInputMeshFaceDescr;
+            indexArrayMesh.pFaceMapIndices[(uint32_t)(*i)] = client_inputmesh_face_idx;
         } // if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
 
         faceID++;
@@ -2295,10 +2295,10 @@ extern "C" void preproc(
                 asFragPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
                 asFragPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-                asFragPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-                asFragPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-                asFragPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-                asFragPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+                asFragPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+                asFragPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+                asFragPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+                asFragPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
 #if 0
                 hmesh_to_array_mesh(
@@ -2347,10 +2347,10 @@ extern "C" void preproc(
                 asFragPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
                 asFragPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-                asFragPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-                asFragPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-                asFragPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-                asFragPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+                asFragPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+                asFragPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+                asFragPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+                asFragPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
            
 #if 0
@@ -2396,10 +2396,10 @@ extern "C" void preproc(
                 asPatchPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
                 asPatchPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-                asPatchPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-                asPatchPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-                asPatchPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-                asPatchPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+                asPatchPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+                asPatchPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+                asPatchPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+                asPatchPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
 #if 0
         hmesh_to_array_mesh(
@@ -2439,10 +2439,10 @@ extern "C" void preproc(
         asPatchPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
         asPatchPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-        asPatchPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-        asPatchPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-        asPatchPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-        asPatchPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+        asPatchPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+        asPatchPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+        asPatchPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+        asPatchPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
 #if 0
             hmesh_to_array_mesh(
@@ -2481,10 +2481,10 @@ extern "C" void preproc(
         asSrcMeshSeamPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
         asSrcMeshSeamPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-        asSrcMeshSeamPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-        asSrcMeshSeamPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-        asSrcMeshSeamPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-        asSrcMeshSeamPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+        asSrcMeshSeamPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+        asSrcMeshSeamPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+        asSrcMeshSeamPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+        asSrcMeshSeamPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 #if 0
             hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
@@ -2516,10 +2516,10 @@ extern "C" void preproc(
         asCutMeshSeamPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
         asCutMeshSeamPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-        asCutMeshSeamPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-        asCutMeshSeamPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-        asCutMeshSeamPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-        asCutMeshSeamPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+        asCutMeshSeamPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+        asCutMeshSeamPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+        asCutMeshSeamPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+        asCutMeshSeamPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 #if 0
             hmesh_to_array_mesh(
 #if defined(MCUT_MULTI_THREADED)
@@ -2577,10 +2577,10 @@ extern "C" void preproc(
         asCutMeshInputPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
         asCutMeshInputPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-        asCutMeshInputPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-        asCutMeshInputPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-        asCutMeshInputPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-        asCutMeshInputPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+        asCutMeshInputPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+        asCutMeshInputPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+        asCutMeshInputPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+        asCutMeshInputPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
 #if 0
             hmesh_to_array_mesh(
@@ -2633,10 +2633,10 @@ extern "C" void preproc(
         asSrcMeshInputPtr->source_hmesh_new_poly_partition_vertices=source_hmesh_new_poly_partition_vertices;
         asSrcMeshInputPtr->cut_hmesh_new_poly_partition_vertices = cut_hmesh_new_poly_partition_vertices_OFFSETTED;
 
-        asSrcMeshInputPtr->internalSrcMeshVertexCount = source_hmesh.number_of_vertices();
-        asSrcMeshInputPtr->userSrcMeshVertexCount = numSrcMeshVertices;
-        asSrcMeshInputPtr->internalSrcMeshFaceCount = source_hmesh.number_of_faces();
-        asSrcMeshInputPtr->userSrcMeshFaceCount = numSrcMeshFaces; // or source_hmesh_face_count
+        asSrcMeshInputPtr->internal_sourcemesh_vertex_count = source_hmesh.number_of_vertices();
+        asSrcMeshInputPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
+        asSrcMeshInputPtr->internal_sourcemesh_face_count = source_hmesh.number_of_faces();
+        asSrcMeshInputPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
 #if 0
             hmesh_to_array_mesh(

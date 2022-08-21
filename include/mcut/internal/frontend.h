@@ -106,10 +106,10 @@ struct connected_component_t {
     // in order to carry out partitioning
     std::shared_ptr < std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputSrcMesh
     std::shared_ptr < std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputCutMesh
-    uint32_t internalSrcMeshVertexCount; // init from source_hmesh.number_of_vertices()
-    uint32_t userSrcMeshVertexCount; // init from numSrcMeshVertices
-    uint32_t internalSrcMeshFaceCount; // init from source_hmesh.number_of_faces()
-    uint32_t userSrcMeshFaceCount; // init from source_hmesh_face_count OR numSrcMeshFaces
+    uint32_t internal_sourcemesh_vertex_count; // init from source_hmesh.number_of_vertices()
+    uint32_t client_sourcemesh_vertex_count; // init from numSrcMeshVertices
+    uint32_t internal_sourcemesh_face_count; // init from source_hmesh.number_of_faces()
+    uint32_t client_sourcemesh_face_count; // init from source_hmesh_face_count OR numSrcMeshFaces
     // NOTE TO SELF: the array just stores the triangulation of all faces (Naive).
     // Need to actually implement what is describe below...
     //
