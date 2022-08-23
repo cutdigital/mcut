@@ -16,7 +16,6 @@
 #include <unordered_map>
 
 #include "mcut/internal/cdt/CDT.h"
-#include "mcut/internal/cdt/VerifyTopology.h"
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
