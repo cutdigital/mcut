@@ -1,9 +1,3 @@
-/// This Source Code Form is subject to the terms of the Mozilla Public
-/// License, v. 2.0. If a copy of the MPL was not distributed with this
-/// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-/// Contribution of original implementation:
-/// Andre Fecteau <andre.fecteau1@gmail.com>
-
 #ifndef KDTREE_KDTREE_H
 #define KDTREE_KDTREE_H
 
@@ -12,13 +6,10 @@
 #include <cassert>
 #include <limits>
 
-namespace KDTree
-{
+namespace KDTree {
 
-struct NodeSplitDirection
-{
-    enum Enum
-    {
+struct NodeSplitDirection {
+    enum Enum {
         X,
         Y,
     };
@@ -40,8 +31,7 @@ template <
     size_t NumVerticesInLeaf,
     size_t InitialStackDepth,
     size_t StackDepthIncrement>
-class KDTree
-{
+class KDTree {
 public:
     typedef TCoordType coord_type;
     typedef CDT::V2d<coord_type> point_type;
@@ -53,10 +43,9 @@ public:
     typedef CDT::array<node_index, 2> children_type;
 
     /// Stores kd-tree node data
-    struct Node
-    {
+    struct Node {
         children_type children; ///< two children if not leaf; {0,0} if leaf
-        point_data_vec data;    ///< points' data if leaf
+        point_data_vec data; ///< points' data if leaf
         /// Create empty leaf
         Node()
         {
@@ -111,8 +100,7 @@ public:
     {
         // if point is outside root, extend tree by adding new roots
         const point_type& pos = points[iPoint];
-        while(!isInsideBox(pos, m_min, m_max))
-        {
+        while (!isInsideBox(pos, m_min, m_max)) {
             extendTree(pos);
         }
         // now insert the point into the tree
@@ -125,20 +113,16 @@ public:
         NodeSplitDirection::Enum newDir(NodeSplitDirection::X);
         coord_type mid(0);
         point_type newMin, newMax;
-        while(true)
-        {
-            if(m_nodes[node].isLeaf())
-            {
+        while (true) {
+            if (m_nodes[node].isLeaf()) {
                 // add point if capacity is not reached
                 point_data_vec& pd = m_nodes[node].data;
-                if(pd.size() < NumVerticesInLeaf)
-                {
+                if (pd.size() < NumVerticesInLeaf) {
                     pd.push_back(iPoint);
                     return;
                 }
                 // initialize bbox first time the root capacity is reached
-                if(!m_isRootBoxInitialized)
-                {
+                if (!m_isRootBoxInitialized) {
                     initializeRootBox(points);
                     min = m_min;
                     max = m_max;
@@ -151,16 +135,13 @@ public:
                 point_data_vec& c1data = m_nodes[c1].data;
                 point_data_vec& c2data = m_nodes[c2].data;
                 // move node's points to children
-                for(pd_cit it = n.data.begin(); it != n.data.end(); ++it)
-                {
+                for (pd_cit it = n.data.begin(); it != n.data.end(); ++it) {
                     whichChild(points[*it], mid, dir) == 0
                         ? c1data.push_back(*it)
                         : c2data.push_back(*it);
                 }
                 n.data = point_data_vec();
-            }
-            else
-            {
+            } else {
                 calcSplitInfo(min, max, dir, mid, newDir, newMin, newMax);
             }
             // add the point to a child
@@ -182,56 +163,45 @@ public:
         value_type out;
         int iTask = -1;
         coord_type minDistSq = std::numeric_limits<coord_type>::max();
-        m_tasksStack[++iTask] =
-            NearestTask(m_root, m_min, m_max, m_rootDir, minDistSq);
-        while(iTask != -1)
-        {
+        m_tasksStack[++iTask] = NearestTask(m_root, m_min, m_max, m_rootDir, minDistSq);
+        while (iTask != -1) {
             const NearestTask t = m_tasksStack[iTask--];
-            if(t.distSq > minDistSq)
+            if (t.distSq > minDistSq)
                 continue;
             const Node& n = m_nodes[t.node];
-            if(n.isLeaf())
-            {
-                for(pd_cit it = n.data.begin(); it != n.data.end(); ++it)
-                {
+            if (n.isLeaf()) {
+                for (pd_cit it = n.data.begin(); it != n.data.end(); ++it) {
                     const point_type& p = points[*it];
                     const coord_type distSq = CDT::distanceSquared(point, p);
-                    if(distSq < minDistSq)
-                    {
+                    if (distSq < minDistSq) {
                         minDistSq = distSq;
                         out.first = p;
                         out.second = *it;
                     }
                 }
-            }
-            else
-            {
+            } else {
                 coord_type mid(0);
                 NodeSplitDirection::Enum newDir;
                 point_type newMin, newMax;
                 calcSplitInfo(t.min, t.max, t.dir, mid, newDir, newMin, newMax);
 
                 const coord_type distToMid = t.dir == NodeSplitDirection::X
-                                                 ? (point.x - mid)
-                                                 : (point.y - mid);
+                    ? (point.x - mid)
+                    : (point.y - mid);
                 const coord_type toMidSq = distToMid * distToMid;
 
                 const std::size_t iChild = whichChild(point, mid, t.dir);
-                if(iTask + 2 >= static_cast<int>(m_tasksStack.size()))
-                {
+                if (iTask + 2 >= static_cast<int>(m_tasksStack.size())) {
                     m_tasksStack.resize(
                         m_tasksStack.size() + StackDepthIncrement);
                 }
                 // node containing point should end up on top of the stack
-                if(iChild == 0)
-                {
+                if (iChild == 0) {
                     m_tasksStack[++iTask] = NearestTask(
                         n.children[1], newMin, t.max, newDir, toMidSq);
                     m_tasksStack[++iTask] = NearestTask(
                         n.children[0], t.min, newMax, newDir, toMidSq);
-                }
-                else
-                {
+                } else {
                     m_tasksStack[++iTask] = NearestTask(
                         n.children[0], t.min, newMax, newDir, toMidSq);
                     m_tasksStack[++iTask] = NearestTask(
@@ -274,8 +244,7 @@ private:
     {
         newMaxOut = max;
         newMinOut = min;
-        switch(dir)
-        {
+        switch (dir) {
         case NodeSplitDirection::X:
             midOut = (min.x + max.x) / coord_type(2);
             newDirOut = NodeSplitDirection::Y;
@@ -306,24 +275,23 @@ private:
     {
         const node_index newRoot = addNewNode();
         const node_index newLeaf = addNewNode();
-        switch(m_rootDir)
-        {
+        switch (m_rootDir) {
         case NodeSplitDirection::X:
             m_rootDir = NodeSplitDirection::Y;
             point.y < m_min.y ? m_nodes[newRoot].setChildren(newLeaf, m_root)
                               : m_nodes[newRoot].setChildren(m_root, newLeaf);
-            if(point.y < m_min.y)
+            if (point.y < m_min.y)
                 m_min.y -= m_max.y - m_min.y;
-            else if(point.y > m_max.y)
+            else if (point.y > m_max.y)
                 m_max.y += m_max.y - m_min.y;
             break;
         case NodeSplitDirection::Y:
             m_rootDir = NodeSplitDirection::X;
             point.x < m_min.x ? m_nodes[newRoot].setChildren(newLeaf, m_root)
                               : m_nodes[newRoot].setChildren(m_root, newLeaf);
-            if(point.x < m_min.x)
+            if (point.x < m_min.x)
                 m_min.x -= m_max.x - m_min.x;
-            else if(point.x > m_max.x)
+            else if (point.x > m_max.x)
                 m_max.x += m_max.x - m_min.x;
             break;
         }
@@ -336,8 +304,7 @@ private:
         const point_data_vec& data = m_nodes[m_root].data;
         m_min = points[data.front()];
         m_max = m_min;
-        for(pd_cit it = data.begin(); it != data.end(); ++it)
-        {
+        for (pd_cit it = data.begin(); it != data.end(); ++it) {
             const point_type& p = points[*it];
             m_min = point_type::make(
                 std::min(m_min.x, p.x), std::min(m_min.y, p.y));
@@ -347,13 +314,11 @@ private:
         // Make sure bounding box does not have a zero size by adding padding:
         // zero-size bounding box cannot be extended properly
         const TCoordType padding(1);
-        if(m_min.x == m_max.x)
-        {
+        if (m_min.x == m_max.x) {
             m_min.x -= padding;
             m_max.x += padding;
         }
-        if(m_min.y == m_max.y)
-        {
+        if (m_min.y == m_max.y) {
             m_min.y -= padding;
             m_max.y += padding;
         }
@@ -369,14 +334,14 @@ private:
     bool m_isRootBoxInitialized;
 
     // used for nearest query
-    struct NearestTask
-    {
+    struct NearestTask {
         node_index node;
         point_type min, max;
         NodeSplitDirection::Enum dir;
         coord_type distSq;
         NearestTask()
-        {}
+        {
+        }
         NearestTask(
             const node_index node,
             const point_type& min,
@@ -388,7 +353,8 @@ private:
             , max(max)
             , dir(dir)
             , distSq(distSq)
-        {}
+        {
+        }
     };
     // allocated in class (not in the 'nearest' method) for better performance
     mutable std::vector<NearestTask> m_tasksStack;
