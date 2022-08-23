@@ -2,7 +2,7 @@
 #define CDT_vW1vZ0lO8rS4gY4uI4fB
 
 #include "CDTUtils.h"
-#include "LocatorKDTree.h"
+#include "KDTree.h"
 
 #include <algorithm>
 #include <cstdlib>
