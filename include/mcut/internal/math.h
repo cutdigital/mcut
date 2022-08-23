@@ -25,9 +25,9 @@
 
 #include <cmath>
 
-#include <memory>
 #include <iostream>
 #include <limits>
+#include <memory>
 
 #include <vector>
 
@@ -69,9 +69,19 @@ public:
     {
     }
 
+    static vec2_ make(const T x, const T y)
+    {
+        return vec2_<T>(x, y);
+    }
+
     static int cardinality()
     {
         return 2;
+    }
+
+    bool operator==(const vec2_<T>& other) const
+    {
+        return this->m_x == other.x() && this->m_y == other.y();
     }
 
     const T& operator[](int index) const
@@ -115,6 +125,16 @@ public:
     }
 
     const T& y() const
+    {
+        return m_y;
+    }
+
+     T& x()  
+    {
+        return m_x;
+    }
+
+      T& y()  
     {
         return m_y;
     }

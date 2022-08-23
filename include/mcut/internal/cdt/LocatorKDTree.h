@@ -4,7 +4,7 @@
 #include "CDTUtils.h"
 #include "KDTree.h"
 
-namespace CDT {
+namespace cdt {
 
 /// KD-tree holding points
 template <
@@ -15,30 +15,29 @@ template <
 class LocatorKDTree {
 public:
     /// Initialize KD-tree with points
-    void initialize(const std::vector<V2d<TCoordType>>& points)
+    void initialize(const std::vector<vec2_<TCoordType>>& points)
     {
-        typedef V2d<TCoordType> V2d_t;
-        V2d_t min = points.front();
-        V2d_t max = min;
-        typedef typename std::vector<V2d_t>::const_iterator Cit;
+        vec2_<TCoordType> min = points.front();
+        vec2_<TCoordType> max = min;
+        typedef typename std::vector<vec2_<TCoordType>>::const_iterator Cit;
         for (Cit it = points.begin(); it != points.end(); ++it) {
-            min = V2d_t::make(std::min(min.x, it->x), std::min(min.y, it->y));
-            max = V2d_t::make(std::max(max.x, it->x), std::max(max.y, it->y));
+            min = vec2_<TCoordType>::make(std::min(min.x(), it->x()), std::min(min.y(), it->y()));
+            max = vec2_<TCoordType>::make(std::max(max.x(), it->x()), std::max(max.y(), it->y()));
         }
         m_kdTree = KDTree_t(min, max);
-        for (VertInd i = 0; i < points.size(); ++i) {
+        for (std::uint32_t i = 0; i < points.size(); ++i) {
             m_kdTree.insert(i, points);
         }
     }
     /// Add point to KD-tree
-    void addPoint(const VertInd i, const std::vector<V2d<TCoordType>>& points)
+    void addPoint(const std::uint32_t i, const std::vector<vec2_<TCoordType>>& points)
     {
         m_kdTree.insert(i, points);
     }
     /// Find nearest point using R-tree
-    VertInd nearPoint(
-        const V2d<TCoordType>& pos,
-        const std::vector<V2d<TCoordType>>& points) const
+    std::uint32_t nearPoint(
+        const vec2_<TCoordType>& pos,
+        const std::vector<vec2_<TCoordType>>& points) const
     {
         return m_kdTree.nearest(pos, points).second;
     }
@@ -53,6 +52,6 @@ private:
     KDTree_t m_kdTree;
 };
 
-} // namespace CDT
+} // namespace cdt
 
 #endif

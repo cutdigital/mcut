@@ -1,6 +1,7 @@
 #ifndef KDTREE_KDTREE_H
 #define KDTREE_KDTREE_H
 
+#include "mcut/internal/math.h"
 #include "CDTUtils.h"
 
 #include <cassert>
@@ -34,13 +35,11 @@ template <
 class KDTree {
 public:
     typedef TCoordType coord_type;
-    typedef CDT::V2d<coord_type> point_type;
-    typedef CDT::VertInd point_index;
-    typedef std::pair<point_type, point_index> value_type;
-    typedef std::vector<point_index> point_data_vec;
+    typedef vec2_<coord_type> point_type;
+    typedef std::pair<point_type, std::uint32_t> value_type;
+    typedef std::vector<std::uint32_t> point_data_vec;
     typedef point_data_vec::const_iterator pd_cit;
-    typedef CDT::VertInd node_index;
-    typedef CDT::array<node_index, 2> children_type;
+    typedef std::array<std::uint32_t, 2> children_type;
 
     /// Stores kd-tree node data
     struct Node {
@@ -53,7 +52,7 @@ public:
             data.reserve(NumVerticesInLeaf);
         }
         /// Children setter for convenience
-        void setChildren(const node_index c1, const node_index c2)
+        void setChildren(const std::uint32_t c1, const std::uint32_t c2)
         {
             children[0] = c1;
             children[1] = c2;
@@ -96,7 +95,7 @@ public:
     /// @param iPoint index of point in external point-buffer
     /// @param points external point-buffer
     void
-    insert(const point_index& iPoint, const std::vector<point_type>& points)
+    insert(const std::uint32_t& iPoint, const std::vector<point_type>& points)
     {
         // if point is outside root, extend tree by adding new roots
         const point_type& pos = points[iPoint];
@@ -104,7 +103,7 @@ public:
             extendTree(pos);
         }
         // now insert the point into the tree
-        node_index node = m_root;
+        std::uint32_t node = m_root;
         point_type min = m_min;
         point_type max = m_max;
         NodeSplitDirection::Enum dir = m_rootDir;
@@ -129,7 +128,7 @@ public:
                 }
                 // split a full leaf node
                 calcSplitInfo(min, max, dir, mid, newDir, newMin, newMax);
-                const node_index c1 = addNewNode(), c2 = addNewNode();
+                const std::uint32_t c1 = addNewNode(), c2 = addNewNode();
                 Node& n = m_nodes[node];
                 n.setChildren(c1, c2);
                 point_data_vec& c1data = m_nodes[c1].data;
@@ -172,7 +171,7 @@ public:
             if (n.isLeaf()) {
                 for (pd_cit it = n.data.begin(); it != n.data.end(); ++it) {
                     const point_type& p = points[*it];
-                    const coord_type distSq = CDT::distanceSquared(point, p);
+                    const coord_type distSq = cdt::get_square_distance(point, p);
                     if (distSq < minDistSq) {
                         minDistSq = distSq;
                         out.first = p;
@@ -186,8 +185,8 @@ public:
                 calcSplitInfo(t.min, t.max, t.dir, mid, newDir, newMin, newMax);
 
                 const coord_type distToMid = t.dir == NodeSplitDirection::X
-                    ? (point.x - mid)
-                    : (point.y - mid);
+                    ? (point.x() - mid)
+                    : (point.y() - mid);
                 const coord_type toMidSq = distToMid * distToMid;
 
                 const std::size_t iChild = whichChild(point, mid, t.dir);
@@ -214,9 +213,9 @@ public:
 
 private:
     /// Add a new node and return it's index in nodes buffer
-    node_index addNewNode()
+    std::uint32_t addNewNode()
     {
-        const node_index newNodeIndex = static_cast<node_index>(m_nodes.size());
+        const std::uint32_t newNodeIndex = static_cast<std::uint32_t>(m_nodes.size());
         m_nodes.push_back(Node());
         return newNodeIndex;
     }
@@ -229,7 +228,7 @@ private:
         const NodeSplitDirection::Enum dir) const
     {
         return static_cast<size_t>(
-            dir == NodeSplitDirection::X ? point.x > split : point.y > split);
+            dir == NodeSplitDirection::X ? point.x() > split : point.y() > split);
     }
 
     /// Calculate split location, direction, and children boxes
@@ -246,16 +245,16 @@ private:
         newMinOut = min;
         switch (dir) {
         case NodeSplitDirection::X:
-            midOut = (min.x + max.x) / coord_type(2);
+            midOut = (min.x() + max.x()) / coord_type(2);
             newDirOut = NodeSplitDirection::Y;
-            newMinOut.x = midOut;
-            newMaxOut.x = midOut;
+            newMinOut.x() = midOut;
+            newMaxOut.x() = midOut;
             return;
         case NodeSplitDirection::Y:
-            midOut = (min.y + max.y) / coord_type(2);
+            midOut = (min.y() + max.y()) / coord_type(2);
             newDirOut = NodeSplitDirection::X;
-            newMinOut.y = midOut;
-            newMaxOut.y = midOut;
+            newMinOut.y() = midOut;
+            newMaxOut.y() = midOut;
             return;
         }
     }
@@ -266,33 +265,33 @@ private:
         const point_type& min,
         const point_type& max)
     {
-        return p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y;
+        return p.x() >= min.x() && p.x() <= max.x() && p.y() >= min.y() && p.y() <= max.y();
     }
 
     /// Extend a tree by creating new root with old root and a new node as
     /// children
     void extendTree(const point_type& point)
     {
-        const node_index newRoot = addNewNode();
-        const node_index newLeaf = addNewNode();
+        const std::uint32_t newRoot = addNewNode();
+        const std::uint32_t newLeaf = addNewNode();
         switch (m_rootDir) {
         case NodeSplitDirection::X:
             m_rootDir = NodeSplitDirection::Y;
-            point.y < m_min.y ? m_nodes[newRoot].setChildren(newLeaf, m_root)
+            point.y() < m_min.y() ? m_nodes[newRoot].setChildren(newLeaf, m_root)
                               : m_nodes[newRoot].setChildren(m_root, newLeaf);
-            if (point.y < m_min.y)
-                m_min.y -= m_max.y - m_min.y;
-            else if (point.y > m_max.y)
-                m_max.y += m_max.y - m_min.y;
+            if (point.y() < m_min.y())
+                m_min.y() -= m_max.y() - m_min.y();
+            else if (point.y() > m_max.y())
+                m_max.y() += m_max.y() - m_min.y();
             break;
         case NodeSplitDirection::Y:
             m_rootDir = NodeSplitDirection::X;
-            point.x < m_min.x ? m_nodes[newRoot].setChildren(newLeaf, m_root)
+            point.x() < m_min.x() ? m_nodes[newRoot].setChildren(newLeaf, m_root)
                               : m_nodes[newRoot].setChildren(m_root, newLeaf);
-            if (point.x < m_min.x)
-                m_min.x -= m_max.x - m_min.x;
-            else if (point.x > m_max.x)
-                m_max.x += m_max.x - m_min.x;
+            if (point.x() < m_min.x())
+                m_min.x() -= m_max.x() - m_min.x();
+            else if (point.x() > m_max.x())
+                m_max.x() += m_max.x() - m_min.x();
             break;
         }
         m_root = newRoot;
@@ -307,26 +306,26 @@ private:
         for (pd_cit it = data.begin(); it != data.end(); ++it) {
             const point_type& p = points[*it];
             m_min = point_type::make(
-                std::min(m_min.x, p.x), std::min(m_min.y, p.y));
+                std::min(m_min.x(), p.x()), std::min(m_min.y(), p.y()));
             m_max = point_type::make(
-                std::max(m_max.x, p.x), std::max(m_max.y, p.y));
+                std::max(m_max.x(), p.x()), std::max(m_max.y(), p.y()));
         }
         // Make sure bounding box does not have a zero size by adding padding:
         // zero-size bounding box cannot be extended properly
         const TCoordType padding(1);
-        if (m_min.x == m_max.x) {
-            m_min.x -= padding;
-            m_max.x += padding;
+        if (m_min.x() == m_max.x()) {
+            m_min.x() -= padding;
+            m_max.x() += padding;
         }
-        if (m_min.y == m_max.y) {
-            m_min.y -= padding;
-            m_max.y += padding;
+        if (m_min.y() == m_max.y()) {
+            m_min.y() -= padding;
+            m_max.y() += padding;
         }
         m_isRootBoxInitialized = true;
     }
 
 private:
-    node_index m_root;
+    std::uint32_t m_root;
     std::vector<Node> m_nodes;
     NodeSplitDirection::Enum m_rootDir;
     point_type m_min;
@@ -335,7 +334,7 @@ private:
 
     // used for nearest query
     struct NearestTask {
-        node_index node;
+        std::uint32_t node;
         point_type min, max;
         NodeSplitDirection::Enum dir;
         coord_type distSq;
@@ -343,7 +342,7 @@ private:
         {
         }
         NearestTask(
-            const node_index node,
+            const std::uint32_t node,
             const point_type& min,
             const point_type& max,
             const NodeSplitDirection::Enum dir,

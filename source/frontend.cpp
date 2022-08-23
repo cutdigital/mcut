@@ -879,8 +879,8 @@ void get_connected_component_data_impl(
             // This is not true for a conforming delaunay triangulation.
             std::vector<vd_t> face_reversed;
 
-            std::vector<CDT::V2d<double>> face_polygon_vertices;
-            std::vector<CDT::Edge> face_polygon_edges;
+            std::vector<vec2_<double>> face_polygon_vertices;
+            std::vector<cdt::edge_t> face_polygon_edges;
             // list of indices which define all triangles that result from the CDT
             std::vector<uint32_t> face_triangulation_indices;
             // used to check that all indices where used in the triangulation. if not, then there will be a hole
@@ -952,7 +952,7 @@ void get_connected_component_data_impl(
 
                     project2D(face_vertex_coords_2d, face_vertex_coords_3d, face_normal, face_normal_largest_component);
 
-                    CDT::Triangulation<double> constrained_delaunay_triangulator(CDT::VertexInsertionOrder::AsProvided); // memory is alway reallocated for this
+                    cdt::Triangulation<double> constrained_delaunay_triangulator(cdt::VertexInsertionOrder::AsProvided); // memory is alway reallocated for this
 
                     // convert face vertex format & compute revered face
                     // =================================================
@@ -962,7 +962,7 @@ void get_connected_component_data_impl(
 
                         const vec2& coords = face_vertex_coords_2d[i];
 
-                        face_polygon_vertices[i] = CDT::V2d<double>::make(coords[0], coords[1]);
+                        face_polygon_vertices[i] = vec2_<double>::make(coords[0], coords[1]);
 
                         winding_order_enforcer.add_vertex(vec3(coords[0], coords[1], 0.0 /*dont care since polygon is 2D*/)); // .. in fact even the coordinates dont matter for the purposes of hmesh_t here
 
@@ -979,13 +979,14 @@ void get_connected_component_data_impl(
                     // ==========================
 
                     for (uint32_t i = 0; i < face_vertex_count; ++i) {
-                        face_polygon_edges.emplace_back(CDT::Edge(i, (i + 1) % face_vertex_count));
+                        face_polygon_edges.emplace_back(cdt::edge_t(i, (i + 1) % face_vertex_count));
                     }
 
                     // prepare and do constrained delaunay triangulation
                     // =================================================
 
-                    const CDT::DuplicatesInfo duplInfo = CDT::RemoveDuplicates(face_polygon_vertices);
+                    const cdt::duplicates_info_t duplInfo = cdt::remove_duplicates(face_polygon_vertices);
+
                     if (!duplInfo.duplicates.empty()) {
                         fprintf(stderr, "triangulation has duplicates\n");
                         // TODO: do stuff with "duplInfo"
@@ -999,11 +1000,10 @@ void get_connected_component_data_impl(
                     // NOTE: it seems that the triangulation can be either CW or CCW.
                     constrained_delaunay_triangulator.eraseOuterTrianglesAndHoles();
 
-                    const CDT::unordered_map<CDT::Edge, CDT::EdgeVec> tmp = CDT::EdgeToPiecesMapping(constrained_delaunay_triangulator.pieceToOriginals);
-                    const CDT::unordered_map<CDT::Edge, std::vector<CDT::VertInd>>
-                        edgeToSplitVerts = CDT::EdgeToSplitVertices(tmp, constrained_delaunay_triangulator.vertices);
+                    const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(constrained_delaunay_triangulator.pieceToOriginals);
+                    const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, constrained_delaunay_triangulator.vertices);
 
-                    if (!CDT::verifyTopology(constrained_delaunay_triangulator)) {
+                    if (!cdt::check_topology(constrained_delaunay_triangulator)) {
 
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
@@ -1026,7 +1026,7 @@ void get_connected_component_data_impl(
                     for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
 
                         // a triangle computed from CDT
-                        const CDT::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
+                        const cdt::triangle_t& triangle = constrained_delaunay_triangulator.triangles[i];
 
                         // convert to local descriptors
                         std::vector<vd_t> triangle_descriptors = {
@@ -1075,7 +1075,7 @@ void get_connected_component_data_impl(
 
                             for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
                                 // a triangle computed from CDT
-                                const CDT::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
+                                const cdt::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
                                 f << "f " << triangle.vertices[0]+1 << " " << triangle.vertices[1]+1 << " " << triangle.vertices[2]+1 << "\n";
                             }
 
