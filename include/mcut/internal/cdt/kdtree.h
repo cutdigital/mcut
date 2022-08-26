@@ -1,13 +1,13 @@
 #ifndef KDTREE_KDTREE_H
 #define KDTREE_KDTREE_H
 
+#include "mcut/internal/cdt/utils.h"
 #include "mcut/internal/math.h"
-#include "CDTUtils.h"
 
 #include <cassert>
 #include <limits>
 
-namespace KDTree {
+namespace kdt {
 
 struct NodeSplitDirection {
     enum Enum {
@@ -32,7 +32,7 @@ template <
     size_t NumVerticesInLeaf,
     size_t InitialStackDepth,
     size_t StackDepthIncrement>
-class KDTree {
+class kdtree_t_ {
 public:
     typedef TCoordType coord_type;
     typedef vec2_<coord_type> point_type;
@@ -65,7 +65,7 @@ public:
     };
 
     /// Default constructor
-    KDTree()
+    kdtree_t_()
         : m_rootDir(NodeSplitDirection::X)
         , m_min(point_type::make(
               -std::numeric_limits<coord_type>::max(),
@@ -80,7 +80,7 @@ public:
     }
 
     /// Constructor with bounding box known in advance
-    KDTree(const point_type& min, const point_type& max)
+    kdtree_t_(const point_type& min, const point_type& max)
         : m_rootDir(NodeSplitDirection::X)
         , m_min(min)
         , m_max(max)
@@ -278,7 +278,7 @@ private:
         case NodeSplitDirection::X:
             m_rootDir = NodeSplitDirection::Y;
             point.y() < m_min.y() ? m_nodes[newRoot].setChildren(newLeaf, m_root)
-                              : m_nodes[newRoot].setChildren(m_root, newLeaf);
+                                  : m_nodes[newRoot].setChildren(m_root, newLeaf);
             if (point.y() < m_min.y())
                 m_min.y() -= m_max.y() - m_min.y();
             else if (point.y() > m_max.y())
@@ -287,7 +287,7 @@ private:
         case NodeSplitDirection::Y:
             m_rootDir = NodeSplitDirection::X;
             point.x() < m_min.x() ? m_nodes[newRoot].setChildren(newLeaf, m_root)
-                              : m_nodes[newRoot].setChildren(m_root, newLeaf);
+                                  : m_nodes[newRoot].setChildren(m_root, newLeaf);
             if (point.x() < m_min.x())
                 m_min.x() -= m_max.x() - m_min.x();
             else if (point.x() > m_max.x())
@@ -359,8 +359,7 @@ private:
     mutable std::vector<NearestTask> m_tasksStack;
 };
 
-} // namespace KDTree
-
+} // namespace kdt
 
 namespace cdt {
 
@@ -370,44 +369,47 @@ template <
     size_t NumVerticesInLeaf = 32,
     size_t InitialStackDepth = 32,
     size_t StackDepthIncrement = 32>
-class LocatorKDTree {
+class locator_kdtree_t {
 public:
     /// Initialize KD-tree with points
     void initialize(const std::vector<vec2_<TCoordType>>& points)
     {
         vec2_<TCoordType> min = points.front();
         vec2_<TCoordType> max = min;
-        typedef typename std::vector<vec2_<TCoordType>>::const_iterator Cit;
-        for (Cit it = points.begin(); it != points.end(); ++it) {
+
+        for (typename std::vector<vec2_<TCoordType>>::const_iterator it = points.begin();
+             it != points.end();
+             ++it) {
+
             min = vec2_<TCoordType>::make(std::min(min.x(), it->x()), std::min(min.y(), it->y()));
             max = vec2_<TCoordType>::make(std::max(max.x(), it->x()), std::max(max.y(), it->y()));
+            
         }
-        m_kdTree = KDTree_t(min, max);
-        for (std::uint32_t i = 0; i < points.size(); ++i) {
-            m_kdTree.insert(i, points);
+
+        m_tree = kdtree_t(min, max);
+
+        for (std::uint32_t i = 0; i < (std::uint32_t)points.size(); ++i) {
+            m_tree.insert(i, points);
         }
     }
     /// Add point to KD-tree
     void addPoint(const std::uint32_t i, const std::vector<vec2_<TCoordType>>& points)
     {
-        m_kdTree.insert(i, points);
+        m_tree.insert(i, points);
     }
+
     /// Find nearest point using R-tree
     std::uint32_t nearPoint(
         const vec2_<TCoordType>& pos,
         const std::vector<vec2_<TCoordType>>& points) const
     {
-        return m_kdTree.nearest(pos, points).second;
+        return m_tree.nearest(pos, points).second;
     }
 
 private:
-    typedef KDTree::KDTree<
-        TCoordType,
-        NumVerticesInLeaf,
-        InitialStackDepth,
-        StackDepthIncrement>
-        KDTree_t;
-    KDTree_t m_kdTree;
+    typedef kdt::kdtree_t_<TCoordType, NumVerticesInLeaf, InitialStackDepth, StackDepthIncrement> kdtree_t;
+
+    kdtree_t m_tree;
 };
 
 } // namespace cdt

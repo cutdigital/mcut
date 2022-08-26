@@ -15,7 +15,7 @@
 #include <string.h>
 #include <unordered_map>
 
-#include "mcut/internal/cdt/CDT.h"
+#include "mcut/internal/cdt/cdt.h"
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"

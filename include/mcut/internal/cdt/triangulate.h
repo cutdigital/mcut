@@ -1,8 +1,8 @@
 #ifndef CDT_vW1vZ0lO8rS4gY4uI4fB
 #define CDT_vW1vZ0lO8rS4gY4uI4fB
 
-#include "CDTUtils.h"
-#include "KDTree.h"
+#include "mcut/internal/cdt/utils.h"
+#include "mcut/internal/cdt/kdtree.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -130,7 +130,7 @@ namespace detail {
  * inserting new points. Provides methods: 'addPoint(vPos, iV)' and
  * 'nearPoint(vPos) -> iV'
  */
-template <typename T, typename TNearPointLocator = LocatorKDTree<T>>
+template <typename T, typename TNearPointLocator = locator_kdtree_t<T>>
 class Triangulation {
 public:
     typedef std::vector<vec2_<T>> V2dVec; ///< Vertices vector

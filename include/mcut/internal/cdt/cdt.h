@@ -1,8 +1,8 @@
 #ifndef _CONSTRAINED_DELAUNAY_TRIANGULATION_H_
 #define _CONSTRAINED_DELAUNAY_TRIANGULATION_H_
 
-#include "CDTUtils.h"
-#include "Triangulation.h"
+#include "mcut/internal/cdt/utils.h"
+#include "mcut/internal/cdt/triangulate.h"
 
 #include <algorithm>
 #include <iterator>
