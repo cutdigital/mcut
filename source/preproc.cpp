@@ -1966,7 +1966,7 @@ extern "C" void preproc(
     int kernel_invocation_counter = -1; // number of times we have called the internal dispatch/intersect function
     double numerical_perturbation_constant = 0.0; // = cut_hmesh_aabb_diag * GENERAL_POSITION_ENFORCMENT_CONSTANT;
 
-    // Resolve mesh intersections
+    // RESOLVE mesh intersections
     // ::::::::::::::::::::::::::
 
     // The following loop-body contains code to do the cutting. The logic resides in a loop

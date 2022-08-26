@@ -952,7 +952,7 @@ void get_connected_component_data_impl(
 
                     project2D(face_vertex_coords_2d, face_vertex_coords_3d, face_normal, face_normal_largest_component);
 
-                    cdt::Triangulation<double> constrained_delaunay_triangulator(cdt::VertexInsertionOrder::AsProvided); // memory is alway reallocated for this
+                    cdt::triangulator_t<double> tri(cdt::vertex_insertion_order_t::AS_GIVEN); // memory is alway reallocated for this
 
                     // convert face vertex format & compute revered face
                     // =================================================
@@ -962,7 +962,7 @@ void get_connected_component_data_impl(
 
                         const vec2& coords = face_vertex_coords_2d[i];
 
-                        face_polygon_vertices[i] = vec2_<double>::make(coords[0], coords[1]);
+                        face_polygon_vertices[i] = coords; //vec2_<double>::make(coords[0], coords[1]);
 
                         winding_order_enforcer.add_vertex(vec3(coords[0], coords[1], 0.0 /*dont care since polygon is 2D*/)); // .. in fact even the coordinates dont matter for the purposes of hmesh_t here
 
@@ -992,41 +992,41 @@ void get_connected_component_data_impl(
                         // TODO: do stuff with "duplInfo"
                     }
 
-                    constrained_delaunay_triangulator.insertVertices(face_polygon_vertices);
-
-                    constrained_delaunay_triangulator.insertEdges(face_polygon_edges);
+                    tri.insert_vertices(face_polygon_vertices);
+                    tri.insert_edges(face_polygon_edges);
 
                     // triangulation done here!
                     // NOTE: it seems that the triangulation can be either CW or CCW.
-                    constrained_delaunay_triangulator.eraseOuterTrianglesAndHoles();
+                    tri.erase_outer_triangles_and_holes();
 
-                    const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(constrained_delaunay_triangulator.pieceToOriginals);
-                    const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, constrained_delaunay_triangulator.vertices);
+                    const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(tri.pieceToOriginals);
+                    const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, tri.vertices);
 
-                    if (!cdt::check_topology(constrained_delaunay_triangulator)) {
+                    if (!cdt::check_topology(tri)) {
 
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(*f) + "has wrong topology");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulator_t on face " + std::to_string(*f) + "has wrong topology");
                     }
 
-                    if (constrained_delaunay_triangulator.triangles.empty()) {
+                    if (tri.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "Triangulation on face " + std::to_string(*f) + "produced zero faces");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulator_t on face " + std::to_string(*f) + "produced zero faces");
                     }
 
                     // save the triangulation
                     // ======================
 
-                    const uint32_t face_resulting_triangle_count = (uint32_t)constrained_delaunay_triangulator.triangles.size();
+                    const uint32_t face_resulting_triangle_count = (uint32_t)tri.triangles.size();
 
+                    // TODO: rather than looping through triangles, maybe attempt walking them according to neighbour information
                     for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
 
                         // a triangle computed from CDT
-                        const cdt::triangle_t& triangle = constrained_delaunay_triangulator.triangles[i];
+                        const cdt::triangle_t& triangle = tri.triangles[i];
 
                         // convert to local descriptors
                         std::vector<vd_t> triangle_descriptors = {
@@ -1068,14 +1068,14 @@ void get_connected_component_data_impl(
                             
                             std::ofstream f("triangulation.obj");
 
-                            for (int i = 0; i < constrained_delaunay_triangulator.vertices.size(); ++i) {
-                                auto vert = constrained_delaunay_triangulator.vertices[i];
+                            for (int i = 0; i < tri.vertices.size(); ++i) {
+                                auto vert = tri.vertices[i];
                                 f << "v " << vert.x << " " << vert.y << " " << 0.0 << "\n";
                             }
 
                             for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
                                 // a triangle computed from CDT
-                                const cdt::Triangle& triangle = constrained_delaunay_triangulator.triangles[i];
+                                const cdt::Triangle& triangle = tri.triangles[i];
                                 f << "f " << triangle.vertices[0]+1 << " " << triangle.vertices[1]+1 << " " << triangle.vertices[2]+1 << "\n";
                             }
 

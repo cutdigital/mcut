@@ -383,7 +383,7 @@ public:
 
             min = vec2_<TCoordType>::make(std::min(min.x(), it->x()), std::min(min.y(), it->y()));
             max = vec2_<TCoordType>::make(std::max(max.x(), it->x()), std::max(max.y(), it->y()));
-            
+
         }
 
         m_tree = kdtree_t(min, max);
@@ -393,7 +393,7 @@ public:
         }
     }
     /// Add point to KD-tree
-    void addPoint(const std::uint32_t i, const std::vector<vec2_<TCoordType>>& points)
+    void add_point(const std::uint32_t i, const std::vector<vec2_<TCoordType>>& points)
     {
         m_tree.insert(i, points);
     }

@@ -1,20 +1,19 @@
 #ifndef _CONSTRAINED_DELAUNAY_TRIANGULATION_H_
 #define _CONSTRAINED_DELAUNAY_TRIANGULATION_H_
 
-#include "mcut/internal/cdt/utils.h"
 #include "mcut/internal/cdt/triangulate.h"
+#include "mcut/internal/cdt/utils.h"
 
 #include <algorithm>
-#include <iterator>
 #include <cassert>
 #include <cstdlib>
+#include <iterator>
 #include <memory>
 #include <stack>
 #include <vector>
 
 /// Namespace containing triangulation functionality
 namespace cdt {
-
 
 /** @defgroup API Public API
  *  Contains API for constrained and conforming Delaunay triangulations
@@ -29,11 +28,8 @@ namespace cdt {
 typedef unsigned short layer_depth_t;
 typedef layer_depth_t boundary_overlap_count_t;
 
-/// Triangles by vertex index
-typedef std::vector<std::vector<std::uint32_t>> per_vertex_triangles;
-
 /** @defgroup helpers Helpers
- *  Helpers for working with cdt::Triangulation.
+ *  Helpers for working with cdt::triangulator_t.
  */
 /// @{
 
@@ -41,21 +37,28 @@ typedef std::vector<std::vector<std::uint32_t>> per_vertex_triangles;
  * Calculate triangles adjacent to vertices (triangles by vertex index)
  * @param triangles triangulation
  * @param verticesSize total number of vertices to pre-allocate the output
- * @return triangles by vertex index
+ * @return triangles by vertex index (array of size V, where V is the number of vertices; each element is a list of triangles incident to corresponding vertex).
  */
-inline per_vertex_triangles calculate_triangles_by_vertices(
+inline std::vector<std::vector<std::uint32_t>> get_vertex_to_triangles_map(
     const std::vector<triangle_t>& triangles,
     const std::uint32_t verticesSize)
 {
-    per_vertex_triangles vertTris(verticesSize);
-    for (std::uint32_t iT = 0; iT < triangles.size(); ++iT) {
-        const std::array<std::uint32_t, 3>& vv = triangles[iT].vertices;
-        for (std::array<std::uint32_t, 3>::const_iterator v = vv.begin(); v != vv.end(); ++v) {
-            vertTris[*v].push_back(iT);
+    std::vector<std::vector<std::uint32_t>> map(verticesSize);
+
+    for (std::uint32_t i = 0; i < (std::uint32_t)triangles.size(); ++i) {
+
+        const std::uint32_t triangle_index = i;
+        const triangle_t& triangle = triangles[triangle_index];
+        const std::array<std::uint32_t, 3>& vertices = triangle.vertices;
+
+        for (std::array<std::uint32_t, 3>::const_iterator j = vertices.begin(); j != vertices.end(); ++j) {
+            const std::uint32_t vertex_index = *j;
+            map[vertex_index].push_back(i);
         }
     }
-    return vertTris;
-};
+
+    return map;
+}
 
 /**
  * Information about removed duplicated vertices.
@@ -68,7 +71,6 @@ struct duplicates_info_t {
     std::vector<std::size_t> mapping; ///< vertex index mapping
     std::vector<std::size_t> duplicates; ///< duplicates' indices
 };
-
 
 /*!
  * Remove elements in the range [first; last) with indices from the sorted
@@ -83,10 +85,14 @@ inline ForwardIt remove_at(
 {
     if (ii_first == ii_last) // no indices-to-remove are given
         return last;
+
     typedef typename std::iterator_traits<ForwardIt>::difference_type diff_t;
     typedef typename std::iterator_traits<SortUniqIndsFwdIt>::value_type ind_t;
+
     ForwardIt destination = first + static_cast<diff_t>(*ii_first);
+
     while (ii_first != ii_last) {
+
         // advance to an index after a chunk of elements-to-keep
         for (ind_t cur = *ii_first++; ii_first != ii_last; ++ii_first) {
             const ind_t nxt = *ii_first;
@@ -94,6 +100,7 @@ inline ForwardIt remove_at(
                 break;
             cur = nxt;
         }
+
         // move the chunk of elements-to-keep to new destination
         const ForwardIt source_first = first + static_cast<diff_t>(*(ii_first - 1)) + 1;
         const ForwardIt source_last = ii_first != ii_last ? first + static_cast<diff_t>(*ii_first) : last;
@@ -130,24 +137,33 @@ duplicates_info_t find_duplicates(
     TGetVertexCoordX get_x_coord,
     TGetVertexCoordY get_y_coord)
 {
-    typedef std::unordered_map<vec2_<T>, std::size_t> PosToIndex;
-    PosToIndex uniqueVerts;
+    std::unordered_map<vec2_<T>, std::size_t> uniqueVerts; // position to index map
     const std::size_t verticesSize = std::distance(first, last);
+
     duplicates_info_t di = {
-        std::vector<std::size_t>(verticesSize), std::vector<std::size_t>()
+        std::vector<std::size_t>(verticesSize),
+        std::vector<std::size_t>()
     };
+
     for (std::size_t iIn = 0, iOut = iIn; iIn < verticesSize; ++iIn, ++first) {
-        typename PosToIndex::const_iterator it;
+        typename std::unordered_map<vec2_<T>, std::size_t>::const_iterator it;
         bool isUnique;
-        tie(it, isUnique) = uniqueVerts.insert(
-            std::make_pair(vec2_<T>::make(get_x_coord(*first), get_y_coord(*first)), iOut));
+
+        // check if the coordinates match [exactly] (in the bitwise sense)
+        std::tie(it, isUnique) = uniqueVerts.insert(
+            std::make_pair(
+                vec2_<T>::make(get_x_coord(*first), get_y_coord(*first)),
+                iOut));
+
         if (isUnique) {
             di.mapping[iIn] = iOut++;
             continue;
         }
+
         di.mapping[iIn] = it->second; // found a duplicate
         di.duplicates.push_back(iIn);
     }
+
     return di;
 }
 
@@ -183,8 +199,13 @@ template <typename T>
 duplicates_info_t remove_duplicates(std::vector<vec2_<T>>& vertices)
 {
     const duplicates_info_t di = find_duplicates<T>(
-        vertices.begin(), vertices.end(), get_x_coord_vec2d<T>, get_y_coord_vec2d<T>);
+        vertices.begin(),
+        vertices.end(),
+        get_x_coord_vec2d<T>,
+        get_y_coord_vec2d<T>);
+
     remove_duplicates(vertices, di.duplicates);
+
     return di;
 }
 
@@ -297,8 +318,10 @@ duplicates_info_t remove_duplicates_and_remap_edges(
     TMakeEdgeFromStartAndEnd makeEdge)
 {
     const duplicates_info_t di = find_duplicates<T>(vertices.begin(), vertices.end(), get_x_coord, get_y_coord);
+
     remove_duplicates(vertices, di.duplicates);
     remap_edges(edgesFirst, edgesLast, di.mapping, getStart, getEnd, makeEdge);
+
     return di;
 }
 
@@ -335,8 +358,8 @@ inline std::unordered_set<edge_t>
 extract_edges_from_triangles(const std::vector<triangle_t>& triangles)
 {
     std::unordered_set<edge_t> edges;
-    typedef std::vector<triangle_t>::const_iterator CIt;
-    for (CIt t = triangles.begin(); t != triangles.end(); ++t) {
+
+    for (std::vector<triangle_t>::const_iterator t = triangles.begin(); t != triangles.end(); ++t) {
         edges.insert(edge_t(std::uint32_t(t->vertices[0]), std::uint32_t(t->vertices[1])));
         edges.insert(edge_t(std::uint32_t(t->vertices[1]), std::uint32_t(t->vertices[2])));
         edges.insert(edge_t(std::uint32_t(t->vertices[2]), std::uint32_t(t->vertices[0])));
@@ -382,6 +405,7 @@ std::unordered_map<edge_t, std::vector<std::uint32_t>> get_edge_to_split_vertice
     const std::vector<vec2_<T>>& vertices)
 {
     typedef std::pair<std::uint32_t, T> VertCoordPair;
+
     struct ComparePred {
         bool operator()(const VertCoordPair& a, const VertCoordPair& b) const
         {
@@ -390,39 +414,52 @@ std::unordered_map<edge_t, std::vector<std::uint32_t>> get_edge_to_split_vertice
     } comparePred;
 
     std::unordered_map<edge_t, std::vector<std::uint32_t>> edgeToSplitVerts;
-    typedef std::unordered_map<edge_t, std::vector<edge_t>>::const_iterator It;
-    for (It it = edgeToPieces.begin(); it != edgeToPieces.end(); ++it) {
+    
+    for (std::unordered_map<edge_t, std::vector<edge_t>>::const_iterator it = edgeToPieces.begin();
+         it != edgeToPieces.end();
+         ++it) {
+
         const edge_t& e = it->first;
         const T dX = vertices[e.v2()].x() - vertices[e.v1()].x();
         const T dY = vertices[e.v2()].y() - vertices[e.v1()].y();
         const bool isX = std::abs(dX) >= std::abs(dY); // X-coord longer
         const bool isAscending = isX ? dX >= 0 : dY >= 0; // Longer coordinate ascends
         const std::vector<edge_t>& pieces = it->second;
+
         std::vector<VertCoordPair> splitVerts;
         // size is:  2[ends] + (pieces - 1)[split vertices] = pieces + 1
         splitVerts.reserve(pieces.size() + 1);
-        typedef std::vector<edge_t>::const_iterator EIt;
-        for (EIt it = pieces.begin(); it != pieces.end(); ++it) {
+
+        for (std::vector<edge_t>::const_iterator it = pieces.begin(); it != pieces.end(); ++it) {
+
             const std::array<std::uint32_t, 2> vv = { it->v1(), it->v2() };
-            typedef std::array<std::uint32_t, 2>::const_iterator VIt;
-            for (VIt v = vv.begin(); v != vv.end(); ++v) {
+
+            for (std::array<std::uint32_t, 2>::const_iterator v = vv.begin(); v != vv.end(); ++v) {
                 const T c = isX ? vertices[*v].x() : vertices[*v].y();
                 splitVerts.push_back(std::make_pair(*v, isAscending ? c : -c));
             }
         }
+
         // sort by longest coordinate
         std::sort(splitVerts.begin(), splitVerts.end(), comparePred);
+
         // remove duplicates
         splitVerts.erase(
             std::unique(splitVerts.begin(), splitVerts.end()),
             splitVerts.end());
-        assert(splitVerts.size() > 2); // 2 end points with split vertices
+
+        MCUT_ASSERT(splitVerts.size() > 2); // 2 end points with split vertices
+
         std::pair<edge_t, std::vector<std::uint32_t>> val = std::make_pair(e, std::vector<std::uint32_t>());
+
         val.second.reserve(splitVerts.size());
-        typedef typename std::vector<VertCoordPair>::const_iterator SEIt;
-        for (SEIt it = splitVerts.begin() + 1; it != splitVerts.end() - 1; ++it) {
+
+        for (typename std::vector<VertCoordPair>::const_iterator it = splitVerts.begin() + 1;
+             it != splitVerts.end() - 1;
+             ++it) {
             val.second.push_back(it->first);
         }
+
         edgeToSplitVerts.insert(val);
     }
     return edgeToSplitVerts;
@@ -444,7 +481,7 @@ template <typename T>
 struct hash<vec2_<T>> {
     size_t operator()(const vec2_<T>& xy) const
     {
-        return std::hash<T> ()(xy.x()) ^ std::hash<T> ()(xy.y());
+        return std::hash<T>()(xy.x()) ^ std::hash<T>()(xy.y());
     }
 };
 
@@ -455,9 +492,6 @@ namespace cdt {
 //-----
 // API
 //-----
-
-
-
 
 /**
  * Verify that triangulation topology is consistent.
@@ -471,11 +505,11 @@ namespace cdt {
  * @tparam TNearPointLocator class providing locating near point for efficiently
  */
 template <typename T, typename TNearPointLocator>
-inline bool check_topology(const cdt::Triangulation<T, TNearPointLocator>& cdt)
+inline bool check_topology(const cdt::triangulator_t<T, TNearPointLocator>& cdt)
 {
     // Check if vertices' adjacent triangles contain vertex
-    const per_vertex_triangles vertTris = cdt.isFinalized()
-        ? calculate_triangles_by_vertices(
+    const std::vector<std::vector<std::uint32_t>> vertTris = cdt.is_finalized()
+        ? get_vertex_to_triangles_map(
             cdt.triangles, static_cast<std::uint32_t>(cdt.vertices.size()))
         : cdt.vertTris;
     for (std::uint32_t iV(0); iV < std::uint32_t(cdt.vertices.size()); ++iV) {

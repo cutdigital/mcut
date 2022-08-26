@@ -92,6 +92,7 @@ box2d_t<T> expand_with_points(const std::vector<vec2_<T>>& vertices);
 /// edge_t connecting two vertices: vertex with smaller index is always first
 /// \note: hash edge_t is specialized at the bottom
 struct edge_t {
+    
     edge_t(std::uint32_t iV1, std::uint32_t iV2)
         : m_vertices(
             iV1 < iV2 ? std::make_pair(iV1, iV2) : std::make_pair(iV2, iV1))
@@ -145,7 +146,7 @@ inline edge_t edge_make(std::uint32_t iV1, std::uint32_t iV2)
     return edge_t(iV1, iV2);
 }
 
-/// Triangulation triangle (CCW winding)
+/// triangulator_t triangle (CCW winding)
 /* Counter-clockwise winding:
        v3
        /\
@@ -153,8 +154,9 @@ inline edge_t edge_make(std::uint32_t iV1, std::uint32_t iV2)
      /____\
    v1  n1  v2                 */
 struct triangle_t {
-    std::array<std::uint32_t, 3> vertices; ///< triangle's three vertices
-    std::array<std::uint32_t, 3> neighbors; ///< triangle's three neighbors
+
+    std::array<std::uint32_t, 3> vertices; 
+    std::array<std::uint32_t, 3> neighbors; 
 
     /**
      * Factory method
@@ -194,7 +196,6 @@ struct point_to_line_location_t {
 } // namespace cdt
 
 #ifndef CDT_USE_AS_COMPILED_LIBRARY
-//#include "predicates.h" // robust predicates: orient, in-circle
 
 #include <stdexcept>
 
@@ -350,7 +351,7 @@ inline std::uint32_t opposite_triangle_index(
 
 /// Index of triangle's vertex opposed to a triangle
 inline std::uint32_t
-opposite_vertex_index(const triangle_t& tri, const std::uint32_t iTopo)
+get_opposite_vertex_index(const triangle_t& tri, const std::uint32_t iTopo)
 {
     for (std::uint32_t ni = std::uint32_t(0); ni < std::uint32_t(3); ++ni)
         if (iTopo == tri.neighbors[ni])
@@ -360,7 +361,7 @@ opposite_vertex_index(const triangle_t& tri, const std::uint32_t iTopo)
 
 /// If triangle has a given neighbor return neighbor-index, throw otherwise
 inline std::uint32_t
-neighbour_index(const triangle_t& tri, std::uint32_t iTnbr)
+get_neighbour_index(const triangle_t& tri, std::uint32_t iTnbr)
 {
     for (std::uint32_t ni = std::uint32_t(0); ni < std::uint32_t(3); ++ni)
         if (iTnbr == tri.neighbors[ni])
@@ -388,12 +389,12 @@ get_opposite_triangle_index(const triangle_t& tri, const std::uint32_t iVert)
 inline std::uint32_t
 get_opposed_vertex_index(const triangle_t& tri, std::uint32_t iTopo)
 {
-    return tri.vertices[opposite_vertex_index(tri, iTopo)];
+    return tri.vertices[get_opposite_vertex_index(tri, iTopo)];
 }
 
 /// Test if point lies in a circumscribed circle of a triangle
 template <typename T>
-bool check_in_circumcircle(
+bool check_is_in_circumcircle(
     const vec2_<T>& p,
     const vec2_<T>& v1,
     const vec2_<T>& v2,
