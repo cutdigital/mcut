@@ -178,7 +178,7 @@ bool client_input_arrays_to_hmesh(
             for (InputStorageIteratorType face_iter = block_start_;
                  face_iter != block_end_; ++face_iter) {
                 uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), face_iter);
-                const std::vector<vd_t>& faceVertices = faces.at(faceID);
+                const std::vector<vd_t>& faceVertices = SAFE_ACCESS(faces, faceID);
                 fd_t fd = halfedgeMesh.add_face(faceVertices);
 
                 if (fd == hmesh_t::null_face()) {
@@ -330,7 +330,7 @@ void hmesh_to_array_mesh(
                 if (!halfedgeMeshInfo.data_maps.vertex_map.empty()) {
                     MCUT_ASSERT((size_t)*viter < halfedgeMeshInfo.data_maps.vertex_map.size() /*halfedgeMeshInfo.data_maps.vertex_map.count(*vIter) == 1*/);
 
-                    uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(*viter);
+                    uint32_t internalInputMeshVertexDescr = SAFE_ACCESS(halfedgeMeshInfo.data_maps.vertex_map, *viter);
                     uint32_t userInputMeshVertexDescr = UINT32_MAX;
                     bool internalInputMeshVertexDescrIsForIntersectionPoint = (internalInputMeshVertexDescr == UINT32_MAX);
 
@@ -407,7 +407,7 @@ void hmesh_to_array_mesh(
 
             // Here we use whatever value was assigned to the current vertex by the kernel.
             // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-            uint32_t internalInputMeshVertexDescr = halfedgeMeshInfo.data_maps.vertex_map.at(vdescr /**vIter*/);
+            uint32_t internalInputMeshVertexDescr = SAFE_ACCESS(halfedgeMeshInfo.data_maps.vertex_map, vdescr /**vIter*/);
             // We use the same default value as that used by the kernel for intersection
             // points (intersection points at mapped to uint_max i.e. null_vertex())
             uint32_t userInputMeshVertexDescr = UINT32_MAX;
@@ -530,7 +530,7 @@ void hmesh_to_array_mesh(
                 if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
                     MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
 
-                    uint32_t internal_inputmesh_face_idx = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+                    uint32_t internal_inputmesh_face_idx = (uint32_t)SAFE_ACCESS(halfedgeMeshInfo.data_maps.face_map, *i);
                     uint32_t client_inputmesh_face_idx = INT32_MAX;
                     const bool internal_inputmesh_face_idx_is_for_src_mesh = ((int)internal_inputmesh_face_idx < internal_sourcemesh_face_count);
 
@@ -611,7 +611,7 @@ void hmesh_to_array_mesh(
         if (!halfedgeMeshInfo.data_maps.face_map.empty()) {
             MCUT_ASSERT((size_t)*i < halfedgeMeshInfo.data_maps.face_map.size() /*halfedgeMeshInfo.data_maps.face_map.count(*i) == 1*/);
 
-            uint32_t internal_inputmesh_face_idx = (uint32_t)halfedgeMeshInfo.data_maps.face_map.at(*i);
+            uint32_t internal_inputmesh_face_idx = (uint32_t)SAFE_ACCESS(halfedgeMeshInfo.data_maps.face_map, *i);
             uint32_t client_inputmesh_face_idx = INT32_MAX;
             const bool internal_inputmesh_face_idx_is_for_src_mesh = ((int)internal_inputmesh_face_idx < internal_sourcemesh_face_count);
 
@@ -1162,8 +1162,8 @@ void resolve_floating_polygons(
                     // for each edge of face
                     for (int edge_iter = 0; edge_iter < face_edge_count; ++edge_iter) {
 
-                        const vec2& face_edge_v0 = face_vertex_coords_2d.at(((size_t)edge_iter) + 0);
-                        const vec2& face_edge_v1 = face_vertex_coords_2d.at((((size_t)edge_iter) + 1) % face_vertex_count);
+                        const vec2& face_edge_v0 = SAFE_ACCESS(face_vertex_coords_2d, ((size_t)edge_iter) + 0);
+                        const vec2& face_edge_v1 = SAFE_ACCESS(face_vertex_coords_2d, (((size_t)edge_iter) + 1) % face_vertex_count);
 
                         // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
                         // Does the current edge of "face" intersect/pass through the area of
@@ -1199,7 +1199,7 @@ void resolve_floating_polygons(
 
                             // for each floating polygon vertex ...
                             for (int fpVertIter = 0; fpVertIter < (int)floating_poly_vertices_2d.size(); ++fpVertIter) {
-                                const char ret = compute_point_in_polygon_test(floating_poly_vertices_2d.at(fpVertIter), face_vertex_coords_2d);
+                                const char ret = compute_point_in_polygon_test(SAFE_ACCESS(floating_poly_vertices_2d, fpVertIter), face_vertex_coords_2d);
                                 if (ret == 'i') { // check if strictly interior
                                     face_containing_floating_poly = *it;
                                     break;
@@ -1439,8 +1439,8 @@ void resolve_floating_polygons(
             // for each edge in "origin_face"
             for (int origFaceEdgeIter = 0; origFaceEdgeIter < originFaceEdgeCount; ++origFaceEdgeIter) {
 
-                const vec2& origFaceEdgeV0 = origin_face_vertices_2d.at(((size_t)origFaceEdgeIter) + 0);
-                const vec2& origFaceEdgeV1 = origin_face_vertices_2d.at(((origFaceEdgeIter) + 1) % originFaceVertexCount);
+                const vec2& origFaceEdgeV0 = SAFE_ACCESS(origin_face_vertices_2d, ((size_t)origFaceEdgeIter) + 0);
+                const vec2& origFaceEdgeV1 = SAFE_ACCESS(origin_face_vertices_2d, ((origFaceEdgeIter) + 1) % originFaceVertexCount);
 
                 const double garbageVal(0xdeadbeef);
                 vec2 intersectionPoint(garbageVal);
@@ -1549,7 +1549,7 @@ void resolve_floating_polygons(
             // NOTE: minus-1 since "get_vertices_around_face(origin_face)" builds a list using halfedge target vertices
             // See the starred note above
             int halfedgeIdx = origFaceEdge0Idx; // wrap_integer(origFaceEdge0Idx - 1, 0, (int)originFaceEdgeCount - 1); //(origFaceEdge0Idx + 1) % originFaceEdgeCount;
-            const hd_t origFaceEdge0Halfedge = origin_face_halfedges.at(halfedgeIdx);
+            const hd_t origFaceEdge0Halfedge = SAFE_ACCESS(origin_face_halfedges, halfedgeIdx);
             MCUT_ASSERT(origin_face == parent_face_hmesh_ptr->face(origFaceEdge0Halfedge));
             const ed_t origFaceEdge0Descr = parent_face_hmesh_ptr->edge(origFaceEdge0Halfedge);
             const vd_t origFaceEdge0HalfedgeSrcDescr = parent_face_hmesh_ptr->source(origFaceEdge0Halfedge);
@@ -1583,7 +1583,7 @@ void resolve_floating_polygons(
             const double& origFaceEdge1IntPointEqnParam = originFaceIntersectedEdge1Info.second.second;
 
             halfedgeIdx = origFaceEdge1Idx; /// wrap_integer(origFaceEdge1Idx - 1, 0, (int)originFaceEdgeCount - 1); // (origFaceEdge1Idx + 1) % originFaceEdgeCount;
-            const hd_t origFaceEdge1Halfedge = origin_face_halfedges.at(halfedgeIdx);
+            const hd_t origFaceEdge1Halfedge = SAFE_ACCESS(origin_face_halfedges, halfedgeIdx);
             MCUT_ASSERT(origin_face == parent_face_hmesh_ptr->face(origFaceEdge1Halfedge));
             const ed_t origFaceEdge1Descr = parent_face_hmesh_ptr->edge(origFaceEdge1Halfedge);
             const vd_t origFaceEdge1HalfedgeSrcDescr = parent_face_hmesh_ptr->source(origFaceEdge1Halfedge);

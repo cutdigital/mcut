@@ -93,16 +93,16 @@ typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
 #define EXCEPTION_THROWN 
 #endif
 
-#define PEDANTIC_SUBSCRIPT_ACCESS 1
+//#define PEDANTIC_SUBSCRIPT_ACCESS 1
 
 #if defined(PEDANTIC_SUBSCRIPT_ACCESS)
-#define SAFE_ACCESS(var, iter) var.at(i)
+#define SAFE_ACCESS(var, i) var.at(i)
 #else
-#define SAFE_ACCESS(var, iter) var[i]
+#define SAFE_ACCESS(var, i) var[i]
 #endif
 
 
-//#define PROFILING_BUILD
+#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
 #include <chrono>
