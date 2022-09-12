@@ -93,6 +93,8 @@ bool client_input_arrays_to_hmesh(
 
     TIMESTACK_PUSH("create faces");
 
+    const bool assume_triangle_mesh = (pFaceSizes == nullptr);
+
 #if defined(MCUT_MULTI_THREADED)
     std::vector<uint32_t> partial_sums(numFaces, 0); // prefix sum result
     std::partial_sum(pFaceSizes, pFaceSizes + numFaces, partial_sums.data());
@@ -111,7 +113,7 @@ bool client_input_arrays_to_hmesh(
             for (InputStorageIteratorType i = block_start_; i != block_end_; ++i) {
                 uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), i);
                 std::vector<vd_t>& faceVertices = faces[faceID];
-                int face_vertex_count = ((uint32_t*)pFaceSizes)[faceID];
+                int face_vertex_count = assume_triangle_mesh ? 3 : ((uint32_t*)pFaceSizes)[faceID];
 
                 if (face_vertex_count < 3) {
                     int zero = (int)McResult::MC_NO_ERROR;
@@ -227,9 +229,7 @@ bool client_input_arrays_to_hmesh(
 
     for (uint32_t i = 0; i < numFaces; ++i) {
         faceVertices.clear();
-        int face_vertex_count = 3; // triangle
-
-        face_vertex_count = ((uint32_t*)pFaceSizes)[i];
+        int face_vertex_count =  assume_triangle_mesh ? 3 : ((uint32_t*)pFaceSizes)[i];
 
         if (face_vertex_count < 3) {
 

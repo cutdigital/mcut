@@ -89,8 +89,8 @@ int main()
         0, 1, 2, //0
         0, 2, 3  //1
     };
-    uint32_t cutMeshFaceSizes[] = {
-        3, 3};
+    //uint32_t cutMeshFaceSizes[] = {
+    //    3, 3};
     uint32_t numCutMeshVertices = 4;
     uint32_t numCutMeshFaces = 2;
 
@@ -117,7 +117,7 @@ int main()
         numCubeFaces,
         cutMeshVertices,
         cutMeshFaces,
-        cutMeshFaceSizes,
+        nullptr, // cutMeshFaceSizes, // no need to give 'faceSizes' parameter since cut-mesh is a triangle mesh
         numCutMeshVertices,
         numCutMeshFaces);
 
@@ -277,6 +277,8 @@ void writeOFF(
     uint32_t numVertices,
     uint32_t numFaces)
 {
+    fprintf(stdout, "write: %s\n",fpath );
+
     FILE *file = fopen(fpath, "w");
 
     if (file == NULL)
