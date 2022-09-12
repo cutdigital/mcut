@@ -218,7 +218,7 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
     //MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
-    MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. */
+    MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. Each face can also be understood as a "planar straight line graph" (PSLG), which is a collection of vertices and segments that lie on the same plane. Segments are edges whose endpoints are vertices in the PSLG.*/
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
     //MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
     MC_CONNECTED_COMPONENT_DATA_EDGE = (1 << 8), /**< List of edges as an array of indices. */
@@ -233,7 +233,8 @@ typedef enum McConnectedComponentData {
     // incidence and adjacency information
     MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE = (1 << 17), /**< List of adjacent faces (their indices) per face.*/
     MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE = (1 << 18), /**< List of adjacent-face-list sizes (number of adjacent faces per face).*/
-    MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION = (1 << 19) /**< List of 3*N triangulated face indices, where N is the number of triangles. */
+    MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION = (1 << 19), /**< List of 3*N triangulated face indices, where N is the number of triangles that are produced using a [Constrained] Delaunay triangulation. Such a triangulation is similar to a Delaunay triangulation, but each (non-triangulated) face segment is present as a single edge in the triangulation. A constrained Delaunay triangulation is not truly a Delaunay triangulation. Some of its triangles might not be Delaunay, but they are all constrained Delaunay. */
+    // TODO MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_CDT = (1<<20) /**< List of 3*N triangulated face indices, where N is the number of triangles that are produced using a [Conforming] Delaunay triangulation. A conforming Delaunay triangulation (CDT) of a PSLG (i.e. a face of in the given connected component) is a true Delaunay triangulation in which each PSLG segment/edge may have been subdivided into several edges by the insertion of additional vertices, called Steiner points. Steiner points are necessary to allow the segments to exist in the mesh while maintaining the Delaunay property. This Delaunay property follows from the definition of a "Delaunay triangulation": the Delaunay triangulation is the triangulation such that, if you circumscribe a circle around every triangle, none of those circles will contain any other points. Alternatively, the Delaunay triangulation is the triangulation that “maximizes the minimum angle in all of the triangles.”. Steiner points are not inserted to meet constraints on the minimum angle and maximum triangle area. MCUT computes a CDT of a given connected component starting only from the faces that have more than three vertices. Neighbouring (triangle) faces will also be processed (i.e. refined) if their incident edges are split as a result of performing CDT on the current face. */
     
 } McConnectedComponentData;
 

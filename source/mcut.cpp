@@ -226,9 +226,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         per_thread_api_log_str = "invalid source-mesh vertex count";
     } else if (pSrcMeshFaceIndices == nullptr) {
         per_thread_api_log_str = "source-mesh face-index array ptr undef (NULL)";
-    } else if (pSrcMeshFaceSizes == nullptr) {
+    } /*else if (pSrcMeshFaceSizes == nullptr) {
         per_thread_api_log_str = "source-mesh face-size array ptr undef (NULL)";
-    } else if (numSrcMeshFaces < 1) {
+    }*/ else if (numSrcMeshFaces < 1) {
         per_thread_api_log_str = "invalid source-mesh vertex count";
     } else if (pCutMeshVertices == nullptr) {
         per_thread_api_log_str = "cut-mesh vertex-position array ptr undef (NULL)";
@@ -236,9 +236,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         per_thread_api_log_str = "invalid cut-mesh vertex count";
     } else if (pCutMeshFaceIndices == nullptr) {
         per_thread_api_log_str = "cut-mesh face-index array ptr undef (NULL)";
-    } else if (pCutMeshFaceSizes == nullptr) {
+    } /*else if (pCutMeshFaceSizes == nullptr) {
         per_thread_api_log_str = "cut-mesh face-size array ptr undef (NULL)";
-    } else if (numCutMeshFaces < 1) {
+    } */else if (numCutMeshFaces < 1) {
         per_thread_api_log_str = "invalid cut-mesh vertex count";
     } else {
         try {

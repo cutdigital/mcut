@@ -45,7 +45,9 @@
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
 #endif
+#include "mcut/internal/kernel.h"
 
+#if 0
 // internal frontend data structure which we use to store connected component
 // data that is computed by the kernel and requested by a client via the 
 // "mcGetConnectedComponentData" function. So the "mcGetConnectedComponentData"
@@ -76,12 +78,44 @@ struct array_mesh_t {
     uint32_t numFaceAdjFaceIndices = 0;
     uint32_t numTriangleIndices = 0;
 };
+#endif
+
 
 // base struct from which other structs represent connected components inherit
 struct connected_component_t {
     virtual ~connected_component_t() {};
     McConnectedComponentType type = (McConnectedComponentType)0;
-    array_mesh_t indexArrayMesh;
+    //array_mesh_t indexArrayMesh;
+    //hmesh_t mesh;
+    output_mesh_info_t kernel_hmesh_data;
+
+    // 
+    std::shared_ptr< //
+        std::unordered_map< //
+        fd_t /*child face*/,
+        fd_t /*parent face in the [user-provided] source mesh*/
+        > //
+    > source_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputSrcMeshFace
+    std::shared_ptr < //
+        std::unordered_map< //
+        fd_t /*child face*/,
+        fd_t /*parent face in the [user-provided] cut mesh*/
+        >
+    > cut_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputCutMeshFace
+    // descriptors and coordinates of new vertices that are added into an input mesh (source mesh or cut mesh)
+    // in order to carry out partitioning
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputSrcMesh
+    std::shared_ptr < std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputCutMesh
+    uint32_t internal_sourcemesh_vertex_count; // init from source_hmesh.number_of_vertices()
+    uint32_t client_sourcemesh_vertex_count; // init from numSrcMeshVertices
+    uint32_t internal_sourcemesh_face_count; // init from source_hmesh.number_of_faces()
+    uint32_t client_sourcemesh_face_count; // init from source_hmesh_face_count OR numSrcMeshFaces
+    // Stores the contiguous array of unsigned integers that define
+    // a triangulation of all [non-triangle faces] of the connected component. 
+    // This vector is only populated if client invokes mcGetConnectedComponnentData
+    // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
+    // triangulating every non-triangle face in the connected component.
+    std::vector<uint32_t> constrained_delaunay_triangulation_indices;
 };
 
 // struct representing a fragment

@@ -258,7 +258,7 @@ unsigned int __inline clz_(unsigned int value)
         for (face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f) {
             const uint32_t faceIdx = static_cast<uint32_t>(*f);
 
-            const vec3& face_aabb_centre = face_bbox_centers.at(faceIdx);
+            const vec3& face_aabb_centre = SAFE_ACCESS(face_bbox_centers,faceIdx);
             const vec3 offset = face_aabb_centre - meshBbox.minimum();
             const vec3 dims = meshBbox.maximum() - meshBbox.minimum();
 
@@ -331,15 +331,15 @@ unsigned int __inline clz_(unsigned int value)
                 if (is_penultimate_level) { // both children are leaves
 
                     const int left_child_index_on_level = left_child_implicit_idx - leftmost_real_node_on_child_level;
-                    const fd_t& left_child_face = bvhLeafNodeFaces.at(left_child_index_on_level);
-                    const bounding_box_t<vec3>& left_child_bbox = face_bboxes.at(left_child_face);
+                    const fd_t& left_child_face = SAFE_ACCESS(bvhLeafNodeFaces, left_child_index_on_level);
+                    const bounding_box_t<vec3>& left_child_bbox = SAFE_ACCESS(face_bboxes, left_child_face);
 
                     node_bbox.expand(left_child_bbox);
 
                     if (right_child_exists) {
                         const int right_child_index_on_level = right_child_implicit_idx - leftmost_real_node_on_child_level;
-                        const fd_t& right_child_face = bvhLeafNodeFaces.at(right_child_index_on_level);
-                        const bounding_box_t<vec3>& right_child_bbox = face_bboxes.at(right_child_face);
+                        const fd_t& right_child_face = SAFE_ACCESS(bvhLeafNodeFaces, right_child_index_on_level);
+                        const bounding_box_t<vec3>& right_child_bbox = SAFE_ACCESS(face_bboxes, right_child_face);
                         node_bbox.expand(right_child_bbox);
                     }
                 } else { // remaining internal node levels
@@ -349,7 +349,7 @@ unsigned int __inline clz_(unsigned int value)
                         leftmost_real_node_on_child_level,
                         0,
                         rightmost_real_node_on_child_level);
-                    const bounding_box_t<vec3>& left_child_bbox = bvhAABBs.at(left_child_memory_idx);
+                    const bounding_box_t<vec3>& left_child_bbox = SAFE_ACCESS(bvhAABBs, left_child_memory_idx);
 
                     node_bbox.expand(left_child_bbox);
 
@@ -359,7 +359,7 @@ unsigned int __inline clz_(unsigned int value)
                             leftmost_real_node_on_child_level,
                             0,
                             rightmost_real_node_on_child_level);
-                        const bounding_box_t<vec3>& right_child_bbox = bvhAABBs.at(right_child_memory_idx);
+                        const bounding_box_t<vec3>& right_child_bbox = SAFE_ACCESS(bvhAABBs, right_child_memory_idx);
                         node_bbox.expand(right_child_bbox);
                     }
                 }
@@ -370,7 +370,7 @@ unsigned int __inline clz_(unsigned int value)
                     0,
                     rightmost_real_node_on_level);
 
-                bvhAABBs.at(node_memory_idx) = node_bbox;
+                SAFE_ACCESS(bvhAABBs, node_memory_idx) = node_bbox;
             } // for each real node on level
         } // for each internal level
         TIMESTACK_POP();
@@ -419,12 +419,12 @@ void intersectOIBVHs(
             sm_bvh_node_level_leftmost_node,
             0,
             sm_bvh_node_level_rightmost_node);
-        sm_bvh_node_bbox = srcMeshBvhAABBs.at(sm_bvh_node_mem_idx);
+        sm_bvh_node_bbox = SAFE_ACCESS(srcMeshBvhAABBs, sm_bvh_node_mem_idx);
 
         if (sm_bvh_node_is_leaf)
         {
             const int sm_bvh_node_idx_on_level = sm_bvh_node_implicit_idx - sm_bvh_node_level_leftmost_node;
-            sm_node_face = srcMeshBvhLeafNodeFaces.at(sm_bvh_node_idx_on_level);
+            sm_node_face = SAFE_ACCESS(srcMeshBvhLeafNodeFaces, sm_bvh_node_idx_on_level);
         }
 
         // cs
@@ -439,12 +439,12 @@ void intersectOIBVHs(
             cs_bvh_node_level_leftmost_node,
             0,
             cs_bvh_node_level_rightmost_node);
-        cs_bvh_node_bbox = cutMeshBvhAABBs.at(cs_bvh_node_mem_idx);
+        cs_bvh_node_bbox = SAFE_ACCESS(cutMeshBvhAABBs, cs_bvh_node_mem_idx);
 
         if (cs_bvh_node_is_leaf)
         {
             const int cs_bvh_node_idx_on_level = cs_bvh_node_implicit_idx - cs_bvh_node_level_leftmost_node;
-            cs_node_face = cutMeshBvhLeafNodeFaces.at(cs_bvh_node_idx_on_level);
+            cs_node_face = SAFE_ACCESS(cutMeshBvhLeafNodeFaces, cs_bvh_node_idx_on_level);
         }
 
         const bool haveOverlap = intersect_bounding_boxes(sm_bvh_node_bbox, cs_bvh_node_bbox);

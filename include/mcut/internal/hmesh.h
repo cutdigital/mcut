@@ -216,7 +216,7 @@ struct face_data_t : id_<face_descriptor_t> {
 
 struct vertex_data_t : id_<vertex_descriptor_t> {
     vec3 p; // geometry coordinates
-    std::vector<face_descriptor_t> m_faces; // ... incident to vertex
+    std::vector<face_descriptor_t> m_faces; // ... incident to vertex // TODO: this is not needed (can be inferred from "m_halfedges")
     std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
 };
 
@@ -299,6 +299,10 @@ public:
     // halfedge whole target is "v1"
     halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);
     face_descriptor_t add_face(const std::vector<vertex_descriptor_t>& vi);
+    // checks whether adding this face will violate 2-manifoldness (i.e. halfedge 
+    // construction rules) which would lead to creating a non-manifold edge 
+    // (one that is referenced by more than 2 faces which is illegal). 
+    bool is_insertable(const std::vector<vertex_descriptor_t> &vi) const;
 
     // also disassociates (not remove) any halfedges(s) and vertices incident to face
     void remove_face(const face_descriptor_t f);
@@ -387,9 +391,12 @@ public:
     std::vector<vertex_descriptor_t> get_vertices_around_face(const face_descriptor_t f, uint32_t prepend_offset = 0) const;
     void get_vertices_around_face(std::vector<vertex_descriptor_t>& vertex_descriptors, const face_descriptor_t f, uint32_t prepend_offset=0) const;
     std::vector<vertex_descriptor_t> get_vertices_around_vertex(const vertex_descriptor_t v) const;
+    uint32_t get_num_vertices_around_face(const face_descriptor_t f) const;
     const std::vector<halfedge_descriptor_t>& get_halfedges_around_face(const face_descriptor_t f) const;
     const std::vector<face_descriptor_t> get_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_ = nullptr) const;
-
+    void get_faces_around_face( std::vector<face_descriptor_t>& faces_around_face, const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_ = nullptr) const;
+    uint32_t get_num_faces_around_face(const face_descriptor_t f, const std::vector<halfedge_descriptor_t>* halfedges_around_face_) const;
+    
     // iterators
     // ---------
 

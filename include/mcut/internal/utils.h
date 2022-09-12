@@ -23,6 +23,13 @@
 #ifndef MCUT_UTILS_H_
 #define MCUT_UTILS_H_
 
+// check if c++11 is supported
+#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
+#define MCUT_CXX11_IS_SUPPORTED
+#elif !defined(__cplusplus) && !defined(_MSC_VER)
+typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
+#endif
+
 #if defined(_WIN64) || defined(_WIN32)
 #define MCUT_BUILD_WINDOWS 1
 #elif defined(__APPLE__)
@@ -86,7 +93,16 @@
 #define EXCEPTION_THROWN 
 #endif
 
-//#define PROFILING_BUILD
+//#define PEDANTIC_SUBSCRIPT_ACCESS 1
+
+#if defined(PEDANTIC_SUBSCRIPT_ACCESS)
+#define SAFE_ACCESS(var, i) var.at(i)
+#else
+#define SAFE_ACCESS(var, i) var[i]
+#endif
+
+
+#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
 #include <chrono>
@@ -134,7 +150,7 @@
                 const std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
                 const std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_start);
                 unsigned long long elapsed_ = elapsed.count();
-                printf("[PROFILE]: %s (%llums)\n", m_name.c_str(), elapsed_);
+                printf("[PROF]: %s (%llums)\n", m_name.c_str(), elapsed_);
             }
         }
         void set_invalid()

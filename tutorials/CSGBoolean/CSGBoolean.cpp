@@ -166,7 +166,7 @@ int main(int argc, const char* argv[])
     // create a context
     // -------------------
     McContext context = MC_NULL_HANDLE;
-    McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
+    McResult err = mcCreateContext(&context, MC_DEBUG);
     my_assert(err == MC_NO_ERROR);
 
     //  do the cutting (boolean ops)
