@@ -900,7 +900,7 @@ void get_connected_component_data_impl(
                 MCUT_ASSERT(face_vertex_count >= 3);
 
                 const bool face_is_triangle = (face_vertex_count == 3);
-                const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
+                //const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
 
                 if (face_is_triangle) {
 
