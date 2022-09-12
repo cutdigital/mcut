@@ -301,7 +301,7 @@ point_to_triangle_location_t::Enum locate_point_wrt_triangle(
 }
 
 /// Opposed neighbor index from vertex index
-inline std::uint32_t opposite_neighbour_from_vertex(const std::uint32_t vertIndex)
+inline std::uint32_t get_opposite_neighbour_from_vertex(const std::uint32_t vertIndex)
 {
     MCUT_ASSERT(vertIndex < 3);
 
@@ -331,7 +331,7 @@ opposite_triangle_index(const triangle_t& tri, const std::uint32_t iVert)
 {
     for (std::uint32_t vi = std::uint32_t(0); vi < std::uint32_t(3); ++vi)
         if (iVert == tri.vertices[vi])
-            return opposite_neighbour_from_vertex(vi);
+            return get_opposite_neighbour_from_vertex(vi);
     throw std::runtime_error("Could not find opposed triangle index");
 }
 
@@ -344,7 +344,7 @@ inline std::uint32_t opposite_triangle_index(
     for (std::uint32_t vi = std::uint32_t(0); vi < std::uint32_t(3); ++vi) {
         const std::uint32_t iVert = tri.vertices[vi];
         if (iVert != iVedge1 && iVert != iVedge2)
-            return opposite_neighbour_from_vertex(vi);
+            return get_opposite_neighbour_from_vertex(vi);
     }
     throw std::runtime_error("Could not find opposed-to-edge triangle index");
 }

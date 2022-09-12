@@ -110,22 +110,11 @@ struct connected_component_t {
     uint32_t client_sourcemesh_vertex_count; // init from numSrcMeshVertices
     uint32_t internal_sourcemesh_face_count; // init from source_hmesh.number_of_faces()
     uint32_t client_sourcemesh_face_count; // init from source_hmesh_face_count OR numSrcMeshFaces
-    // NOTE TO SELF: the array just stores the triangulation of all faces (Naive).
-    // Need to actually implement what is describe below...
-    //
     // Stores the contiguous array of unsigned integers that define
     // a triangulation of all [non-triangle faces] of the connected component. 
     // This vector is only populated if client invokes mcGetConnectedComponnentData
     // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
     // triangulating every non-triangle face in the connected component.
-    // NOTE: Only the indices of the triangulations on N-Gon faces are stored in here.
-    // They are stored according to the order in which they are encountered while iterating
-    // over the faces of the connected component. For example, if face �12� is the first 
-    // encountered N-Gon face while iterating (e.g. a quad) such that its triangulation produces two 
-    // triangles then these triangles will come first in this array. The format in which
-    // this index information is stored is [<N>,<N*3 indices>, <M>, <M*3 indices>, <P>, <P*3 indices>, ...]
-    // This format helps us to save memory by only storing the triangulation (of NGon faces) indices
-    // since the remaining already triangulated faces are store in "mesh".
     std::vector<uint32_t> constrained_delaunay_triangulation_indices;
 };
 

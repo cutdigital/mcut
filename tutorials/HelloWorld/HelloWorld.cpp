@@ -168,7 +168,6 @@ int main()
         // query the vertices
         // ----------------------
 
-        numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes);
 
         if (err != MC_NO_ERROR)

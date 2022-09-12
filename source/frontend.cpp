@@ -370,6 +370,7 @@ void get_connected_component_data_impl(
             double* casted_ptr = reinterpret_cast<double*>(pMem);
 
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
+                
                 const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
@@ -415,6 +416,7 @@ void get_connected_component_data_impl(
 
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+                
                 vertices_around_face.clear();
                 cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *fiter);
                 const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
@@ -481,8 +483,10 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             std::vector<fd_t> faces_around_face;
+            
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+                
                 faces_around_face.clear();
                 cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
 
@@ -859,10 +863,7 @@ void get_connected_component_data_impl(
         if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
         {
             uint32_t face_indices_offset = 0;
-            //std::vector<uint32_t> tri_face_indices;
             cc_uptr->constrained_delaunay_triangulation_indices.reserve(cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
-
-            //const uint32_t nontri_cc_face_count = (uint32_t)cc_uptr->kernel_hmesh_data.mesh.number_of_faces();//cc_uptr->indexArrayMesh.numFaces;
 
             // -----
             std::vector<vec3> face_vertex_coords_3d;
@@ -908,12 +909,6 @@ void get_connected_component_data_impl(
                         cc_uptr->constrained_delaunay_triangulation_indices.push_back(face_vertex_idx);
                     }
 
-                } else if (!face_is_triangle && is_adjacent_to_intersection_curve) {
-                    // TODO: This is when we should actually do triangulation
-                    //
-                    // NOTE: the feature of "performing triangulation only for faces
-                    // next to the intersection curve" or "triangulating all non-tri faces"
-                    // should be controlled via a flag e.g. MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_LOCAL and MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_GLOBAL
                 } else {
 
                     //
@@ -932,11 +927,8 @@ void get_connected_component_data_impl(
 
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
 
-                        const vertex_descriptor_t face_vertex_idx((uint32_t)vertices_around_face[v]);//cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
-
-                        //const double* const vptr = cc_uptr->indexArrayMesh.pVertices.get() + ((std::size_t)face_vertex_idx * 3);
-
-                        face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(face_vertex_idx);// face_vertex_coords_3d[v];
+                        const vertex_descriptor_t face_vertex_idx((uint32_t)vertices_around_face[v]);
+                        face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(face_vertex_idx);
                     }
 
                     // project face vertices to 2D (NOTE: area is unchanged)
@@ -1148,10 +1140,6 @@ void get_connected_component_data_impl(
 
             MCUT_ASSERT(cc_uptr->constrained_delaunay_triangulation_indices.size() >= 3);
 
-            //cc_uptr->indexArrayMesh.numTriangleIndices = (uint32_t)tri_face_indices.size();
-            //cc_uptr->indexArrayMesh.pTriangleIndices = std::unique_ptr<uint32_t[]>(new uint32_t[cc_uptr->indexArrayMesh.numTriangleIndices]);
-
-            //memcpy(reinterpret_cast<void*>(cc_uptr->indexArrayMesh.pTriangleIndices.get()), tri_face_indices.data(), tri_face_indices.size() * sizeof(uint32_t));
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
         const uint32_t num_triangulation_indices= (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
