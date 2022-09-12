@@ -734,7 +734,7 @@ hmesh_t extract_connected_components(
                      ++face_vertex_iter) {
                     MCUT_ASSERT(ccID_to_mX_to_cc_vertex.find(cc_id) != ccID_to_mX_to_cc_vertex.cend());
 
-                    const std::unordered_map<vd_t, vd_t>& vertex_map = mX_to_cc_vertex;
+                    /*const*/ std::unordered_map<vd_t, vd_t>& vertex_map = mX_to_cc_vertex;
                     const vd_t m1_sm_descr = *face_vertex_iter;
 
                     MCUT_ASSERT(vertex_map.find(m1_sm_descr) != vertex_map.cend());
@@ -1914,14 +1914,14 @@ void dispatch(output_t& output, const input_t& input)
                     bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
                     if (is_sm_face) {
 #if defined(USE_OIBVH)
-                        iface_bbox = SAFE_ACCESS(&((*input.source_hmesh_face_aabb_array_ptr), *iface_iter));
+                        iface_bbox = &(SAFE_ACCESS((*input.source_hmesh_face_aabb_array_ptr), *iface_iter));
 
 #else
                         iface_bbox = &input.source_hmesh_BVH->GetPrimitiveBBox(*iface_iter); // SAFE_ACCESS(((*input.source_hmesh_face_aabb_array_ptr), *iface_iter));
 #endif
                     } else {
 #if defined(USE_OIBVH)
-                        iface_bbox = SAFE_ACCESS(&((*input.cut_hmesh_face_aabb_array_ptr), ((size_t)(*iface_iter) - sm_face_count)));
+                        iface_bbox = &(SAFE_ACCESS((*input.cut_hmesh_face_aabb_array_ptr), (size_t)(*iface_iter) - sm_face_count));
 #else
                         iface_bbox = &input.cut_hmesh_BVH->GetPrimitiveBBox((size_t)(*iface_iter) - sm_face_count); // SAFE_ACCESS(((*input.cut_hmesh_face_aabb_array_ptr), ((size_t)(*iface_iter) - sm_face_count)));
 
@@ -4495,7 +4495,7 @@ void dispatch(output_t& output, const input_t& input)
                 for (std::vector<hd_t>::const_iterator i = it->second.cbegin(); i != it->second.cend(); ++i) {
                     hd_t he_local = *i;
                     ed_t he_edge_local = ed_t((uint32_t)he_local / 2);
-                    ivtx_to_incoming_hlist[it->first].push_back(m0_.halfedge(emap, he_edge_local), (uint32_t)(he_local % 2)));
+                    ivtx_to_incoming_hlist[it->first].push_back(m0_.halfedge(SAFE_ACCESS(emap,he_edge_local), (uint32_t)(he_local % 2)));
                 }
             }
         };
