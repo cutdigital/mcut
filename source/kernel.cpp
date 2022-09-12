@@ -1316,7 +1316,7 @@ vd_t resolve_intersection_point_descriptor(
         MCUT_ASSERT((uint32_t)h_proc < (uint32_t)m1.number_of_halfedges());
         vd_t h_tgt = m1.target(h_proc);
         MCUT_ASSERT((uint32_t)h_tgt < (uint32_t)m1.number_of_vertices());
-        const vec3& vertex = m1.vertex(h_tgt);
+        const vec3 vertex = m1.vertex(h_tgt);
         const vd_t tgt_copy = m1.add_vertex(vertex); // make a copy
 
         resolved_inst = tgt_copy;

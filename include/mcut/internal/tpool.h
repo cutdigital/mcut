@@ -31,8 +31,6 @@
 #include <thread>
 #include <vector>
 
-//#undef MCUT_MULTI_THREADED // *********************************************************************************
-
 class function_wrapper {
 private:
     struct impl_base {
