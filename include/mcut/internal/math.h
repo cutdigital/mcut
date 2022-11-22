@@ -99,14 +99,12 @@ public:
     {
         MCUT_ASSERT(index >= 0 && index <= 1);
 
-        T* val = nullptr;
         if (index == 0) {
-            val = &m_x;
-        } else {
-            val = &m_y;
-        }
+            return m_x;
+        } 
 
-        return *val;
+            return m_y;
+        
     }
 
     const vec2_ operator-(const vec2_& other) const
