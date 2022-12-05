@@ -112,6 +112,11 @@ public:
         return vec2_(m_x - other.m_x, m_y - other.m_y);
     }
 
+    const vec2_ operator+(const vec2_& other) const
+    {
+        return vec2_(m_x + other.m_x, m_y + other.m_y);
+    }
+
     const vec2_ operator/(const T& number) const
     {
         return vec2_(m_x / number, m_y / number);
@@ -639,6 +644,7 @@ struct bounding_box_t {
             return 2;
     }
 };
+
 
 template <typename T>
 inline bool intersect_bounding_boxes(const bounding_box_t<vec3_<T>>& a, const bounding_box_t<vec3_<T>>& b)

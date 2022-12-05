@@ -944,7 +944,7 @@ void get_connected_component_data_impl(
 
                     project2D(face_vertex_coords_2d, face_vertex_coords_3d, face_normal, face_normal_largest_component);
 
-                    cdt::triangulator_t<double> tri(cdt::vertex_insertion_order_t::AS_GIVEN); // memory is alway reallocated for this
+                    cdt::triangulator_t tri(cdt::vertex_insertion_order_t::AS_GIVEN); // memory is alway reallocated for this
 
                     // convert face vertex format & compute revered face
                     // =================================================

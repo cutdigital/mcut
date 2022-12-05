@@ -511,7 +511,7 @@ inline bool check_topology(const cdt::triangulator_t<T, TNearPointLocator>& cdt)
     const std::vector<std::vector<std::uint32_t>> vertTris = cdt.is_finalized()
         ? get_vertex_to_triangles_map(
             cdt.triangles, static_cast<std::uint32_t>(cdt.vertices.size()))
-        : cdt.vertTris;
+        : cdt.per_vertex_adjacent_triangles;
     for (std::uint32_t iV(0); iV < std::uint32_t(cdt.vertices.size()); ++iV) {
         const std::vector<std::uint32_t>& vTris = vertTris[iV];
         typedef std::vector<std::uint32_t>::const_iterator TriIndCit;

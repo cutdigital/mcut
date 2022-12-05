@@ -19,21 +19,20 @@ namespace cdt {
 
 /// X- coordinate getter for vec2d_t
 template <typename T>
-const T& get_x_coord_vec2d(const vec2_<T>& v)
+const T& get_x_coord_vec2d(const vec2& v)
 {
     return v.x();
 }
 
 /// Y-coordinate getter for vec2d_t
 template <typename T>
-const T& get_y_coord_vec2d(const vec2_<T>& v)
+const T& get_y_coord_vec2d(const vec2& v)
 {
     return v.y();
 }
 
 /// If two 2D vectors are exactly equal
-template <typename T>
-bool operator==(const vec2_<T>& lhs, const vec2_<T>& rhs)
+bool operator==(const vec2& lhs, const vec2& rhs)
 {
     return lhs.x() == rhs.x() && lhs.y() == rhs.y();
 }
@@ -43,14 +42,15 @@ const static std::uint32_t null_neighbour(std::numeric_limits<std::uint32_t>::ma
 /// Constant representing no valid vertex for a triangle
 const static std::uint32_t null_vertex(std::numeric_limits<std::uint32_t>::max());
 
+#if 0
 /// 2D bounding box
 template <typename T>
 struct box2d_t {
-    vec2_<T> min; ///< min box corner
-    vec2_<T> max; ///< max box corner
+    vec2 min; ///< min box corner
+    vec2 max; ///< max box corner
 
     /// Envelop box around a point
-    void expand_with_point(const vec2_<T>& p)
+    void expand_with_point(const vec2& p)
     {
         expand_with_point(p.x(), p.y());
     }
@@ -63,31 +63,31 @@ struct box2d_t {
         max.y() = std::max(y, max.y());
     }
 };
-
+#endif
 /// Bounding box of a collection of custom 2D points given coordinate getters
 template <
-    typename T,
-    typename TVertexIter,
-    typename TGetVertexCoordX,
-    typename TGetVertexCoordY>
-box2d_t<T> expand_with_points(
+    typename TVertexIter//,
+    //typename TGetVertexCoordX,
+    //typename TGetVertexCoordY
+    >
+bounding_box_t<vec2> construct_bbox_containing_points(
     TVertexIter first,
-    TVertexIter last,
-    TGetVertexCoordX get_x_coord,
-    TGetVertexCoordY get_y_coord)
+    TVertexIter last//,
+    //TGetVertexCoordX get_x_coord,
+    //TGetVertexCoordY get_y_coord
+    )
 {
-    const T max = std::numeric_limits<T>::max();
-    box2d_t<T> box = { { max, max }, { -max, -max } };
+    const double max = std::numeric_limits<double>::max();
+    bounding_box_t<vec2> box = { { max, max }, { -max, -max } };
 
     for (; first != last; ++first) {
-        box.expand_with_point(get_x_coord(*first), get_y_coord(*first));
+        box.expand_with_point(first->x(), first->y());
     }
     return box;
 }
 
 /// Bounding box of a collection of 2D points
-template <typename T>
-box2d_t<T> expand_with_points(const std::vector<vec2_<T>>& vertices);
+bounding_box_t<vec2> construct_bbox_containing_points(const std::vector<vec2>& points);
 
 /// edge_t connecting two vertices: vertex with smaller index is always first
 /// \note: hash edge_t is specialized at the bottom
@@ -201,14 +201,12 @@ struct point_to_line_location_t {
 
 namespace cdt {
 
-//*****************************************************************************
-// box2d_t
-//*****************************************************************************
-template <typename T>
-box2d_t<T> expand_with_points(const std::vector<vec2_<T>>& vertices)
+// returns a 2D bounding box containing the vertices
+
+bounding_box_t<vec2> construct_bbox_containing_points(const std::vector<vec2>& points)
 {
-    return expand_with_points<T>(
-        vertices.begin(), vertices.end(), get_x_coord_vec2d<T>, get_y_coord_vec2d<T>);
+    return construct_bbox_containing_points(
+        points.begin(), points.end()/*, get_x_coord_vec2d<T>, get_y_coord_vec2d<T>*/);
 }
 
 //*****************************************************************************
@@ -237,23 +235,23 @@ inline bool check_on_edge(const point_to_triangle_location_t::Enum location)
 /// \note Call only if located on the edge!
 inline std::uint32_t edge_neighbour(const point_to_triangle_location_t::Enum location)
 {
-    assert(location >= point_to_triangle_location_t::ON_1ST_EDGE);
+    MCUT_ASSERT(location >= point_to_triangle_location_t::ON_1ST_EDGE);
+    // make index be in range 0,2
     return static_cast<std::uint32_t>(location - point_to_triangle_location_t::ON_1ST_EDGE);
 }
 
 #if 0
 /// Orient p against line v1-v2 2D: robust geometric predicate
 template <typename T>
-T orient2D(const vec2_<T>& p, const vec2_<T>& v1, const vec2_<T>& v2)
+T orient2D(const vec2& p, const vec2& v1, const vec2& v2)
 {
     return orient2d(v1.x(), v1.y(), v2.x(), v2.y(), p.x(), p.y());
 }
 #endif
 
 /// Classify value of orient2d predicate
-template <typename T>
 point_to_line_location_t::Enum
-classify_orientation(const T orientation, const T orientationTolerance = T(0))
+classify_orientation(const double orientation, const double orientationTolerance = double(0))
 {
     if (orientation < -orientationTolerance)
         return point_to_line_location_t::RIGHT_SIDE;
@@ -263,23 +261,21 @@ classify_orientation(const T orientation, const T orientationTolerance = T(0))
 }
 
 /// Check if point lies to the left of, to the right of, or on a line
-template <typename T>
 point_to_line_location_t::Enum locate_point_wrt_line(
-    const vec2_<T>& p,
-    const vec2_<T>& v1,
-    const vec2_<T>& v2,
-    const T orientationTolerance = T(0))
+    const vec2& p,
+    const vec2& v1,
+    const vec2& v2,
+    const double orientationTolerance = double(0))
 {
     return classify_orientation(orient2d(p, v1, v2), orientationTolerance);
 }
 
 /// Check if point a lies inside of, outside of, or on an edge of a triangle
-template <typename T>
 point_to_triangle_location_t::Enum locate_point_wrt_triangle(
-    const vec2_<T>& p,
-    const vec2_<T>& v1,
-    const vec2_<T>& v2,
-    const vec2_<T>& v3)
+    const vec2& p,
+    const vec2& v1,
+    const vec2& v2,
+    const vec2& v3)
 {
     point_to_triangle_location_t::Enum result = point_to_triangle_location_t::INSIDE;
     point_to_line_location_t::Enum edgeCheck = locate_point_wrt_line(p, v1, v2);
@@ -393,19 +389,18 @@ get_opposed_vertex_index(const triangle_t& tri, std::uint32_t iTopo)
 }
 
 /// Test if point lies in a circumscribed circle of a triangle
-template <typename T>
 bool check_is_in_circumcircle(
-    const vec2_<T>& p,
-    const vec2_<T>& v1,
-    const vec2_<T>& v2,
-    const vec2_<T>& v3)
+    const vec2& p,
+    const vec2& v1,
+    const vec2& v2,
+    const vec2& v3)
 {
     const double p_[2] = { static_cast<double>(p.x()), static_cast<double>(p.y()) };
     const double v1_[2] = { static_cast<double>(v1.x()), static_cast<double>(v1.y()) };
     const double v2_[2] = { static_cast<double>(v2.x()), static_cast<double>(v2.y()) };
     const double v3_[2] = { static_cast<double>(v3.x()), static_cast<double>(v3.y()) };
 
-    return ::incircle(v1_, v2_, v3_, p_) > T(0);
+    return ::incircle(v1_, v2_, v3_, p_) > double(0);
 }
 
 /// Test if two vertices share at least one common triangle
@@ -417,28 +412,24 @@ inline bool check_vertices_share_edge(const std::vector<std::uint32_t>& aTris, c
     return false;
 }
 
-template <typename T>
-T get_square_distance(const T ax, const T ay, const T bx, const T by)
+double get_square_distance(const double ax, const double ay, const double bx, const double by)
 {
-    const T dx = bx - ax;
-    const T dy = by - ay;
+    const double dx = bx - ax;
+    const double dy = by - ay;
     return dx * dx + dy * dy;
 }
 
-template <typename T>
-T distance(const T ax, const T ay, const T bx, const T by)
+double distance(const double ax, const double ay, const double bx, const double by)
 {
     return std::sqrt(get_square_distance(ax, ay, bx, by));
 }
 
-template <typename T>
-T distance(const vec2_<T>& a, const vec2_<T>& b)
+double distance(const vec2& a, const vec2& b)
 {
     return distance(a.x(), a.y(), b.x(), b.y());
 }
 
-template <typename T>
-T get_square_distance(const vec2_<T>& a, const vec2_<T>& b)
+double get_square_distance(const vec2& a, const vec2& b)
 {
     return get_square_distance(a.x(), a.y(), b.x(), b.y());
 }
