@@ -309,16 +309,26 @@ inline std::uint32_t get_opposite_neighbour_from_vertex(const std::uint32_t vert
         return std::uint32_t(0);
     throw std::runtime_error("Invalid vertex index");
 }
-/// Opposed vertex index from neighbor index
-inline std::uint32_t opposite_vertex_from_neighbour(const std::uint32_t neighborIndex)
+
+/// Opposed local vertex index from neighbor index
+inline std::uint32_t get_opposite_vertex_local_index_from_neighbour_local_index(const std::uint32_t neighbour_local_index)
 {
-    if (neighborIndex == std::uint32_t(0))
-        return std::uint32_t(2);
-    if (neighborIndex == std::uint32_t(1))
-        return std::uint32_t(0);
-    if (neighborIndex == std::uint32_t(2))
-        return std::uint32_t(1);
-    throw std::runtime_error("Invalid neighbor index");
+    std::uint32_t opposite_vertex_local_index = null_vertex;
+    
+    if (neighbour_local_index == std::uint32_t(0))
+    {
+        opposite_vertex_local_index = std::uint32_t(2);
+    } 
+    else if (neighbour_local_index == std::uint32_t(1))
+    {
+        opposite_vertex_local_index = std::uint32_t(0);
+    } 
+    else if (neighbour_local_index == std::uint32_t(2))
+    {
+        opposite_vertex_local_index = std::uint32_t(1);
+    }
+
+    MCUT_ASSERT(opposite_vertex_local_index != null_vertex); // Invalid neighbor index
 }
 
 /// Index of triangle's neighbor opposed to a vertex
@@ -345,19 +355,29 @@ inline std::uint32_t opposite_triangle_index(
     throw std::runtime_error("Could not find opposed-to-edge triangle index");
 }
 
-/// Index of triangle's vertex opposed to a triangle
-inline std::uint32_t
-get_opposite_vertex_index(const triangle_t& tri, const std::uint32_t iTopo)
+// Index of triangle's vertex opposed to a triangle
+inline std::uint32_t get_local_vertex_index_opposite_neighbour(const triangle_t& triangle, const std::uint32_t neighbour_triangle_index)
 {
-    for (std::uint32_t ni = std::uint32_t(0); ni < std::uint32_t(3); ++ni)
-        if (iTopo == tri.neighbors[ni])
-            return opposite_vertex_from_neighbour(ni);
-    throw std::runtime_error("Could not find opposed vertex index");
+    std::uint32_t opposite_vertex = null_vertex;
+
+    // for each neighbour
+    for (std::uint32_t i = std::uint32_t(0); i < std::uint32_t(3); ++i)
+    {
+        // does the neighbour match the one I'm looking for?
+        if (neighbour_triangle_index == triangle.neighbors[i])
+        {
+            opposite_vertex = get_opposite_vertex_local_index_from_neighbour_local_index(i);
+            break;
+        }
+    }
+    
+    MCUT_ASSERT(opposite_vertex != null_vertex);
+
+    return opposite_vertex;
 }
 
 /// If triangle has a given neighbor return neighbor-index, throw otherwise
-inline std::uint32_t
-get_neighbour_index(const triangle_t& tri, std::uint32_t iTnbr)
+inline std::uint32_t get_neighbour_index(const triangle_t& tri, std::uint32_t iTnbr)
 {
     for (std::uint32_t ni = std::uint32_t(0); ni < std::uint32_t(3); ++ni)
         if (iTnbr == tri.neighbors[ni])
@@ -385,7 +405,7 @@ get_opposite_triangle_index(const triangle_t& tri, const std::uint32_t iVert)
 inline std::uint32_t
 get_opposed_vertex_index(const triangle_t& tri, std::uint32_t iTopo)
 {
-    return tri.vertices[get_opposite_vertex_index(tri, iTopo)];
+    return tri.vertices[get_local_vertex_index_opposite_neighbour(tri, iTopo)];
 }
 
 /// Test if point lies in a circumscribed circle of a triangle

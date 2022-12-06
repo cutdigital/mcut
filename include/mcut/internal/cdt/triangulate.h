@@ -323,62 +323,105 @@ public:
 
     /// Returns indices of four resulting triangles
     /* Inserting a point on the edge between two triangles
-     *    T1 (top)        v1
+     *    T0 (top)        v0
      *                   /|\
-     *              n1 /  |  \ n4
+     *              n0 /  |  \ n3
      *               /    |    \
-     *             /  T1' | Tnew1\
-     *           v2-------v-------v4
-     *             \ Tnew2| T2'  /
+     *             /  T0' | Tnew0\
+     *           v1-------v-------v3
+     *             \ Tnew1| T1'  /
      *               \    |    /
-     *              n2 \  |  / n3
+     *              n1 \  |  / n2
      *                   \|/
-     *   T2 (bottom)      v3
+     *   T1 (bottom)      v2
      */
     std::stack<std::uint32_t> insert_point_on_edge(
-        const std::uint32_t v,
-        const std::uint32_t iT1,
-        const std::uint32_t iT2)
+        const std::uint32_t vertex_index,
+        const std::uint32_t edge_triangle0_index,
+        const std::uint32_t edge_triangle1_index)
     {
-        const std::uint32_t iTnew1 = add_triangle();
-        const std::uint32_t iTnew2 = add_triangle();
+        // create space for two new triangles
+        const std::uint32_t new_triangle0_index = add_triangle();
+        const std::uint32_t new_triangle1_index = add_triangle();
 
-        triangle_t& t1 = triangles[iT1];
-        triangle_t& t2 = triangles[iT2];
-        std::uint32_t i = get_opposite_vertex_index(t1, iT2);
-        const std::uint32_t v1 = t1.vertices[i];
-        const std::uint32_t v2 = t1.vertices[ccw(i)];
-        const std::uint32_t n1 = t1.neighbors[i];
-        const std::uint32_t n4 = t1.neighbors[cw(i)];
-        i = get_opposite_vertex_index(t2, iT1);
-        const std::uint32_t v3 = t2.vertices[i];
-        const std::uint32_t v4 = t2.vertices[ccw(i)];
-        const std::uint32_t n3 = t2.neighbors[i];
-        const std::uint32_t n2 = t2.neighbors[cw(i)];
+        // get the two triangles incident on edge to be split
+        triangle_t& edge_triangle0 = triangles[edge_triangle0_index];
+        triangle_t& edge_triangle1 = triangles[edge_triangle1_index];
+
+        // get vertex of "edge_triangle0" that is opposite to triangle "edge_triangle1_index"
+        const std::uint32_t triangle0_vertex_opposite_neighbour = get_local_vertex_index_opposite_neighbour(edge_triangle0, edge_triangle1_index);
+
+        const std::uint32_t v0 = edge_triangle0.vertices[triangle0_vertex_opposite_neighbour];
+        const std::uint32_t v1 = edge_triangle0.vertices[ccw(triangle0_vertex_opposite_neighbour)];
+
+        const std::uint32_t n0 = edge_triangle0.neighbors[triangle0_vertex_opposite_neighbour];
+        const std::uint32_t n3 = edge_triangle0.neighbors[cw(triangle0_vertex_opposite_neighbour)];
+
+        // get vertex of "edge_triangle1" that is opposite to triangle "edge_triangle0_index"
+        const std::uint32_t triangle1_opp_vertex_index = get_local_vertex_index_opposite_neighbour(edge_triangle1, edge_triangle0_index);
+
+        const std::uint32_t v2 = edge_triangle1.vertices[triangle1_opp_vertex_index];
+        const std::uint32_t v3 = edge_triangle1.vertices[ccw(triangle1_opp_vertex_index)];
+
+        const std::uint32_t n2 = edge_triangle1.neighbors[triangle1_opp_vertex_index];
+        const std::uint32_t n1 = edge_triangle1.neighbors[cw(triangle1_opp_vertex_index)];
+
+        //
         // add new triangles and change existing ones
-        using detail::arr3;
-        t1 = { { v1, v2, v }, { n1, iTnew2, iTnew1 } }; // triangle_t::make(arr3(v1, v2, v), arr3(n1, iTnew2, iTnew1));
-        t2 = { { v3, v4, v }, { n3, iTnew1, iTnew2 } }; // triangle_t::make(arr3(v3, v4, v), arr3(n3, iTnew1, iTnew2));
-        triangles[iTnew1] = { { v1, v, v4 }, { iT1, iT2, n4 } }; // triangle_t::make(arr3(v1, v, v4), arr3(iT1, iT2, n4));
-        triangles[iTnew2] = { { v3, v, v2 }, { iT2, iT1, n2 } }; // triangle_t::make(arr3(v3, v, v2), arr3(iT2, iT1, n2));
+        //
+
+        edge_triangle0 = {
+            { v0, v1, vertex_index },
+            { n0, new_triangle1_index, new_triangle0_index }
+        }; // triangle_t::make(arr3(v0, v1, vertex_index), arr3(n0, new_triangle1_index, new_triangle0_index));
+
+        edge_triangle1 = {
+            { v2, v3, vertex_index },
+            { n2, new_triangle0_index, new_triangle1_index }
+        }; // triangle_t::make(arr3(v2, v3, vertex_index), arr3(n2, new_triangle0_index, new_triangle1_index));
+
+        triangles[new_triangle0_index] = {
+            { v0, vertex_index, v3 },
+            { edge_triangle0_index, edge_triangle1_index, n3 }
+        }; // triangle_t::make(arr3(v0, vertex_index, v3), arr3(edge_triangle0_index, edge_triangle1_index, n3));
+
+        triangles[new_triangle1_index] = {
+            { v2, vertex_index, v1 },
+            { edge_triangle1_index, edge_triangle0_index, n1 }
+        }; // triangle_t::make(arr3(v2, vertex_index, v1), arr3(edge_triangle1_index, edge_triangle0_index, n1));
+
         // make and add new vertex
-        vertex_register_adjacent_triangles(v, iT1, iTnew2, iT2, iTnew1);
+        vertex_register_adjacent_triangles(
+            vertex_index,
+            // incident triangles
+            edge_triangle0_index,
+            new_triangle1_index,
+            edge_triangle1_index,
+            new_triangle0_index);
+
         // adjust neighboring triangles and vertices
-        triangle_replace_neighbour(n4, iT1, iTnew1);
-        triangle_replace_neighbour(n2, iT2, iTnew2);
-        vertex_register_adjacent_triangle(v1, iTnew1);
-        vertex_register_adjacent_triangle(v3, iTnew2);
-        vertex_deregister_adjacent_triangle(v2, iT2);
-        vertex_register_adjacent_triangle(v2, iTnew2);
-        vertex_deregister_adjacent_triangle(v4, iT1);
-        vertex_register_adjacent_triangle(v4, iTnew1);
+        triangle_replace_neighbour(n3, edge_triangle0_index, new_triangle0_index);
+        triangle_replace_neighbour(n1, edge_triangle1_index, new_triangle1_index);
+
+        vertex_register_adjacent_triangle(v0, new_triangle0_index);
+        vertex_register_adjacent_triangle(v2, new_triangle1_index);
+
+        vertex_deregister_adjacent_triangle(v1, edge_triangle1_index);
+
+        vertex_register_adjacent_triangle(v1, new_triangle1_index);
+
+        vertex_deregister_adjacent_triangle(v3, edge_triangle0_index);
+
+        vertex_register_adjacent_triangle(v3, new_triangle0_index);
+
         // return newly added triangles
-        std::stack<std::uint32_t> newTriangles;
-        newTriangles.push(iT1);
-        newTriangles.push(iTnew2);
-        newTriangles.push(iT2);
-        newTriangles.push(iTnew1);
-        return newTriangles;
+        std::stack<std::uint32_t> new_triangles_stack;
+        new_triangles_stack.push(edge_triangle0_index);
+        new_triangles_stack.push(new_triangle1_index);
+        new_triangles_stack.push(edge_triangle1_index);
+        new_triangles_stack.push(new_triangle0_index);
+
+        return new_triangles_stack;
     }
 
     std::array<std::uint32_t, 2> trianglesAt(const vec2& pos) const
@@ -386,10 +429,10 @@ public:
         std::array<std::uint32_t, 2> out = { null_neighbour, null_neighbour };
         for (std::uint32_t i = std::uint32_t(0); i < std::uint32_t(triangles.size()); ++i) {
             const triangle_t& t = triangles[i];
-            const vec2& v1 = vertices[t.vertices[0]];
-            const vec2& v2 = vertices[t.vertices[1]];
-            const vec2& v3 = vertices[t.vertices[2]];
-            const point_to_triangle_location_t::Enum loc = locate_point_wrt_triangle(pos, v1, v2, v3);
+            const vec2& v0 = vertices[t.vertices[0]];
+            const vec2& v1 = vertices[t.vertices[1]];
+            const vec2& v2 = vertices[t.vertices[2]];
+            const point_to_triangle_location_t::Enum loc = locate_point_wrt_triangle(pos, v0, v1, v2);
             if (loc == point_to_triangle_location_t::OUTSIDE)
                 continue;
             out[0] = i;
@@ -520,25 +563,25 @@ public:
         // ... to split
         triangle_t& triangle = triangles[triangle_index];
 
-        const std::array<std::uint32_t, 3> &triangle_vertices = triangle.vertices;
-        const std::array<std::uint32_t, 3> &triangle_neighbours = triangle.neighbors;
+        const std::array<std::uint32_t, 3>& triangle_vertices = triangle.vertices;
+        const std::array<std::uint32_t, 3>& triangle_neighbours = triangle.neighbors;
 
-        //const std::uint32_t triangle_vertices[0] = triangle_vertices[0], v2 = triangle_vertices[1], v3 = triangle_vertices[2];
-        //const std::uint32_t n1 = triangle_neighbours[0], n2 = triangle_neighbours[1], n3 = triangle_neighbours[2];
-        // make two new triangles and convert current triangle to 3rd new
-        // triangle
-        //using detail::arr3;
+        // const std::uint32_t triangle_vertices[0] = triangle_vertices[0], v2 = triangle_vertices[1], v3 = triangle_vertices[2];
+        // const std::uint32_t n1 = triangle_neighbours[0], n2 = triangle_neighbours[1], n3 = triangle_neighbours[2];
+        //  make two new triangles and convert current triangle to 3rd new
+        //  triangle
+        // using detail::arr3;
         triangles[new_triangle0_index] = {
-            {triangle_vertices[1], triangle_vertices[2], point_index}, 
-            {triangle_neighbours[1], new_triangle1_index, triangle_index}
+            { triangle_vertices[1], triangle_vertices[2], point_index },
+            { triangle_neighbours[1], new_triangle1_index, triangle_index }
         };
         triangles[new_triangle1_index] = {
-            {triangle_vertices[2], triangle_vertices[0], point_index}, 
-            {triangle_neighbours[2], triangle_index, new_triangle0_index}
+            { triangle_vertices[2], triangle_vertices[0], point_index },
+            { triangle_neighbours[2], triangle_index, new_triangle0_index }
         };
         triangle = {
-            {triangle_vertices[0], triangle_vertices[1], point_index}, 
-            {triangle_neighbours[0], new_triangle0_index, new_triangle1_index}
+            { triangle_vertices[0], triangle_vertices[1], point_index },
+            { triangle_neighbours[0], new_triangle0_index, new_triangle1_index }
         };
 
         //
@@ -550,11 +593,11 @@ public:
         // adjust lists of adjacent triangles for triangle_vertices[0], triangle_vertices[1], triangle_vertices[2]
         vertex_register_adjacent_triangle(triangle_vertices[0], new_triangle1_index);
         vertex_register_adjacent_triangle(triangle_vertices[1], new_triangle0_index);
-        
+
         // dissassociate triangle from vertex (triangle has taken on a new role even
         // though index has not changed)
         vertex_deregister_adjacent_triangle(triangle_vertices[2], triangle_index);
-        
+
         vertex_register_adjacent_triangle(triangle_vertices[2], new_triangle0_index);
         vertex_register_adjacent_triangle(triangle_vertices[2], new_triangle1_index);
 
@@ -564,7 +607,7 @@ public:
 
         // return newly added triangles
         std::stack<std::uint32_t> new_triangles_stack;
-        
+
         new_triangles_stack.push(triangle_index);
         new_triangles_stack.push(new_triangle0_index);
         new_triangles_stack.push(new_triangle1_index);
@@ -589,8 +632,7 @@ public:
 
         const point_to_triangle_location_t::Enum loc = locate_point_wrt_triangle(position, vertex0_coords, vertex1_coords, vertex2_coords);
 
-        if (loc == point_to_triangle_location_t::OUTSIDE)
-        {
+        if (loc == point_to_triangle_location_t::OUTSIDE) {
             // logic error: it means "walk_triangles" was not actually able to find
             // a triangle containing "position"
             throw std::runtime_error("Failed to find triangle containing position");
@@ -601,7 +643,7 @@ public:
         if (check_on_edge(loc)) // does "position" actually lies on an edge of "containing_triangle"?
         {
             // The neighbouring triangle that shares the edge on which "position"
-            // lies.  
+            // lies.
             // NOTE: we need this information to later handle one this nasty
             // point-on-edge cases.
             const uint32_t neighbour_triangle_index = edge_neighbour(loc);
@@ -1321,7 +1363,7 @@ std::uint32_t triangulator_t::add_triangle()
 
         // add new triangle (with default status)
         triangles.push_back(dummy);
-        
+
         // return the index of the newly added triangle
         return std::uint32_t(triangles.size() - 1);
     }
@@ -1727,7 +1769,7 @@ triangulator_t::insert_vertex_and_flip_fixed_edges(
          *                       v1
          */
         const triangle_t& tOpo = triangles[iTopo];
-        const std::uint32_t i = get_opposite_vertex_index(tOpo, iT);
+        const std::uint32_t i = get_local_vertex_index_opposite_neighbour(tOpo, iT);
         const std::uint32_t iV2 = tOpo.vertices[i];
         const std::uint32_t iV1 = tOpo.vertices[cw(i)];
         const std::uint32_t iV3 = tOpo.vertices[ccw(i)];
@@ -1753,14 +1795,14 @@ void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex
     const vec2& vertex_coords = vertices[vertex_index];
 
     // Array of two elements:
-    // In the normal case, only the first element is defined (i.e. "triangle_containing_point_info[0]"), 
-    // which is the index of the triangle containing the point "vertex_coords". 
+    // In the normal case, only the first element is defined (i.e. "triangle_containing_point_info[0]"),
+    // which is the index of the triangle containing the point "vertex_coords".
     // Otherwise, the second element (i.e. "triangle_containing_point_info[1]") will also be
-    // defined, which occurs when the point "vertex_coords" actually lies on an 
-    // edge of the containing triangle (i.e. "triangle_containing_point_info[0]"). 
-    // In this instance, the second element (i.e. "triangle_containing_point_info[1]") refers 
+    // defined, which occurs when the point "vertex_coords" actually lies on an
+    // edge of the containing triangle (i.e. "triangle_containing_point_info[0]").
+    // In this instance, the second element (i.e. "triangle_containing_point_info[1]") refers
     // to the neighbour of the containing triangle that share the edge on which the point lies.
-    std::array<std::uint32_t, 2> triangle_containing_point_info = find_triangle_containing_point(vertex_coords); 
+    std::array<std::uint32_t, 2> triangle_containing_point_info = find_triangle_containing_point(vertex_coords);
 
     const std::uint32_t triangle_containing_point_index = triangle_containing_point_info[0];
     const std::uint32_t triangle_containing_point_neighbour_index = triangle_containing_point_info[1];
@@ -1768,14 +1810,11 @@ void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex
     const bool is_normal_case = (triangle_containing_point_neighbour_index == null_neighbour);
     std::stack<std::uint32_t> stack_of_triangle_indices;
 
-    if(is_normal_case)
-    {
+    if (is_normal_case) {
         // just insert the point into the triangle and sub-divide it as usual
         stack_of_triangle_indices = insert_point_in_triangle(vertex_index, triangle_containing_point_index);
-    }
-    else
-    {
-
+    } else {
+        // awkward case of having to splitting an edge and replacing the two adjacent triangles four new one
         stack_of_triangle_indices = insert_point_on_edge(vertex_index, triangle_containing_point_index, triangle_containing_point_neighbour_index);
     }
 
@@ -1897,7 +1936,7 @@ bool triangulator_t::check_is_edgeflip_needed(
      *                       v1
      */
     const triangle_t& tOpo = triangles[iTopo];
-    const std::uint32_t i = get_opposite_vertex_index(tOpo, iT);
+    const std::uint32_t i = get_local_vertex_index_opposite_neighbour(tOpo, iT);
     const std::uint32_t iV2 = tOpo.vertices[i];
     const std::uint32_t iV1 = tOpo.vertices[cw(i)];
     const std::uint32_t iV3 = tOpo.vertices[ccw(i)];
@@ -1984,14 +2023,14 @@ void triangulator_t::do_edgeflip(
     const std::array<std::uint32_t, 3>& triOpoVs = tOpo.vertices;
 
     // find vertices and neighbors
-    std::uint32_t i = get_opposite_vertex_index(t, iTopo);
+    std::uint32_t i = get_local_vertex_index_opposite_neighbour(t, iTopo);
 
     const std::uint32_t v1 = triVs[i];
     const std::uint32_t v2 = triVs[ccw(i)];
     const std::uint32_t n1 = triNs[i];
     const std::uint32_t n3 = triNs[cw(i)];
 
-    i = get_opposite_vertex_index(tOpo, iT);
+    i = get_local_vertex_index_opposite_neighbour(tOpo, iT);
 
     const std::uint32_t v3 = triOpoVs[i];
     const std::uint32_t v4 = triOpoVs[ccw(i)];
@@ -2058,20 +2097,20 @@ void triangulator_t::vertex_register_adjacent_triangles(
 }
 
 void triangulator_t::vertex_register_adjacent_triangles(
-    const std::uint32_t iVertex,
-    const std::uint32_t iT1,
-    const std::uint32_t iT2,
-    const std::uint32_t iT3,
-    const std::uint32_t iT4)
+    const std::uint32_t vertex_index,
+    const std::uint32_t triangle0_index,
+    const std::uint32_t triangle1_index,
+    const std::uint32_t triangle2_index,
+    const std::uint32_t triangle3_index)
 {
-    std::vector<std::uint32_t>& vTris = per_vertex_adjacent_triangles[iVertex];
+    std::vector<std::uint32_t>& adjacent_triangles = per_vertex_adjacent_triangles[vertex_index];
 
-    vTris.reserve(vTris.size() + 4);
+    adjacent_triangles.reserve(adjacent_triangles.size() + 4);
 
-    vTris.push_back(iT1);
-    vTris.push_back(iT2);
-    vTris.push_back(iT3);
-    vTris.push_back(iT4);
+    adjacent_triangles.push_back(triangle0_index);
+    adjacent_triangles.push_back(triangle1_index);
+    adjacent_triangles.push_back(triangle2_index);
+    adjacent_triangles.push_back(triangle3_index);
 }
 
 // disassociate the triangle from vertex
@@ -2081,8 +2120,8 @@ void triangulator_t::vertex_deregister_adjacent_triangle(
 {
     std::vector<std::uint32_t>& adjacent_triangles = per_vertex_adjacent_triangles[vertex_index];
     std::vector<std::uint32_t>::iterator fiter = std::find(adjacent_triangles.begin(), adjacent_triangles.end(), triangle_index);
-    // The iterator pos must be valid and dereferenceable. Thus the end() 
-    // iterator (which is valid, but is not dereferenceable) cannot be used as 
+    // The iterator pos must be valid and dereferenceable. Thus the end()
+    // iterator (which is valid, but is not dereferenceable) cannot be used as
     // a value for input to "erase".
     MCUT_ASSERT(fiter != adjacent_triangles.end());
     adjacent_triangles.erase(fiter);
