@@ -362,16 +362,16 @@ public:
         triangles[iTnew1] = { { v1, v, v4 }, { iT1, iT2, n4 } }; // triangle_t::make(arr3(v1, v, v4), arr3(iT1, iT2, n4));
         triangles[iTnew2] = { { v3, v, v2 }, { iT2, iT1, n2 } }; // triangle_t::make(arr3(v3, v, v2), arr3(iT2, iT1, n2));
         // make and add new vertex
-        add_adjacent_triangles(v, iT1, iTnew2, iT2, iTnew1);
+        vertex_register_adjacent_triangles(v, iT1, iTnew2, iT2, iTnew1);
         // adjust neighboring triangles and vertices
-        change_neighbour(n4, iT1, iTnew1);
-        change_neighbour(n2, iT2, iTnew2);
-        add_adjacent_triangle(v1, iTnew1);
-        add_adjacent_triangle(v3, iTnew2);
-        remove_adjacent_triangle(v2, iT2);
-        add_adjacent_triangle(v2, iTnew2);
-        remove_adjacent_triangle(v4, iT1);
-        add_adjacent_triangle(v4, iTnew1);
+        triangle_replace_neighbour(n4, iT1, iTnew1);
+        triangle_replace_neighbour(n2, iT2, iTnew2);
+        vertex_register_adjacent_triangle(v1, iTnew1);
+        vertex_register_adjacent_triangle(v3, iTnew2);
+        vertex_deregister_adjacent_triangle(v2, iT2);
+        vertex_register_adjacent_triangle(v2, iTnew2);
+        vertex_deregister_adjacent_triangle(v4, iT1);
+        vertex_register_adjacent_triangle(v4, iTnew1);
         // return newly added triangles
         std::stack<std::uint32_t> newTriangles;
         newTriangles.push(iT1);
@@ -506,40 +506,70 @@ public:
      *                     n1
      */
     std::stack<std::uint32_t> insert_point_in_triangle(
-        const std::uint32_t v,
-        const std::uint32_t iT)
+        const std::uint32_t point_index,
+        const std::uint32_t triangle_index)
     {
-        const std::uint32_t iNewT1 = add_triangle();
-        const std::uint32_t iNewT2 = add_triangle();
+        //
+        // create new triangle (their vertices and neighbour information)
+        //
 
-        triangle_t& t = triangles[iT];
-        const std::array<std::uint32_t, 3> vv = t.vertices;
-        const std::array<std::uint32_t, 3> nn = t.neighbors;
-        const std::uint32_t v1 = vv[0], v2 = vv[1], v3 = vv[2];
-        const std::uint32_t n1 = nn[0], n2 = nn[1], n3 = nn[2];
+        // add triangle into the current triangulation (with default status)
+        const std::uint32_t new_triangle0_index = add_triangle();
+        const std::uint32_t new_triangle1_index = add_triangle();
+
+        // ... to split
+        triangle_t& triangle = triangles[triangle_index];
+
+        const std::array<std::uint32_t, 3> &triangle_vertices = triangle.vertices;
+        const std::array<std::uint32_t, 3> &triangle_neighbours = triangle.neighbors;
+
+        //const std::uint32_t triangle_vertices[0] = triangle_vertices[0], v2 = triangle_vertices[1], v3 = triangle_vertices[2];
+        //const std::uint32_t n1 = triangle_neighbours[0], n2 = triangle_neighbours[1], n3 = triangle_neighbours[2];
         // make two new triangles and convert current triangle to 3rd new
         // triangle
-        using detail::arr3;
-        triangles[iNewT1] = triangle_t::make(arr3(v2, v3, v), arr3(n2, iNewT2, iT));
-        triangles[iNewT2] = triangle_t::make(arr3(v3, v1, v), arr3(n3, iT, iNewT1));
-        t = triangle_t::make(arr3(v1, v2, v), arr3(n1, iNewT1, iNewT2));
+        //using detail::arr3;
+        triangles[new_triangle0_index] = {
+            {triangle_vertices[1], triangle_vertices[2], point_index}, 
+            {triangle_neighbours[1], new_triangle1_index, triangle_index}
+        };
+        triangles[new_triangle1_index] = {
+            {triangle_vertices[2], triangle_vertices[0], point_index}, 
+            {triangle_neighbours[2], triangle_index, new_triangle0_index}
+        };
+        triangle = {
+            {triangle_vertices[0], triangle_vertices[1], point_index}, 
+            {triangle_neighbours[0], new_triangle0_index, new_triangle1_index}
+        };
+
+        //
+        // Update internal connectivity graph
+        //
+
         // make and add a new vertex
-        add_adjacent_triangles(v, iT, iNewT1, iNewT2);
-        // adjust lists of adjacent triangles for v1, v2, v3
-        add_adjacent_triangle(v1, iNewT2);
-        add_adjacent_triangle(v2, iNewT1);
-        remove_adjacent_triangle(v3, iT);
-        add_adjacent_triangle(v3, iNewT1);
-        add_adjacent_triangle(v3, iNewT2);
-        // change triangle neighbor's neighbors to new triangles
-        change_neighbour(n2, iT, iNewT1);
-        change_neighbour(n3, iT, iNewT2);
+        vertex_register_adjacent_triangles(point_index, triangle_index, new_triangle0_index, new_triangle1_index);
+        // adjust lists of adjacent triangles for triangle_vertices[0], triangle_vertices[1], triangle_vertices[2]
+        vertex_register_adjacent_triangle(triangle_vertices[0], new_triangle1_index);
+        vertex_register_adjacent_triangle(triangle_vertices[1], new_triangle0_index);
+        
+        // dissassociate triangle from vertex (triangle has taken on a new role even
+        // though index has not changed)
+        vertex_deregister_adjacent_triangle(triangle_vertices[2], triangle_index);
+        
+        vertex_register_adjacent_triangle(triangle_vertices[2], new_triangle0_index);
+        vertex_register_adjacent_triangle(triangle_vertices[2], new_triangle1_index);
+
+        // change triangle neighbours to new triangles
+        triangle_replace_neighbour(triangle_neighbours[1], triangle_index, new_triangle0_index);
+        triangle_replace_neighbour(triangle_neighbours[2], triangle_index, new_triangle1_index);
+
         // return newly added triangles
-        std::stack<std::uint32_t> newTriangles;
-        newTriangles.push(iT);
-        newTriangles.push(iNewT1);
-        newTriangles.push(iNewT2);
-        return newTriangles;
+        std::stack<std::uint32_t> new_triangles_stack;
+        
+        new_triangles_stack.push(triangle_index);
+        new_triangles_stack.push(new_triangle0_index);
+        new_triangles_stack.push(new_triangle1_index);
+
+        return new_triangles_stack;
     }
 
     // find the triangle containing "position"
@@ -727,22 +757,22 @@ private:
         std::uint32_t iV3) const;
     bool
     check_is_edgeflip_needed(const vec2& v, std::uint32_t iT, std::uint32_t iTopo, std::uint32_t iVert) const;
-    void change_neighbour(std::uint32_t iT, std::uint32_t oldNeighbor, std::uint32_t newNeighbor);
-    void change_neighbour(
+    void triangle_replace_neighbour(std::uint32_t iT, std::uint32_t oldNeighbor, std::uint32_t newNeighbor);
+    void triangle_replace_neighbour(
         std::uint32_t iT,
         std::uint32_t iVedge1,
         std::uint32_t iVedge2,
         std::uint32_t newNeighbor);
-    void add_adjacent_triangle(std::uint32_t iVertex, std::uint32_t iTriangle);
+    void vertex_register_adjacent_triangle(std::uint32_t iVertex, std::uint32_t iTriangle);
     void
-    add_adjacent_triangles(std::uint32_t iVertex, std::uint32_t iT1, std::uint32_t iT2, std::uint32_t iT3);
-    void add_adjacent_triangles(
+    vertex_register_adjacent_triangles(std::uint32_t iVertex, std::uint32_t iT1, std::uint32_t iT2, std::uint32_t iT3);
+    void vertex_register_adjacent_triangles(
         std::uint32_t iVertex,
         std::uint32_t iT1,
         std::uint32_t iT2,
         std::uint32_t iT3,
         std::uint32_t iT4);
-    void remove_adjacent_triangle(std::uint32_t iVertex, std::uint32_t iTriangle);
+    void vertex_deregister_adjacent_triangle(std::uint32_t iVertex, std::uint32_t iTriangle);
     std::uint32_t triangulate_pseudo_polygon(
         std::uint32_t ia,
         std::uint32_t ib,
@@ -799,11 +829,11 @@ private:
 
         typedef std::array<std::uint32_t, 3>::const_iterator VCit;
         for (VCit iV = t.vertices.begin(); iV != t.vertices.end(); ++iV)
-            remove_adjacent_triangle(*iV, iT);
+            vertex_deregister_adjacent_triangle(*iV, iT);
 
         typedef std::array<std::uint32_t, 3>::const_iterator NCit;
         for (NCit iTn = t.neighbors.begin(); iTn != t.neighbors.end(); ++iTn)
-            change_neighbour(*iTn, iT, null_neighbour);
+            triangle_replace_neighbour(*iTn, iT, null_neighbour);
 
         m_dummyTris.push_back(iT);
     }
@@ -1091,7 +1121,7 @@ triangulator_t::triangulator_t(
 {
 }
 
-void triangulator_t::change_neighbour(
+void triangulator_t::triangle_replace_neighbour(
     const std::uint32_t iT,
     const std::uint32_t iVedge1,
     const std::uint32_t iVedge2,
@@ -1278,14 +1308,21 @@ std::uint32_t triangulator_t::add_triangle(const triangle_t& t)
     return nxtDummy;
 }
 
+// create a new triangle
 std::uint32_t triangulator_t::add_triangle()
 {
+    // check cache
     if (m_dummyTris.empty()) {
+        // create cache entry
         const triangle_t dummy = {
             { null_vertex, null_vertex, null_vertex },
             { null_neighbour, null_neighbour, null_neighbour }
         };
+
+        // add new triangle (with default status)
         triangles.push_back(dummy);
+        
+        // return the index of the newly added triangle
         return std::uint32_t(triangles.size() - 1);
     }
     const std::uint32_t nxtDummy = m_dummyTris.back();
@@ -1445,8 +1482,8 @@ void triangulator_t::insert_edge(
     const std::uint32_t iTleft = triangulate_pseudo_polygon(iA, iB, ptsLeft.begin(), ptsLeft.end());
     std::reverse(ptsRight.begin(), ptsRight.end());
     const std::uint32_t iTright = triangulate_pseudo_polygon(iB, iA, ptsRight.begin(), ptsRight.end());
-    change_neighbour(iTleft, null_neighbour, iTright);
-    change_neighbour(iTright, null_neighbour, iTleft);
+    triangle_replace_neighbour(iTleft, null_neighbour, iTright);
+    triangle_replace_neighbour(iTright, null_neighbour, iTleft);
 
     if (iB != edge.v2()) // encountered point on the edge
     {
@@ -1723,7 +1760,7 @@ void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex
     // edge of the containing triangle (i.e. "triangle_containing_point_info[0]"). 
     // In this instance, the second element (i.e. "triangle_containing_point_info[1]") refers 
     // to the neighbour of the containing triangle that share the edge on which the point lies.
-    std::array<std::uint32_t, 2> triangle_containing_point_info = find_triangle_containing_point(vertex_coords);
+    std::array<std::uint32_t, 2> triangle_containing_point_info = find_triangle_containing_point(vertex_coords); 
 
     const std::uint32_t triangle_containing_point_index = triangle_containing_point_info[0];
     const std::uint32_t triangle_containing_point_neighbour_index = triangle_containing_point_info[1];
@@ -1733,11 +1770,12 @@ void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex
 
     if(is_normal_case)
     {
-        // just insert the point into the triangle as usual
+        // just insert the point into the triangle and sub-divide it as usual
         stack_of_triangle_indices = insert_point_in_triangle(vertex_index, triangle_containing_point_index);
     }
     else
     {
+
         stack_of_triangle_indices = insert_point_on_edge(vertex_index, triangle_containing_point_index, triangle_containing_point_neighbour_index);
     }
 
@@ -1903,7 +1941,7 @@ std::uint32_t triangulator_t::walk_triangles(const std::uint32_t starting_vertex
                 orientation == point_to_line_location_t::RIGHT_SIDE && //
                 // neighbour (of RHS of edge) exists
                 current_triangle.neighbors[i] != null_neighbour && //
-                // we have NOT already visited neigher on RHS of edge
+                // we have NOT already visited neighbour on RHS of edge
                 visited.insert(current_triangle.neighbors[i]).second) {
                 found = false;
                 // update the current triangle to the neighbour, which we will visit
@@ -1967,58 +2005,59 @@ void triangulator_t::do_edgeflip(
     tOpo = triangle_t::make(arr3(v2, v3, v1), arr3(n2, iT, n1));
 
     // adjust neighboring triangles and vertices
-    change_neighbour(n1, iT, iTopo);
-    change_neighbour(n4, iTopo, iT);
+    triangle_replace_neighbour(n1, iT, iTopo);
+    triangle_replace_neighbour(n4, iTopo, iT);
 
     // only adjust adjacent triangles if triangulation is not finalized:
     // can happen when called from outside on an already finalized triangulation
     if (!is_finalized()) {
 
-        add_adjacent_triangle(v1, iTopo);
-        add_adjacent_triangle(v3, iT);
+        vertex_register_adjacent_triangle(v1, iTopo);
+        vertex_register_adjacent_triangle(v3, iT);
 
-        remove_adjacent_triangle(v2, iT);
-        remove_adjacent_triangle(v4, iTopo);
+        vertex_deregister_adjacent_triangle(v2, iT);
+        vertex_deregister_adjacent_triangle(v4, iTopo);
     }
 }
 
-void triangulator_t::change_neighbour(
-    const std::uint32_t iT,
-    const std::uint32_t oldNeighbor,
-    const std::uint32_t newNeighbor)
+void triangulator_t::triangle_replace_neighbour(
+    const std::uint32_t triangle_index,
+    const std::uint32_t old_neighbour,
+    const std::uint32_t new_neighbour)
 {
-    if (iT == null_neighbour) {
+    if (triangle_index == null_neighbour) {
         return;
     }
 
-    triangle_t& t = triangles[iT];
+    triangle_t& triangle = triangles[triangle_index];
 
-    t.neighbors[get_neighbour_index(t, oldNeighbor)] = newNeighbor;
+    triangle.neighbors[get_neighbour_index(triangle, old_neighbour)] = new_neighbour;
 }
 
-void triangulator_t::add_adjacent_triangle(
-    const std::uint32_t iVertex,
-    const std::uint32_t iTriangle)
+void triangulator_t::vertex_register_adjacent_triangle(
+    const std::uint32_t vertex_index,
+    const std::uint32_t triangle_index)
 {
-    per_vertex_adjacent_triangles[iVertex].push_back(iTriangle);
+    per_vertex_adjacent_triangles[vertex_index].push_back(triangle_index);
 }
 
-void triangulator_t::add_adjacent_triangles(
-    const std::uint32_t iVertex,
-    const std::uint32_t iT1,
-    const std::uint32_t iT2,
-    const std::uint32_t iT3)
+// associates the given three triangles to the vertex labelled "vertex_index"
+void triangulator_t::vertex_register_adjacent_triangles(
+    const std::uint32_t vertex_index,
+    const std::uint32_t triangle0_index,
+    const std::uint32_t triangle1_index,
+    const std::uint32_t triangle2_index)
 {
-    std::vector<std::uint32_t>& vTris = per_vertex_adjacent_triangles[iVertex];
+    std::vector<std::uint32_t>& adjacent_triangles = per_vertex_adjacent_triangles[vertex_index];
 
-    vTris.reserve(vTris.size() + 3);
+    adjacent_triangles.reserve(adjacent_triangles.size() + 3ul);
 
-    vTris.push_back(iT1);
-    vTris.push_back(iT2);
-    vTris.push_back(iT3);
+    adjacent_triangles.push_back(triangle0_index);
+    adjacent_triangles.push_back(triangle1_index);
+    adjacent_triangles.push_back(triangle2_index);
 }
 
-void triangulator_t::add_adjacent_triangles(
+void triangulator_t::vertex_register_adjacent_triangles(
     const std::uint32_t iVertex,
     const std::uint32_t iT1,
     const std::uint32_t iT2,
@@ -2035,12 +2074,18 @@ void triangulator_t::add_adjacent_triangles(
     vTris.push_back(iT4);
 }
 
-void triangulator_t::remove_adjacent_triangle(
-    const std::uint32_t iVertex,
-    const std::uint32_t iTriangle)
+// disassociate the triangle from vertex
+void triangulator_t::vertex_deregister_adjacent_triangle(
+    const std::uint32_t vertex_index,
+    const std::uint32_t triangle_index)
 {
-    std::vector<std::uint32_t>& tris = per_vertex_adjacent_triangles[iVertex];
-    tris.erase(std::find(tris.begin(), tris.end(), iTriangle));
+    std::vector<std::uint32_t>& adjacent_triangles = per_vertex_adjacent_triangles[vertex_index];
+    std::vector<std::uint32_t>::iterator fiter = std::find(adjacent_triangles.begin(), adjacent_triangles.end(), triangle_index);
+    // The iterator pos must be valid and dereferenceable. Thus the end() 
+    // iterator (which is valid, but is not dereferenceable) cannot be used as 
+    // a value for input to "erase".
+    MCUT_ASSERT(fiter != adjacent_triangles.end());
+    adjacent_triangles.erase(fiter);
 }
 
 std::uint32_t triangulator_t::triangulate_pseudo_polygon(
@@ -2072,22 +2117,22 @@ std::uint32_t triangulator_t::triangulate_pseudo_polygon(
     // adjust neighboring triangles and vertices
     if (iT1 != null_neighbour) {
         if (pointsFirst == newLast) {
-            change_neighbour(iT1, ia, ic, iT);
+            triangle_replace_neighbour(iT1, ia, ic, iT);
         } else {
             triangles[iT1].neighbors[0] = iT;
         }
     }
     if (iT2 != null_neighbour) {
         if (newFirst == pointsLast) {
-            change_neighbour(iT2, ic, ib, iT);
+            triangle_replace_neighbour(iT2, ic, ib, iT);
         } else {
             triangles[iT2].neighbors[0] = iT;
         }
     }
 
-    add_adjacent_triangle(ia, iT);
-    add_adjacent_triangle(ib, iT);
-    add_adjacent_triangle(ic, iT);
+    vertex_register_adjacent_triangle(ia, iT);
+    vertex_register_adjacent_triangle(ib, iT);
+    vertex_register_adjacent_triangle(ic, iT);
 
     return iT;
 }
