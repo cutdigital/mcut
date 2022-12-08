@@ -130,7 +130,7 @@ public:
     // typedef std::vector<vec2> vec2_vector_t; ///< Vertices vector
     std::vector<vec2> vertices; ///< triangulation's vertices
     std::vector<triangle_t> triangles; ///< triangulation's triangles
-    std::unordered_set<edge_t> fixedEdges; ///< triangulation's constraints (fixed edges)
+    std::unordered_set<edge_t> m_constrained_edges; ///< triangulation's constraints (fixed edges)
     /**
      * triangles adjacent to each vertex
      * @note will be reset to empty when super-triangle is removed and
@@ -623,6 +623,7 @@ public:
         // Query  for a vertex close to "position", to start the search
         const std::uint32_t nearest_point_index = m_nearPtLocator.find_nearest_point(position, vertices);
         const std::uint32_t starting_vertex_index = nearest_point_index;
+        // https://raw.githubusercontent.com/klutometis/aima/master/papers/green-computing-dirichlet-tessellations-in-the-plane.pdf
         const std::uint32_t containing_triangle_index = walk_triangles(starting_vertex_index, position);
         // Finished walk, locate point in "containing_triangle"
         const triangle_t& containing_triangle = triangles[containing_triangle_index];
@@ -791,14 +792,14 @@ private:
         boundary_overlap_count_t overlaps);
 
     std::uint32_t walk_triangles(std::uint32_t startVertex, const vec2& pos) const;
-    bool check_is_edgeflip_needed(
+    bool check_if_edgeflip_required(
         const vec2& v,
         std::uint32_t iV,
         std::uint32_t iV1,
         std::uint32_t iV2,
         std::uint32_t iV3) const;
     bool
-    check_is_edgeflip_needed(const vec2& v, std::uint32_t iT, std::uint32_t iTopo, std::uint32_t iVert) const;
+    check_if_edgeflip_required(const vec2& v, std::uint32_t iT, std::uint32_t iTopo, std::uint32_t iVert) const;
     void triangle_replace_neighbour(std::uint32_t iT, std::uint32_t oldNeighbor, std::uint32_t newNeighbor);
     void triangle_replace_neighbour(
         std::uint32_t iT,
@@ -840,13 +841,13 @@ private:
         const edge_t& edge,
         const boundary_overlap_count_t overlaps)
     {
-        fixedEdges.insert(edge);
+        m_constrained_edges.insert(edge);
         overlapCount[edge] = overlaps; // override overlap counter
     }
 
     void fixEdge(const edge_t& edge)
     {
-        if (!fixedEdges.insert(edge).second) {
+        if (!m_constrained_edges.insert(edge).second) {
             ++overlapCount[edge]; // if edge is already fixed increment the counter
         }
     }
@@ -946,10 +947,10 @@ private:
             const triangle_t& t = triangles[iT];
             for (std::uint32_t i(0); i < std::uint32_t(3); ++i) {
                 const edge_t opEdge(t.vertices[ccw(i)], t.vertices[cw(i)]);
-                const std::uint32_t iN = t.neighbors[get_opposite_neighbour_from_vertex(i)];
+                const std::uint32_t iN = t.neighbors[get_local_index_of_neighbour_opposite_vertex(i)];
                 if (iN == null_neighbour || triDepths[iN] <= layerDepth)
                     continue;
-                if (fixedEdges.count(opEdge)) {
+                if (m_constrained_edges.count(opEdge)) {
                     const std::unordered_map<edge_t, layer_depth_t>::const_iterator cit = overlapCount.find(opEdge);
                     const layer_depth_t triDepth = cit == overlapCount.end()
                         ? layerDepth + 1
@@ -1170,7 +1171,7 @@ void triangulator_t::triangle_replace_neighbour(
     const std::uint32_t newNeighbor)
 {
     triangle_t& t = triangles[iT];
-    t.neighbors[opposite_triangle_index(t, iVedge1, iVedge2)] = newNeighbor;
+    t.neighbors[get_local_index_of_neighbour_opposite_vertex(t, iVedge1, iVedge2)] = newNeighbor;
 }
 
 void triangulator_t::eraseSuperTriangle()
@@ -1265,10 +1266,10 @@ void triangulator_t::finalise_triangulation(
         { // fixed edges
             std::unordered_set<edge_t> updatedFixedEdges;
             typedef std::unordered_set<edge_t>::const_iterator It;
-            for (It e = fixedEdges.begin(); e != fixedEdges.end(); ++e) {
+            for (It e = m_constrained_edges.begin(); e != m_constrained_edges.end(); ++e) {
                 updatedFixedEdges.insert(remap_no_supertriangle(*e));
             }
-            fixedEdges = updatedFixedEdges;
+            m_constrained_edges = updatedFixedEdges;
         }
         { // overlap count
             std::unordered_map<edge_t, boundary_overlap_count_t> updatedOverlapCount;
@@ -1328,9 +1329,9 @@ std::unordered_set<std::uint32_t> triangulator_t::grow_to_boundary(
         const triangle_t& t = triangles[iT];
         for (std::uint32_t i(0); i < std::uint32_t(3); ++i) {
             const edge_t opEdge(t.vertices[ccw(i)], t.vertices[cw(i)]);
-            if (fixedEdges.count(opEdge))
+            if (m_constrained_edges.count(opEdge))
                 continue;
-            const std::uint32_t iN = t.neighbors[get_opposite_neighbour_from_vertex(i)];
+            const std::uint32_t iN = t.neighbors[get_local_index_of_neighbour_opposite_vertex(i)];
             if (iN != null_neighbour && traversed.count(iN) == 0)
                 seeds.push(iN);
         }
@@ -1454,13 +1455,13 @@ void triangulator_t::insert_edge(
     std::uint32_t iV = iA;
     triangle_t t = triangles[iT];
     while (std::find(t.vertices.begin(), t.vertices.end(), iB) == t.vertices.end()) {
-        const std::uint32_t iTopo = get_opposite_triangle_index(t, iV);
+        const std::uint32_t iTopo = get_global_triangle_index_opposite_vertex(t, iV);
         const triangle_t& tOpo = triangles[iTopo];
         const std::uint32_t iVopo = get_opposed_vertex_index(tOpo, iT);
         const vec2 vOpo = vertices[iVopo];
 
         // RESOLVE intersection between two constraint edges if needed
-        if (m_intersectingEdgesStrategy == action_on_intersecting_constraint_edges_t::RESOLVE && fixedEdges.count(edge_t(iVleft, iVright))) {
+        if (m_intersectingEdgesStrategy == action_on_intersecting_constraint_edges_t::RESOLVE && m_constrained_edges.count(edge_t(iVleft, iVright))) {
             const std::uint32_t iNewVert = static_cast<std::uint32_t>(vertices.size());
 
             // split constraint edge that already exists in triangulation
@@ -1469,7 +1470,7 @@ void triangulator_t::insert_edge(
             const edge_t half2(iNewVert, iVright);
             const boundary_overlap_count_t overlaps = overlapCount[splitEdge];
             // remove the edge that will be split
-            fixedEdges.erase(splitEdge);
+            m_constrained_edges.erase(splitEdge);
             overlapCount.erase(splitEdge);
             // add split edge's halves
             fixEdge(half1, overlaps);
@@ -1577,13 +1578,13 @@ void triangulator_t::conform_to_edge(
     std::uint32_t iV = iA;
     triangle_t t = triangles[iT];
     while (std::find(t.vertices.begin(), t.vertices.end(), iB) == t.vertices.end()) {
-        const std::uint32_t iTopo = get_opposite_triangle_index(t, iV);
+        const std::uint32_t iTopo = get_global_triangle_index_opposite_vertex(t, iV);
         const triangle_t& tOpo = triangles[iTopo];
         const std::uint32_t iVopo = get_opposed_vertex_index(tOpo, iT);
         const vec2 vOpo = vertices[iVopo];
 
         // RESOLVE intersection between two constraint edges if needed
-        if (m_intersectingEdgesStrategy == action_on_intersecting_constraint_edges_t::RESOLVE && fixedEdges.count(edge_t(iVleft, iVright))) {
+        if (m_intersectingEdgesStrategy == action_on_intersecting_constraint_edges_t::RESOLVE && m_constrained_edges.count(edge_t(iVleft, iVright))) {
             const std::uint32_t iNewVert = static_cast<std::uint32_t>(vertices.size());
 
             // split constraint edge that already exists in triangulation
@@ -1592,7 +1593,7 @@ void triangulator_t::conform_to_edge(
             const edge_t half2(iNewVert, iVright);
             const boundary_overlap_count_t overlaps = overlapCount[splitEdge];
             // remove the edge that will be split
-            fixedEdges.erase(splitEdge);
+            m_constrained_edges.erase(splitEdge);
             overlapCount.erase(splitEdge);
             // add split edge's halves
             fixEdge(half1, overlaps);
@@ -1652,7 +1653,7 @@ void triangulator_t::conform_to_edge(
     for (std::vector<edge_t>::const_iterator it = flippedFixedEdges.begin();
          it != flippedFixedEdges.end();
          ++it) {
-        fixedEdges.erase(*it);
+        m_constrained_edges.erase(*it);
 
         boundary_overlap_count_t prevOverlaps = 0;
         const std::unordered_map<edge_t, boundary_overlap_count_t>::const_iterator
@@ -1751,7 +1752,7 @@ triangulator_t::insert_vertex_and_flip_fixed_edges(
         stack_of_triangle_indices.pop();
 
         const triangle_t& t = triangles[iT];
-        const std::uint32_t iTopo = get_opposite_triangle_index(t, iVert);
+        const std::uint32_t iTopo = get_global_triangle_index_opposite_vertex(t, iVert);
         if (iTopo == null_neighbour)
             continue;
 
@@ -1774,10 +1775,10 @@ triangulator_t::insert_vertex_and_flip_fixed_edges(
         const std::uint32_t iV1 = tOpo.vertices[cw(i)];
         const std::uint32_t iV3 = tOpo.vertices[ccw(i)];
 
-        if (check_is_edgeflip_needed(v, iVert, iV1, iV2, iV3)) {
+        if (check_if_edgeflip_required(v, iVert, iV1, iV2, iV3)) {
             // if flipped edge is fixed, remember it
             const edge_t flippedEdge(iV1, iV3);
-            if (fixedEdges.count(flippedEdge))
+            if (m_constrained_edges.count(flippedEdge))
                 flippedFixedEdges.push_back(flippedEdge);
 
             do_edgeflip(iT, iTopo);
@@ -1790,8 +1791,13 @@ triangulator_t::insert_vertex_and_flip_fixed_edges(
     return flippedFixedEdges;
 }
 
-void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex_index)
+// formerlly insert a (previously allocated) vertex into the current
+// triangulation. This vertex is identified by its index.
+void triangulator_t::insert_vertex_into_triangulation(
+    // index of vertex inserted into triangle
+    const std::uint32_t vertex_index)
 {
+    // coordinates of vertex inserted into triangle
     const vec2& vertex_coords = vertices[vertex_index];
 
     // Array of two elements:
@@ -1807,10 +1813,14 @@ void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex
     const std::uint32_t triangle_containing_point_index = triangle_containing_point_info[0];
     const std::uint32_t triangle_containing_point_neighbour_index = triangle_containing_point_info[1];
 
-    const bool is_normal_case = (triangle_containing_point_neighbour_index == null_neighbour);
+    // if this is false then the vertex lies on an edge
+    const bool vertex_lies_inside_triangle = (triangle_containing_point_neighbour_index == null_neighbour);
+
+    // stack of the new triangles that have been created as a result of inserting
+    // the vertex labelled "vertex_index" into the current triangulation
     std::stack<std::uint32_t> stack_of_triangle_indices;
 
-    if (is_normal_case) {
+    if (vertex_lies_inside_triangle) {
         // just insert the point into the triangle and sub-divide it as usual
         stack_of_triangle_indices = insert_point_in_triangle(vertex_index, triangle_containing_point_index);
     } else {
@@ -1818,34 +1828,49 @@ void triangulator_t::insert_vertex_into_triangulation(const std::uint32_t vertex
         stack_of_triangle_indices = insert_point_on_edge(vertex_index, triangle_containing_point_index, triangle_containing_point_neighbour_index);
     }
 
+    // make all triangles in the current triangulation satisfy the delauney property
     enforce_delaunay_property_using_edge_flips(vertex_coords, vertex_index, stack_of_triangle_indices);
 
     m_nearPtLocator.add_point(vertex_index, vertices);
 }
 
 void triangulator_t::enforce_delaunay_property_using_edge_flips(
-    const vec2& v,
+    // coordinates of a vertex (e.g that has just been inserted into the current triangulation)
+    const vec2& vertex_coords,
+    // label/index of a vertex (e.g that has just been inserted into the current triangulation)
     const std::uint32_t vertex_index,
+    // the stack of the newly created triangules as a result of e.g. inserting a new vertex
     std::stack<std::uint32_t>& stack_of_triangle_indices)
 {
+    // while we have triangles to check i.e. to check if no other vertex in the
+    // triangulation lies inside the circumcircle of a triangle's vertices.
     while (!stack_of_triangle_indices.empty()) {
 
-        const std::uint32_t iT = stack_of_triangle_indices.top();
-        stack_of_triangle_indices.pop();
+        // index of the current triangle we are checking for the delauney property
+        const std::uint32_t current_triangle_index = stack_of_triangle_indices.top();
+        stack_of_triangle_indices.pop(); // remove
 
-        const triangle_t& t = triangles[iT];
-        const std::uint32_t iTopo = get_opposite_triangle_index(t, vertex_index);
+        const triangle_t& current_triangle = triangles[current_triangle_index];
+        // get the triangle that lies opposite to the vertex labelled "vertex_index" in "current_triangle"
+        const std::uint32_t global_index_of_neighbour_opposite_vertex = get_global_triangle_index_opposite_vertex(current_triangle, vertex_index);
 
-        if (iTopo == null_neighbour) {
+        if (global_index_of_neighbour_opposite_vertex == null_neighbour) {
             continue;
         }
 
-        if (check_is_edgeflip_needed(v, iT, iTopo, vertex_index)) {
+        // do we need to flip the edge that is shared by "current_triangle_index" and "global_index_of_neighbour_opposite_vertex"?
+        const bool edge_flip_required = check_if_edgeflip_required(
+            vertex_coords,
+            current_triangle_index,
+            global_index_of_neighbour_opposite_vertex,
+            vertex_index);
 
-            do_edgeflip(iT, iTopo);
+        if (edge_flip_required) {
 
-            stack_of_triangle_indices.push(iT);
-            stack_of_triangle_indices.push(iTopo);
+            do_edgeflip(current_triangle_index, global_index_of_neighbour_opposite_vertex);
+
+            stack_of_triangle_indices.push(current_triangle_index);
+            stack_of_triangle_indices.push(global_index_of_neighbour_opposite_vertex);
         }
     }
 }
@@ -1874,9 +1899,10 @@ void triangulator_t::enforce_delaunay_property_using_edge_flips(
  *                       v1
  */
 
-bool triangulator_t::check_is_edgeflip_needed(
-    const vec2& v,
-    const std::uint32_t iV,
+bool triangulator_t::check_if_edgeflip_required(
+    // coordinates of a vertex (e.g that has just been inserted into the current triangulation)
+    const vec2& vertex_coords,
+    const std::uint32_t vertex_index,
     const std::uint32_t iV1,
     const std::uint32_t iV2,
     const std::uint32_t iV3) const
@@ -1884,68 +1910,109 @@ bool triangulator_t::check_is_edgeflip_needed(
     const vec2& v1 = vertices[iV1];
     const vec2& v2 = vertices[iV2];
     const vec2& v3 = vertices[iV3];
-    if (m_superGeomType == super_geometry_type_t::SUPER_TRIANGLE) {
-        // If flip-candidate edge touches super-triangle in-circumference
-        // test has to be replaced with orient2d test against the line
-        // formed by two non-artificial vertices (that don't belong to
-        // super-triangle)
-        if (iV < 3) // flip-candidate edge touches super-triangle
-        {
-            // does original edge also touch super-triangle?
-            if (iV1 < 3)
-                return locate_point_wrt_line(v1, v2, v3) == locate_point_wrt_line(v, v2, v3);
-            if (iV3 < 3)
-                return locate_point_wrt_line(v3, v1, v2) == locate_point_wrt_line(v, v1, v2);
-            return false; // original edge does not touch super-triangle
+
+    bool answer = true;
+    // if (m_superGeomType == super_geometry_type_t::SUPER_TRIANGLE) { // TODO: remove this check
+    
+    //
+    //  The following if-condition check whether any one of the vertices in the
+    //  stencil of the edge flip belongs to the super-triangle
+    //
+
+    // If the flip-candidate edge touches/is part of the super-triangle, then the 
+    // "in-circumcircle" test has to be replaced with an "orient2d" test against 
+    // the line formed by two non-artificial vertices (that don't belong to
+    // super-triangle)
+    if (vertex_index < 3 /*super-tri verticess have index < 3*/) // Does the "flip-candidate edge" touch the super-triangle? (i.e. does "v" belongs to super-triangle)
+    {
+        // does original edge also touch super-triangle?
+        if (iV1 < 3) {
+            answer = locate_point_wrt_line(v1, v2, v3) == locate_point_wrt_line(vertex_coords, v2, v3);
+        } else if (iV3 < 3) {
+            answer = locate_point_wrt_line(v3, v1, v2) == locate_point_wrt_line(vertex_coords, v1, v2);
+        } else {
+            answer = false; // original edge does not touch super-triangle
         }
-        if (iV2 < 3) // flip-candidate edge touches super-triangle
-        {
-            // does original edge also touch super-triangle?
-            if (iV1 < 3)
-                return locate_point_wrt_line(v1, v, v3) == locate_point_wrt_line(v2, v, v3);
-            if (iV3 < 3)
-                return locate_point_wrt_line(v3, v1, v) == locate_point_wrt_line(v2, v1, v);
-            return false; // original edge does not touch super-triangle
+    } else if (iV2 < 3) // flip-candidate edge touches super-triangle
+    {
+        // does original edge also touch super-triangle?
+        if (iV1 < 3) {
+            answer = locate_point_wrt_line(v1, vertex_coords, v3) == locate_point_wrt_line(v2, vertex_coords, v3);
+        } else if (iV3 < 3) {
+            answer = locate_point_wrt_line(v3, v1, vertex_coords) == locate_point_wrt_line(v2, v1, vertex_coords);
+        } else {
+            answer = false; // original edge does not touch super-triangle
         }
-        // flip-candidate edge does not touch super-triangle
-        if (iV1 < 3)
-            return locate_point_wrt_line(v1, v2, v3) == locate_point_wrt_line(v, v2, v3);
-        if (iV3 < 3)
-            return locate_point_wrt_line(v3, v1, v2) == locate_point_wrt_line(v, v1, v2);
     }
-    return check_is_in_circumcircle(v, v1, v2, v3);
+    // flip-candidate edge does not touch super-triangle
+    else if (iV1 < 3) {
+        answer = locate_point_wrt_line(v1, v2, v3) == locate_point_wrt_line(vertex_coords, v2, v3);
+    } else if (iV3 < 3) {
+        answer = locate_point_wrt_line(v3, v1, v2) == locate_point_wrt_line(vertex_coords, v1, v2);
+    } else {
+        answer = check_is_in_circumcircle(vertex_coords, v1, v2, v3);
+    }
+    //}
+    return answer;
 }
 
-bool triangulator_t::check_is_edgeflip_needed(
-    const vec2& v,
-    const std::uint32_t iT,
-    const std::uint32_t iTopo,
-    const std::uint32_t iV) const
+// This function 1) extracts the indices of the (four) vertices in the stencil of an edge flip
+// 2) checks if the edge to be flipped is actually constrained and 3) check if the
+// edge flip even required (i.e. maybe the current triangle does not even
+// violate the delaunay property)
+//
+bool triangulator_t::check_if_edgeflip_required(
+    // coordinates of a vertex (e.g that has just been inserted into the current triangulation)
+    const vec2& vertex_coords,
+    // index of the current triangle we are checking for the delauney property
+    const std::uint32_t current_triangle_index,
+    // the triangle that lies opposite to the vertex labelled "vertex_index" in "current_triangle"
+    const std::uint32_t current_triangle_neighbour_index,
+    // index of a vertex (e.g that has just been inserted into the current triangulation)
+    const std::uint32_t vertex_index) const
 {
     /*
-     *                       v3         original edge: (v1, v3)
-     *                      /|\   flip-candidate edge: (v,  v2)
+     *                       v2         original edge: (v0, v2)
+     *                      /|\   flip-candidate edge: (v,  v1)
      *                    /  |  \
      *                  /    |    \
      *                /      |      \
-     * new vertex--> v       |       v2
+     * new vertex--> v       |       v1
      *                \      |      /
      *                  \    |    /
      *                    \  |  /
      *                      \|/
-     *                       v1
+     *                       v0
      */
-    const triangle_t& tOpo = triangles[iTopo];
-    const std::uint32_t i = get_local_vertex_index_opposite_neighbour(tOpo, iT);
-    const std::uint32_t iV2 = tOpo.vertices[i];
-    const std::uint32_t iV1 = tOpo.vertices[cw(i)];
-    const std::uint32_t iV3 = tOpo.vertices[ccw(i)];
+
+    // get the neighbour triangle's data
+    const triangle_t& neighbour = triangles[current_triangle_neighbour_index];
+    // index of the vertex that lies opposite to the current triangle in the neighbour (i.e. v1 in the illustation)
+    const std::uint32_t neighbour_opp_vertex_local_index = get_local_vertex_index_opposite_neighbour(neighbour, current_triangle_index);
+    const std::uint32_t neighbour_vertex1_index = neighbour.vertices[neighbour_opp_vertex_local_index];
+    const std::uint32_t neighbour_vertex0_index = neighbour.vertices[cw(neighbour_opp_vertex_local_index)];
+    const std::uint32_t neighbour_vertex2_index = neighbour.vertices[ccw(neighbour_opp_vertex_local_index)];
+
+    // NOTE: we only check vertices 0 and 2 because, they are already forming an
+    // edge that is part of the current triangulation and we do not know (without
+    // checking) whether the edge they form is specified as  "fixed" by th user
+    // (i.e. cannot be flipped).
+    edge_t edge(neighbour_vertex0_index, neighbour_vertex2_index);
+    const bool edge_is_constrained = m_constrained_edges.count(edge);
 
     // flip not needed if the original edge is fixed
-    if (fixedEdges.count(edge_t(iV1, iV3)))
+    if (edge_is_constrained) {
         return false;
+    }
 
-    return check_is_edgeflip_needed(v, iV, iV1, iV2, iV3);
+    const bool edge_flip_requred = check_if_edgeflip_required(
+        vertex_coords,
+        vertex_index,
+        neighbour_vertex0_index,
+        neighbour_vertex1_index,
+        neighbour_vertex2_index);
+
+    return edge_flip_requred;
 }
 
 // Find the triangle containing "position". So what we do is start from

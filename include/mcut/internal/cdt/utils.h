@@ -66,16 +66,16 @@ struct box2d_t {
 #endif
 /// Bounding box of a collection of custom 2D points given coordinate getters
 template <
-    typename TVertexIter//,
-    //typename TGetVertexCoordX,
-    //typename TGetVertexCoordY
+    typename TVertexIter //,
+    // typename TGetVertexCoordX,
+    // typename TGetVertexCoordY
     >
 bounding_box_t<vec2> construct_bbox_containing_points(
     TVertexIter first,
-    TVertexIter last//,
-    //TGetVertexCoordX get_x_coord,
-    //TGetVertexCoordY get_y_coord
-    )
+    TVertexIter last //,
+    // TGetVertexCoordX get_x_coord,
+    // TGetVertexCoordY get_y_coord
+)
 {
     const double max = std::numeric_limits<double>::max();
     bounding_box_t<vec2> box = { { max, max }, { -max, -max } };
@@ -92,7 +92,7 @@ bounding_box_t<vec2> construct_bbox_containing_points(const std::vector<vec2>& p
 /// edge_t connecting two vertices: vertex with smaller index is always first
 /// \note: hash edge_t is specialized at the bottom
 struct edge_t {
-    
+
     edge_t(std::uint32_t iV1, std::uint32_t iV2)
         : m_vertices(
             iV1 < iV2 ? std::make_pair(iV1, iV2) : std::make_pair(iV2, iV1))
@@ -155,8 +155,8 @@ inline edge_t edge_make(std::uint32_t iV1, std::uint32_t iV2)
    v1  n1  v2                 */
 struct triangle_t {
 
-    std::array<std::uint32_t, 3> vertices; 
-    std::array<std::uint32_t, 3> neighbors; 
+    std::array<std::uint32_t, 3> vertices;
+    std::array<std::uint32_t, 3> neighbors;
 
     /**
      * Factory method
@@ -206,7 +206,7 @@ namespace cdt {
 bounding_box_t<vec2> construct_bbox_containing_points(const std::vector<vec2>& points)
 {
     return construct_bbox_containing_points(
-        points.begin(), points.end()/*, get_x_coord_vec2d<T>, get_y_coord_vec2d<T>*/);
+        points.begin(), points.end() /*, get_x_coord_vec2d<T>, get_y_coord_vec2d<T>*/);
 }
 
 //*****************************************************************************
@@ -296,53 +296,70 @@ point_to_triangle_location_t::Enum locate_point_wrt_triangle(
     return result;
 }
 
-/// Opposed neighbor index from vertex index
-inline std::uint32_t get_opposite_neighbour_from_vertex(const std::uint32_t vertIndex)
+// Opposed neighbor index from vertex index
+inline std::uint32_t get_local_index_of_neighbour_opposite_vertex(const std::uint32_t vertex_local_index)
 {
-    MCUT_ASSERT(vertIndex < 3);
+    MCUT_ASSERT(vertex_local_index >= 0 && vertex_local_index <= 2);
 
-    if (vertIndex == std::uint32_t(0))
-        return std::uint32_t(1);
-    if (vertIndex == std::uint32_t(1))
-        return std::uint32_t(2);
-    if (vertIndex == std::uint32_t(2))
-        return std::uint32_t(0);
-    throw std::runtime_error("Invalid vertex index");
+    std::uint32_t opposite_neighbour_local_index = null_neighbour;
+
+    if (vertex_local_index == std::uint32_t(0)) {
+        opposite_neighbour_local_index = std::uint32_t(1);
+    } else if (vertex_local_index == std::uint32_t(1)) {
+        opposite_neighbour_local_index = std::uint32_t(2);
+    } else if (vertex_local_index == std::uint32_t(2)) {
+        opposite_neighbour_local_index = std::uint32_t(0);
+    }
+
+    MCUT_ASSERT(opposite_neighbour_local_index != null_neighbour);
+
+    return opposite_neighbour_local_index;
 }
 
 /// Opposed local vertex index from neighbor index
 inline std::uint32_t get_opposite_vertex_local_index_from_neighbour_local_index(const std::uint32_t neighbour_local_index)
 {
+    MCUT_ASSERT(neighbour_local_index >= 0 && neighbour_local_index <= 2);
+
     std::uint32_t opposite_vertex_local_index = null_vertex;
-    
-    if (neighbour_local_index == std::uint32_t(0))
-    {
+
+    if (neighbour_local_index == std::uint32_t(0)) {
         opposite_vertex_local_index = std::uint32_t(2);
-    } 
-    else if (neighbour_local_index == std::uint32_t(1))
-    {
+    } else if (neighbour_local_index == std::uint32_t(1)) {
         opposite_vertex_local_index = std::uint32_t(0);
-    } 
-    else if (neighbour_local_index == std::uint32_t(2))
-    {
+    } else if (neighbour_local_index == std::uint32_t(2)) {
         opposite_vertex_local_index = std::uint32_t(1);
     }
 
     MCUT_ASSERT(opposite_vertex_local_index != null_vertex); // Invalid neighbor index
+
+    return opposite_vertex_local_index;
 }
 
-/// Index of triangle's neighbor opposed to a vertex
-inline std::uint32_t
-opposite_triangle_index(const triangle_t& tri, const std::uint32_t iVert)
+// Local index of triangle's neighbor opposed to a vertex
+inline std::uint32_t get_local_index_of_neighbour_opposite_vertex(const triangle_t& triangle, const std::uint32_t vertex_index)
 {
-    for (std::uint32_t vi = std::uint32_t(0); vi < std::uint32_t(3); ++vi)
-        if (iVert == tri.vertices[vi])
-            return get_opposite_neighbour_from_vertex(vi);
-    throw std::runtime_error("Could not find opposed triangle index");
+    std::uint32_t neighbour_opp_vertex_index_local = null_neighbour;
+
+    // for each vertex of triangle
+    for (std::uint32_t i = std::uint32_t(0); i < std::uint32_t(3); ++i) {
+        // does the (global) index match the sought vertex
+        if (vertex_index == triangle.vertices[i]) {
+            
+            neighbour_opp_vertex_index_local = get_local_index_of_neighbour_opposite_vertex(i);
+            break;
+        }
+    }
+
+    // the neighbour of a border triangle might be null (non-existent) but
+    // the local index is always defined.
+    MCUT_ASSERT(neighbour_opp_vertex_index_local != null_neighbour);
+
+    return neighbour_opp_vertex_index_local;
 }
 
 /// Index of triangle's neighbor opposed to an edge
-inline std::uint32_t opposite_triangle_index(
+inline std::uint32_t get_local_index_of_neighbour_opposite_vertex(
     const triangle_t& tri,
     const std::uint32_t iVedge1,
     const std::uint32_t iVedge2)
@@ -350,7 +367,7 @@ inline std::uint32_t opposite_triangle_index(
     for (std::uint32_t vi = std::uint32_t(0); vi < std::uint32_t(3); ++vi) {
         const std::uint32_t iVert = tri.vertices[vi];
         if (iVert != iVedge1 && iVert != iVedge2)
-            return get_opposite_neighbour_from_vertex(vi);
+            return get_local_index_of_neighbour_opposite_vertex(vi);
     }
     throw std::runtime_error("Could not find opposed-to-edge triangle index");
 }
@@ -361,16 +378,14 @@ inline std::uint32_t get_local_vertex_index_opposite_neighbour(const triangle_t&
     std::uint32_t opposite_vertex = null_vertex;
 
     // for each neighbour
-    for (std::uint32_t i = std::uint32_t(0); i < std::uint32_t(3); ++i)
-    {
+    for (std::uint32_t i = std::uint32_t(0); i < std::uint32_t(3); ++i) {
         // does the neighbour match the one I'm looking for?
-        if (neighbour_triangle_index == triangle.neighbors[i])
-        {
+        if (neighbour_triangle_index == triangle.neighbors[i]) {
             opposite_vertex = get_opposite_vertex_local_index_from_neighbour_local_index(i);
             break;
         }
     }
-    
+
     MCUT_ASSERT(opposite_vertex != null_vertex);
 
     return opposite_vertex;
@@ -395,10 +410,11 @@ inline std::uint32_t get_vertex_index(const triangle_t& tri, const std::uint32_t
 }
 
 /// Given triangle and a vertex find opposed triangle
-inline std::uint32_t
-get_opposite_triangle_index(const triangle_t& tri, const std::uint32_t iVert)
-{
-    return tri.neighbors[opposite_triangle_index(tri, iVert)];
+inline std::uint32_t get_global_triangle_index_opposite_vertex(const triangle_t& triangle, const std::uint32_t vertex_index)
+{   
+    const std::uint32_t local_index_of_neighbour_opposite_vertex = get_local_index_of_neighbour_opposite_vertex(triangle, vertex_index);
+    const std::uint32_t global_index_of_neighbour_opposite_vertex = triangle.neighbors[local_index_of_neighbour_opposite_vertex];
+    return global_index_of_neighbour_opposite_vertex;
 }
 
 /// Given two triangles, return vertex of first triangle opposed to the second
