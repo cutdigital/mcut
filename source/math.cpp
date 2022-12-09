@@ -108,7 +108,6 @@
         const double pd_[3] = { static_cast<double>(pd.x()), static_cast<double>(pd.y()), static_cast<double>(pd.z()) };
 
         return ::orient3d(pa_, pb_, pc_, pd_); // shewchuk predicate
-        // return ::orient3d((double*)(&pa[0]), (double*)(&pb[0]), (double*)(&pc[0]), (double*)(&pd[0]));
     }
 
 #if 0

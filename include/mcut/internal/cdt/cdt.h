@@ -504,8 +504,7 @@ namespace cdt {
  * @tparam T type of vertex coordinates (e.g., float, double)
  * @tparam TNearPointLocator class providing locating near point for efficiently
  */
-template <typename T, typename TNearPointLocator>
-inline bool check_topology(const cdt::triangulator_t<T, TNearPointLocator>& cdt)
+inline bool check_topology(const cdt::triangulator_t& cdt)
 {
     // Check if vertices' adjacent triangles contain vertex
     const std::vector<std::vector<std::uint32_t>> vertTris = cdt.is_finalized()

@@ -205,7 +205,7 @@ public:
      * @param get_y_coord getter of Y-coordinate
      */
     template <
-        typename TVertexIter,
+        typename TVertexIter//,
         // typename TGetVertexCoordX,
         // typename TGetVertexCoordY
         >
@@ -349,7 +349,7 @@ public:
         triangle_t& edge_triangle1 = triangles[edge_triangle1_index];
 
         // get vertex of "edge_triangle0" that is opposite to triangle "edge_triangle1_index"
-        const std::uint32_t triangle0_vertex_opposite_neighbour = get_local_vertex_index_opposite_neighbour(edge_triangle0, edge_triangle1_index);
+        const std::uint32_t triangle0_vertex_opposite_neighbour = get_vertex_local_id_opposite_neighbour(edge_triangle0, edge_triangle1_index);
 
         const std::uint32_t v0 = edge_triangle0.vertices[triangle0_vertex_opposite_neighbour];
         const std::uint32_t v1 = edge_triangle0.vertices[ccw(triangle0_vertex_opposite_neighbour)];
@@ -358,7 +358,7 @@ public:
         const std::uint32_t n3 = edge_triangle0.neighbors[cw(triangle0_vertex_opposite_neighbour)];
 
         // get vertex of "edge_triangle1" that is opposite to triangle "edge_triangle0_index"
-        const std::uint32_t triangle1_opp_vertex_index = get_local_vertex_index_opposite_neighbour(edge_triangle1, edge_triangle0_index);
+        const std::uint32_t triangle1_opp_vertex_index = get_vertex_local_id_opposite_neighbour(edge_triangle1, edge_triangle0_index);
 
         const std::uint32_t v2 = edge_triangle1.vertices[triangle1_opp_vertex_index];
         const std::uint32_t v3 = edge_triangle1.vertices[ccw(triangle1_opp_vertex_index)];
@@ -1031,29 +1031,37 @@ void triangulator_t::insert_vertices(
         create_vertex(coordinates, std::vector<std::uint32_t>());
     }
 
-    switch (m_vertexInsertionOrder) {
+    //switch (m_vertexInsertionOrder) {
 
-    case vertex_insertion_order_t::AS_GIVEN: {
+    //case vertex_insertion_order_t::AS_GIVEN: {
 
+        // for each vertex to be inserted
         for (TVertexIter it = first; it != last; ++it) {
             const std::uint32_t local_vertex_index = (std::uint32_t)std::distance(first, it); // amongst the new vertices
             const std::uint32_t global_vertex_index = preexisting_vertex_count + local_index; // amongst all vertices
+
+            // do the usual steps:
+            // find nearest points in current triangulation
+            // get nearest triangle from nearest point
+            // walk triangles to find triangle containing vertex
+            // split triangle (may be more than one triangle to split if vertex lies on edge) 
+            // enforce delauney property with edge flips
             insert_vertex_into_triangulation(global_vertex_index);
         }
 
-        break;
-    }
-    case vertex_insertion_order_t::RANDOM: {
-        std::vector<std::uint32_t> ii(std::distance(first, last));
-        typedef std::vector<std::uint32_t>::iterator Iter;
-        std::uint32_t value = static_cast<std::uint32_t>(preexisting_vertex_count);
-        for (Iter it = ii.begin(); it != ii.end(); ++it, ++value)
-            *it = value;
-        detail::random_shuffle(ii.begin(), ii.end());
-        for (Iter it = ii.begin(); it != ii.end(); ++it)
-            insert_vertex_into_triangulation(*it);
-        break;
-    }
+     //   break;
+   // }
+    //case vertex_insertion_order_t::RANDOM: {
+    //    std::vector<std::uint32_t> ii(std::distance(first, last));
+    //    typedef std::vector<std::uint32_t>::iterator Iter;
+    //    std::uint32_t value = static_cast<std::uint32_t>(preexisting_vertex_count);
+    //    for (Iter it = ii.begin(); it != ii.end(); ++it, ++value)
+    //        *it = value;
+    //    detail::random_shuffle(ii.begin(), ii.end());
+    //    for (Iter it = ii.begin(); it != ii.end(); ++it)
+    //        insert_vertex_into_triangulation(*it);
+    //    break;
+    //}
     }
 }
 
@@ -1770,7 +1778,7 @@ triangulator_t::insert_vertex_and_flip_fixed_edges(
          *                       v1
          */
         const triangle_t& tOpo = triangles[iTopo];
-        const std::uint32_t i = get_local_vertex_index_opposite_neighbour(tOpo, iT);
+        const std::uint32_t i = get_vertex_local_id_opposite_neighbour(tOpo, iT);
         const std::uint32_t iV2 = tOpo.vertices[i];
         const std::uint32_t iV1 = tOpo.vertices[cw(i)];
         const std::uint32_t iV3 = tOpo.vertices[ccw(i)];
@@ -1867,23 +1875,45 @@ void triangulator_t::enforce_delaunay_property_using_edge_flips(
 
         if (edge_flip_required) {
 
+            //
+            // flip the edges and add the new triangles to the stack so that we can
+            // check whether they satisfy the delauney property
+            //
+
             do_edgeflip(current_triangle_index, global_index_of_neighbour_opposite_vertex);
 
             stack_of_triangle_indices.push(current_triangle_index);
             stack_of_triangle_indices.push(global_index_of_neighbour_opposite_vertex);
         }
-    }
+    } // while (!stack_of_triangle_indices.empty()) {
 }
 
 /*!
- * Handles super-triangle vertices.
- * Super-tri points are not infinitely far and influence the input points
- * Three cases are possible:
- *  1.  If one of the opposed vertices is super-tri: no flip needed
- *  2.  One of the shared vertices is super-tri:
- *      check if on point is same side of line formed by non-super-tri
- * vertices as the non-super-tri shared vertex
+ * This function check if an edge flip is required by first checking with 
+ * super-triangle vertices, which must be treated specially.
+ * 
+ * Moreover, these super-triangle vertices are not infinitely far away and will 
+ * influence the input points.
+ * 
+ * There are three possible cases that may arise with super-triangle vertices
+ * (see also the illustration below):
+ * 
+ *  1.  If any one of the opposed vertices (i.e. v1, v2 or v3) is a super-triangle vertex: 
+ *          --> no flip needed (edge formed by v1 and v3 is a border edge)
+ *  2.  If any one of the shared vertices is super-triangle vertex:
+ *          --> check if on point is same side of line formed by non-super-tri vertices as the non-super-tri shared vertex
  *  3.  None of the vertices are super-tri: normal circumcircle test
+ * 
+ *  OR ALTERNATIVELY: These are the possible cases that may arise
+ * 
+ * * None of vertices belongs to the super-triangle.
+ *      -> This is the most common caseand it is solved by the empty circle test
+ * * Both vertices v1 and v3 belong to the super-triangle (i.e. common edge is one of the edges of the super-triangle). 
+ *      -> This case is NOT possible because the edge of the super-triangle does not belong to more than one triangle
+ * * One of vertices "v2" or "v" belongs to the super-triangle.
+ *      -> Edge v1-v3 is taken as a correct (i.e. border) edge and there is no need to enforce delauney property.
+ *  * One of vertices "v1" or "v3" belongs to the super-triangle
+ *      -> This case causes problems if it is not considered adequately.
  */
 /*
  *                       v3         original edge: (v1, v3)
@@ -1897,8 +1927,8 @@ void triangulator_t::enforce_delaunay_property_using_edge_flips(
  *                    \  |  /
  *                      \|/
  *                       v1
+ * 
  */
-
 bool triangulator_t::check_if_edgeflip_required(
     // coordinates of a vertex (e.g that has just been inserted into the current triangulation)
     const vec2& vertex_coords,
@@ -1923,7 +1953,7 @@ bool triangulator_t::check_if_edgeflip_required(
     // "in-circumcircle" test has to be replaced with an "orient2d" test against 
     // the line formed by two non-artificial vertices (that don't belong to
     // super-triangle)
-    if (vertex_index < 3 /*super-tri verticess have index < 3*/) // Does the "flip-candidate edge" touch the super-triangle? (i.e. does "v" belongs to super-triangle)
+    if (vertex_index < 3 /*super-tri verticess have index < 3*/) // Does the "flip-candidate edge" touch the super-triangle? (i.e. does "v2" belongs to super-triangle)
     {
         // does original edge also touch super-triangle?
         if (iV1 < 3) {
@@ -1988,7 +2018,7 @@ bool triangulator_t::check_if_edgeflip_required(
     // get the neighbour triangle's data
     const triangle_t& neighbour = triangles[current_triangle_neighbour_index];
     // index of the vertex that lies opposite to the current triangle in the neighbour (i.e. v1 in the illustation)
-    const std::uint32_t neighbour_opp_vertex_local_index = get_local_vertex_index_opposite_neighbour(neighbour, current_triangle_index);
+    const std::uint32_t neighbour_opp_vertex_local_index = get_vertex_local_id_opposite_neighbour(neighbour, current_triangle_index);
     const std::uint32_t neighbour_vertex1_index = neighbour.vertices[neighbour_opp_vertex_local_index];
     const std::uint32_t neighbour_vertex0_index = neighbour.vertices[cw(neighbour_opp_vertex_local_index)];
     const std::uint32_t neighbour_vertex2_index = neighbour.vertices[ccw(neighbour_opp_vertex_local_index)];
@@ -2078,51 +2108,53 @@ std::uint32_t triangulator_t::walk_triangles(const std::uint32_t starting_vertex
  */
 
 void triangulator_t::do_edgeflip(
-    const std::uint32_t iT,
-    const std::uint32_t iTopo)
+    const std::uint32_t triangle_global_id,
+    const std::uint32_t triangle_neighbour_global_id)
 {
-    triangle_t& t = triangles[iT];
-    triangle_t& tOpo = triangles[iTopo];
+    triangle_t& triangle = triangles[triangle_global_id];
+    triangle_t& neighbour = triangles[triangle_neighbour_global_id];
 
-    const std::array<std::uint32_t, 3>& triNs = t.neighbors;
-    const std::array<std::uint32_t, 3>& triOpoNs = tOpo.neighbors;
-    const std::array<std::uint32_t, 3>& triVs = t.vertices;
-    const std::array<std::uint32_t, 3>& triOpoVs = tOpo.vertices;
+    const std::array<std::uint32_t, 3>& triangle_neighbours = triangle.neighbors;
+    const std::array<std::uint32_t, 3>& neighbour_neighbours = neighbour.neighbors;
+    const std::array<std::uint32_t, 3>& triangle_vertices = triangle.vertices;
+    const std::array<std::uint32_t, 3>& neighbour_vertices = neighbour.vertices;
 
     // find vertices and neighbors
-    std::uint32_t i = get_local_vertex_index_opposite_neighbour(t, iTopo);
+    std::uint32_t vertex_local_id_opposite_neighbour = get_vertex_local_id_opposite_neighbour(triangle, triangle_neighbour_global_id);
 
-    const std::uint32_t v1 = triVs[i];
-    const std::uint32_t v2 = triVs[ccw(i)];
-    const std::uint32_t n1 = triNs[i];
-    const std::uint32_t n3 = triNs[cw(i)];
+    const std::uint32_t v1 = triangle_vertices[vertex_local_id_opposite_neighbour];
+    const std::uint32_t v2 = triangle_vertices[ccw(vertex_local_id_opposite_neighbour)];
 
-    i = get_local_vertex_index_opposite_neighbour(tOpo, iT);
+    const std::uint32_t n1 = triangle_neighbours[vertex_local_id_opposite_neighbour];
+    const std::uint32_t n3 = triangle_neighbours[cw(vertex_local_id_opposite_neighbour)];
 
-    const std::uint32_t v3 = triOpoVs[i];
-    const std::uint32_t v4 = triOpoVs[ccw(i)];
-    const std::uint32_t n4 = triOpoNs[i];
-    const std::uint32_t n2 = triOpoNs[cw(i)];
+    std::uint32_t vertex_local_id_opposite_triangle = get_vertex_local_id_opposite_neighbour(neighbour, triangle_neighbour_global_id);
+
+    const std::uint32_t v3 = neighbour_vertices[vertex_local_id_opposite_triangle];
+    const std::uint32_t v4 = neighbour_vertices[ccw(vertex_local_id_opposite_triangle)];
+
+    const std::uint32_t n4 = neighbour_neighbours[vertex_local_id_opposite_triangle];
+    const std::uint32_t n2 = neighbour_neighbours[cw(vertex_local_id_opposite_triangle)];
 
     // change vertices and neighbors
     using detail::arr3;
 
-    t = triangle_t::make(arr3(v4, v1, v3), arr3(n3, iTopo, n4));
-    tOpo = triangle_t::make(arr3(v2, v3, v1), arr3(n2, iT, n1));
+    triangle = {{v4, v1, v3}, {n3, triangle_neighbour_global_id, n4}};// triangle_t::make(arr3(v4, v1, v3), arr3(n3, triangle_neighbour_global_id, n4));
+    neighbour = {{v2, v3, v1}, {n2, triangle_global_id, n1}}; //triangle_t::make(arr3(v2, v3, v1), arr3(n2, triangle_global_id, n1));
 
     // adjust neighboring triangles and vertices
-    triangle_replace_neighbour(n1, iT, iTopo);
-    triangle_replace_neighbour(n4, iTopo, iT);
+    triangle_replace_neighbour(n1, triangle_global_id, triangle_neighbour_global_id);
+    triangle_replace_neighbour(n4, triangle_neighbour_global_id, triangle_global_id);
 
     // only adjust adjacent triangles if triangulation is not finalized:
     // can happen when called from outside on an already finalized triangulation
     if (!is_finalized()) {
 
-        vertex_register_adjacent_triangle(v1, iTopo);
-        vertex_register_adjacent_triangle(v3, iT);
+        vertex_register_adjacent_triangle(v1, triangle_neighbour_global_id);
+        vertex_register_adjacent_triangle(v3, triangle_global_id);
 
-        vertex_deregister_adjacent_triangle(v2, iT);
-        vertex_deregister_adjacent_triangle(v4, iTopo);
+        vertex_deregister_adjacent_triangle(v2, triangle_global_id);
+        vertex_deregister_adjacent_triangle(v4, triangle_neighbour_global_id);
     }
 }
 

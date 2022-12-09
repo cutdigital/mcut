@@ -249,6 +249,7 @@ T orient2D(const vec2& p, const vec2& v1, const vec2& v2)
 }
 #endif
 
+// TODO: replace with "sign_t sign()" from math.h
 /// Classify value of orient2d predicate
 point_to_line_location_t::Enum
 classify_orientation(const double orientation, const double orientationTolerance = double(0))
@@ -262,12 +263,14 @@ classify_orientation(const double orientation, const double orientationTolerance
 
 /// Check if point lies to the left of, to the right of, or on a line
 point_to_line_location_t::Enum locate_point_wrt_line(
-    const vec2& p,
-    const vec2& v1,
-    const vec2& v2,
-    const double orientationTolerance = double(0))
+    const vec2& point_coords,
+    const vec2& line_vertex0_coords,
+    const vec2& line_vertex1_coords,
+    const double eps = double(0.0))
 {
-    return classify_orientation(orient2d(p, v1, v2), orientationTolerance);
+    const double orient2d_result = orient2d(point_coords, line_vertex0_coords, line_vertex1_coords);
+    const point_to_line_location_t::Enum orientation_of_point_wrt_line = classify_orientation(orient2d_result, eps);
+    return orientation_of_point_wrt_line;
 }
 
 /// Check if point a lies inside of, outside of, or on an edge of a triangle
@@ -373,7 +376,7 @@ inline std::uint32_t get_local_index_of_neighbour_opposite_vertex(
 }
 
 // Index of triangle's vertex opposed to a triangle
-inline std::uint32_t get_local_vertex_index_opposite_neighbour(const triangle_t& triangle, const std::uint32_t neighbour_triangle_index)
+inline std::uint32_t get_vertex_local_id_opposite_neighbour(const triangle_t& triangle, const std::uint32_t neighbour_triangle_index)
 {
     std::uint32_t opposite_vertex = null_vertex;
 
@@ -421,7 +424,7 @@ inline std::uint32_t get_global_triangle_index_opposite_vertex(const triangle_t&
 inline std::uint32_t
 get_opposed_vertex_index(const triangle_t& tri, std::uint32_t iTopo)
 {
-    return tri.vertices[get_local_vertex_index_opposite_neighbour(tri, iTopo)];
+    return tri.vertices[get_vertex_local_id_opposite_neighbour(tri, iTopo)];
 }
 
 /// Test if point lies in a circumscribed circle of a triangle
