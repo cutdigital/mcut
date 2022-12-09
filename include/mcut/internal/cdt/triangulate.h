@@ -1003,13 +1003,16 @@ void triangulator_t::insert_vertices(
      TGetVertexCoordY get_y_coord*/
 )
 {
-    if (is_finalized()) {
-        throw std::runtime_error(
-            "triangulator_t was finalized with 'erase...' method. Inserting new "
-            "vertices is not possible");
-    }
+    MCUT_ASSERT(is_finalized() == false); // super-triangle was erased already
 
-    detail::randGenerator.seed(9001); // ensure deterministic behavior
+    //if () {
+    //    throw std::runtime_error(
+    //        "triangulator_t was finalized with 'erase...' method. Inserting new "
+    //        "vertices is not possible");
+    //}
+
+    // TODO: remove this.
+    //detail::randGenerator.seed(9001); // ensure deterministic behavior
 
     if (vertices.empty()) {
         const bounding_box_t<vec2> bbox = construct_bbox_containing_points(first, last /*, get_x_coord, get_y_coord*/);
@@ -1037,8 +1040,8 @@ void triangulator_t::insert_vertices(
 
         // for each vertex to be inserted
         for (TVertexIter it = first; it != last; ++it) {
-            const std::uint32_t local_vertex_index = (std::uint32_t)std::distance(first, it); // amongst the new vertices
-            const std::uint32_t global_vertex_index = preexisting_vertex_count + local_index; // amongst all vertices
+            const std::uint32_t vertex_local_id = (std::uint32_t)std::distance(first, it); // amongst the new vertices
+            const std::uint32_t vertex_global_id = preexisting_vertex_count + vertex_local_id; // amongst all vertices
 
             // do the usual steps:
             // find nearest points in current triangulation
@@ -1046,7 +1049,7 @@ void triangulator_t::insert_vertices(
             // walk triangles to find triangle containing vertex
             // split triangle (may be more than one triangle to split if vertex lies on edge) 
             // enforce delauney property with edge flips
-            insert_vertex_into_triangulation(global_vertex_index);
+            insert_vertex_into_triangulation(vertex_global_id);
         }
 
      //   break;
