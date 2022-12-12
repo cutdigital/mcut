@@ -420,8 +420,8 @@ std::unordered_map<edge_t, std::vector<std::uint32_t>> get_edge_to_split_vertice
          ++it) {
 
         const edge_t& e = it->first;
-        const T dX = vertices[e.v2()].x() - vertices[e.v1()].x();
-        const T dY = vertices[e.v2()].y() - vertices[e.v1()].y();
+        const T dX = vertices[e.get_vertex(1)].x() - vertices[e.get_vertex(0)].x();
+        const T dY = vertices[e.get_vertex(1)].y() - vertices[e.get_vertex(0)].y();
         const bool isX = std::abs(dX) >= std::abs(dY); // X-coord longer
         const bool isAscending = isX ? dX >= 0 : dY >= 0; // Longer coordinate ascends
         const std::vector<edge_t>& pieces = it->second;
@@ -432,7 +432,7 @@ std::unordered_map<edge_t, std::vector<std::uint32_t>> get_edge_to_split_vertice
 
         for (std::vector<edge_t>::const_iterator it = pieces.begin(); it != pieces.end(); ++it) {
 
-            const std::array<std::uint32_t, 2> vv = { it->v1(), it->v2() };
+            const std::array<std::uint32_t, 2> vv = { it->get_vertex(0), it->get_vertex(1) };
 
             for (std::array<std::uint32_t, 2>::const_iterator v = vv.begin(); v != vv.end(); ++v) {
                 const T c = isX ? vertices[*v].x() : vertices[*v].y();

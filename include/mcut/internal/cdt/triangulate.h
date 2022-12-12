@@ -230,25 +230,14 @@ public:
      * algorithm of triangulator_t::erase_outer_triangles_and_holes works.
      * <b>Make sure there are no erroneous duplicates.</b>
      * @tparam TEdgeIter iterator that dereferences to custom edge type
-     * @tparam TGetEdgeVertexStart function object getting start vertex index
-     * from an edge.
-     * Getter signature: const TEdgeIter::value_type& -> std::uint32_t
-     * @tparam TGetEdgeVertexEnd function object getting end vertex index from
-     * an edge. Getter signature: const TEdgeIter::value_type& -> std::uint32_t
      * @param first beginning of the range of edges to add
      * @param last end of the range of edges to add
-     * @param getStart getter of edge start vertex index
-     * @param getEnd getter of edge end vertex index
      */
     template <
-        typename TEdgeIter,
-        typename TGetEdgeVertexStart,
-        typename TGetEdgeVertexEnd>
+        typename TEdgeIter>
     void insert_edges(
         TEdgeIter first,
-        TEdgeIter last,
-        TGetEdgeVertexStart getStart,
-        TGetEdgeVertexEnd getEnd);
+        const TEdgeIter last);
     /**
      * Insert constraint edges into triangulation
      * @note Each fixed edge is inserted by deleting the triangles it crosses,
@@ -274,49 +263,88 @@ public:
      */
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t>
     get_intersected_triangle(
-        const std::uint32_t iA,
-        const std::vector<std::uint32_t>& candidates,
-        const vec2& a,
-        const vec2& b,
-        const double orientationTolerance) const
+        // one of the vertices of the edge e.g. "edge_vtx0" 
+        const std::uint32_t vertex_id,
+        const std::vector<std::uint32_t>& candidate_triangles, // candidates to check i.e. adjacent triangle of "vertex_id"
+        const vec2& edge_vtx0_coords,
+        const vec2& edge_vtx1_coords,
+        const double eps) const
     {
-        typedef std::vector<std::uint32_t>::const_iterator TriIndCit;
-        for (TriIndCit it = candidates.begin(); it != candidates.end(); ++it) {
-            const std::uint32_t iT = *it;
-            const triangle_t t = triangles[iT];
-            const std::uint32_t i = get_vertex_index(t, iA);
-            const std::uint32_t iP2 = t.vertices[ccw(i)];
-            const double orientP2 = orient2d(vertices[iP2], a, b);
-            const point_to_line_location_t::Enum locP2 = classify_orientation(orientP2);
 
-            if (locP2 == point_to_line_location_t::RIGHT_SIDE) {
-                const std::uint32_t iP1 = t.vertices[cw(i)];
-                const double orientP1 = orient2d(vertices[iP1], a, b);
-                const point_to_line_location_t::Enum locP1 = classify_orientation(orientP1);
-                if (locP1 == point_to_line_location_t::COLLINEAR) {
-                    return std::make_tuple(null_neighbour, iP1, iP1);
+        //
+        // NOTE: The following algorithm finds the triangle of the CDT that is cut/intersection by our edge.
+            // It is outlined in the paper "An improved incremental algorithm for constructing 
+            // restricted Delaunay triangulations" by Marc Vigo Anglada (1997). Section 4. 
+            //
+            
+        // for each candidate triangle to check ... 
+        // NOTE: each such triangle will contain "vertex_id" in its vertex list
+        for (std::vector<std::uint32_t>::const_iterator iter = candidate_triangles.begin(); 
+                iter != candidate_triangles.end(); 
+                ++iter) {
+
+            const std::uint32_t current_candidate_triangle_id = *iter;
+            const triangle_t current_candidate_triangle = triangles[current_candidate_triangle_id];
+
+            // Local index of "vertex_id" in the current triangle
+            const std::uint32_t vertex_local_id_in_cur_triangle = triangle_get_vertex_local_id(current_candidate_triangle, vertex_id);
+            // Local index of the next vertex from "vertex_id" in the current triangle
+            const std::uint32_t next_vertex_local_id_in_cur_triangle = ccw(vertex_local_id_in_cur_triangle);
+            // Global index of the next vertex from "vertex_id" in the current triangle
+            const std::uint32_t next_vertex_global_id_in_cur_triangle = current_candidate_triangle.vertices[next_vertex_local_id_in_cur_triangle];
+            // Coordinates of the next vertex from "vertex_id" in the current triangle
+            const vec2& next_vertex_coords = vertices[next_vertex_global_id_in_cur_triangle];
+            // Orientation of the next vertex from "vertex_id" in the current triangle w.r.t the edge defined by "edge_vtx0_coords" and "edge_vtx1_coords"
+            const double orientation_of_next = orient2d(next_vertex_coords, edge_vtx0_coords, edge_vtx1_coords);
+            const point_to_line_location_t::Enum location_of_next = classify_orientation(orientation_of_next);
+
+            // Does the next vertex from "vertex_id" in the current triangle lie on the right side of the edge?
+            if (location_of_next == point_to_line_location_t::RIGHT_SIDE) 
+            { 
+                // Local index of the previous vertex from "vertex_id" in the current triangle
+                const std::uint32_t prev_vertex_local_id_in_cur_triangle = cw(vertex_local_id_in_cur_triangle);
+                // Global index of the previous vertex from "vertex_id" in the current triangle
+                const std::uint32_t prev_vertex_global_id_in_cur_triangle = current_candidate_triangle.vertices[prev_vertex_local_id_in_cur_triangle];
+                // Coordinates of the previous vertex from "vertex_id" in the current triangle
+                const vec2& prev_vertex_coords = vertices[prev_vertex_global_id_in_cur_triangle];
+                // Orientation of the next vertex from "vertex_id" in the current triangle w.r.t the edge defined by "edge_vtx0_coords" and "edge_vtx1_coords"
+                const double orientation_of_prev = orient2d(prev_vertex_coords, edge_vtx0_coords, edge_vtx1_coords);
+                const point_to_line_location_t::Enum location_of_prev = classify_orientation(orientation_of_prev);
+
+                if (location_of_prev == point_to_line_location_t::COLLINEAR) 
+                {
+                    return std::make_tuple(null_neighbour, prev_vertex_global_id_in_cur_triangle, prev_vertex_global_id_in_cur_triangle);
                 }
-                if (locP1 == point_to_line_location_t::LEFT_SIDE) {
-                    if (orientationTolerance) {
+
+                if (location_of_prev == point_to_line_location_t::LEFT_SIDE) 
+                {
+                    if (eps) 
+                    {
                         double closestOrient;
                         std::uint32_t iClosestP;
-                        if (std::abs(orientP1) <= std::abs(orientP2)) {
-                            closestOrient = orientP1;
-                            iClosestP = iP1;
-                        } else {
-                            closestOrient = orientP2;
-                            iClosestP = iP2;
+
+                        if (std::abs(orientation_of_prev) <= std::abs(orientation_of_next)) 
+                        {
+                            closestOrient = orientation_of_prev;
+                            iClosestP = prev_vertex_global_id_in_cur_triangle;
+                        } 
+                        else 
+                        {
+                            closestOrient = orientation_of_next;
+                            iClosestP = next_vertex_global_id_in_cur_triangle;
                         }
+
                         if (classify_orientation(
-                                closestOrient, orientationTolerance)
+                                closestOrient, eps)
                             == point_to_line_location_t::COLLINEAR) {
                             return std::make_tuple(null_neighbour, iClosestP, iClosestP);
                         }
                     }
-                    return std::make_tuple(iT, iP1, iP2);
+                    return std::make_tuple(current_candidate_triangle_id, prev_vertex_global_id_in_cur_triangle, next_vertex_global_id_in_cur_triangle);
                 }
             }
-        }
+        } // for each candidate triangle to check ... 
+
         throw std::runtime_error("Could not find vertex triangle intersected by "
                                  "edge. Note: can be caused by duplicate points.");
     }
@@ -485,17 +513,17 @@ public:
      */
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t>
     TintersectedTriangle(
-        const std::uint32_t iA,
+        const std::uint32_t vertex_id,
         const std::vector<std::uint32_t>& candidates,
         const vec2& a,
         const vec2& b,
-        const double orientationTolerance = double(0)) const
+        const double eps = double(0)) const
     {
         typedef std::vector<std::uint32_t>::const_iterator TriIndCit;
         for (TriIndCit it = candidates.begin(); it != candidates.end(); ++it) {
             const std::uint32_t iT = *it;
             const triangle_t t = triangles[iT];
-            const std::uint32_t i = get_vertex_index(t, iA);
+            const std::uint32_t i = triangle_get_vertex_local_id(t, vertex_id);
             const std::uint32_t iP2 = t.vertices[ccw(i)];
             const double orientP2 = orient2D(vertices[iP2], a, b);
             const point_to_line_location_t::Enum locP2 = classify_orientation(orientP2);
@@ -507,7 +535,7 @@ public:
                     return std::make_tuple(null_neighbour, iP1, iP1);
                 }
                 if (locP1 == point_to_line_location_t::LEFT_SIDE) {
-                    if (orientationTolerance) {
+                    if (eps) {
                         double closestOrient;
                         std::uint32_t iClosestP;
                         if (std::abs(orientP1) <= std::abs(orientP2)) {
@@ -518,7 +546,7 @@ public:
                             iClosestP = iP2;
                         }
                         if (classify_orientation(
-                                closestOrient, orientationTolerance)
+                                closestOrient, eps)
                             == point_to_line_location_t::COLLINEAR) {
                             return std::make_tuple(null_neighbour, iClosestP, iClosestP);
                         }
@@ -773,9 +801,9 @@ private:
     /**
      * Insert an edge into constraint Delaunay triangulation
      * @param edge edge to insert
-     * @param originalEdge original edge inserted edge is part of
+     * @param original_edge original edge inserted edge is part of
      */
-    void insert_edge(edge_t edge, edge_t originalEdge);
+    void insert_edge(edge_t edge, edge_t original_edge);
     /**
      * Conform Delaunay triangulation to a fixed edge by recursively inserting
      * mid point of the edge and then conforming to its halves
@@ -783,7 +811,7 @@ private:
      * @param originalEdges original edges that new edge is piece of
      * @param overlaps count of overlapping boundaries at the edge. Only used
      * when re-introducing edge with overlaps > 0
-     * @param orientationTolerance tolerance for orient2d predicate,
+     * @param eps tolerance for orient2d predicate,
      * values [-tolerance,+tolerance] are considered as 0.
      */
     void conform_to_edge(
@@ -837,7 +865,7 @@ private:
     void finalise_triangulation(const std::unordered_set<std::uint32_t>& removedTriangles);
     std::unordered_set<std::uint32_t> grow_to_boundary(std::stack<std::uint32_t> seeds) const;
 
-    void fixEdge(
+    void mark_edge_as_constrained(
         const edge_t& edge,
         const boundary_overlap_count_t overlaps)
     {
@@ -845,20 +873,27 @@ private:
         overlapCount[edge] = overlaps; // override overlap counter
     }
 
-    void fixEdge(const edge_t& edge)
+    void mark_edge_as_constrained(const edge_t& edge)
     {
-        if (!m_constrained_edges.insert(edge).second) {
+        const std::pair<std::unordered_set<edge_t>::iterator, bool> pair = m_constrained_edges.insert(edge);
+        const bool edge_is_already_marked_as_constrained = (pair.second == false);
+        
+        if (edge_is_already_marked_as_constrained) 
+        {
             ++overlapCount[edge]; // if edge is already fixed increment the counter
         }
     }
 
-    void fixEdge(
+    void mark_edge_as_constrained(
         const edge_t& edge,
-        const edge_t& originalEdge)
+        const edge_t& original_edge)
     {
-        fixEdge(edge);
-        if (edge != originalEdge)
-            detail::insert_unique(pieceToOriginals[edge], originalEdge);
+        mark_edge_as_constrained(edge);
+        
+        if (edge != original_edge)
+        {
+            detail::insert_unique(pieceToOriginals[edge], original_edge);
+        }
     }
     /**
      * Flag triangle as dummy
@@ -1065,30 +1100,32 @@ void triangulator_t::insert_vertices(
     //        insert_vertex_into_triangulation(*it);
     //    break;
     //}
-    }
+    //}
 }
 
-template <
-    typename TEdgeIter,
-    typename TGetEdgeVertexStart,
-    typename TGetEdgeVertexEnd>
+template <typename TEdgeIter>
 void triangulator_t::insert_edges(
     TEdgeIter first,
-    const TEdgeIter last,
-    TGetEdgeVertexStart getStart,
-    TGetEdgeVertexEnd getEnd)
+    const TEdgeIter last)
 {
-    if (is_finalized()) {
-        throw std::runtime_error(
-            "triangulator_t was finalized with 'erase...' method. Inserting new "
-            "edges is not possible");
-    }
+    MCUT_ASSERT(is_finalized());
+
+    //if (is_finalized()) {
+    //    throw std::runtime_error(
+    //        "triangulator_t was finalized with 'erase...' method. Inserting new "
+    //        "edges is not possible");
+    //}
+
     for (; first != last; ++first) {
         // +3 to account for super-triangle vertices
         const edge_t edge(
-            std::uint32_t(getStart(*first) + m_nTargetVerts),
-            std::uint32_t(getEnd(*first) + m_nTargetVerts));
+            first->get_vertex(0) + m_nTargetVerts, // std::uint32_t(getStart(*first) + m_nTargetVerts),
+            first->get_vertex(1) + m_nTargetVerts // std::uint32_t(getEnd(*first) + m_nTargetVerts)
+            );
+
+        // insert the edge into the current triangulation
         insert_edge(edge, edge);
+
     }
     erase_dummies();
 }
@@ -1230,7 +1267,7 @@ void triangulator_t::erase_outer_triangles_and_holes()
 /// Remap removing super-triangle: subtract 3 from vertices
 inline edge_t remap_no_supertriangle(const edge_t& e)
 {
-    return edge_t(e.v1() - 3, e.v2() - 3);
+    return edge_t(e.get_vertex(0) - 3, e.get_vertex(1) - 3);
 }
 
 void triangulator_t::remove_triangles(
@@ -1384,10 +1421,9 @@ std::uint32_t triangulator_t::add_triangle()
     return nxtDummy;
 }
 
-void triangulator_t::insert_edges(
-    const std::vector<edge_t>& edges)
+void triangulator_t::insert_edges(const std::vector<edge_t>& edges)
 {
-    insert_edges(edges.begin(), edges.end(), edge_get_v1, edge_get_v2);
+    insert_edges(edges.begin(), edges.end());
 }
 
 void triangulator_t::conform_to_edges(
@@ -1432,40 +1468,69 @@ namespace detail {
 
 void triangulator_t::insert_edge(
     const edge_t edge,
-    const edge_t originalEdge)
+    const edge_t original_edge)
 {
-    const std::uint32_t iA = edge.v1();
-    std::uint32_t iB = edge.v2();
-    if (iA == iB) // edge connects a vertex to itself
-        return;
-    const std::vector<std::uint32_t>& aTris = per_vertex_adjacent_triangles[iA];
-    const std::vector<std::uint32_t>& bTris = per_vertex_adjacent_triangles[iB];
-    const vec2& a = vertices[iA];
-    const vec2& b = vertices[iB];
-    if (check_vertices_share_edge(aTris, bTris)) {
-        fixEdge(edge, originalEdge);
+    // extract the vertices of edge
+    const std::uint32_t edge_vtx0_id = edge.get_vertex(0);
+    std::uint32_t edge_vtx1_id = edge.get_vertex(1);
+
+    MCUT_ASSERT(edge_vtx0_id != edge_vtx1_id);
+
+    //if (edge_vtx0_id == edge_vtx1_id) // edge connects a vertex to itself
+    //{
+    //    return;
+    //}
+
+    // get triangles adjacent to each vertex of edge
+    const std::vector<std::uint32_t>& vtx0_adjacent_triangles = per_vertex_adjacent_triangles[edge_vtx0_id];
+    const std::vector<std::uint32_t>& vtx1_adjacent_triangles = per_vertex_adjacent_triangles[edge_vtx1_id];
+
+    // get coordinates of each vertex
+    const vec2& vtx0_coords = vertices[edge_vtx0_id];
+    const vec2& vtx1_coords = vertices[edge_vtx1_id];
+
+    // Here we check whether the edge we are trying to insert is actually 
+    // already established as being part of the current triangulation. we do 
+    // this by checking whether they share at-least one adjacent triangle.
+    const bool already_sharing_edge = check_vertices_share_edge(vtx0_adjacent_triangles, vtx1_adjacent_triangles);
+
+    if (already_sharing_edge) {
+        // Since an edge that is being inserted is (by definition) a "constraint edge",
+        // it follows that if we find that the current triangulation already contains
+        // this edge's connectivity then the pre-existing edge in the current 
+        // triangulation must be marked as a "constraint edge" and will not be 
+        // modified furthermore with edgeflips. 
+        // NOTE: from the user's perspective, an inserted edge is one which typically
+        // forms the boundary of a polygon being triangulated.
+        mark_edge_as_constrained(edge, original_edge);
         return;
     }
 
-    const double distanceTolerance = m_minDistToConstraintEdge == double(0)
+    // estimate tolerance threshold for numerical operations (zero by default)
+    const double eps = m_minDistToConstraintEdge == double(0)
         ? double(0)
-        : m_minDistToConstraintEdge * distance(a, b);
+        : m_minDistToConstraintEdge * length(vtx0_coords - vtx1_coords);
 
-    std::uint32_t iT;
+    //
+    // Here we now find the [first] triangle that is intersected by the inserted edge.
+    // This triangle will be one of the ones that are adjacent to the vertices
+    // of the edge
+    //
+    std::uint32_t iT; // intersected triangle
     std::uint32_t iVleft, iVright;
-    std::tie(iT, iVleft, iVright) = get_intersected_triangle(iA, aTris, a, b, distanceTolerance);
+    std::tie(iT, iVleft, iVright) = get_intersected_triangle(edge_vtx0_id, vtx0_adjacent_triangles, vtx0_coords, vtx1_coords, eps);
     // if one of the triangle vertices is on the edge, move edge start
     if (iT == null_neighbour) {
-        const edge_t edgePart(iA, iVleft);
-        fixEdge(edgePart, originalEdge);
-        return insert_edge(edge_t(iVleft, iB), originalEdge);
+        const edge_t edgePart(edge_vtx0_id, iVleft);
+        mark_edge_as_constrained(edgePart, original_edge);
+        return insert_edge(edge_t(iVleft, edge_vtx1_id), original_edge);
     }
     std::vector<std::uint32_t> intersected(1, iT);
     std::vector<std::uint32_t> ptsLeft(1, iVleft);
     std::vector<std::uint32_t> ptsRight(1, iVright);
-    std::uint32_t iV = iA;
+    std::uint32_t iV = edge_vtx0_id;
     triangle_t t = triangles[iT];
-    while (std::find(t.vertices.begin(), t.vertices.end(), iB) == t.vertices.end()) {
+    while (std::find(t.vertices.begin(), t.vertices.end(), edge_vtx1_id) == t.vertices.end()) {
         const std::uint32_t iTopo = get_global_triangle_index_opposite_vertex(t, iV);
         const triangle_t& tOpo = triangles[iTopo];
         const std::uint32_t iVopo = get_opposed_vertex_index(tOpo, iT);
@@ -1484,8 +1549,8 @@ void triangulator_t::insert_edge(
             m_constrained_edges.erase(splitEdge);
             overlapCount.erase(splitEdge);
             // add split edge's halves
-            fixEdge(half1, overlaps);
-            fixEdge(half2, overlaps);
+            mark_edge_as_constrained(half1, overlaps);
+            mark_edge_as_constrained(half2, overlaps);
             // maintain piece-to-original mapping
             std::vector<edge_t> newOriginals(1, splitEdge);
             const std::unordered_map<edge_t, std::vector<edge_t>>::const_iterator originalsIt = pieceToOriginals.find(splitEdge);
@@ -1498,17 +1563,17 @@ void triangulator_t::insert_edge(
 
             // add a new point at the intersection of two constraint edges
             const vec2 newV = detail::get_intersection_point_coords(
-                vertices[iA],
-                vertices[iB],
+                vertices[edge_vtx0_id],
+                vertices[edge_vtx1_id],
                 vertices[iVleft],
                 vertices[iVright]);
             create_vertex(newV, std::vector<std::uint32_t>());
             std::stack<std::uint32_t> stack_of_triangle_indices = insert_point_on_edge(iNewVert, iT, iTopo);
             enforce_delaunay_property_using_edge_flips(newV, iNewVert, stack_of_triangle_indices);
             // TODO: is it's possible to re-use pseudo-polygons
-            //  for inserting [iA, iNewVert] edge half?
-            insert_edge(edge_t(iA, iNewVert), originalEdge);
-            insert_edge(edge_t(iNewVert, iB), originalEdge);
+            //  for inserting [edge_vtx0_id, iNewVert] edge half?
+            insert_edge(edge_t(edge_vtx0_id, iNewVert), original_edge);
+            insert_edge(edge_t(iNewVert, edge_vtx1_id), original_edge);
             return;
         }
 
@@ -1516,7 +1581,7 @@ void triangulator_t::insert_edge(
         iT = iTopo;
         t = triangles[iT];
 
-        const point_to_line_location_t::Enum loc = locate_point_wrt_line(vOpo, a, b, distanceTolerance);
+        const point_to_line_location_t::Enum loc = locate_point_wrt_line(vOpo, vtx0_coords, vtx1_coords, eps);
         if (loc == point_to_line_location_t::LEFT_SIDE) {
             ptsLeft.push_back(iVopo);
             iV = iVleft;
@@ -1526,27 +1591,27 @@ void triangulator_t::insert_edge(
             iV = iVright;
             iVright = iVopo;
         } else // encountered point on the edge
-            iB = iVopo;
+            edge_vtx1_id = iVopo;
     }
     // Remove intersected triangles
     typedef std::vector<std::uint32_t>::const_iterator TriIndCit;
     for (TriIndCit it = intersected.begin(); it != intersected.end(); ++it)
         make_dummies(*it);
     // Triangulate pseudo-polygons on both sides
-    const std::uint32_t iTleft = triangulate_pseudo_polygon(iA, iB, ptsLeft.begin(), ptsLeft.end());
+    const std::uint32_t iTleft = triangulate_pseudo_polygon(edge_vtx0_id, edge_vtx1_id, ptsLeft.begin(), ptsLeft.end());
     std::reverse(ptsRight.begin(), ptsRight.end());
-    const std::uint32_t iTright = triangulate_pseudo_polygon(iB, iA, ptsRight.begin(), ptsRight.end());
+    const std::uint32_t iTright = triangulate_pseudo_polygon(edge_vtx1_id, edge_vtx0_id, ptsRight.begin(), ptsRight.end());
     triangle_replace_neighbour(iTleft, null_neighbour, iTright);
     triangle_replace_neighbour(iTright, null_neighbour, iTleft);
 
-    if (iB != edge.v2()) // encountered point on the edge
+    if (edge_vtx1_id != edge.get_vertex(1)) // encountered point on the edge
     {
         // fix edge part
-        const edge_t edgePart(iA, iB);
-        fixEdge(edgePart, originalEdge);
-        return insert_edge(edge_t(iB, edge.v2()), originalEdge);
+        const edge_t edgePart(edge_vtx0_id, edge_vtx1_id);
+        mark_edge_as_constrained(edgePart, original_edge);
+        return insert_edge(edge_t(edge_vtx1_id, edge.get_vertex(1)), original_edge);
     } else {
-        fixEdge(edge, originalEdge);
+        mark_edge_as_constrained(edge, original_edge);
     }
 }
 
@@ -1555,16 +1620,16 @@ void triangulator_t::conform_to_edge(
     std::vector<edge_t> originalEdges,
     const boundary_overlap_count_t overlaps)
 {
-    const std::uint32_t iA = edge.v1();
-    std::uint32_t iB = edge.v2();
-    if (iA == iB) // edge connects a vertex to itself
+    const std::uint32_t edge_vtx0_id = edge.get_vertex(0);
+    std::uint32_t edge_vtx1_id = edge.get_vertex(1);
+    if (edge_vtx0_id == edge_vtx1_id) // edge connects a vertex to itself
         return;
-    const std::vector<std::uint32_t>& aTris = per_vertex_adjacent_triangles[iA];
-    const std::vector<std::uint32_t>& bTris = per_vertex_adjacent_triangles[iB];
-    const vec2& a = vertices[iA];
-    const vec2& b = vertices[iB];
-    if (check_vertices_share_edge(aTris, bTris)) {
-        overlaps > 0 ? fixEdge(edge, overlaps) : fixEdge(edge);
+    const std::vector<std::uint32_t>& vtx0_adjacent_triangles = per_vertex_adjacent_triangles[edge_vtx0_id];
+    const std::vector<std::uint32_t>& vtx1_adjacent_triangles = per_vertex_adjacent_triangles[edge_vtx1_id];
+    const vec2& a = vertices[edge_vtx0_id];
+    const vec2& b = vertices[edge_vtx1_id];
+    if (check_vertices_share_edge(vtx0_adjacent_triangles, vtx1_adjacent_triangles)) {
+        overlaps > 0 ? mark_edge_as_constrained(edge, overlaps) : mark_edge_as_constrained(edge);
         // avoid marking edge as a part of itself
         if (!originalEdges.empty() && edge != originalEdges.front()) {
             detail::insert_unique(pieceToOriginals[edge], originalEdges);
@@ -1577,18 +1642,18 @@ void triangulator_t::conform_to_edge(
         : m_minDistToConstraintEdge * distance(a, b);
     std::uint32_t iT;
     std::uint32_t iVleft, iVright;
-    std::tie(iT, iVleft, iVright) = get_intersected_triangle(iA, aTris, a, b, distanceTolerance);
+    std::tie(iT, iVleft, iVright) = get_intersected_triangle(edge_vtx0_id, vtx0_adjacent_triangles, a, b, distanceTolerance);
     // if one of the triangle vertices is on the edge, move edge start
     if (iT == null_neighbour) {
-        const edge_t edgePart(iA, iVleft);
-        overlaps > 0 ? fixEdge(edgePart, overlaps) : fixEdge(edgePart);
+        const edge_t edgePart(edge_vtx0_id, iVleft);
+        overlaps > 0 ? mark_edge_as_constrained(edgePart, overlaps) : mark_edge_as_constrained(edgePart);
         detail::insert_unique(pieceToOriginals[edgePart], originalEdges);
-        return conform_to_edge(edge_t(iVleft, iB), originalEdges, overlaps);
+        return conform_to_edge(edge_t(iVleft, edge_vtx1_id), originalEdges, overlaps);
     }
 
-    std::uint32_t iV = iA;
+    std::uint32_t iV = edge_vtx0_id;
     triangle_t t = triangles[iT];
-    while (std::find(t.vertices.begin(), t.vertices.end(), iB) == t.vertices.end()) {
+    while (std::find(t.vertices.begin(), t.vertices.end(), edge_vtx1_id) == t.vertices.end()) {
         const std::uint32_t iTopo = get_global_triangle_index_opposite_vertex(t, iV);
         const triangle_t& tOpo = triangles[iTopo];
         const std::uint32_t iVopo = get_opposed_vertex_index(tOpo, iT);
@@ -1607,8 +1672,8 @@ void triangulator_t::conform_to_edge(
             m_constrained_edges.erase(splitEdge);
             overlapCount.erase(splitEdge);
             // add split edge's halves
-            fixEdge(half1, overlaps);
-            fixEdge(half2, overlaps);
+            mark_edge_as_constrained(half1, overlaps);
+            mark_edge_as_constrained(half2, overlaps);
             // maintain piece-to-original mapping
             std::vector<edge_t> newOriginals(1, splitEdge);
             const std::unordered_map<edge_t, std::vector<edge_t>>::const_iterator originalsIt = pieceToOriginals.find(splitEdge);
@@ -1621,15 +1686,15 @@ void triangulator_t::conform_to_edge(
 
             // add a new point at the intersection of two constraint edges
             const vec2 newV = detail::get_intersection_point_coords(
-                vertices[iA],
-                vertices[iB],
+                vertices[edge_vtx0_id],
+                vertices[edge_vtx1_id],
                 vertices[iVleft],
                 vertices[iVright]);
             create_vertex(newV, std::vector<std::uint32_t>());
             std::stack<std::uint32_t> stack_of_triangle_indices = insert_point_on_edge(iNewVert, iT, iTopo);
             enforce_delaunay_property_using_edge_flips(newV, iNewVert, stack_of_triangle_indices);
-            conform_to_edge(edge_t(iA, iNewVert), originalEdges, overlaps);
-            conform_to_edge(edge_t(iNewVert, iB), originalEdges, overlaps);
+            conform_to_edge(edge_t(edge_vtx0_id, iNewVert), originalEdges, overlaps);
+            conform_to_edge(edge_t(iNewVert, edge_vtx1_id), originalEdges, overlaps);
             return;
         }
 
@@ -1644,21 +1709,21 @@ void triangulator_t::conform_to_edge(
             iV = iVright;
             iVright = iVopo;
         } else // encountered point on the edge
-            iB = iVopo;
+            edge_vtx1_id = iVopo;
     }
     /**/
 
     // add mid-point to triangulation
     const std::uint32_t iMid = static_cast<std::uint32_t>(vertices.size());
-    const vec2& start = vertices[iA];
-    const vec2& end = vertices[iB];
+    const vec2& start = vertices[edge_vtx0_id];
+    const vec2& end = vertices[edge_vtx1_id];
     create_vertex(
         vec2::make((start.x() + end.x()) / 2.0, (start.y() + end.y()) / 2.0),
         std::vector<std::uint32_t>());
     const std::vector<edge_t> flippedFixedEdges = insert_vertex_and_flip_fixed_edges(iMid);
 
-    conform_to_edge(edge_t(iA, iMid), originalEdges, overlaps);
-    conform_to_edge(edge_t(iMid, iB), originalEdges, overlaps);
+    conform_to_edge(edge_t(edge_vtx0_id, iMid), originalEdges, overlaps);
+    conform_to_edge(edge_t(iMid, edge_vtx1_id), originalEdges, overlaps);
     // re-introduce fixed edges that were flipped
     // and make sure overlap count is preserved
     for (std::vector<edge_t>::const_iterator it = flippedFixedEdges.begin();
@@ -1682,8 +1747,8 @@ void triangulator_t::conform_to_edge(
         }
         conform_to_edge(*it, prevOriginals, prevOverlaps);
     }
-    if (iB != edge.v2())
-        conform_to_edge(edge_t(iB, edge.v2()), originalEdges, overlaps);
+    if (edge_vtx1_id != edge.get_vertex(1))
+        conform_to_edge(edge_t(edge_vtx1_id, edge.get_vertex(1)), originalEdges, overlaps);
 }
 
 void triangulator_t::add_super_triangle(const bounding_box_t<vec2>& box)

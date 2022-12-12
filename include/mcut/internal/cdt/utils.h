@@ -93,15 +93,15 @@ bounding_box_t<vec2> construct_bbox_containing_points(const std::vector<vec2>& p
 /// \note: hash edge_t is specialized at the bottom
 struct edge_t {
 
-    edge_t(std::uint32_t iV1, std::uint32_t iV2)
-        : m_vertices(
-            iV1 < iV2 ? std::make_pair(iV1, iV2) : std::make_pair(iV2, iV1))
+    edge_t(std::uint32_t vertex0_global_id, std::uint32_t vertex1_global_id)
+        : m_vertex_pair(
+            vertex0_global_id < vertex1_global_id ? std::make_pair(vertex0_global_id, vertex1_global_id) : std::make_pair(vertex1_global_id, vertex0_global_id))
     {
     }
 
     inline bool operator==(const edge_t& other) const
     {
-        return m_vertices == other.m_vertices;
+        return m_vertex_pair == other.m_vertex_pair;
     }
 
     inline bool operator!=(const edge_t& other) const
@@ -109,35 +109,38 @@ struct edge_t {
         return !(this->operator==(other));
     }
 
-    inline std::uint32_t v1() const
+    inline std::uint32_t get_vertex(const std::uint32_t index) const
     {
-        return m_vertices.first;
+        std::uint32_t result = m_vertex_pair.first; 
+        
+        if(index != 0)
+        {
+            MCUT_ASSERT(index == 1);
+            result = m_vertex_pair.second;
+        }
+
+        return result;
     }
 
-    inline std::uint32_t v2() const
+    inline const std::pair<std::uint32_t, std::uint32_t>& get_vertex_pair() const
     {
-        return m_vertices.second;
-    }
-
-    inline const std::pair<std::uint32_t, std::uint32_t>& verts() const
-    {
-        return m_vertices;
+        return m_vertex_pair;
     }
 
 private:
-    std::pair<std::uint32_t, std::uint32_t> m_vertices;
+    std::pair<std::uint32_t, std::uint32_t> m_vertex_pair;
 };
 
 /// Get edge first vertex
 inline std::uint32_t edge_get_v1(const edge_t& e)
 {
-    return e.v1();
+    return e.get_vertex(0);
 }
 
 /// Get edge second vertex
 inline std::uint32_t edge_get_v2(const edge_t& e)
 {
-    return e.v2();
+    return e.get_vertex(1);
 }
 
 /// Get edge second vertex
@@ -403,13 +406,28 @@ inline std::uint32_t get_neighbour_index(const triangle_t& tri, std::uint32_t iT
     throw std::runtime_error("Could not find neighbor triangle index");
 }
 
-/// If triangle has a given vertex return vertex-index, throw otherwise
-inline std::uint32_t get_vertex_index(const triangle_t& tri, const std::uint32_t iV)
+/// If triangle has a given vertex return vertex-index
+inline std::uint32_t triangle_get_vertex_local_id(const triangle_t& triangle, const std::uint32_t vertex_global_id)
 {
+    MCUT_ASSERT(vertex_global_id != null_vertex);
+
+    std::uint32_t result = null_vertex;
+
+    // for each vertex of triangle
     for (std::uint32_t i = std::uint32_t(0); i < std::uint32_t(3); ++i)
-        if (iV == tri.vertices[i])
-            return i;
-    throw std::runtime_error("Could not find vertex index in triangle");
+    {
+        // does the global id of the current triangle vertex match the one
+        // we are looking for?
+        if (vertex_global_id == triangle.vertices[i])
+        {
+            result = i; // save local index
+            break;
+        }
+    }
+    
+    MCUT_ASSERT(result != null_vertex);
+
+    return result;
 }
 
 /// Given triangle and a vertex find opposed triangle
@@ -443,14 +461,27 @@ bool check_is_in_circumcircle(
 }
 
 /// Test if two vertices share at least one common triangle
-inline bool check_vertices_share_edge(const std::vector<std::uint32_t>& aTris, const std::vector<std::uint32_t>& bTris)
+inline bool check_vertices_share_edge(
+    const std::vector<std::uint32_t>& vtx0_adjacent_triangles, 
+    const std::vector<std::uint32_t>& vtx1_adjacent_triangles)
 {
-    for (std::vector<std::uint32_t>::const_iterator it = aTris.begin(); it != aTris.end(); ++it)
-        if (std::find(bTris.begin(), bTris.end(), *it) != bTris.end())
-            return true;
-    return false;
+    bool result = false;
+
+    for (std::vector<std::uint32_t>::const_iterator it = vtx0_adjacent_triangles.begin(); it != vtx0_adjacent_triangles.end(); ++it)
+    {
+        const std::vector<std::uint32_t>::const_iterator fiter = std::find(vtx1_adjacent_triangles.begin(), vtx1_adjacent_triangles.end(), *it);
+
+        if (fiter != vtx1_adjacent_triangles.end())
+        {
+            result = true;
+            break;
+        }
+    }
+
+    return result;
 }
 
+#if 0
 double get_square_distance(const double ax, const double ay, const double bx, const double by)
 {
     const double dx = bx - ax;
@@ -472,6 +503,7 @@ double get_square_distance(const vec2& a, const vec2& b)
 {
     return get_square_distance(a.x(), a.y(), b.x(), b.y());
 }
+#endif
 
 } // namespace cdt
 
@@ -497,7 +529,7 @@ private:
     }
     static std::size_t get_hashed_edge_index(const cdt::edge_t& e)
     {
-        const std::pair<std::uint32_t, std::uint32_t>& vv = e.verts();
+        const std::pair<std::uint32_t, std::uint32_t>& vv = e.get_vertex_pair();
         std::size_t seed1(0);
         combine_hash_values(seed1, vv.first);
         combine_hash_values(seed1, vv.second);
