@@ -263,7 +263,7 @@ public:
      */
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t>
     get_intersected_triangle(
-        // one of the vertices of the edge e.g. "edge_vtx0" 
+        // one of the vertices of the edge e.g. "edge_vtx0" i.e. vertex a
         const std::uint32_t vertex_id,
         const std::vector<std::uint32_t>& candidate_triangles, // candidates to check i.e. adjacent triangle of "vertex_id"
         const vec2& edge_vtx0_coords,
@@ -273,9 +273,23 @@ public:
 
         //
         // NOTE: The following algorithm finds the triangle of the CDT that is cut/intersection by our edge.
-            // It is outlined in the paper "An improved incremental algorithm for constructing 
-            // restricted Delaunay triangulations" by Marc Vigo Anglada (1997). Section 4. 
-            //
+        // It is outlined in the paper "An improved incremental algorithm for constructing 
+        // restricted Delaunay triangulations" by Marc Vigo Anglada (1997). Section 4. 
+        //
+        // Note further that before entering this function we have already performed the first step of insertion,
+        // which is to find the triangle of the CDT that contains the vertex "a" which is cut by the segment "ab"
+        //  
+        // Use the adjacency relationship between the triangles to move through the triangles that converge on "a", 
+        // moving in a clockwise direction until we find the triangle that is cut by the segment "ab".
+        // The remaining triangles cut by "ab" are easily found by using the same adjacency relationship and 
+        // the classification test of a point with respect to "a" line.
+        // 
+        // This process also allows simultaneous classification of the vertices of the triangles in two sets,that 
+        // of the vertices above the edge "ab", and that of those below.
+        //
+        // The polygon that results from inserting an edge (before re-triangulation) is called the pseudo-polygon.
+        // The two halfs of the the psuedo-polygn and called the lower and upper pseudo-polygons, respectively
+        // 
             
         // for each candidate triangle to check ... 
         // NOTE: each such triangle will contain "vertex_id" in its vertex list
@@ -312,35 +326,55 @@ public:
                 const point_to_line_location_t::Enum location_of_prev = classify_orientation(orientation_of_prev);
 
                 if (location_of_prev == point_to_line_location_t::COLLINEAR) 
-                {
-                    return std::make_tuple(null_neighbour, prev_vertex_global_id_in_cur_triangle, prev_vertex_global_id_in_cur_triangle);
+                { // previous vertex of triangle lies on the edge "ab"
+                    return std::make_tuple(
+                        null_neighbour, // cannot determine neighbour because edge "ab" cuts through vertex "prev" 
+                        prev_vertex_global_id_in_cur_triangle, 
+                        prev_vertex_global_id_in_cur_triangle);
                 }
 
+                // Does previous vertex of triangle lies on the left side edge "ab"?
+                // i.e. edge ab passes through the edge that is opposite the vertex labelled "vertex_id"
                 if (location_of_prev == point_to_line_location_t::LEFT_SIDE) 
-                {
-                    if (eps) 
+                {     
+                    if (eps != double(0.0)) // is thresholding enabled (false by default)
                     {
-                        double closestOrient;
-                        std::uint32_t iClosestP;
+                        //
+                        // These tests are used if edge ab passes very close to either the previous or the next vertes, or that
+                        // the edge that is opposite the vertex labelled "vertex_id" is very short/small 
+                        //
 
+                        double closest_orientation;
+                        std::uint32_t closest_vertex_id;
+
+                        // prev vertex is closer to edge "ab" than is next vertex
                         if (std::abs(orientation_of_prev) <= std::abs(orientation_of_next)) 
                         {
-                            closestOrient = orientation_of_prev;
-                            iClosestP = prev_vertex_global_id_in_cur_triangle;
+                            closest_orientation = orientation_of_prev;
+                            closest_vertex_id = prev_vertex_global_id_in_cur_triangle;
                         } 
                         else 
                         {
-                            closestOrient = orientation_of_next;
-                            iClosestP = next_vertex_global_id_in_cur_triangle;
+                            closest_orientation = orientation_of_next;
+                            closest_vertex_id = next_vertex_global_id_in_cur_triangle;
                         }
 
-                        if (classify_orientation(
-                                closestOrient, eps)
-                            == point_to_line_location_t::COLLINEAR) {
-                            return std::make_tuple(null_neighbour, iClosestP, iClosestP);
+                        const point_to_line_location_t::Enum location_of_closest = classify_orientation(closest_orientation, eps);
+
+                        if (location_of_closest == point_to_line_location_t::COLLINEAR) {
+                            return std::make_tuple(
+                                null_neighbour, // cannot determine neighbour because edge "ab" cuts through closest vertex ("prev" or "next") 
+                                closest_vertex_id, 
+                                closest_vertex_id);
                         }
                     }
-                    return std::make_tuple(current_candidate_triangle_id, prev_vertex_global_id_in_cur_triangle, next_vertex_global_id_in_cur_triangle);
+
+                    return std::make_tuple(
+                        current_candidate_triangle_id, // triangle through which "ab" is passing 
+                        // vertices defined the CDT edge to be removed because it is intersecting with "ab" 
+                        prev_vertex_global_id_in_cur_triangle, // left of "ab" (for upper psuedo-polygon)
+                        next_vertex_global_id_in_cur_triangle // right of "ab" (for lower psuedo-polygon)
+                        );
                 }
             }
         } // for each candidate triangle to check ... 
@@ -536,19 +570,19 @@ public:
                 }
                 if (locP1 == point_to_line_location_t::LEFT_SIDE) {
                     if (eps) {
-                        double closestOrient;
-                        std::uint32_t iClosestP;
+                        double closest_orientation;
+                        std::uint32_t closest_vertex_id;
                         if (std::abs(orientP1) <= std::abs(orientP2)) {
-                            closestOrient = orientP1;
-                            iClosestP = iP1;
+                            closest_orientation = orientP1;
+                            closest_vertex_id = iP1;
                         } else {
-                            closestOrient = orientP2;
-                            iClosestP = iP2;
+                            closest_orientation = orientP2;
+                            closest_vertex_id = iP2;
                         }
                         if (classify_orientation(
-                                closestOrient, eps)
+                                closest_orientation, eps)
                             == point_to_line_location_t::COLLINEAR) {
-                            return std::make_tuple(null_neighbour, iClosestP, iClosestP);
+                            return std::make_tuple(null_neighbour, closest_vertex_id, closest_vertex_id);
                         }
                     }
                     return std::make_tuple(iT, iP1, iP2);
@@ -1490,7 +1524,7 @@ void triangulator_t::insert_edge(
     const vec2& vtx1_coords = vertices[edge_vtx1_id];
 
     // Here we check whether the edge we are trying to insert is actually 
-    // already established as being part of the current triangulation. we do 
+    // already established as being part of the CDT. we do 
     // this by checking whether they share at-least one adjacent triangle.
     const bool already_sharing_edge = check_vertices_share_edge(vtx0_adjacent_triangles, vtx1_adjacent_triangles);
 
@@ -1499,8 +1533,8 @@ void triangulator_t::insert_edge(
         // it follows that if we find that the current triangulation already contains
         // this edge's connectivity then the pre-existing edge in the current 
         // triangulation must be marked as a "constraint edge" and will not be 
-        // modified furthermore with edgeflips. 
-        // NOTE: from the user's perspective, an inserted edge is one which typically
+        // modified furthermore (i.e. during edgeflips). 
+        // NOTE: from the user's perspective, an inserted edge is one which 
         // forms the boundary of a polygon being triangulated.
         mark_edge_as_constrained(edge, original_edge);
         return;
@@ -1513,37 +1547,68 @@ void triangulator_t::insert_edge(
 
     //
     // Here we now find the [first] triangle that is intersected by the inserted edge.
-    // This triangle will be one of the ones that are adjacent to the vertices
-    // of the edge
+    // This triangle will be one of the ones that are adjacent to one the vertices
+    // of the edge e.g. the first one 
     //
-    std::uint32_t iT; // intersected triangle
-    std::uint32_t iVleft, iVright;
-    std::tie(iT, iVleft, iVright) = get_intersected_triangle(edge_vtx0_id, vtx0_adjacent_triangles, vtx0_coords, vtx1_coords, eps);
-    // if one of the triangle vertices is on the edge, move edge start
-    if (iT == null_neighbour) {
-        const edge_t edgePart(edge_vtx0_id, iVleft);
-        mark_edge_as_constrained(edgePart, original_edge);
-        return insert_edge(edge_t(iVleft, edge_vtx1_id), original_edge);
+
+    // adjacent triangle (to "edge_vtx0_id") whose edge is intersected by "ab"
+    std::uint32_t intersected_triangle_id; 
+    // vertex belonging to the edge in "intersected_triangle_id", which lies on 
+    // the left side of edge "ab" (i.e. the source vertex of halfedge intersected by "ab") 
+    std::uint32_t itriangle_prev_vtx_from_vtx0_id;
+    // vertex belonging to the edge in "intersected_triangle_id", which lies on 
+    // the right side of edge "ab" (i.e. the target vertex of halfedge intersected by "ab")  
+    std::uint32_t itriangle_next_vtx_from_vtx1_id;
+
+    std::tie(
+        intersected_triangle_id, 
+        itriangle_prev_vtx_from_vtx0_id, 
+        itriangle_next_vtx_from_vtx1_id) = get_intersected_triangle(edge_vtx0_id, vtx0_adjacent_triangles, vtx0_coords, vtx1_coords, eps);
+
+    // if one of the triangle vertices (prev or next) is exactly on the edge, move edge-start to one of the two vertices
+    if (intersected_triangle_id == null_neighbour) {
+
+        // left edge i.e. the pre-existing edge connecting "prev" and "curr" vertex in intersected triangle
+        const edge_t left_edge(edge_vtx0_id, itriangle_prev_vtx_from_vtx0_id);
+
+        // mark pre-existing edge as constrained
+        mark_edge_as_constrained(left_edge, original_edge);
+
+        // Edge running from the "prev" vertex of intersected triangle, to the endpoint "b" of "ab"
+        // NOTE: this is like re-starting the edge-insertion process but from vertex "itriangle_prev_vtx_from_vtx0_id" instead of "a" of "ab"
+        const edge_t edge_(itriangle_prev_vtx_from_vtx0_id, edge_vtx1_id);
+
+        return insert_edge(edge_, original_edge);
     }
-    std::vector<std::uint32_t> intersected(1, iT);
-    std::vector<std::uint32_t> ptsLeft(1, iVleft);
-    std::vector<std::uint32_t> ptsRight(1, iVright);
-    std::uint32_t iV = edge_vtx0_id;
-    triangle_t t = triangles[iT];
+
+    //
+    // proceed as usual ("ab" partitions "prev" and "next" unambiguously)
+    //
+    
+    // vector of triangled intersected by "ab"
+    std::vector<std::uint32_t> intersected(1, intersected_triangle_id);
+    // vertices (from intersected triangles) that lie on the left side of "ab"
+    std::vector<std::uint32_t> vertices_on_left(1, itriangle_prev_vtx_from_vtx0_id);
+    // vertices (from intersected triangles) that lie on the right side of "ab"
+    std::vector<std::uint32_t> vertices_on_right(1, itriangle_next_vtx_from_vtx1_id);
+
+    std::uint32_t iV = edge_vtx0_id; // vertex "a" of the edge we are inserting called "ab"
+    triangle_t t = triangles[intersected_triangle_id];
+
     while (std::find(t.vertices.begin(), t.vertices.end(), edge_vtx1_id) == t.vertices.end()) {
         const std::uint32_t iTopo = get_global_triangle_index_opposite_vertex(t, iV);
         const triangle_t& tOpo = triangles[iTopo];
-        const std::uint32_t iVopo = get_opposed_vertex_index(tOpo, iT);
+        const std::uint32_t iVopo = get_opposed_vertex_index(tOpo, intersected_triangle_id);
         const vec2 vOpo = vertices[iVopo];
 
         // RESOLVE intersection between two constraint edges if needed
-        if (m_intersectingEdgesStrategy == action_on_intersecting_constraint_edges_t::RESOLVE && m_constrained_edges.count(edge_t(iVleft, iVright))) {
+        if (m_intersectingEdgesStrategy == action_on_intersecting_constraint_edges_t::RESOLVE && m_constrained_edges.count(edge_t(itriangle_prev_vtx_from_vtx0_id, itriangle_next_vtx_from_vtx1_id))) {
             const std::uint32_t iNewVert = static_cast<std::uint32_t>(vertices.size());
 
             // split constraint edge that already exists in triangulation
-            const edge_t splitEdge(iVleft, iVright);
-            const edge_t half1(iVleft, iNewVert);
-            const edge_t half2(iNewVert, iVright);
+            const edge_t splitEdge(itriangle_prev_vtx_from_vtx0_id, itriangle_next_vtx_from_vtx1_id);
+            const edge_t half1(itriangle_prev_vtx_from_vtx0_id, iNewVert);
+            const edge_t half2(iNewVert, itriangle_next_vtx_from_vtx1_id);
             const boundary_overlap_count_t overlaps = overlapCount[splitEdge];
             // remove the edge that will be split
             m_constrained_edges.erase(splitEdge);
@@ -1565,10 +1630,10 @@ void triangulator_t::insert_edge(
             const vec2 newV = detail::get_intersection_point_coords(
                 vertices[edge_vtx0_id],
                 vertices[edge_vtx1_id],
-                vertices[iVleft],
-                vertices[iVright]);
+                vertices[itriangle_prev_vtx_from_vtx0_id],
+                vertices[itriangle_next_vtx_from_vtx1_id]);
             create_vertex(newV, std::vector<std::uint32_t>());
-            std::stack<std::uint32_t> stack_of_triangle_indices = insert_point_on_edge(iNewVert, iT, iTopo);
+            std::stack<std::uint32_t> stack_of_triangle_indices = insert_point_on_edge(iNewVert, intersected_triangle_id, iTopo);
             enforce_delaunay_property_using_edge_flips(newV, iNewVert, stack_of_triangle_indices);
             // TODO: is it's possible to re-use pseudo-polygons
             //  for inserting [edge_vtx0_id, iNewVert] edge half?
@@ -1578,18 +1643,18 @@ void triangulator_t::insert_edge(
         }
 
         intersected.push_back(iTopo);
-        iT = iTopo;
-        t = triangles[iT];
+        intersected_triangle_id = iTopo;
+        t = triangles[intersected_triangle_id];
 
         const point_to_line_location_t::Enum loc = locate_point_wrt_line(vOpo, vtx0_coords, vtx1_coords, eps);
         if (loc == point_to_line_location_t::LEFT_SIDE) {
-            ptsLeft.push_back(iVopo);
-            iV = iVleft;
-            iVleft = iVopo;
+            vertices_on_left.push_back(iVopo);
+            iV = itriangle_prev_vtx_from_vtx0_id;
+            itriangle_prev_vtx_from_vtx0_id = iVopo;
         } else if (loc == point_to_line_location_t::RIGHT_SIDE) {
-            ptsRight.push_back(iVopo);
-            iV = iVright;
-            iVright = iVopo;
+            vertices_on_right.push_back(iVopo);
+            iV = itriangle_next_vtx_from_vtx1_id;
+            itriangle_next_vtx_from_vtx1_id = iVopo;
         } else // encountered point on the edge
             edge_vtx1_id = iVopo;
     }
@@ -1598,9 +1663,9 @@ void triangulator_t::insert_edge(
     for (TriIndCit it = intersected.begin(); it != intersected.end(); ++it)
         make_dummies(*it);
     // Triangulate pseudo-polygons on both sides
-    const std::uint32_t iTleft = triangulate_pseudo_polygon(edge_vtx0_id, edge_vtx1_id, ptsLeft.begin(), ptsLeft.end());
-    std::reverse(ptsRight.begin(), ptsRight.end());
-    const std::uint32_t iTright = triangulate_pseudo_polygon(edge_vtx1_id, edge_vtx0_id, ptsRight.begin(), ptsRight.end());
+    const std::uint32_t iTleft = triangulate_pseudo_polygon(edge_vtx0_id, edge_vtx1_id, vertices_on_left.begin(), vertices_on_left.end());
+    std::reverse(vertices_on_right.begin(), vertices_on_right.end());
+    const std::uint32_t iTright = triangulate_pseudo_polygon(edge_vtx1_id, edge_vtx0_id, vertices_on_right.begin(), vertices_on_right.end());
     triangle_replace_neighbour(iTleft, null_neighbour, iTright);
     triangle_replace_neighbour(iTright, null_neighbour, iTleft);
 
