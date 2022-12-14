@@ -365,45 +365,43 @@ namespace cdt {
 
 /// KD-tree holding points
 template <
+    typename TCoordType,
     size_t NumVerticesInLeaf = 32,
     size_t InitialStackDepth = 32,
     size_t StackDepthIncrement = 32>
 class locator_kdtree_t {
 public:
     /// Initialize KD-tree with points
-    void initialize(const std::vector<vec2>& points)
+    void initialize(const std::vector<vec2_<TCoordType>>& points)
     {
-        vec2 min = points.front();
-        vec2 max = min;
+        vec2_<TCoordType> min = points.front();
+        vec2_<TCoordType> max = min;
 
-        for (std::vector<vec2>::const_iterator it = points.begin();            it != points.end();             ++it) {
+        for (typename std::vector<vec2_<TCoordType>>::const_iterator it = points.begin();
+             it != points.end();
+             ++it) {
 
-            //min = vec2_<TCoordType>::make(std::min(min.x(), it->x()), std::min(min.y(), it->y()));
-            min.x() = std::min(min.x(), it->x());
-            min.y() = std::min(min.y(), it->y());
+            min = vec2_<TCoordType>::make(std::min(min.x(), it->x()), std::min(min.y(), it->y()));
+            max = vec2_<TCoordType>::make(std::max(max.x(), it->x()), std::max(max.y(), it->y()));
 
-            //max = vec2_<TCoordType>::make(std::max(max.x(), it->x()), std::max(max.y(), it->y()));
-            max.x() = std::max(max.x(), it->x());
-            max.y() = std::max(max.y(), it->y());
         }
 
-        m_tree = kdtree_t(min, max); // init tree
+        m_tree = kdtree_t(min, max);
 
-        for (std::uint32_t i = 0; i < (std::uint32_t)points.size(); ++i) 
-        {
+        for (std::uint32_t i = 0; i < (std::uint32_t)points.size(); ++i) {
             m_tree.insert(i, points);
         }
     }
     /// Add point to KD-tree
-    void add_point(const std::uint32_t i, const std::vector<vec2>& points)
+    void add_point(const std::uint32_t i, const std::vector<vec2_<TCoordType>>& points)
     {
         m_tree.insert(i, points);
     }
 
     /// Find nearest point using R-tree
-    std::uint32_t find_nearest_point(
-        const vec2& pos,
-        const std::vector<vec2>& points) const
+    std::uint32_t nearPoint(
+        const vec2_<TCoordType>& pos,
+        const std::vector<vec2_<TCoordType>>& points) const
     {
         return m_tree.nearest(pos, points).second;
     }

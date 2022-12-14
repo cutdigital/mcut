@@ -420,8 +420,8 @@ std::unordered_map<edge_t, std::vector<std::uint32_t>> get_edge_to_split_vertice
          ++it) {
 
         const edge_t& e = it->first;
-        const T dX = vertices[e.get_vertex(1)].x() - vertices[e.get_vertex(0)].x();
-        const T dY = vertices[e.get_vertex(1)].y() - vertices[e.get_vertex(0)].y();
+        const T dX = vertices[e.v2()].x() - vertices[e.v1()].x();
+        const T dY = vertices[e.v2()].y() - vertices[e.v1()].y();
         const bool isX = std::abs(dX) >= std::abs(dY); // X-coord longer
         const bool isAscending = isX ? dX >= 0 : dY >= 0; // Longer coordinate ascends
         const std::vector<edge_t>& pieces = it->second;
@@ -432,7 +432,7 @@ std::unordered_map<edge_t, std::vector<std::uint32_t>> get_edge_to_split_vertice
 
         for (std::vector<edge_t>::const_iterator it = pieces.begin(); it != pieces.end(); ++it) {
 
-            const std::array<std::uint32_t, 2> vv = { it->get_vertex(0), it->get_vertex(1) };
+            const std::array<std::uint32_t, 2> vv = { it->v1(), it->v2() };
 
             for (std::array<std::uint32_t, 2>::const_iterator v = vv.begin(); v != vv.end(); ++v) {
                 const T c = isX ? vertices[*v].x() : vertices[*v].y();
@@ -504,13 +504,14 @@ namespace cdt {
  * @tparam T type of vertex coordinates (e.g., float, double)
  * @tparam TNearPointLocator class providing locating near point for efficiently
  */
-inline bool check_topology(const cdt::triangulator_t& cdt)
+template <typename T, typename TNearPointLocator>
+inline bool check_topology(const cdt::triangulator_t<T, TNearPointLocator>& cdt)
 {
     // Check if vertices' adjacent triangles contain vertex
     const std::vector<std::vector<std::uint32_t>> vertTris = cdt.is_finalized()
         ? get_vertex_to_triangles_map(
             cdt.triangles, static_cast<std::uint32_t>(cdt.vertices.size()))
-        : cdt.per_vertex_adjacent_triangles;
+        : cdt.vertTris;
     for (std::uint32_t iV(0); iV < std::uint32_t(cdt.vertices.size()); ++iV) {
         const std::vector<std::uint32_t>& vTris = vertTris[iV];
         typedef std::vector<std::uint32_t>::const_iterator TriIndCit;

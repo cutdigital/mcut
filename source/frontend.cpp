@@ -281,6 +281,256 @@ void get_connected_components_impl(
     }
 }
 
+#include <numeric>
+#include <queue>
+
+// Three alternative schemes are proposed for ear processing
+enum class EarSorting {
+    // processes ears in the order they are found.
+    // May produce numerous badly shaped triangles
+    SEQUENTIAL,
+
+    // processes ears in random order. Tends to produce
+    // slightly better triangulations than SEQUENTIAL,
+    // with substancially no computational overhead
+    RANDOMIZED,
+
+    // sorts ears by increasing inner angle.
+    // Produces the best triangulations but
+    // is introduces a tiny overhead to handle
+    // the priority queue
+    PRIORITIZED
+};
+
+/// Location of point on a triangle
+struct point_to_triangle_location_t {
+    /// Enum
+    enum Enum {
+        INSIDE,
+        OUTSIDE,
+        ON_1ST_EDGE,
+        ON_2ND_EDGE,
+        ON_3RD_EDGE,
+    };
+};
+
+/// Relative location of point to a line
+struct point_to_line_location_t {
+    /// Enum
+    enum Enum {
+        LEFT_SIDE,
+        RIGHT_SIDE,
+        COLLINEAR,
+    };
+};
+
+bool earcut(const std::vector<vec2>& poly,
+    std::vector<uint>& tris,
+    const EarSorting sort) // { SEQUENTIAL, RANDOMIZED, PRIORITIZED }
+{
+    tris.clear();
+
+    if (sort == EarSorting::RANDOMIZED)
+        srand(1234567);
+
+    // doubly linked list for O(1) polygon update
+    uint size = poly.size();
+    MCUT_ASSERT(size >= 3);
+    std::vector<uint> prev(size);
+    std::vector<uint> next(size);
+    std::iota(prev.begin(), prev.end(), -1);
+    std::iota(next.begin(), next.end(), 1);
+    prev.front() = size - 1;
+    next.back() = 0;
+
+    // list of the ears to be cut
+    // (SEQUENTIAL and RANDOMIZED use ears, PRIORITIZED uses ears_prio)
+    std::vector<uint> ears;
+    std::priority_queue<std::pair<double, uint>> ears_prio;
+    ears.reserve(size);
+
+    // these always have size |poly|, and keep track of ears and concave vertices
+    //  - corners that were not ears at the beginning may become so later on...
+    //  - corners that were concave at the beginning may become convex/ears so later on....
+    std::vector<bool> is_ear(size, false);
+    std::vector<bool> is_concave(size, false);
+
+    // boolean function that performs a local concavity test around vertex v_curr
+    auto concave_test = [&](const uint v_curr) {
+        uint v_prev = prev[v_curr];
+        uint v_next = next[v_curr];
+
+        const vec2 t0 = poly.at(v_prev);
+        const vec2 t1 = poly.at(v_curr);
+        const vec2 t2 = poly.at(v_next);
+
+        return (orient2d(t0, t1, t2) <= 0);
+    };
+
+    auto // TODO: replace with "sign_t sign()" from math.h
+        /// Classify value of orient2d predicate
+
+        classify_orientation
+        = [&](const double orientation) -> point_to_line_location_t::Enum {
+        if (orientation < 0)
+            return point_to_line_location_t::RIGHT_SIDE;
+        if (orientation > 0)
+            return point_to_line_location_t::LEFT_SIDE;
+        return point_to_line_location_t::COLLINEAR;
+    };
+
+    auto
+        /// Check if point lies to the left of, to the right of, or on a line
+        locate_point_wrt_line
+        = [&](
+              const vec2& point_coords,
+              const vec2& line_vertex0_coords,
+              const vec2& line_vertex1_coords) -> point_to_line_location_t::Enum {
+        const double orient2d_result = orient2d(point_coords, line_vertex0_coords, line_vertex1_coords);
+        const point_to_line_location_t::Enum orientation_of_point_wrt_line = classify_orientation(orient2d_result);
+        return orientation_of_point_wrt_line;
+    };
+
+    /// Check if point a lies inside of, outside of, or on an edge of a triangle
+    auto
+        point_in_triangle_2d
+        = [&](
+              const vec2& p,
+              const vec2& v1,
+              const vec2& v2,
+              const vec2& v3) -> point_to_triangle_location_t::Enum {
+        point_to_triangle_location_t::Enum result = point_to_triangle_location_t::INSIDE;
+        point_to_line_location_t::Enum edgeCheck = locate_point_wrt_line(p, v1, v2);
+        if (edgeCheck == point_to_line_location_t::RIGHT_SIDE)
+            return point_to_triangle_location_t::OUTSIDE;
+        if (edgeCheck == point_to_line_location_t::COLLINEAR)
+            result = point_to_triangle_location_t::ON_1ST_EDGE;
+        edgeCheck = locate_point_wrt_line(p, v2, v3);
+        if (edgeCheck == point_to_line_location_t::RIGHT_SIDE)
+            return point_to_triangle_location_t::OUTSIDE;
+        if (edgeCheck == point_to_line_location_t::COLLINEAR)
+            result = point_to_triangle_location_t::ON_2ND_EDGE;
+        edgeCheck = locate_point_wrt_line(p, v3, v1);
+        if (edgeCheck == point_to_line_location_t::RIGHT_SIDE)
+            return point_to_triangle_location_t::OUTSIDE;
+        if (edgeCheck == point_to_line_location_t::COLLINEAR)
+            result = point_to_triangle_location_t::ON_3RD_EDGE;
+        return result;
+    };
+
+    // boolean function that performs a local ear test around vertex v_curr
+    auto ear_test = [&](const uint v_curr) {
+        if (is_concave[v_curr])
+            return false;
+
+        uint v_prev = prev[v_curr];
+        uint v_next = next[v_curr];
+
+        const vec2 t0 = poly.at(v_prev);
+        const vec2 t1 = poly.at(v_curr);
+        const vec2 t2 = poly.at(v_next);
+
+        // does the ear contain any other front vertex?
+        uint beg = next[v_curr];
+        uint end = prev[v_curr];
+        uint test = next[beg];
+        while (test != end) {
+            // check only concave vertices....
+            if (is_concave[test] && point_in_triangle_2d(poly.at(test), t0, t1, t2) != point_to_triangle_location_t::OUTSIDE) {
+                return false;
+            }
+            test = next[test];
+        }
+        return true;
+    };
+
+    // inserts an ear into the ear list. uses the vector for SEQUENTIAL and
+    // RANDOMIZED mode, and a prio queue for PRIORITIZED mode
+    auto push_ear = [&](const uint v_curr) {
+        is_ear.at(v_curr) = true;
+        if (sort == EarSorting::PRIORITIZED) {
+            uint v_prev = prev[v_curr];
+            uint v_next = next[v_curr];
+            vec2 u = poly.at(v_prev) - poly.at(v_curr);
+            vec2 v = poly.at(v_next) - poly.at(v_curr);
+            // double ang   = u.angle_rad(v);
+            double dot = dot_product(u, v); // dot product between [x1, y1] and [x2, y2]
+            double det = u.x() * v.y() - u.y() * v.x(); // determinant
+            double ang = atan2(det, dot); // atan2(y, x) or atan2(sin, cos)
+            ears_prio.push(std::make_pair(-ang, v_curr));
+        } else {
+            ears.emplace_back(v_curr);
+        }
+    };
+
+    // detect all concave vertices and valid ears in O(n)
+    for (uint curr = 0; curr < size; ++curr)
+        is_concave[curr] = concave_test(curr);
+    for (uint curr = 0; curr < size; ++curr)
+        if (ear_test(curr))
+            push_ear(curr);
+
+    // iteratively triangulate the polygon, also updating the list of ears
+    // (a simple polygon with n vertices can be meshed with n-2 triangles)
+    for (uint i = 0; i < size - 2; ++i) {
+        // something went wrong.... degenerate polygon?
+        if (ears.empty() && ears_prio.empty())
+            return false;
+
+        uint curr;
+        if (sort == EarSorting::PRIORITIZED) {
+            curr = ears_prio.top().second;
+            ears_prio.pop();
+        } else {
+            if (sort == EarSorting::RANDOMIZED) {
+                uint off = rand() % ears.size();
+                std::swap(ears.at(off), ears.back());
+            }
+            curr = ears.back();
+            ears.pop_back();
+        }
+
+        // the ear has already been processed
+        if (!is_ear.at(curr)) {
+            --i;
+            continue;
+        }
+
+        // useful to mark the current ear as already processed
+        is_ear.at(curr) = false;
+
+        // make new tri
+        tris.push_back(prev[curr]);
+        tris.push_back(curr);
+        tris.push_back(next[curr]);
+
+        // exclude curr from the front, connecting prev and next
+        next[prev[curr]] = next[curr];
+        prev[next[curr]] = prev[curr];
+
+        // update concavity info
+        is_concave[prev[curr]] = concave_test(prev[curr]);
+        is_concave[next[curr]] = concave_test(next[curr]);
+
+        // update prev ear info
+        if (ear_test(prev[curr])) {
+            push_ear(prev[curr]);
+        } else if (is_ear.at(prev[curr])) {
+            // if it was an ear before, mark it as non ear
+            is_ear.at(prev[curr]) = false;
+        }
+
+        // update next ear
+        if (ear_test(next[curr])) {
+            push_ear(next[curr]);
+        } else if (is_ear.at(next[curr])) {
+            // if it was an ear before, mark it as non ear
+            is_ear.at(next[curr]) = false;
+        }
+    }
+    return true;
+}
+
 void get_connected_component_data_impl(
     const McContext context,
     const McConnectedComponent connCompId,
@@ -370,7 +620,7 @@ void get_connected_component_data_impl(
             double* casted_ptr = reinterpret_cast<double*>(pMem);
 
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
-                
+
                 const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
@@ -416,7 +666,7 @@ void get_connected_component_data_impl(
 
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                
+
                 vertices_around_face.clear();
                 cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *fiter);
                 const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
@@ -483,10 +733,10 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             std::vector<fd_t> faces_around_face;
-            
+
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                
+
                 faces_around_face.clear();
                 cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
 
@@ -529,16 +779,16 @@ void get_connected_component_data_impl(
 
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices 
+            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices
         } else {
-            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2  * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
             if (bytes % (sizeof(uint32_t) * 2) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            
+
             uint64_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
@@ -570,7 +820,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT) {
             throw std::invalid_argument("invalid client pointer type");
         }
@@ -592,7 +842,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT && cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_PATCH) {
             throw std::invalid_argument("connected component must be a patch or a fragment");
         }
@@ -619,7 +869,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT) {
             throw std::invalid_argument("invalid client pointer type");
         }
@@ -640,7 +890,7 @@ void get_connected_component_data_impl(
     } break;
         //
     case MC_CONNECTED_COMPONENT_DATA_ORIGIN: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_SEAM && cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_INPUT) {
             throw std::invalid_argument("invalid connected component type");
         }
@@ -673,7 +923,7 @@ void get_connected_component_data_impl(
         }
 
         const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data.seam_vertices.size();
-        
+
         if (pMem == nullptr) {
             *pNumBytes = seam_vertex_count * sizeof(uint32_t);
         } else {
@@ -688,10 +938,9 @@ void get_connected_component_data_impl(
             const uint32_t elems_to_copy = bytes / sizeof(uint32_t);
             uint32_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
-            
+
             // TODO: make parallel
-            for (uint32_t i = 0; i < elems_to_copy; ++i)
-            {
+            for (uint32_t i = 0; i < elems_to_copy; ++i) {
                 const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data.seam_vertices[i];
                 *(casted_ptr + elem_offset) = seam_vertex_idx;
                 elem_offset++;
@@ -731,11 +980,11 @@ void get_connected_component_data_impl(
             // TODO: make parallel
             for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each vertex in CC
             {
-                // Here we use whatever index value was assigned to the current vertex by the kernel, where the 
+                // Here we use whatever index value was assigned to the current vertex by the kernel, where the
                 // the kernel does not necessarilly know that the input meshes it was given where modified by
-                // the frontend (in this case via polygon partitioning) 
+                // the frontend (in this case via polygon partitioning)
                 // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-                
+
                 uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data.data_maps.vertex_map[i];
                 // We use the same default value as that used by the kernel for intersection
                 // points (intersection points at mapped to uint_max i.e. null_vertex())
@@ -747,21 +996,20 @@ void get_connected_component_data_impl(
                     // NOTE: The kernel will assign/map a 'proper' index value to vertices that exist due to face partitioning.
                     // 'proper' here means that the kernel treats these vertices as 'original vertices' from a client-provided input
                     // mesh. In reality, the frontend added such vertices in order to partition a face. i.e. the kernel is not aware
-                    // that a given input mesh it is working with is modified by the frontend (it assumes that the meshes is exactly as was 
+                    // that a given input mesh it is working with is modified by the frontend (it assumes that the meshes is exactly as was
                     // provided by the client).
                     // So, here we have to fix that mapping information to correctly state that "any vertex added due to face
                     // partitioning was not in the user provided input mesh" and should therefore be treated/labelled as an intersection
                     // point i.e. it should map to UINT32_MAX because it does not map to any vertex in the client-provided input mesh.
                     bool vertex_exists_due_to_face_partitioning = false;
                     // this flag tells us whether the current vertex maps to one in the internal version of the source mesh
-                    // i.e. it does not map to the internal version cut-mesh 
+                    // i.e. it does not map to the internal version cut-mesh
                     const bool internal_input_mesh_vertex_is_for_source_mesh = (internal_input_mesh_vertex_idx < cc_uptr->internal_sourcemesh_vertex_count);
 
                     if (internal_input_mesh_vertex_is_for_source_mesh) {
                         const std::unordered_map<vd_t, vec3>::const_iterator fiter = cc_uptr->source_hmesh_new_poly_partition_vertices->find(vd_t(internal_input_mesh_vertex_idx));
                         vertex_exists_due_to_face_partitioning = (fiter != cc_uptr->source_hmesh_new_poly_partition_vertices->cend());
-                    }
-                    else // i.e. internal_input_mesh_vertex_is_for_cut_mesh
+                    } else // i.e. internal_input_mesh_vertex_is_for_cut_mesh
                     {
                         std::unordered_map<vd_t, vec3>::const_iterator fiter = cc_uptr->cut_hmesh_new_poly_partition_vertices->find(vd_t(internal_input_mesh_vertex_idx));
                         vertex_exists_due_to_face_partitioning = (fiter != cc_uptr->cut_hmesh_new_poly_partition_vertices->cend());
@@ -776,8 +1024,7 @@ void get_connected_component_data_impl(
                             // vertices added due to face-partitioning will have an offsetted index/descriptor that is >= client_sourcemesh_vertex_count
                             const uint32_t internal_input_mesh_vertex_idx_without_offset = (internal_input_mesh_vertex_idx - cc_uptr->internal_sourcemesh_vertex_count);
                             client_input_mesh_vertex_idx = (internal_input_mesh_vertex_idx_without_offset + cc_uptr->client_sourcemesh_vertex_count); // ensure that we offset using number of [user-provided mesh] vertices
-                        }
-                        else {
+                        } else {
                             client_input_mesh_vertex_idx = internal_input_mesh_vertex_idx; // src-mesh vertices have no offset unlike cut-mesh vertices
                         }
                     }
@@ -791,7 +1038,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
-        
+
         const uint32_t face_map_size = cc_uptr->kernel_hmesh_data.data_maps.face_map.size();
 
         if (face_map_size == 0) {
@@ -802,8 +1049,7 @@ void get_connected_component_data_impl(
 
         if (pMem == nullptr) {
             *pNumBytes = face_map_size * sizeof(uint32_t); // each face has a map value (intersection point == uint_max)
-        }
-        else {
+        } else {
             if (bytes > (face_map_size * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
@@ -826,24 +1072,21 @@ void get_connected_component_data_impl(
                 if (internal_input_mesh_face_idx_is_for_src_mesh) {
 
                     std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->source_hmesh_child_to_usermesh_birth_face->find(fd_t(internal_inputmesh_face_idx));
-                    
+
                     if (fiter != cc_uptr->source_hmesh_child_to_usermesh_birth_face->cend()) {
                         client_input_mesh_face_idx = fiter->second;
-                    }
-                    else {
+                    } else {
                         client_input_mesh_face_idx = internal_inputmesh_face_idx;
                     }
                     MCUT_ASSERT(client_input_mesh_face_idx < cc_uptr->client_sourcemesh_face_count);
-                }
-                else // internalInputMeshVertexDescrIsForCutMesh
+                } else // internalInputMeshVertexDescrIsForCutMesh
                 {
                     std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->cut_hmesh_child_to_usermesh_birth_face->find(fd_t(internal_inputmesh_face_idx));
-                    
+
                     if (fiter != cc_uptr->cut_hmesh_child_to_usermesh_birth_face->cend()) {
                         uint32_t unoffsettedDescr = (fiter->second - cc_uptr->internal_sourcemesh_face_count);
                         client_input_mesh_face_idx = unoffsettedDescr + cc_uptr->client_sourcemesh_face_count;
-                    }
-                    else {
+                    } else {
                         uint32_t unoffsettedDescr = (internal_inputmesh_face_idx - cc_uptr->internal_sourcemesh_face_count);
                         client_input_mesh_face_idx = unoffsettedDescr + cc_uptr->client_sourcemesh_face_count;
                     }
@@ -859,7 +1102,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
-        
+
         if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
         {
             uint32_t face_indices_offset = 0;
@@ -868,10 +1111,6 @@ void get_connected_component_data_impl(
             // -----
             std::vector<vec3> face_vertex_coords_3d;
             std::vector<vec2> face_vertex_coords_2d;
-            // temp halfedge data structure whose in-built functionality helps us ensure that
-            // the winding order that is computed by the constrained delaunay triangulator
-            // is consistent with that of the connected component face we are triangulating.
-            hmesh_t winding_order_enforcer;
 
             // add the face which contains the opposite winding order of the
             // connected component face face we are triangulating (we will use this to prevent inserting
@@ -880,9 +1119,9 @@ void get_connected_component_data_impl(
             // This is not true for a conforming delaunay triangulation.
             std::vector<vd_t> face_reversed;
 
-            std::vector<vec2_<double>> face_polygon_vertices;
-            std::vector<cdt::edge_t> face_polygon_edges;
-            // list of indices which define all triangles that result from the CDT
+            std::vector<vec2> face_polygon_vertices;
+             std::vector<cdt::edge_t> face_polygon_edges;
+            //  list of indices which define all triangles that result from the CDT
             std::vector<uint32_t> face_triangulation_indices;
             // used to check that all indices where used in the triangulation. if not, then there will be a hole
             std::vector<bool> vertex_is_used;
@@ -892,20 +1131,20 @@ void get_connected_component_data_impl(
             std::vector<vertex_descriptor_t> vertices_around_face;
 
             for (face_array_iterator_t f = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); f != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++f) {
-                
+
                 cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *f);
 
                 const uint32_t face_vertex_count = (uint32_t)vertices_around_face.size(); //->indexArrayMesh.pFaceSizes[f];
-                
+
                 MCUT_ASSERT(face_vertex_count >= 3);
 
                 const bool face_is_triangle = (face_vertex_count == 3);
-                //const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
+                // const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
 
                 if (face_is_triangle) {
 
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
-                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v];// cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
+                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
                         cc_uptr->constrained_delaunay_triangulation_indices.push_back(face_vertex_idx);
                     }
 
@@ -916,19 +1155,77 @@ void get_connected_component_data_impl(
                     //
                     face_vertex_coords_3d.resize(face_vertex_count);
                     face_vertex_coords_2d.clear(); // resized by project2D(...)
-                    winding_order_enforcer.reset();
                     face_reversed.resize(face_vertex_count);
-                    face_polygon_edges.clear(); //.resize(face_vertex_count); // |edges| == |vertices|
+                     face_polygon_edges.clear(); //.resize(face_vertex_count); // |edges| == |vertices|
                     face_polygon_vertices.resize(face_vertex_count);
                     face_triangulation_indices.clear();
+                    vertex_is_used.resize(face_vertex_count);
+
+                    // temp halfedge data structure whose in-built functionality helps us ensure that
+                    // the winding order that is computed by the constrained delaunay triangulator
+                    // is consistent with that of the connected component face we are triangulating.
+                    //
+                    // It stores the neighbours of the current face (it is the connectivity info that
+                    // we will used to check for proper winding).
+                    hmesh_t wo_enforcer;
+                    std::map<vertex_descriptor_t, vertex_descriptor_t> enforcer_to_cc_vmap;
+                    std::map<vertex_descriptor_t, vertex_descriptor_t> cc_to_enforcer_vmap;
+
+                    const std::vector<halfedge_descriptor_t>& halfedges_around_face = cc_uptr->kernel_hmesh_data.mesh.get_halfedges_around_face(*f);
+
+                    // fo each halfedge of face
+                    for (std::vector<halfedge_descriptor_t>::const_iterator hiter = halfedges_around_face.begin(); hiter != halfedges_around_face.end(); ++hiter) {
+                        halfedge_descriptor_t h = *hiter;
+                        halfedge_descriptor_t opph = cc_uptr->kernel_hmesh_data.mesh.opposite(h);
+                        face_descriptor_t neigh = cc_uptr->kernel_hmesh_data.mesh.face(opph);
+                        const bool neighbour_exists = (neigh != hmesh_t::null_face());
+
+                        if (neighbour_exists) {
+                            //
+                            // define "wo_enforcer" as neighbour
+                            //
+
+                            const std::vector<vertex_descriptor_t>& vertices_around_neighbour = cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(neigh);
+
+                            std::vector<vertex_descriptor_t> remapped_verts; // from cc to enforcer
+
+                            for (std::vector<vertex_descriptor_t>::const_iterator viter = vertices_around_neighbour.cbegin(); viter != vertices_around_neighbour.cend(); ++viter) {
+                                if (cc_to_enforcer_vmap.find(*viter) == cc_to_enforcer_vmap.cend()) {
+                                    vertex_descriptor_t vd = wo_enforcer.add_vertex(cc_uptr->kernel_hmesh_data.mesh.vertex(*viter));
+
+                                    enforcer_to_cc_vmap[vd] = *viter;
+                                    cc_to_enforcer_vmap[*viter] = vd;
+                                }
+
+                                remapped_verts.push_back(cc_to_enforcer_vmap[*viter]);
+                            }
+
+                            face_descriptor_t nfd = wo_enforcer.add_face(remapped_verts);
+
+                            MCUT_ASSERT(nfd != hmesh_t::null_face());
+                        }
+                    }
 
                     // copy/get face vertices and save mapping
                     // =======================================
 
+                    std::map<uint32_t, vertex_descriptor_t> cdt_to_enforcer_vmap;
+
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
 
-                        const vertex_descriptor_t face_vertex_idx((uint32_t)vertices_around_face[v]);
-                        face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(face_vertex_idx);
+                        const vertex_descriptor_t cc_face_vertex_descr = vertices_around_face[v];
+
+                        face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(cc_face_vertex_descr);
+
+                        std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator fiter = cc_to_enforcer_vmap.find(cc_face_vertex_descr);
+
+                        if (fiter == cc_to_enforcer_vmap.cend()) {
+                            vertex_descriptor_t vd = wo_enforcer.add_vertex(face_vertex_coords_3d[v]);
+                            fiter = cc_to_enforcer_vmap.insert(std::make_pair(cc_face_vertex_descr, vd)).first;
+                        }
+
+                        enforcer_to_cc_vmap[fiter->second] = fiter->first;
+                        cdt_to_enforcer_vmap[v] = fiter->second;
                     }
 
                     // project face vertices to 2D (NOTE: area is unchanged)
@@ -944,7 +1241,7 @@ void get_connected_component_data_impl(
 
                     project2D(face_vertex_coords_2d, face_vertex_coords_3d, face_normal, face_normal_largest_component);
 
-                    cdt::triangulator_t tri(cdt::vertex_insertion_order_t::AS_GIVEN); // memory is alway reallocated for this
+                    cdt::triangulator_t<double> constrained_cdt(cdt::vertex_insertion_order_t::AS_GIVEN); // memory is alway reallocated for this
 
                     // convert face vertex format & compute revered face
                     // =================================================
@@ -954,21 +1251,11 @@ void get_connected_component_data_impl(
 
                         const vec2& coords = face_vertex_coords_2d[i];
 
-                        face_polygon_vertices[i] = coords; //vec2_<double>::make(coords[0], coords[1]);
+                        face_polygon_vertices[i] = coords; // vec2_<double>::make(coords[0], coords[1]);
 
-                        winding_order_enforcer.add_vertex(vec3(coords[0], coords[1], 0.0 /*dont care since polygon is 2D*/)); // .. in fact even the coordinates dont matter for the purposes of hmesh_t here
 
-                        face_reversed[i] = vd_t(face_vertex_count - 1 - i);
+                        // face_reversed[i] = vd_t(i);// vd_t(face_vertex_count - 1 - i);
                     }
-
-                    // save reversed face
-                    // ==================
-
-                    fd_t fd = winding_order_enforcer.add_face(face_reversed);
-                    MCUT_ASSERT(fd != hmesh_t::null_face());
-
-                    // create edges (constraints)
-                    // ==========================
 
                     for (uint32_t i = 0; i < face_vertex_count; ++i) {
                         face_polygon_edges.emplace_back(cdt::edge_t(i, (i + 1) % face_vertex_count));
@@ -984,17 +1271,17 @@ void get_connected_component_data_impl(
                         // TODO: do stuff with "duplInfo"
                     }
 
-                    tri.insert_vertices(face_polygon_vertices);
-                    tri.insert_edges(face_polygon_edges);
+                    constrained_cdt.insert_vertices(face_polygon_vertices);
+                    constrained_cdt.insert_edges(face_polygon_edges);
 
                     // triangulation done here!
                     // NOTE: it seems that the triangulation can be either CW or CCW.
-                    tri.erase_outer_triangles_and_holes();
+                    constrained_cdt.erase_outer_triangles_and_holes();
 
-                    const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(tri.pieceToOriginals);
-                    const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, tri.vertices);
+                    const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(constrained_cdt.pieceToOriginals);
+                    const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, constrained_cdt.vertices);
 
-                    if (!cdt::check_topology(tri)) {
+                    if (!cdt::check_topology(constrained_cdt)) {
 
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
@@ -1002,29 +1289,34 @@ void get_connected_component_data_impl(
                             MC_DEBUG_SEVERITY_NOTIFICATION, "triangulator_t on face " + std::to_string(*f) + "has wrong topology");
                     }
 
-                    if (tri.triangles.empty()) {
+                    if (constrained_cdt.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
                             MC_DEBUG_SEVERITY_NOTIFICATION, "triangulator_t on face " + std::to_string(*f) + "produced zero faces");
                     }
 
+
                     // save the triangulation
                     // ======================
 
-                    const uint32_t face_resulting_triangle_count = (uint32_t)tri.triangles.size();
+                    const uint32_t face_resulting_triangle_count = (uint32_t)constrained_cdt.triangles.size();
 
                     // TODO: rather than looping through triangles, maybe attempt walking them according to neighbour information
                     for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
 
                         // a triangle computed from CDT
-                        const cdt::triangle_t& triangle = tri.triangles[i];
+                         const cdt::triangle_t& triangle = constrained_cdt.triangles[i];
+
+                        for (int i = 0; i < 3; i++)
+                            vertex_is_used[triangle.vertices[i]] = true;
 
                         // convert to local descriptors
+                        // NOTE: winding order has been reversed!
                         std::vector<vd_t> triangle_descriptors = {
-                            vd_t(triangle.vertices[0]),
-                            vd_t(triangle.vertices[1]),
-                            vd_t(triangle.vertices[2])
+                            vd_t(cdt_to_enforcer_vmap.at(triangle.vertices[0])),
+                            vd_t(cdt_to_enforcer_vmap.at(triangle.vertices[1])),
+                            vd_t(cdt_to_enforcer_vmap.at(triangle.vertices[2]))
                         };
 
                         face_triangulation_indices.emplace_back(triangle.vertices[0]);
@@ -1032,9 +1324,10 @@ void get_connected_component_data_impl(
                         face_triangulation_indices.emplace_back(triangle.vertices[2]);
 
                         // check that the winding order matches the triangulated face's order
-                        const bool is_insertible = winding_order_enforcer.is_insertable(triangle_descriptors);
+                        const bool is_insertible = wo_enforcer.is_insertable(triangle_descriptors);
 
                         if (!is_insertible) {
+
                             // flip the winding order
                             uint32_t a = triangle_descriptors[0];
                             uint32_t c = triangle_descriptors[2];
@@ -1046,70 +1339,12 @@ void get_connected_component_data_impl(
                         }
 
                         // add face into our WO enforcer
-                        fd = winding_order_enforcer.add_face(triangle_descriptors); // keep track of added faces
+                        fd_t fd = wo_enforcer.add_face(triangle_descriptors); // keep track of added faces
 
                         // if this fails then CDT gave us a strange triangulation e.g.
                         // duplicate triangles with opposite winding order
-                        if (fd == hmesh_t::null_face()) {
-// simply remove/ignore the offending triangle
-#if 0
-                            uint32_t a = triangle_descriptors[0];
-                            uint32_t b = triangle_descriptors[1];
-                            uint32_t c = triangle_descriptors[2];
-                            printf("inserted face: %u %u %u\n", a, b, c);
-                            
-                            std::ofstream f("triangulation.obj");
-
-                            for (int i = 0; i < tri.vertices.size(); ++i) {
-                                auto vert = tri.vertices[i];
-                                f << "v " << vert.x << " " << vert.y << " " << 0.0 << "\n";
-                            }
-
-                            for (uint32_t i = 0; i < face_resulting_triangle_count; ++i) {
-                                // a triangle computed from CDT
-                                const cdt::Triangle& triangle = tri.triangles[i];
-                                f << "f " << triangle.vertices[0]+1 << " " << triangle.vertices[1]+1 << " " << triangle.vertices[2]+1 << "\n";
-                            }
-
-                            f.close();
-
-                            std::ofstream g("polygon.off");
-                            g << "OFF\n";
-                            g << face_vertex_count << " 1 0\n"; 
-                            for (int i = 0; i < face_vertex_count; ++i) {
-                                auto vert = face_vertex_coords_3d[i];
-                                g << vert[0] << " " << vert[1] << " " << vert[2] << "\n";
-                            }
-                            g << face_vertex_count << " "; 
-                            for (uint32_t i = 0; i < face_vertex_count; ++i) {
-                                // a triangle computed from CDT
-                                
-                                g << i << " ";
-                            }
-                            g << "\n";
-
-                            g.close();
-
-                            std::ofstream h("polygon2d.txt");
-                            h << face_vertex_count << " " << face_vertex_count << "\n"; 
-                            for (int i = 0; i < face_vertex_count; ++i) {
-                                auto vert = face_vertex_coords_2d[i];
-                                h << vert[0] << " " << vert[1] << "\n";
-                            }
-                            for (uint32_t i = 0; i < face_vertex_count; ++i) {
-                                // a triangle computed from CDT
-                                
-                                h << i << " " << (i+1) % face_vertex_count <<"\n";
-                            }
-
-                            h.close();
-
-
-                            printf("is_insertible=%d\n", (int)is_insertible);
-                            fprintf(stderr, "error: could not insert triangle %d\n", i);
-                            std::exit(1);
-#endif
-
+                         if (fd == hmesh_t::null_face()) {
+                            // simply remove/ignore the offending triangle
                             face_triangulation_indices.pop_back();
                             face_triangulation_indices.pop_back();
                             face_triangulation_indices.pop_back();
@@ -1119,20 +1354,23 @@ void get_connected_component_data_impl(
                     // swap local triangle indices to global index values (in CC) and save
                     // ===================================================================
 
+                    //for (int i = 0; i < vertex_is_used.size(); ++i) {
+                        //MCUT_ASSERT(vertex_is_used[i] == true);
+                   // }
+
                     const uint32_t face_triangulation_indices_count = (uint32_t)face_triangulation_indices.size();
 
                     for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
                         const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];//cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
+                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
 
                         face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
                     }
 
                     cc_uptr->constrained_delaunay_triangulation_indices.insert(
-                        cc_uptr->constrained_delaunay_triangulation_indices.end(), 
-                        face_triangulation_indices.begin(), 
+                        cc_uptr->constrained_delaunay_triangulation_indices.end(),
+                        face_triangulation_indices.begin(),
                         face_triangulation_indices.end());
-
                 } //  if (face_vertex_count == 3)
 
                 face_indices_offset += face_vertex_count;
@@ -1142,7 +1380,7 @@ void get_connected_component_data_impl(
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
-        const uint32_t num_triangulation_indices= (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
+        const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
 
         if (pMem == nullptr) // client pointer is null (asking for size)
         {
