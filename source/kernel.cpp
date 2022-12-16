@@ -128,17 +128,6 @@ std::string to_string(const cm_patch_winding_order_t& v)
     return s;
 }
 
-int wrap_integer(int x, const int lo, const int hi)
-{
-    const int range_size = hi - lo + 1;
-
-    if (x < lo) {
-        x += range_size * ((lo - x) / range_size + 1);
-    }
-
-    return lo + (x - lo) % range_size;
-}
-
 // returns whether a polygon-soup vertex is an intersection vertex/point
 inline bool m0_is_intersection_point(const vd_t& ps_vd, const int ps_vtx_cnt)
 {

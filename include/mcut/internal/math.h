@@ -122,6 +122,11 @@ public:
         return vec2_(m_x / number, m_y / number);
     }
 
+    const vec2_ operator*(const T& number) const
+    {
+        return vec2_(m_x * number, m_y * number);
+    }
+
     const T& x() const
     {
         return m_x;
