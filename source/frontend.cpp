@@ -911,71 +911,12 @@ void get_connected_component_data_impl(
                     face_triangulation_indices.clear();
                     vertex_is_used.resize(face_vertex_count);
 
-                    // temp halfedge data structure whose in-built functionality helps us ensure that
-                    // the winding order that is computed by the constrained delaunay triangulator
-                    // is consistent with that of the connected component face we are triangulating.
-                    //
-                    // It stores the neighbours of the current face (it is the connectivity info that
-                    // we will used to check for proper winding).
-                    hmesh_t wo_enforcer;
-                    std::map<vertex_descriptor_t, vertex_descriptor_t> enforcer_to_cc_vmap;
-                    std::map<vertex_descriptor_t, vertex_descriptor_t> cc_to_enforcer_vmap;
-
-                    const std::vector<halfedge_descriptor_t>& halfedges_around_face = cc_uptr->kernel_hmesh_data.mesh.get_halfedges_around_face(*f);
-
-                    // for each halfedge of face
-                    for (std::vector<halfedge_descriptor_t>::const_iterator hiter = halfedges_around_face.begin(); hiter != halfedges_around_face.end(); ++hiter) {
-                        halfedge_descriptor_t h = *hiter;
-                        halfedge_descriptor_t opph = cc_uptr->kernel_hmesh_data.mesh.opposite(h);
-                        face_descriptor_t neigh = cc_uptr->kernel_hmesh_data.mesh.face(opph);
-                        const bool neighbour_exists = (neigh != hmesh_t::null_face());
-
-                        if (neighbour_exists) {
-                            //
-                            // define "wo_enforcer" as neighbour
-                            //
-
-                            const std::vector<vertex_descriptor_t>& vertices_around_neighbour = cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(neigh);
-
-                            std::vector<vertex_descriptor_t> remapped_verts; // from cc to enforcer
-
-                            for (std::vector<vertex_descriptor_t>::const_iterator viter = vertices_around_neighbour.cbegin(); viter != vertices_around_neighbour.cend(); ++viter) {
-                                if (cc_to_enforcer_vmap.find(*viter) == cc_to_enforcer_vmap.cend()) {
-                                    vertex_descriptor_t vd = wo_enforcer.add_vertex(cc_uptr->kernel_hmesh_data.mesh.vertex(*viter));
-
-                                    enforcer_to_cc_vmap[vd] = *viter;
-                                    cc_to_enforcer_vmap[*viter] = vd;
-                                }
-
-                                remapped_verts.push_back(SAFE_ACCESS(cc_to_enforcer_vmap, *viter));
-                            }
-
-                            face_descriptor_t nfd = wo_enforcer.add_face(remapped_verts);
-
-                            MCUT_ASSERT(nfd != hmesh_t::null_face());
-                        }
-                    }
-
-                    // copy/get face vertices and save mapping
-                    // =======================================
-
-                    std::map<uint32_t, vertex_descriptor_t> cdt_to_enforcer_vmap;
-
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
 
                         const vertex_descriptor_t cc_face_vertex_descr = vertices_around_face[v];
 
                         face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(cc_face_vertex_descr);
 
-                        std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator fiter = cc_to_enforcer_vmap.find(cc_face_vertex_descr);
-
-                        if (fiter == cc_to_enforcer_vmap.cend()) {
-                            vertex_descriptor_t vd = wo_enforcer.add_vertex(face_vertex_coords_3d[v]);
-                            fiter = cc_to_enforcer_vmap.insert(std::make_pair(cc_face_vertex_descr, vd)).first;
-                        }
-
-                        enforcer_to_cc_vmap[fiter->second] = fiter->first;
-                        cdt_to_enforcer_vmap[v] = fiter->second;
                     }
 
                     // project face vertices to 2D (NOTE: area is unchanged)
@@ -1002,6 +943,124 @@ void get_connected_component_data_impl(
                         const vec2& coords = face_vertex_coords_2d[i];
 
                         face_polygon_vertices[i] = coords; // vec2_<double>::make(coords[0], coords[1]);
+                    }
+                    
+#if 0
+                    std::string fname= "face-" + std::to_string(*f) + ".off";
+                    std::cout << "dump: " << fname << std::endl;
+
+                    std::ofstream g(fname);
+                    g << "OFF\n";
+                    g << face_vertex_count << " 1 0\n";
+                    for (int i = 0; i < face_vertex_count; ++i) {
+                        auto vert = face_polygon_vertices[i];
+                        g << vert[0] << " " << vert[1] << " " << 0 << "\n";
+                    }
+                    g << face_vertex_count << " ";
+                    for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                        // a triangle computed from CDT
+
+                        g << i << " ";
+                    }
+                    g << "\n";
+
+                    g.close();
+#endif
+                    // Temp halfedge data structure whose in-built functionality helps us ensure that
+                    // the winding order that is computed by the constrained delaunay triangulator
+                    // is consistent with that of the connected component face we are triangulating.
+                    //
+                    // It stores the neighbours of the current face (it is the connectivity info that
+                    // we will used to check for proper winding).
+                    hmesh_t wo_enforcer;
+                    std::map<vertex_descriptor_t, vertex_descriptor_t> enforcer_to_cc_vmap;
+                    std::map<vertex_descriptor_t, vertex_descriptor_t> cc_to_enforcer_vmap;
+                    // The halfedge with-which we will identify the first CDT triangle to insert into the
+                    // triangulated topology array of the connected component.
+                    // We need this to ensure that the first CDT triangle to be inserted is inserted with the
+                    // correct winding order. This caters to the scenario where "wo_enforcer" does not
+                    // contain enough information to be able to reject the winding order with which we
+                    // attempt to insert _the first_ CDT triangle (i.e. its reversed).
+                    // It is perfectly possible for this to remain null, which will happen the face being
+                    // triangulated is the only face in the connected component.
+                    halfedge_descriptor_t seed_halfedge = hmesh_t::null_halfedge();
+                    std::unordered_set<face_descriptor_t> registered_neighbours; // those we have already saved in the wo-enforcer
+                    const std::vector<halfedge_descriptor_t>& halfedges_around_face = cc_uptr->kernel_hmesh_data.mesh.get_halfedges_around_face(*f);
+
+                    // for each halfedge of face
+                    for (std::vector<halfedge_descriptor_t>::const_iterator hiter = halfedges_around_face.begin(); hiter != halfedges_around_face.end(); ++hiter) {
+
+                        halfedge_descriptor_t h = *hiter;
+                        halfedge_descriptor_t opph = cc_uptr->kernel_hmesh_data.mesh.opposite(h);
+                        face_descriptor_t neigh = cc_uptr->kernel_hmesh_data.mesh.face(opph);
+                        const bool neighbour_exists = (neigh != hmesh_t::null_face());
+
+                        // neighbour exists and we have not already registered it into the enforcer
+                        if (neighbour_exists && registered_neighbours.count(neigh) == 0) {
+
+                            if (seed_halfedge == hmesh_t::null_halfedge()) {
+                                seed_halfedge = h; // set once
+                            } 
+
+                            //
+                            // insert the neighbour into "wo_enforcer", the stored winding order information.
+                            // will prevent us from inserting triangles with the incorrect orientation.
+                            //
+
+                            const std::vector<vertex_descriptor_t>& vertices_around_neighbour = cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(neigh);
+
+                            std::vector<vertex_descriptor_t> remapped_descrs; // from CC to enforcer
+
+                            // for each vertex around neighbour
+                            for (std::vector<vertex_descriptor_t>::const_iterator neigh_viter = vertices_around_neighbour.cbegin(); neigh_viter != vertices_around_neighbour.cend(); ++neigh_viter) {
+
+                                std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator cc_to_enforcer_vmap_iter = cc_to_enforcer_vmap.find(*neigh_viter);
+
+                                if (cc_to_enforcer_vmap_iter == cc_to_enforcer_vmap.cend()) {
+
+                                    const vec3& neigh_vertex_coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*neigh_viter);
+
+                                    const vertex_descriptor_t woe_vdescr = wo_enforcer.add_vertex(neigh_vertex_coords);
+
+                                    enforcer_to_cc_vmap[woe_vdescr] = (*neigh_viter);
+                                    cc_to_enforcer_vmap_iter = cc_to_enforcer_vmap.insert(std::make_pair(*neigh_viter, woe_vdescr)).first;
+                                }
+
+                                MCUT_ASSERT(cc_to_enforcer_vmap_iter != cc_to_enforcer_vmap.cend());
+
+                                remapped_descrs.push_back(cc_to_enforcer_vmap_iter->second);
+                            }
+
+                            face_descriptor_t nfd = wo_enforcer.add_face(remapped_descrs);
+
+                            MCUT_ASSERT(nfd != hmesh_t::null_face());
+                        }
+
+                        registered_neighbours.insert(neigh);
+                    }
+
+                    // copy/get face vertices and save mapping
+                    // =======================================
+
+                    std::map<uint32_t, vertex_descriptor_t> cdt_to_enforcer_vmap;
+                    std::map<vertex_descriptor_t, uint32_t> enforcer_to_cdt_vmap;
+
+                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
+
+                        const vertex_descriptor_t cc_face_vertex_descr = vertices_around_face[v];
+
+                        //face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(cc_face_vertex_descr);
+
+                        std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator fiter = cc_to_enforcer_vmap.find(cc_face_vertex_descr);
+
+                        if (fiter == cc_to_enforcer_vmap.cend()) {
+                            vertex_descriptor_t vd = wo_enforcer.add_vertex(face_vertex_coords_3d[v]);
+                            fiter = cc_to_enforcer_vmap.insert(std::make_pair(cc_face_vertex_descr, vd)).first;
+                        }
+
+                        enforcer_to_cc_vmap[fiter->second] = fiter->first;
+                        cdt_to_enforcer_vmap[v] = fiter->second;
+                        enforcer_to_cdt_vmap[fiter->second] = v;
                     }
 
                     //
@@ -1138,7 +1197,7 @@ void get_connected_component_data_impl(
                                     const std::uint32_t edge_start_idx = viter;
                                     const std::uint32_t edge_end_idx = (viter + 1) % face_vertex_count;
 
-                                    if (edge_start_idx == cur_dupl_vertex_id || edge_end_idx == cur_dupl_vertex_id || edge_start_idx == cur_dupl_partner_id || edge_end_idx == cur_dupl_partner_id) {
+                                    if (edge_start_idx == (uint32_t)cur_dupl_vertex_id || edge_end_idx == (uint32_t)cur_dupl_vertex_id || edge_start_idx == (uint32_t)cur_dupl_partner_id || edge_end_idx == (uint32_t)cur_dupl_partner_id) {
                                         continue; // impossible to intersect incident edges
                                     }
 
@@ -1236,7 +1295,7 @@ void get_connected_component_data_impl(
                     // save the triangulation
                     // ======================
 
-                    const uint32_t face_resulting_triangle_count = (uint32_t)constrained_cdt.triangles.size();
+                    //const uint32_t face_resulting_triangle_count = (uint32_t)constrained_cdt.triangles.size();
 
                     //
                     // It is preferrable to without the assumption that the resulting CDT triangles
@@ -1246,24 +1305,83 @@ void get_connected_component_data_impl(
                     // triangulated CC mesh without violating the "enforcer"
                     //
 
+                    // map vertices to CDT triangles
+                    std::vector<std::vector<uint32_t>> vertex_to_triangle_map(face_vertex_count, std::vector<uint32_t>());
+
+                    // for each CDT triangle
+                    for (uint32_t t = 0; t < (uint32_t)constrained_cdt.triangles.size(); ++t) {
+                        const cdt::triangle_t& triangle = SAFE_ACCESS(constrained_cdt.triangles, t);
+
+                        for (uint32_t v = 0; v < 3; v++) {
+                            const uint32_t vertex_id = SAFE_ACCESS(triangle.vertices, v);
+                            std::vector<uint32_t>& incident_triangles = SAFE_ACCESS(vertex_to_triangle_map, vertex_id);
+                            incident_triangles.push_back(t);
+                        }
+                    }
+
                     // start with any boundary edge (AKA constraint/fixed edge)
 
                     std::unordered_set<cdt::edge_t>::const_iterator fixed_edge_iter = constrained_cdt.fixedEdges.cbegin();
 
-                    MCUT_ASSERT(fixed_edge_iter != constrained_cdt.fixedEdges.cend()); // due to the fact that we have inserted edges into the CDT
+                    // NOTE: in the case that we DO NOT have a seed halfedge, then the current face
+                    // that we are triangulating is the only face in the connected component and therefore
+                    // it has no neighbours. In this instance, the winding order of the produced triangles
+                    // is dependent on the CDT triangulator. The MCUT frontend will at best be able to
+                    // ensure that all CDT triangles have consistent winding order (even if the triangulator
+                    // produced mixed winding orders between the resulting triangles) but we cannot guarrantee
+                    // the "front-facing" side of triangulated face will match that of the non-triangulated
+                    // face from the connected component. We leave that to the user to fix upon inspection.
+                    //
+                    const bool have_seed_halfedge = seed_halfedge != hmesh_t::null_halfedge();
 
-                    // get the two vertices of the "seed" fixed edge
+                    if (have_seed_halfedge) {
+                        // if the seend halfedge exists then the triangulated face must have
+                        // atleast one neighbour
+                        MCUT_ASSERT(wo_enforcer.number_of_faces() != 0);
+
+                        // source and target descriptor in the connected component
+                        const vertex_descriptor_t seed_halfedge_src = cc_uptr->kernel_hmesh_data.mesh.source(seed_halfedge);
+                        const vertex_descriptor_t seed_halfedge_tgt = cc_uptr->kernel_hmesh_data.mesh.target(seed_halfedge);
+
+                        // source and target descriptor in the face
+                        const vertex_descriptor_t woe_src = SAFE_ACCESS(cc_to_enforcer_vmap, seed_halfedge_src);
+                        const uint32_t cdt_src = SAFE_ACCESS(enforcer_to_cdt_vmap, woe_src);
+                        const vertex_descriptor_t woe_tgt = SAFE_ACCESS(cc_to_enforcer_vmap, seed_halfedge_tgt);
+                        const uint32_t cdt_tgt = SAFE_ACCESS(enforcer_to_cdt_vmap, woe_tgt);
+
+                        // find the fixed edge in the CDT matching the vertices of the seed halfedge
+
+                        fixed_edge_iter = std::find_if(
+                            constrained_cdt.fixedEdges.cbegin(),
+                            constrained_cdt.fixedEdges.cend(),
+                            [&](const cdt::edge_t& e) {
+                                return (e.v1() == cdt_src && e.v2() == cdt_tgt) || (e.v2() == cdt_src && e.v1() == cdt_tgt);
+                            });
+
+                        MCUT_ASSERT(fixed_edge_iter != constrained_cdt.fixedEdges.cend());
+                    }
+
+                    // must always exist since cdt edge ultimately came from CC and
+                    // due to the fact that we have inserted edges into the CDT
+                    MCUT_ASSERT(fixed_edge_iter != constrained_cdt.fixedEdges.cend());
+
+                    // get the two vertices of the "seed" fixed edge (indices into CDT)
                     const std::uint32_t fixed_edge_vtx0_id = fixed_edge_iter->v1();
                     const std::uint32_t fixed_edge_vtx1_id = fixed_edge_iter->v2();
 
                     // since these vertices share an edge, they will share a triangle in the CDT
-                    // So lets get that shared triangle, which will be the seed for traversal
-                    const std::vector<std::uint32_t>& fixed_edge_vtx0_tris = constrained_cdt.vertTris[fixed_edge_vtx0_id];
-                    const std::vector<std::uint32_t>& fixed_edge_vtx1_tris = constrained_cdt.vertTris[fixed_edge_vtx1_id];
+                    // So lets get that shared triangle, which will be the seed triangle for the
+                    // traversal process, which we will use to walk and insert triangles into
+                    // the output user array
+                    const std::vector<std::uint32_t>& fixed_edge_vtx0_tris = SAFE_ACCESS(vertex_to_triangle_map, fixed_edge_vtx0_id);
+                    MCUT_ASSERT(fixed_edge_vtx0_tris.empty() == false);
+                    const std::vector<std::uint32_t>& fixed_edge_vtx1_tris = SAFE_ACCESS(vertex_to_triangle_map, fixed_edge_vtx1_id);
+                    MCUT_ASSERT(fixed_edge_vtx1_tris.empty() == false);
 
                     std::uint32_t fix_edge_seed_triangle = cdt::null_neighbour;
-                    
+
                     for (std::vector<std::uint32_t>::const_iterator it = fixed_edge_vtx0_tris.begin(); it != fixed_edge_vtx0_tris.end(); ++it) {
+
                         if (*it == cdt::null_neighbour) {
                             continue;
                         }
@@ -1322,7 +1440,7 @@ void get_connected_component_data_impl(
                         }
 
                         // add face into our WO enforcer
-                        fd_t fd = wo_enforcer.add_face(triangle_descriptors); // keep track of added faces
+                        fd_t fd = wo_enforcer.add_face(triangle_descriptors); // keep track of added triangles from CDT
 
                         // if this fails then CDT gave us a strange triangulation e.g.
                         // duplicate triangles with opposite winding order
@@ -1360,7 +1478,6 @@ void get_connected_component_data_impl(
 
                     // every triangle in the finalized CDT must be walked!
                     MCUT_ASSERT(traversed.size() == constrained_cdt.triangles.size());
-
 
 #if 0
                     {
@@ -1417,7 +1534,7 @@ void get_connected_component_data_impl(
                     // swap local triangle indices to global index values (in CC) and save
                     // ===================================================================
 
-                    for (int i = 0; i < vertex_is_used.size(); ++i) {
+                    for (std::uint32_t i = 0; i < (std::uint32_t)vertex_is_used.size(); ++i) {
                         if (vertex_is_used[i] != true) {
                             context_uptr->log(
                                 MC_DEBUG_SOURCE_KERNEL,
