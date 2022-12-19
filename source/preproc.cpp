@@ -1073,7 +1073,7 @@ void resolve_floating_polygons(
 
             std::vector<vec2> floating_poly_vertices_2d;
 
-            project2D(floating_poly_vertices_2d, fpi.polygon_vertices, fpi.polygon_normal, fpi.polygon_normal_largest_component);
+            project_to_2d(floating_poly_vertices_2d, fpi.polygon_vertices, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
             // face to be (potentially) partitioned
             // NOTE: This "origin_face" variable refer's to face that [may] actually be a child face that was created (in a previous iteration)
@@ -1154,7 +1154,7 @@ void resolve_floating_polygons(
                     // project face coords to 2D
                     std::vector<vec2> face_vertex_coords_2d;
 
-                    project2D(face_vertex_coords_2d, face_vertex_coords_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
+                    project_to_2d(face_vertex_coords_2d, face_vertex_coords_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
                     const int face_edge_count = (int)face_vertex_descriptors.size(); // num edges == num verts
                     const int face_vertex_count = face_edge_count;
@@ -1262,7 +1262,7 @@ void resolve_floating_polygons(
             //
 
             std::vector<vec2> origin_face_vertices_2d;
-            project2D(origin_face_vertices_2d, origin_face_vertices_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
+            project_to_2d(origin_face_vertices_2d, origin_face_vertices_3d, fpi.polygon_normal, fpi.polygon_normal_largest_component);
 
             // ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
             // 1. pick two edges in the floating polygon

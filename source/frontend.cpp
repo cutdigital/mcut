@@ -409,7 +409,7 @@ void get_connected_component_data_impl(
 
             uint32_t num_indices = 0;
 
-            std::vector<vd_t> vertices_around_face;
+            std::vector<vd_t> cc_face_vertices;
 
             uint64_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
@@ -417,14 +417,14 @@ void get_connected_component_data_impl(
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
 
-                vertices_around_face.clear();
-                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *fiter);
-                const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
+                cc_face_vertices.clear();
+                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(cc_face_vertices, *fiter);
+                const uint32_t num_vertices_around_face = (uint32_t)cc_face_vertices.size();
 
                 MCUT_ASSERT(num_vertices_around_face >= 3u);
 
                 for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
-                    const uint32_t vertex_idx = (uint32_t)vertices_around_face[i];
+                    const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
                     *(casted_ptr + elem_offset) = vertex_idx;
                     ++elem_offset;
                 }
@@ -855,539 +855,719 @@ void get_connected_component_data_impl(
 
         if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
         {
+            // internal halfedge data structure from the current connected component
+            const hmesh_t& cc = cc_uptr->kernel_hmesh_data.mesh;
+
             uint32_t face_indices_offset = 0;
-            cc_uptr->constrained_delaunay_triangulation_indices.reserve(cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
+            cc_uptr->constrained_delaunay_triangulation_indices.reserve(cc.number_of_faces());
 
             // -----
-            std::vector<vec3> face_vertex_coords_3d;
-            std::vector<vec2> face_vertex_coords_2d;
+            std::vector<vec3> cc_face_vcoords3d;
+            // NOTE: the elements of this array might be reversed, which occurs
+            // when the winding-order/orientation of "cc_face_iter" is flipped
+            // due to projection (see call to project_to_2d())
+            std::vector<vec2> cc_face_vcoords2d; 
 
-            // add the face which contains the opposite winding order of the
-            // connected component face face we are triangulating (we will use this to prevent inserting
-            // reversed triangles). This is guarranteed to work because all triangles
-            // are adjacent to the border for a constrained delaunay triangulation.
-            // This is not true for a conforming delaunay triangulation.
-            std::vector<vd_t> face_reversed;
-
-            std::vector<vec2> face_polygon_vertices;
-            std::vector<cdt::edge_t> face_polygon_edges;
+            // edge of face, which are used by triangulator as "fixed edges" to
+            // constrain the CDT
+            std::vector<cdt::edge_t> cc_face_edges;
             //  list of indices which define all triangles that result from the CDT
-            std::vector<uint32_t> face_triangulation_indices;
-            // used to check that all indices where used in the triangulation. if not, then there will be a hole
-            std::vector<bool> vertex_is_used;
-            // -----
+            std::vector<uint32_t> cc_face_triangulation;
+            // used to check that all indices where used in the triangulation.
+            // If any entry is false after finshing triangulation then there will be a hole in the output
+            // This is use for sanity checking
+            std::vector<bool> cc_face_vtx_to_is_used_flag;
+            // descriptors of vertices in face (they index into the CC)
+            std::vector<vertex_descriptor_t> cc_face_vertices;
 
             // for each face (TODO: make parallel)
-            std::vector<vertex_descriptor_t> vertices_around_face;
+            for (face_array_iterator_t cc_face_iter = cc.faces_begin(); cc_face_iter != cc.faces_end(); ++cc_face_iter) {
 
-            for (face_array_iterator_t f = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); f != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++f) {
+                cc.get_vertices_around_face(cc_face_vertices, *cc_face_iter);
 
-                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *f);
+                // number of vertices of triangulated face
+                const uint32_t cc_face_vcount = (uint32_t)cc_face_vertices.size();
 
-                const uint32_t face_vertex_count = (uint32_t)vertices_around_face.size(); //->indexArrayMesh.pFaceSizes[f];
+                MCUT_ASSERT(cc_face_vcount >= 3);
 
-                MCUT_ASSERT(face_vertex_count >= 3);
+                const bool cc_face_is_triangle = (cc_face_vcount == 3);
 
-                const bool face_is_triangle = (face_vertex_count == 3);
-                // const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
+                if (cc_face_is_triangle) {
 
-                if (face_is_triangle) {
+                    // for each vertex in face
+                    for (uint32_t i = 0; i < cc_face_vcount; ++i) {
+                        const uint32_t vertex_id_in_cc = (uint32_t)SAFE_ACCESS(cc_face_vertices, i);
 
-                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
-                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
-                        cc_uptr->constrained_delaunay_triangulation_indices.push_back(face_vertex_idx);
+                        cc_uptr->constrained_delaunay_triangulation_indices.push_back(vertex_id_in_cc);
                     }
 
                 } else {
 
                     //
-                    // init vars
+                    // need to triangulate face
                     //
-                    face_vertex_coords_3d.resize(face_vertex_count);
-                    face_vertex_coords_2d.clear(); // resized by project2D(...)
-                    face_reversed.resize(face_vertex_count);
-                    face_polygon_edges.clear(); //.resize(face_vertex_count); // |edges| == |vertices|
-                    face_polygon_vertices.resize(face_vertex_count);
-                    face_triangulation_indices.clear();
-                    vertex_is_used.resize(face_vertex_count);
 
-                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
+                    //
+                    // init vars (which we do not want to be re-inititalizing)
+                    //
+                    cc_face_vcoords3d.resize(cc_face_vcount);
+                    cc_face_vcoords2d.clear(); // resized by project_to_2d(...)
+                    cc_face_edges.clear();
+                    cc_face_triangulation.clear();
+                    cc_face_vtx_to_is_used_flag.resize(cc_face_vcount);
 
-                        const vertex_descriptor_t cc_face_vertex_descr = vertices_around_face[v];
+                    // for each vertex in face: get its coordinates
+                    for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
-                        face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(cc_face_vertex_descr);
+                        const vertex_descriptor_t cc_face_vertex_descr = SAFE_ACCESS(cc_face_vertices, i);
 
+                        const vec3& coords = cc.vertex(cc_face_vertex_descr);
+
+                        SAFE_ACCESS(cc_face_vcoords3d, i) = coords;
                     }
 
-                    // project face vertices to 2D (NOTE: area is unchanged)
+                    // Project face-vertex coordinates to 2D
+                    //
+                    // NOTE: Although we are projecting using the plane normal of
+                    // the plane, the shape and thus area of the face polygon is
+                    // unchanged (but the winding order might change!). 
+                    // See definition of "project_to_2d()"
                     // =====================================================
 
-                    vec3 face_normal;
-                    double param_d;
-                    int face_normal_largest_component = compute_polygon_plane_coefficients(
-                        face_normal,
-                        param_d,
-                        face_vertex_coords_3d.data(),
-                        (int)face_vertex_count);
+                    // Maps each vertex in face to the reversed index if the polygon
+                    // winding order was reversed due to projection to 2D. Otherwise,
+                    // Simply stores the indices from 0 to N-1
+                    std::vector<uint32_t> face_to_cdt_vmap(cc_face_vcount); 
+                    std::iota (std::begin(face_to_cdt_vmap), std::end(face_to_cdt_vmap), 0);
 
-                    project2D(face_vertex_coords_2d, face_vertex_coords_3d, face_normal, face_normal_largest_component);
+                    {
+                        vec3 cc_face_normal_vector;
+                        double cc_face_plane_eq_dparam; //
+                        const int largest_component_of_normal = compute_polygon_plane_coefficients(
+                            cc_face_normal_vector,
+                            cc_face_plane_eq_dparam,
+                            cc_face_vcoords3d.data(),
+                            (int)cc_face_vcount);
 
-                    cdt::triangulator_t<double> constrained_cdt(cdt::vertex_insertion_order_t::AS_GIVEN); // memory is alway reallocated for this
+                        project_to_2d(cc_face_vcoords2d, cc_face_vcoords3d, cc_face_normal_vector, largest_component_of_normal);
 
-                    // convert face vertex format & compute revered face
-                    // =================================================
+                        //
+                        // determine the signed area to check if the 2D face polygon
+                        // is CW (negative) or CCW (positive)
+                        //
 
-                    // the vertices are in counter-clockwise order (user provided order)
-                    for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                        double signed_area = 0;
 
-                        const vec2& coords = face_vertex_coords_2d[i];
+                        for(uint32_t i = 0; i < cc_face_vcount-2; ++i)
+                        {
+                            vec2 cur = cc_face_vcoords2d[i];
+                            vec2 nxt = cc_face_vcoords2d[(i+1) % cc_face_vcount];
+                            vec2 nxtnxt = cc_face_vcoords2d[(i+2) % cc_face_vcount];
+                            signed_area += orient2d(cur, nxt, nxtnxt);
+                        }
 
-                        face_polygon_vertices[i] = coords; // vec2_<double>::make(coords[0], coords[1]);
+                        const bool winding_order_flipped_due_to_projection = (signed_area < 0);
+                        
+                        if(winding_order_flipped_due_to_projection)
+                        {
+                            // Reverse the order of points
+                            std::reverse(cc_face_vcoords2d.begin(), cc_face_vcoords2d.end());
+
+                            std::vector<vec2> cc_face_vcoords2d_tmp = cc_face_vcoords2d;
+
+                            // for each vertex index in face
+                            for(int32_t i =0; i < (int32_t)cc_face_vcount; ++i)
+                            {
+                                // save reverse index map
+                                face_to_cdt_vmap[i] = wrap_integer(-(i+1), 0, cc_face_vcount-1 );
+                            }
+                        }
                     }
-                    
-#if 0
-                    std::string fname= "face-" + std::to_string(*f) + ".off";
-                    std::cout << "dump: " << fname << std::endl;
 
-                    std::ofstream g(fname);
-                    g << "OFF\n";
-                    g << face_vertex_count << " 1 0\n";
-                    for (int i = 0; i < face_vertex_count; ++i) {
-                        auto vert = face_polygon_vertices[i];
-                        g << vert[0] << " " << vert[1] << " " << 0 << "\n";
-                    }
-                    g << face_vertex_count << " ";
-                    for (uint32_t i = 0; i < face_vertex_count; ++i) {
-                        // a triangle computed from CDT
+                    // Winding order tracker (WOT):
+                    // We use this halfedge data structure to ensure that the winding-order
+                    // that is computed by the CDT triangulator is consistent with that
+                    // of "cc_face_iter".
+                    // Before triangulation, we populate it with the vertices, (half)edges and
+                    // faces of the neighbours of "cc_face_iter". This information we will be
+                    // used to check for proper winding-order when we later insert the CDT
+                    // triangles whose winding order we assume to be inconsistent with
+                    // "cc_face_iter"
+                    hmesh_t wot;
+                    // vertex descriptor map (from WOT to CC)
+                    // std::map<vertex_descriptor_t, vertex_descriptor_t> wot_to_cc_vmap;
 
-                        g << i << " ";
-                    }
-                    g << "\n";
+                    // vertex descriptor map (from CC to WOT)
+                    std::map<vertex_descriptor_t, vertex_descriptor_t> cc_to_wot_vmap;
 
-                    g.close();
-#endif
-                    // Temp halfedge data structure whose in-built functionality helps us ensure that
-                    // the winding order that is computed by the constrained delaunay triangulator
-                    // is consistent with that of the connected component face we are triangulating.
-                    //
-                    // It stores the neighbours of the current face (it is the connectivity info that
-                    // we will used to check for proper winding).
-                    hmesh_t wo_enforcer;
-                    std::map<vertex_descriptor_t, vertex_descriptor_t> enforcer_to_cc_vmap;
-                    std::map<vertex_descriptor_t, vertex_descriptor_t> cc_to_enforcer_vmap;
                     // The halfedge with-which we will identify the first CDT triangle to insert into the
-                    // triangulated topology array of the connected component.
-                    // We need this to ensure that the first CDT triangle to be inserted is inserted with the
-                    // correct winding order. This caters to the scenario where "wo_enforcer" does not
-                    // contain enough information to be able to reject the winding order with which we
-                    // attempt to insert _the first_ CDT triangle (i.e. its reversed).
-                    // It is perfectly possible for this to remain null, which will happen the face being
-                    // triangulated is the only face in the connected component.
-                    halfedge_descriptor_t seed_halfedge = hmesh_t::null_halfedge();
-                    std::unordered_set<face_descriptor_t> registered_neighbours; // those we have already saved in the wo-enforcer
-                    const std::vector<halfedge_descriptor_t>& halfedges_around_face = cc_uptr->kernel_hmesh_data.mesh.get_halfedges_around_face(*f);
+                    // array "cc_face_triangulation" (see below when we actually do insertion).
+                    //
+                    // The order of triangle insertion must priotise the triangle adjacent to the boundary,
+                    // which are those that are incident to a fixed-edge in the CDT triangulators output.
+                    // We need "cc_seed_halfedge" to ensure that the first CDT triangle to be inserted is inserted with the
+                    // correct winding order. This caters to the scenario where "WOT" does not
+                    // contain enough information to be able to reject the winding-order with which we
+                    // attempt to insert _the first_ CDT triangle into "cc_face_triangulation".
+                    //
+                    // It is perfectly possible for "cc_seed_halfedge" to remain null, which will happen if "cc_face_iter"
+                    // is the only face in the connected component.
+                    halfedge_descriptor_t cc_seed_halfedge = hmesh_t::null_halfedge();
+                    // ... those we have already saved in the wot
+                    // This is needed to prevent attempting to add the same neighbour face into
+                    // the WOT, which can happen if the cc_face_iter shares two or more edges
+                    // with a neighbours (this is possible since our connected components
+                    // can have n-gon faces )
+                    std::unordered_set<face_descriptor_t> wot_traversed_neighbours;
+                    // ... in CCW order
+                    const std::vector<halfedge_descriptor_t>& cc_face_halfedges = cc.get_halfedges_around_face(*cc_face_iter);
 
                     // for each halfedge of face
-                    for (std::vector<halfedge_descriptor_t>::const_iterator hiter = halfedges_around_face.begin(); hiter != halfedges_around_face.end(); ++hiter) {
+                    for (std::vector<halfedge_descriptor_t>::const_iterator hiter = cc_face_halfedges.begin(); hiter != cc_face_halfedges.end(); ++hiter) {
 
                         halfedge_descriptor_t h = *hiter;
-                        halfedge_descriptor_t opph = cc_uptr->kernel_hmesh_data.mesh.opposite(h);
-                        face_descriptor_t neigh = cc_uptr->kernel_hmesh_data.mesh.face(opph);
+                        halfedge_descriptor_t opph = cc.opposite(h);
+                        face_descriptor_t neigh = cc.face(opph);
                         const bool neighbour_exists = (neigh != hmesh_t::null_face());
 
-                        // neighbour exists and we have not already registered it into the enforcer
-                        if (neighbour_exists && registered_neighbours.count(neigh) == 0) {
+                        // neighbour exists and we have not already traversed it
+                        // by adding it into the WOT
+                        if (neighbour_exists && wot_traversed_neighbours.count(neigh) == 0) {
 
-                            if (seed_halfedge == hmesh_t::null_halfedge()) {
-                                seed_halfedge = h; // set once
-                            } 
-
-                            //
-                            // insert the neighbour into "wo_enforcer", the stored winding order information.
-                            // will prevent us from inserting triangles with the incorrect orientation.
-                            //
-
-                            const std::vector<vertex_descriptor_t>& vertices_around_neighbour = cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(neigh);
-
-                            std::vector<vertex_descriptor_t> remapped_descrs; // from CC to enforcer
-
-                            // for each vertex around neighbour
-                            for (std::vector<vertex_descriptor_t>::const_iterator neigh_viter = vertices_around_neighbour.cbegin(); neigh_viter != vertices_around_neighbour.cend(); ++neigh_viter) {
-
-                                std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator cc_to_enforcer_vmap_iter = cc_to_enforcer_vmap.find(*neigh_viter);
-
-                                if (cc_to_enforcer_vmap_iter == cc_to_enforcer_vmap.cend()) {
-
-                                    const vec3& neigh_vertex_coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*neigh_viter);
-
-                                    const vertex_descriptor_t woe_vdescr = wo_enforcer.add_vertex(neigh_vertex_coords);
-
-                                    enforcer_to_cc_vmap[woe_vdescr] = (*neigh_viter);
-                                    cc_to_enforcer_vmap_iter = cc_to_enforcer_vmap.insert(std::make_pair(*neigh_viter, woe_vdescr)).first;
-                                }
-
-                                MCUT_ASSERT(cc_to_enforcer_vmap_iter != cc_to_enforcer_vmap.cend());
-
-                                remapped_descrs.push_back(cc_to_enforcer_vmap_iter->second);
+                            if (cc_seed_halfedge == hmesh_t::null_halfedge()) {
+                                cc_seed_halfedge = h; // set once based on first neighbour
                             }
 
-                            face_descriptor_t nfd = wo_enforcer.add_face(remapped_descrs);
+                            //
+                            // insert the neighbour into WOT.
+                            // REMEMBER: the stored connectivity information is what we
+                            // will use to ensure that we insert triangles into "cc_face_triangulation"
+                            // with the correct orientation.
+                            //
+
+                            const std::vector<vertex_descriptor_t>& vertices_around_neighbour = cc.get_vertices_around_face(neigh);
+
+                            // face vertices (their descriptors for indexing into the WOT)
+                            std::vector<vertex_descriptor_t> remapped_descrs; // from CC to WOT
+
+                            // for each vertex around neighbour
+                            for (std::vector<vertex_descriptor_t>::const_iterator neigh_viter = vertices_around_neighbour.cbegin();
+                                 neigh_viter != vertices_around_neighbour.cend(); ++neigh_viter) {
+
+                                // Check if vertex is already added into the WOT
+                                std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator cc_to_wot_vmap_iter = cc_to_wot_vmap.find(*neigh_viter);
+
+                                if (cc_to_wot_vmap_iter == cc_to_wot_vmap.cend()) { // if not ..
+
+                                    const vec3& neigh_vertex_coords = cc.vertex(*neigh_viter);
+
+                                    const vertex_descriptor_t woe_vdescr = wot.add_vertex(neigh_vertex_coords);
+
+                                    cc_to_wot_vmap_iter = cc_to_wot_vmap.insert(std::make_pair(*neigh_viter, woe_vdescr)).first;
+                                }
+
+                                MCUT_ASSERT(cc_to_wot_vmap_iter != cc_to_wot_vmap.cend());
+
+                                remapped_descrs.push_back(cc_to_wot_vmap_iter->second);
+                            }
+
+                            // add the neighbour into WOT
+                            face_descriptor_t nfd = wot.add_face(remapped_descrs);
 
                             MCUT_ASSERT(nfd != hmesh_t::null_face());
                         }
 
-                        registered_neighbours.insert(neigh);
+                        wot_traversed_neighbours.insert(neigh);
                     }
 
-                    // copy/get face vertices and save mapping
+                    // Add (remaining) vertices of "cc_face_iter" into WOT.
+                    //
+                    // NOTE: some (or all) of the vertices of the "cc_face_iter"
+                    // might already have been added when registering the neighbours.
+                    // However, we must still check that all vertices have been added
+                    // since a vertex is added (during the previous neighbour
+                    // registration phase) if-and-only-if it is used by a neighbour.
+                    // Thus vertices are only added during neighbour registration
+                    // phase if they are incident to an edge that is shared with another
+                    // face.
+                    // If "cc_face_iter" has zero neighbours then non of it vertices
+                    // will have been added in the previous phase.
                     // =======================================
 
-                    std::map<uint32_t, vertex_descriptor_t> cdt_to_enforcer_vmap;
-                    std::map<vertex_descriptor_t, uint32_t> enforcer_to_cdt_vmap;
+                    // vertex descriptor map (from CDT to WOT)
+                    std::map<uint32_t, vertex_descriptor_t> cdt_to_wot_vmap;
+                    // vertex descriptor map (from WOT to CDT)
+                    std::map<vertex_descriptor_t, uint32_t> wot_to_cdt_vmap;
 
-                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
+                    // for each vertex of face
+                    for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
-                        const vertex_descriptor_t cc_face_vertex_descr = vertices_around_face[v];
+                        const vertex_descriptor_t cc_face_vertex_descr = SAFE_ACCESS(cc_face_vertices, i);
 
-                        //face_vertex_coords_3d[v] = cc_uptr->kernel_hmesh_data.mesh.vertex(cc_face_vertex_descr);
+                        // check if vertex has already been added into the WOT
+                        std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator fiter = cc_to_wot_vmap.find(cc_face_vertex_descr);
 
-                        std::map<vertex_descriptor_t, vertex_descriptor_t>::const_iterator fiter = cc_to_enforcer_vmap.find(cc_face_vertex_descr);
+                        if (fiter == cc_to_wot_vmap.cend()) { // ... if not
 
-                        if (fiter == cc_to_enforcer_vmap.cend()) {
-                            vertex_descriptor_t vd = wo_enforcer.add_vertex(face_vertex_coords_3d[v]);
-                            fiter = cc_to_enforcer_vmap.insert(std::make_pair(cc_face_vertex_descr, vd)).first;
+                            const vec3& coords = SAFE_ACCESS(cc_face_vcoords3d, i);
+
+                            vertex_descriptor_t vd = wot.add_vertex(coords);
+
+                            fiter = cc_to_wot_vmap.insert(std::make_pair(cc_face_vertex_descr, vd)).first;
                         }
 
-                        enforcer_to_cc_vmap[fiter->second] = fiter->first;
-                        cdt_to_enforcer_vmap[v] = fiter->second;
-                        enforcer_to_cdt_vmap[fiter->second] = v;
+                        cdt_to_wot_vmap[i] = fiter->second;
+                        wot_to_cdt_vmap[fiter->second] = i;
                     }
 
                     //
-                    // Handle duplicate vertices in face, which [will] occur if we had a
-                    // partial cut between the input source-mesh and cut-mesh.
+                    // In the following section, we will check-for and handle
+                    // the case of having duplicate vertices in "cc_face_iter".
+                    //
+                    // Duplicate vertices arise when "cc_face_iter" has a
+                    // partial-cut. Example: source-mesh=triangle and cut-mesh=triangle,
+                    // where the cut-mesh does not split the source-mesh into
+                    // two disjoint parts (i.e. a triangle and a quad) but instead
+                    // induces a slit
                     //
 
-                    // Duplicates that exist before we do triangulation
+                    // Find the duplicates (if any)
                     const cdt::duplicates_info_t duplicates_info_pre = cdt::find_duplicates<double>(
-                        face_polygon_vertices.begin(),
-                        face_polygon_vertices.end(),
+                        cc_face_vcoords2d.begin(),
+                        cc_face_vcoords2d.end(),
                         cdt::get_x_coord_vec2d<double>,
                         cdt::get_y_coord_vec2d<double>);
 
-                    const bool have_duplicates = duplicates_info_pre.duplicates.empty() == false;
+                    const uint32_t duplicate_vcount = (uint32_t)duplicates_info_pre.duplicates.size();
+                    const bool have_duplicates = duplicate_vcount > 0;
 
                     if (have_duplicates) {
-                        /*
-                            For each duplicate vertex (they come in pairs 'a' and 'b') -> cur
-                                1. get prev and next vertex from 'a' and 'b'
-                                    - (we actually need to pick the point whose adjacent vectors form the largest angle 'b') -> x
-                                2. compute vector from prev to x -> "px"
-                                3. compute vector from 'x' to next -> "xn"
-                                4. compute perpendicular vector in counter-clockwise dir for "px" and "xn"
-                                5. compute average vector of "px" and "xn", and normalize it -> v
-                                6. compute maximum perpendicular vector length -> s
-                                    - Use mean edge-length scaled by perturbation constant.
-                                7. for i in {a, b}
-                                    1. construct segment from 'i' to 'i'+'v'*'s'
-                                    2. if segment intersects any edge in face
-                                        a. compute intersection point as paramater t
-                                        b. update tval as tval = min(t, 1);
-                                8. shift 'a' by a = a+(v*(s*(tval/2)))
-                                9. shift 'b' by b = b+(-v*(s*(tval/2)))
 
-                                # A note regarding steps 8 and 9:
-                                # the 2 is a hardcoded constant telling us to
-                                # shift 'a' (or 'b') halfway to the position of
-                                # the intersected edge of the face to be triangulated
-                                # (if we do indeed intersect an edge with the
-                                # scaled perp vector). Otherwise, the 'a' is
-                                # shifted by the prescribed amount of "v*s"
-                        */
+                        // for each pair of duplicate vertices
+                        for (std::vector<std::size_t>::const_iterator duplicate_vpair_iter = duplicates_info_pre.duplicates.cbegin();
+                             duplicate_vpair_iter != duplicates_info_pre.duplicates.cend(); ++duplicate_vpair_iter) {
 
-                        for (std::vector<std::size_t>::const_iterator dupl_iter = duplicates_info_pre.duplicates.cbegin();
-                             dupl_iter != duplicates_info_pre.duplicates.cend(); ++dupl_iter) {
+                            // first vertex in pair (index into "cc_face_iter")
+                            //const std::uint32_t first_vertex_index = (std::uint32_t)(*duplicate_vpair_iter); // ... in the cc-face to be triangulated
+                            // second vertex in pair (index into "cc_face_iter")
+                            //const std::uint32_t second_vertex_index = (std::uint32_t)SAFE_ACCESS(duplicates_info_pre.mapping, first_vertex_index);
 
-                            const std::uint32_t dupl_vertex_idx = (std::uint32_t)(*dupl_iter); // ... in the cc-face to be triangulated
-                            const std::uint32_t dupl_vertex_other_idx = (std::uint32_t)SAFE_ACCESS(duplicates_info_pre.mapping, dupl_vertex_idx);
-
-                            // lets rename the vars
-                            const std::uint32_t dupl_vtx_pair_arr[] = { dupl_vertex_idx, dupl_vertex_other_idx };
+                            // array of the current pair of two duplicate vertices
+                            //const std::uint32_t duplicate_vpair[] = { first_vertex_index, second_vertex_index };
 
                             //
-                            // compute average vector of the two (directed) edges
-                            // eminating from each duplicate vertex e.g. "prev - a" and "next - a"
+                            // The two vertices are duplicates because they have the _exact_ same coordinates.
+                            // We make these points unique by perturbing their coordinates. This requires care
+                            // because we want to ensure that "cc_face_iter" remains a simple polygon (without
+                            // self-intersections) after perturbation. To do this, we must perturbation one
+                            // vertex in the direction that lies on the left-side (i.e. CCW dir) of the two
+                            // halfedges incident to that vertex. We take care to account for the fact the two
+                            // incident edges may be parallel.
                             //
-                            for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
 
-                                const std::int32_t cur_dupl_vertex_id = dupl_vtx_pair_arr[dv_iter];
-                                const std::uint32_t prev_vtx_id = wrap_integer(cur_dupl_vertex_id - 1, 0, face_polygon_vertices.size() - 1);
-                                const std::uint32_t next_vtx_id = wrap_integer(cur_dupl_vertex_id + 1, 0, face_polygon_vertices.size() - 1);
+                            //const uint32_t num_vertices_in_pair = 2;
 
-                                const std::int32_t cur_dupl_partner_id = dupl_vtx_pair_arr[(dv_iter + 1) % 2];
+                            // for each duplicate vertex in pair
+                            //for (std::uint32_t dv_iter = 0; dv_iter < num_vertices_in_pair; ++dv_iter) {
+                                //
+                                // compute the perturbtion vector, which encodes the direction and magnitude to shift
+                                // the vertex's coordinates with (small amount).
+                                //
 
-                                vec2& cur_dupl_vertex_coords = face_polygon_vertices[dupl_vertex_idx]; // will be modified by shifting
-                                const vec2& prev_vtx_coords = face_polygon_vertices[prev_vtx_id];
-                                const vec2& next_vtx_coords = face_polygon_vertices[next_vtx_id];
+                                // current duplicate vertex (index in "cc_face_iter")
+                                const std::int32_t perturbed_dvertex_id = (std::uint32_t)(*duplicate_vpair_iter);
+                                // previous vertex (in "cc_face_iter") from current duplicate vertex
+                                const std::uint32_t prev_vtx_id = wrap_integer(perturbed_dvertex_id - 1, 0, cc_face_vcount - 1);
+                                // next vertex (in "cc_face_iter") from current duplicate vertex
+                                const std::uint32_t next_vtx_id = wrap_integer(perturbed_dvertex_id + 1, 0, cc_face_vcount - 1);
+                                // the other duplicate vertex of pair
+                                const std::int32_t other_dvertex_id = (std::uint32_t)SAFE_ACCESS(duplicates_info_pre.mapping, perturbed_dvertex_id);
 
-                                const vec2 cur_to_prev = prev_vtx_coords - cur_dupl_vertex_coords;
-                                const vec2 cur_to_next = next_vtx_coords - cur_dupl_vertex_coords;
+                                vec2& perturbed_dvertex_coords = SAFE_ACCESS(cc_face_vcoords2d, perturbed_dvertex_id); // will be modified by shifting/perturbation
+                                const vec2& prev_vtx_coords = SAFE_ACCESS(cc_face_vcoords2d, prev_vtx_id);
+                                const vec2& next_vtx_coords = SAFE_ACCESS(cc_face_vcoords2d, next_vtx_id);
 
-                                // positive-value if in CCW order (sign_t::ON_NEGATIVE_SIDE)
-                                // negative-value if in CW order (sign_t::ON_POSITIVE_SIDE)
+                                // vector along incident edge, pointing from current to previous vertex (NOTE: clockwise dir, reverse)
+                                const vec2 to_prev = prev_vtx_coords - perturbed_dvertex_coords;
+                                // vector along incident edge, pointing from current to next vertex (NOTE: counter-clockwise dir, normal)
+                                const vec2 to_next = next_vtx_coords - perturbed_dvertex_coords;
+
+                                // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
+                                // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
                                 // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
-                                const double orient2d_res = orient2d(cur_dupl_vertex_coords, next_vtx_coords, prev_vtx_coords);
+                                const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
                                 const sign_t orient2d_sgn = sign(orient2d_res);
 
-                                const double cur_to_prev_sqr_len = squared_length(cur_to_prev);
-                                const double cur_to_next_sqr_len = squared_length(cur_to_next);
+                                const double to_prev_sqr_len = squared_length(to_prev);
+                                const double to_next_sqr_len = squared_length(to_next);
 
-                                vec2 orth_perp_dir;
-
-                                // the error bounds for the orient2d predicate
-                                const double ccwerrboundA = 3.3306690738754716e-16;
-                                const double errbound = ccwerrboundA * 1e6;
-
-                                // We use "errbound" (instead of "orient2d_res") to determine if the incident edges
-                                // are parallel because that leaves us with sufficient precision in the coordinate
-                                // to compute the orthogonal perturbation vector as the mean of the two incident edges
-                                // eminating from the current vertex. "orient2d()" is exact and may depend on
-                                // calculation with numbers that are lower than "errbound", which would complicate
-                                // our ability to compute the orthogonal perturbation vector
                                 //
+                                // Now we must determine which side is the perturbation_vector must 
+                                // pointing. i.e. the side of "perturbed_dvertex_coords" or the side 
+                                // of its duplicate
+                                //
+                                // NOTE: this is only really necessary if the partially cut polygon
+                                // Has more that 3 intersection points (i.e. more than the case of 
+                                // one tip, and two duplicates)
+                                //
+
+                                const int32_t flip = (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) ? -1 : 1;
+                                
+                                //
+                                // Compute the perturbation vector as the average of the two incident edges eminating
+                                // from the current vertex. NOTE: This perturbation vector should generally point in
+                                // the direction of the polygon-interior (i.e. analogous to pushing the polygon the
+                                // the location represented by perturbed_dvertex_coords) to cause a minute dent due to small
+                                // loss of area.
+                                // Normalization happens below
+                                vec2 perturbation_vector = ((to_prev + to_next) / 2.0) * flip;
+
+                                // The floating-point error-bound used by the "orient2d" predicate to determine
+                                // if exact arthmetic should be used (see definition of "orient2d()")
+                                const double orient2d_ccwerrboundA = 3.3306690738754716e-16;
+                                // "orient2d()" is exact in the sense that it can depend on computations with numbers
+                                // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
+                                // that this threshold is too "small" a number for us to be able to reliably compute
+                                // stuff with the result of "orient2d()" that is near this threshold.
+                                // Our solution is to scale this threshold by six-orders of magnitude (I must
+                                // acknowledge that the choice of 1e6 is arbitrary).
+                                const double errbound = orient2d_ccwerrboundA * 1e6;
+
+                                // We use "errbound", rather than "orient2d_res", to determine if the incident edges
+                                // are parallel to give us sufficient room of numerical-precision to reliably compute
+                                // the perturbation vector.
+                                // In general, if the incident edges are not parallel then the perturbation vector
+                                // is computed as the mean of "to_prev" and "to_next". Thus, being "too close"
+                                // (within some threshold) to the edges being parallel, can induce unpredicatable
+                                // numerical instabilities, where the mean-vector will be too close to the zero-vector
+                                // and can complicate the task of perturbation.
                                 const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
 
                                 if (incident_edges_are_parallel) {
                                     //
-                                    // pick the longest of the two incident edges and compute the
+                                    // pick the shortest of the two incident edges and compute the
                                     // orthogonal perturbation vector as the counter-clockwise rotation
+                                    // of this shortest incident edge.
                                     //
 
-                                    // flip sign so that the edge is in the CCW dir to give "prev->cur"
-                                    vec2 edge_vec(-cur_to_prev.x(), -cur_to_prev.y());
+                                    // flip sign so that the edge is in the CCW dir by pointing from "prev" to "cur"
+                                    vec2 edge_vec(-to_prev.x(), -to_prev.y());
 
-                                    if (cur_to_prev_sqr_len > cur_to_next_sqr_len) {
-                                        edge_vec = cur_to_next; // pick shortest (NOTE: "cur_to_next" is already in CCW dir)
+                                    if (to_prev_sqr_len > to_next_sqr_len) {
+                                        edge_vec = to_next; // pick shortest (NOTE: "to_next" is already in CCW dir)
                                     }
 
+                                    // rotate the selected edge by 90 degrees
                                     const vec2 edge_vec_rotated90(-edge_vec.y(), edge_vec.x());
 
-                                    orth_perp_dir = edge_vec_rotated90;
-                                } else {
-                                    //
-                                    // compute the orthogonal perturbation vector as the average of the
-                                    // two incident edges emminating from the current vertex
-                                    //
-                                    const vec2 avg_vector = (cur_to_prev + cur_to_next) / 2.0;
-                                    orth_perp_dir = avg_vector;
+                                    perturbation_vector = edge_vec_rotated90;
                                 }
 
+                                const vec2 perturbation_dir = normalize(perturbation_vector);
+
                                 //
-                                // We will now construct a segment from "cur" to "cur + orth_perp_dir*errbound".
-                                // This segment will be tested against every edge in the face using
-                                // the (potentially modified) vertices in "face_polygon_vertices".
+                                // Compute the maximum length between any two vertices in "cc_face_iter" as the
+                                // largest length between any two vertices.
                                 //
-                                const vec2& segment_start = cur_dupl_vertex_coords;
-                                const vec2 shift = (normalize(orth_perp_dir) * (0.1 * length(orth_perp_dir)));
-                                const vec2 segment_end = segment_start + shift;
-                                double tval = 1.0; // start of segment, which is "cur_dupl_vertex_coords"
+                                // This will be used to scale "perturbation_dir" so that we find the
+                                // closest edge (from "perturbed_dvertex_coords") that iss intersected by this edge.
+                                // We will use the resulting information to determine the amount by-which
+                                // "perturbed_dvertex_coords" is to be perturbed.
+                                //
 
-                                // for each edge of face to be triangulated (number of vertices == number of edges)
-                                for (std::uint32_t viter = 0; viter < face_vertex_count; ++viter) {
-                                    const std::uint32_t edge_start_idx = viter;
-                                    const std::uint32_t edge_end_idx = (viter + 1) % face_vertex_count;
+                                // largest squared length between any two vertices in "cc_face_iter"
+                                double largest_sqrd_length = -1.0;
 
-                                    if (edge_start_idx == (uint32_t)cur_dupl_vertex_id || edge_end_idx == (uint32_t)cur_dupl_vertex_id || edge_start_idx == (uint32_t)cur_dupl_partner_id || edge_end_idx == (uint32_t)cur_dupl_partner_id) {
-                                        continue; // impossible to intersect incident edges
-                                    }
+                                for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
-                                    const vec2& edge_start_coords = face_polygon_vertices[edge_start_idx];
-                                    const vec2& edge_end_coords = face_polygon_vertices[edge_end_idx];
+                                    const vec2& a = SAFE_ACCESS(cc_face_vcoords2d, i);
 
-                                    double segment_tval; // parameter along segment
-                                    double edge_tval; // parameter along edge
-                                    vec2 intersection_point; // if it exists (not used)
+                                    for (uint32_t j = 0; j < cc_face_vcount; ++j) {
 
-                                    const char result = compute_segment_intersection(
-                                        segment_start, segment_end, edge_start_coords, edge_end_coords,
-                                        intersection_point, segment_tval, edge_tval);
+                                        if (i == j) {
+                                            continue; // skip -> comparison is redundant
+                                        }
 
-                                    MCUT_ASSERT(result != 'e'); // imagine when this occurs
+                                        const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
 
-                                    if (result == '1') {
-                                        tval = std::min(tval, segment_tval);
+                                        const double sqrd_length = squared_length(b - a);
+                                        largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
                                     }
                                 }
 
-                                if (tval != 1.0) {
-                                    tval /= 2.0; // halfway from intersection
-                                }
+                                //
+                                // construct the segment with which will will find the closest
+                                // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
+                                //
 
-                                vec2 shift_final;
+                                const double shift_len = std::sqrt(largest_sqrd_length);
+                                const vec2 shift = perturbation_dir * shift_len;
 
-                                // final shifted position of vertex
-                                if (orient2d_sgn == sign_t::ON_POSITIVE_SIDE ||
-                                    // if collinear then we will be using the rotated
-                                    // incident incident edge, whose directiion will
-                                    // point torward he correct side of the polygon.
-                                    // So shift as normal
-                                    (orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY)) {
-                                    shift_final = (shift * tval);
-                                } else // if(orient2d_sgn == sign_t::ON_NEGATIVE_SIDE)
+                                vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
+
                                 {
-                                    shift_final = (shift * tval * -1.0); // opposite dir
+                                    struct {
+                                        vec2 start;
+                                        vec2 end;
+                                    } segment;
+                                    segment.start = perturbed_dvertex_coords;
+                                    segment.end = perturbed_dvertex_coords + shift;
+
+                                    // test segment against all edges to find closest intersection point
+
+                                    double segment_min_tval = 1.0;
+
+                                    // for each edge of face to be triangulated (number of vertices == number of edges)
+                                    for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
+                                        const std::uint32_t edge_start_idx = i;
+                                        const std::uint32_t edge_end_idx = (i + 1) % cc_face_vcount;
+
+                                        if ((edge_start_idx == (uint32_t)perturbed_dvertex_id || edge_end_idx == (uint32_t)perturbed_dvertex_id) || //
+                                            (edge_start_idx == (uint32_t)other_dvertex_id || edge_end_idx == (uint32_t)other_dvertex_id)) {
+                                            continue; // impossible to properly intersect incident edges
+                                        }
+
+                                        const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
+                                        const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
+
+                                        double segment_tval; // parameter along segment
+                                        double edge_tval; // parameter along current edge
+                                        vec2 ipoint; // intersection point between segment and current edge
+
+                                        const char result = compute_segment_intersection(
+                                            segment.start, segment.end, edge_start_coords, edge_end_coords,
+                                            ipoint, segment_tval, edge_tval);
+
+                                        if (result == '1' && segment_min_tval > segment_tval) { // we have an clear intersection point
+                                            segment_min_tval = segment_tval;
+                                            intersection_point_on_edge = ipoint;
+                                        } else if (
+                                            // segment and edge are collinear
+                                            result == 'e' ||
+                                            // segment and edge are collinear, or one entity cuts through the vertex of the other
+                                            result == 'v') {
+                                            // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
+
+                                            // length from segment start to the start of edge
+                                            const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
+                                            // length from segment start to the end of edge
+                                            const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
+
+                                            // length from start of segment to either start of edge or end of edge (depending on which is closer)
+                                            double sqr_dist_to_closest = sqr_dist_to_edge_start;
+                                            const vec2* ipoint_ptr = &edge_start_coords;
+
+                                            if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
+                                                sqr_dist_to_closest = sqr_dist_to_edge_end;
+                                                ipoint_ptr = &edge_end_coords;
+                                            }
+
+                                            // ratio along segment
+                                            segment_tval = std::sqrt(sqr_dist_to_closest) / shift_len;
+
+                                            if (segment_min_tval > segment_tval) {
+                                                segment_min_tval = segment_tval;
+                                                intersection_point_on_edge = *ipoint_ptr; // closest point
+                                            }
+                                        }
+                                    }
+
+                                    MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
                                 }
 
-                                cur_dupl_vertex_coords = cur_dupl_vertex_coords + shift_final;
+                                // Shortened perturbation vector: shortening from the vector that is as long as the
+                                // max length between any two vertices in "cc_face_iter", to a vector that runs
+                                // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
+                                // "perturbation_vector" and passing through the interior of "cc_face_iter")
+                                const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
+                                const double revised_perturbation_len = length(revised_perturbation_vector);
 
-                            } // for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
-                        } // for (std::vector<std::size_t>::const_iterator dupl_iter = duplicates_info_pre.duplicates.cbegin(); ...
+                                const double scale = (errbound * revised_perturbation_len);
+                                // The translation by which we perturb "perturbed_dvertex_coords"
+                                //
+                                // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
+                                // "displacement" is by-default pointing in the positive/CCW direction, which is torward
+                                // the interior of the polygon represented by "cc_face_iter".
+                                // Thus, the cases with "orient2d_sgn == sign_t::ON_POSITIVE_SIDE" and
+                                // "orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY", result in the same displacement vector
+                                vec2 displacement = (perturbation_dir * scale);
+
+                                // negative sign to point outside
+                                //if (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) {
+                                //    displacement = displacement * (-1.0);
+                                //}
+
+                                // perturb
+                                perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
+
+                            //} // for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
+                        } // for (std::vector<std::size_t>::const_iterator duplicate_vpair_iter = duplicates_info_pre.duplicates.cbegin(); ...
                     } // if (have_duplicates) {
 
                     //
-                    // create the constraint edges for CDT, which is just our face's edges
+                    // create the constraint edges for the CDT triangulator, which are just the edges of "cc_face_iter"
                     //
-                    for (uint32_t i = 0; i < face_vertex_count; ++i) {
-                        face_polygon_edges.emplace_back(cdt::edge_t(i, (i + 1) % face_vertex_count));
+                    for (uint32_t i = 0; i < cc_face_vcount; ++i) {
+                        cc_face_edges.push_back(cdt::edge_t(i, (i + 1) % cc_face_vcount));
                     }
 
                     // check for duplicate vertices again
                     const cdt::duplicates_info_t duplicates_info_post = cdt::find_duplicates<double>(
-                        face_polygon_vertices.begin(),
-                        face_polygon_vertices.end(),
+                        cc_face_vcoords2d.begin(),
+                        cc_face_vcoords2d.end(),
                         cdt::get_x_coord_vec2d<double>,
                         cdt::get_y_coord_vec2d<double>);
 
                     if (!duplicates_info_post.duplicates.empty()) {
-                        // probably a good idea to email the author
+                        // This should not happen! Probably a good idea to email the author
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_ERROR, 0,
-                            MC_DEBUG_SEVERITY_HIGH, "face " + std::to_string(*f) + " has duplicate vertices that could not be resolved (bug)");
-                        continue;
+                            MC_DEBUG_SEVERITY_HIGH, "face " + std::to_string(*cc_face_iter) + " has duplicate vertices that could not be resolved (bug)");
+                        continue; // skip to next face (will leave a hole in the output)
                     }
 
-                    constrained_cdt.insert_vertices(face_polygon_vertices);
-                    constrained_cdt.insert_edges(face_polygon_edges);
+                    // allocate triangulator
+                    cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+                    cdt.insert_vertices(cc_face_vcoords2d);
+                    cdt.insert_edges(cc_face_edges);
+                    cdt.erase_outer_triangles(); // do the constrained delaunay triangulation
 
-                    // triangulation done here!
-                    // NOTE: it seems that the triangulation can be either CW or CCW.
-                    constrained_cdt.erase_outer_triangles();
+                    // const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(cdt.pieceToOriginals);
+                    // const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, cdt.vertices);
 
-                    const std::unordered_map<cdt::edge_t, std::vector<cdt::edge_t>> tmp = cdt::edge_to_pieces_mapping(constrained_cdt.pieceToOriginals);
-                    const std::unordered_map<cdt::edge_t, std::vector<std::uint32_t>> edgeToSplitVerts = cdt::get_edge_to_split_vertices_map(tmp, constrained_cdt.vertices);
-
-                    if (!cdt::check_topology(constrained_cdt)) {
+                    if (!cdt::check_topology(cdt)) {
 
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face " + std::to_string(*f) + "has wrong topology");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face " + std::to_string(*cc_face_iter) + " has invalid topology");
+
+                        continue; // skip to next face (will leave a hole in the output)
                     }
 
-                    if (constrained_cdt.triangles.empty()) {
+                    if (cdt.triangles.empty()) {
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face " + std::to_string(*f) + " produced zero faces");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face " + std::to_string(*cc_face_iter) + " produced zero faces");
+
+                        continue; // skip to next face (will leave a hole in the output)
                     }
-
-                    // save the triangulation
-                    // ======================
-
-                    //const uint32_t face_resulting_triangle_count = (uint32_t)constrained_cdt.triangles.size();
 
                     //
-                    // It is preferrable to without the assumption that the resulting CDT triangles
-                    // have the proper winding order, which matches our faces.
-                    // Thus, we have to use a BFS flood-fill strategy to "walk" the
-                    // triangles of the CDT, thereby inserting then one-by-one into our
-                    // triangulated CC mesh without violating the "enforcer"
+                    // In the following, we will now save the produce triangles into the
+                    // output array "cc_face_triangulation".
+                    //
+
+                    // number of CDT triangles
+                    const uint32_t cc_face_triangle_count = (uint32_t)cdt.triangles.size();
+
+                    //
+                    // We insert triangles into "cc_face_triangulation" by using a
+                    // breadth-first search-like flood-fill strategy to "walk" the
+                    // triangles of the CDT. We start from a prescribed triangle next to the
+                    // boundary of "cc_face_iter".
                     //
 
                     // map vertices to CDT triangles
-                    std::vector<std::vector<uint32_t>> vertex_to_triangle_map(face_vertex_count, std::vector<uint32_t>());
+                    // Needed for the BFS traversal of triangles
+                    std::vector<std::vector<uint32_t>> vertex_to_triangle_map(cc_face_vcount, std::vector<uint32_t>());
 
                     // for each CDT triangle
-                    for (uint32_t t = 0; t < (uint32_t)constrained_cdt.triangles.size(); ++t) {
-                        const cdt::triangle_t& triangle = SAFE_ACCESS(constrained_cdt.triangles, t);
+                    for (uint32_t i = 0; i < cc_face_triangle_count; ++i) {
 
-                        for (uint32_t v = 0; v < 3; v++) {
-                            const uint32_t vertex_id = SAFE_ACCESS(triangle.vertices, v);
-                            std::vector<uint32_t>& incident_triangles = SAFE_ACCESS(vertex_to_triangle_map, vertex_id);
-                            incident_triangles.push_back(t);
+                        const cdt::triangle_t& triangle = SAFE_ACCESS(cdt.triangles, i);
+
+                        // for each triangle vertex
+                        for (uint32_t j = 0; j < 3; j++) {
+                            const uint32_t cdt_vertex_id = SAFE_ACCESS(triangle.vertices, j);
+                            const uint32_t cc_face_vertex_id = SAFE_ACCESS(face_to_cdt_vmap, cdt_vertex_id);
+                            std::vector<uint32_t>& incident_triangles = SAFE_ACCESS(vertex_to_triangle_map, cc_face_vertex_id);
+                            incident_triangles.push_back(i); // save mapping
                         }
                     }
 
                     // start with any boundary edge (AKA constraint/fixed edge)
+                    std::unordered_set<cdt::edge_t>::const_iterator fixed_edge_iter = cdt.fixedEdges.cbegin();
 
-                    std::unordered_set<cdt::edge_t>::const_iterator fixed_edge_iter = constrained_cdt.fixedEdges.cbegin();
-
-                    // NOTE: in the case that we DO NOT have a seed halfedge, then the current face
-                    // that we are triangulating is the only face in the connected component and therefore
-                    // it has no neighbours. In this instance, the winding order of the produced triangles
+                    // NOTE: in the case that "cc_seed_halfedge" is null, then "cc_face_iter"
+                    // is the only face in its connected component (mesh) and therefore
+                    // it has no neighbours. In this case, the winding-order of the produced triangles
                     // is dependent on the CDT triangulator. The MCUT frontend will at best be able to
                     // ensure that all CDT triangles have consistent winding order (even if the triangulator
                     // produced mixed winding orders between the resulting triangles) but we cannot guarrantee
-                    // the "front-facing" side of triangulated face will match that of the non-triangulated
-                    // face from the connected component. We leave that to the user to fix upon inspection.
+                    // the "front-facing" side of triangulated "cc_face_iter" will match that of its
+                    // original non-triangulated form from the connected component.
                     //
-                    const bool have_seed_halfedge = seed_halfedge != hmesh_t::null_halfedge();
+                    // We leave that to the user to fix upon visual inspection.
+                    //
+                    const bool have_seed_halfedge = cc_seed_halfedge != hmesh_t::null_halfedge();
 
                     if (have_seed_halfedge) {
-                        // if the seend halfedge exists then the triangulated face must have
+                        // if the seed halfedge exists then the triangulated face must have
                         // atleast one neighbour
-                        MCUT_ASSERT(wo_enforcer.number_of_faces() != 0);
+                        MCUT_ASSERT(wot.number_of_faces() != 0);
 
                         // source and target descriptor in the connected component
-                        const vertex_descriptor_t seed_halfedge_src = cc_uptr->kernel_hmesh_data.mesh.source(seed_halfedge);
-                        const vertex_descriptor_t seed_halfedge_tgt = cc_uptr->kernel_hmesh_data.mesh.target(seed_halfedge);
+                        const vertex_descriptor_t cc_seed_halfedge_src = cc.source(cc_seed_halfedge);
+                        const vertex_descriptor_t cc_seed_halfedge_tgt = cc.target(cc_seed_halfedge);
 
                         // source and target descriptor in the face
-                        const vertex_descriptor_t woe_src = SAFE_ACCESS(cc_to_enforcer_vmap, seed_halfedge_src);
-                        const uint32_t cdt_src = SAFE_ACCESS(enforcer_to_cdt_vmap, woe_src);
-                        const vertex_descriptor_t woe_tgt = SAFE_ACCESS(cc_to_enforcer_vmap, seed_halfedge_tgt);
-                        const uint32_t cdt_tgt = SAFE_ACCESS(enforcer_to_cdt_vmap, woe_tgt);
+                        const vertex_descriptor_t woe_src = SAFE_ACCESS(cc_to_wot_vmap, cc_seed_halfedge_src);
+                        const uint32_t cdt_src = SAFE_ACCESS(wot_to_cdt_vmap, woe_src);
+                        const vertex_descriptor_t woe_tgt = SAFE_ACCESS(cc_to_wot_vmap, cc_seed_halfedge_tgt);
+                        const uint32_t cdt_tgt = SAFE_ACCESS(wot_to_cdt_vmap, woe_tgt);
 
                         // find the fixed edge in the CDT matching the vertices of the seed halfedge
 
                         fixed_edge_iter = std::find_if(
-                            constrained_cdt.fixedEdges.cbegin(),
-                            constrained_cdt.fixedEdges.cend(),
-                            [&](const cdt::edge_t& e) {
-                                return (e.v1() == cdt_src && e.v2() == cdt_tgt) || (e.v2() == cdt_src && e.v1() == cdt_tgt);
+                            cdt.fixedEdges.cbegin(),
+                            cdt.fixedEdges.cend(),
+                            [&](const cdt::edge_t& e) -> bool {
+                                return (e.v1() == cdt_src && e.v2() == cdt_tgt) || //
+                                    (e.v2() == cdt_src && e.v1() == cdt_tgt);
                             });
 
-                        MCUT_ASSERT(fixed_edge_iter != constrained_cdt.fixedEdges.cend());
+                        MCUT_ASSERT(fixed_edge_iter != cdt.fixedEdges.cend());
                     }
 
-                    // must always exist since cdt edge ultimately came from CC and
+                    // must always exist since cdt edge ultimately came from the CC, and also
                     // due to the fact that we have inserted edges into the CDT
-                    MCUT_ASSERT(fixed_edge_iter != constrained_cdt.fixedEdges.cend());
+                    MCUT_ASSERT(fixed_edge_iter != cdt.fixedEdges.cend());
 
                     // get the two vertices of the "seed" fixed edge (indices into CDT)
                     const std::uint32_t fixed_edge_vtx0_id = fixed_edge_iter->v1();
                     const std::uint32_t fixed_edge_vtx1_id = fixed_edge_iter->v2();
 
-                    // since these vertices share an edge, they will share a triangle in the CDT
+                    //
+                    // Since these vertices share an edge, they will share a triangle in the CDT
                     // So lets get that shared triangle, which will be the seed triangle for the
                     // traversal process, which we will use to walk and insert triangles into
-                    // the output user array
+                    // the output array "cc_face_triangulation"
+                    //
+
+                    // incident triangles of first vertex
                     const std::vector<std::uint32_t>& fixed_edge_vtx0_tris = SAFE_ACCESS(vertex_to_triangle_map, fixed_edge_vtx0_id);
                     MCUT_ASSERT(fixed_edge_vtx0_tris.empty() == false);
+                    // incident triangles of second vertex
                     const std::vector<std::uint32_t>& fixed_edge_vtx1_tris = SAFE_ACCESS(vertex_to_triangle_map, fixed_edge_vtx1_id);
                     MCUT_ASSERT(fixed_edge_vtx1_tris.empty() == false);
 
+                    // the shared triangle between the two vertices of fixed edge
                     std::uint32_t fix_edge_seed_triangle = cdt::null_neighbour;
 
+                    // for each CDT triangle incident to the first vertex
                     for (std::vector<std::uint32_t>::const_iterator it = fixed_edge_vtx0_tris.begin(); it != fixed_edge_vtx0_tris.end(); ++it) {
 
                         if (*it == cdt::null_neighbour) {
                             continue;
                         }
 
+                        // does it exist in the incident triangle list of the other vertex?
                         if (std::find(fixed_edge_vtx1_tris.begin(), fixed_edge_vtx1_tris.end(), *it) != fixed_edge_vtx1_tris.end()) {
-                            fix_edge_seed_triangle = *it;
+                            fix_edge_seed_triangle = *it; // found
+                            break; // done
                         }
                     }
 
@@ -1395,62 +1575,71 @@ void get_connected_component_data_impl(
 
                     std::stack<std::uint32_t> seeds(std::deque<std::uint32_t>(1, fix_edge_seed_triangle));
 
+                    // collection of traversed CDT triangles
                     std::unordered_set<std::uint32_t> traversed;
 
-                    while (!seeds.empty()) {
+                    while (!seeds.empty()) { // while we still have triangles to walk
 
                         const std::uint32_t curr_triangle_id = seeds.top();
                         seeds.pop();
 
                         traversed.insert(curr_triangle_id); // those we have walked
 
-                        const cdt::triangle_t& triangle = constrained_cdt.triangles[curr_triangle_id];
+                        const cdt::triangle_t& triangle = cdt.triangles[curr_triangle_id];
 
                         //
                         // insert current triangle into our triangulated CC mesh
                         //
+                        const uint32_t triangle_vertex_count = 3;
 
-                        for (int i = 0; i < 3; i++)
-                            vertex_is_used[triangle.vertices[i]] = true; // marked
+                        // from CDT/"cc_face_iter" indices to WOT descriptors
+                        std::vector<vertex_descriptor_t> remapped_triangle(triangle_vertex_count, hmesh_t::null_vertex());
 
-                        // convert to local descriptors
-                        std::vector<vd_t> triangle_descriptors = {
-                            vd_t(cdt_to_enforcer_vmap.at(triangle.vertices[0])),
-                            vd_t(cdt_to_enforcer_vmap.at(triangle.vertices[1])),
-                            vd_t(cdt_to_enforcer_vmap.at(triangle.vertices[2]))
-                        };
+                        // for each vertex of triangle
+                        for (uint32_t i = 0; i < triangle_vertex_count; i++)
+                        {
+                            // index of current vertex in CDT/"cc_face_iter"
+                            const uint32_t cdt_vertex_id = SAFE_ACCESS(triangle.vertices, i);
+                            const uint32_t cc_face_vertex_id = SAFE_ACCESS(face_to_cdt_vmap, cdt_vertex_id);
+                            
+                            // mark vertex as used (for sanity check)
+                            SAFE_ACCESS(cc_face_vtx_to_is_used_flag, cc_face_vertex_id) = true; 
 
-                        face_triangulation_indices.emplace_back(triangle.vertices[0]);
-                        face_triangulation_indices.emplace_back(triangle.vertices[1]);
-                        face_triangulation_indices.emplace_back(triangle.vertices[2]);
+                            // remap triangle vertex index
+                            SAFE_ACCESS(remapped_triangle, i) = SAFE_ACCESS(cdt_to_wot_vmap, cc_face_vertex_id);
 
-                        // check that the winding order matches the triangulated face's order
-                        const bool is_insertible = wo_enforcer.is_insertable(triangle_descriptors);
-
-                        if (!is_insertible) {
-
-                            // flip the winding order
-                            uint32_t a = triangle_descriptors[0];
-                            uint32_t c = triangle_descriptors[2];
-                            std::swap(a, c);
-                            triangle_descriptors[0] = vd_t(a);
-                            triangle_descriptors[2] = vd_t(c);
-                            const size_t N = face_triangulation_indices.size();
-                            std::swap(face_triangulation_indices[N - 1], face_triangulation_indices[N - 3]); // reverse last added triangle's indices
+                            // save index into output array (where every three indices is a triangle)
+                            cc_face_triangulation.emplace_back(cc_face_vertex_id);
                         }
 
-                        // add face into our WO enforcer
-                        fd_t fd = wo_enforcer.add_face(triangle_descriptors); // keep track of added triangles from CDT
+                        // check that the winding order respects the winding order of "cc_face_iter"
+                        const bool is_insertible = wot.is_insertable(remapped_triangle);
 
-                        // if this fails then CDT gave us a strange triangulation e.g.
-                        // duplicate triangles with opposite winding order
+                        if (!is_insertible) { // CDT somehow produce a triangle with reversed winding-order (i.e. CW)
+
+                            // flip the winding order by simply swapping indices
+                            uint32_t a = remapped_triangle[0];
+                            uint32_t c = remapped_triangle[2];
+                            std::swap(a, c); // swap indices in the remapped triangle
+                            remapped_triangle[0] = vertex_descriptor_t(a);
+                            remapped_triangle[2] = vertex_descriptor_t(c);
+                            const size_t N = cc_face_triangulation.size();
+
+                            // swap indice in the saved triangle
+                            std::swap(cc_face_triangulation[N - 1], cc_face_triangulation[N - 3]); // reverse last added triangle's indices
+                        }
+
+                        // add face into our WO wot
+                        face_descriptor_t fd = wot.add_face(remapped_triangle); // keep track of added triangles from CDT
+
+                        // if this happens then CDT gave us a strange triangulation e.g. duplicate triangles with opposite winding order
                         if (fd == hmesh_t::null_face()) {
-                            // simply remove/ignore the offending triangle
-                            face_triangulation_indices.pop_back();
-                            face_triangulation_indices.pop_back();
-                            face_triangulation_indices.pop_back();
+                            // Simply remove/ignore the offending triangle. We cannot do anything at this stage.
+                            cc_face_triangulation.pop_back();
+                            cc_face_triangulation.pop_back();
+                            cc_face_triangulation.pop_back();
 
-                            const std::string msg = "triangulation on face " + std::to_string(*f) + " produced invalid triangles tht could not be inserted";
+                            const std::string msg = "triangulation on face " + std::to_string(*cc_face_iter) + " produced invalid triangles that could not be stored";
 
                             context_uptr->log(
                                 MC_DEBUG_SOURCE_KERNEL,
@@ -1459,25 +1648,30 @@ void get_connected_component_data_impl(
                         }
 
                         //
-                        // add neighbouring triangles into queue/stack
+                        // We will now add the neighbouring CDT triangles into queue/stack
                         //
 
-                        for (std::uint32_t i(0); i < std::uint32_t(3); ++i) {
-                            const cdt::edge_t opEdge(triangle.vertices[cdt::ccw(i)], triangle.vertices[cdt::cw(i)]);
-                            if (constrained_cdt.fixedEdges.count(opEdge)) {
-                                continue; // current edge is fixed edge so do not add neigher
+                        // for each CDT vertex
+                        for (std::uint32_t i(0); i < triangle_vertex_count; ++i) {
+                            
+                            const uint32_t next = triangle.vertices[cdt::ccw(i)];
+                            const uint32_t prev = triangle.vertices[cdt::cw(i)];
+                            const cdt::edge_t query_edge(next, prev);
+                            
+                            if (cdt.fixedEdges.count(query_edge)) {
+                                continue; // current edge is fixed edge so there is no neighbour
                             }
 
-                            const std::uint32_t iN = triangle.neighbors[cdt::get_opposite_neighbour_from_vertex(i)];
+                            const std::uint32_t neighbour_index = triangle.neighbors[cdt::get_opposite_neighbour_from_vertex(i)];
 
-                            if (iN != cdt::null_neighbour && traversed.count(iN) == 0) {
-                                seeds.push(iN);
+                            if (neighbour_index != cdt::null_neighbour && traversed.count(neighbour_index) == 0) {
+                                seeds.push(neighbour_index);
                             }
                         }
                     } // while (!seeds.empty()) {
 
                     // every triangle in the finalized CDT must be walked!
-                    MCUT_ASSERT(traversed.size() == constrained_cdt.triangles.size());
+                    MCUT_ASSERT(traversed.size() == cdt.triangles.size()); // this might be violated if CDT produced duplicate triangles
 
 #if 0
                     {
@@ -1486,14 +1680,14 @@ void get_connected_component_data_impl(
 
                         std::ofstream file(fname);
 
-                        for (int i = 0; i < constrained_cdt.vertices.size(); ++i) {
-                            auto vert = constrained_cdt.vertices[i];
+                        for (int i = 0; i < cdt.vertices.size(); ++i) {
+                            auto vert = cdt.vertices[i];
                             file << "v " << vert.x() << " " << vert.y() << " " << 0.0 << "\n";
                         }
 
-                        for (uint32_t i = 0; i < constrained_cdt.triangles.size(); ++i) {
+                        for (uint32_t i = 0; i < cdt.triangles.size(); ++i) {
                             // a triangle computed from CDT
-                            const cdt::triangle_t& triangle = constrained_cdt.triangles[i];
+                            const cdt::triangle_t& triangle = cdt.triangles[i];
                             file << "f " << triangle.vertices[0] + 1 << " " << triangle.vertices[1] + 1 << " " << triangle.vertices[2] + 1 << "\n";
                         }
 
@@ -1501,13 +1695,13 @@ void get_connected_component_data_impl(
 
                         std::ofstream g("face-" + std::to_string(*f) + ".off");
                         g << "OFF\n";
-                        g << face_vertex_count << " 1 0\n";
-                        for (int i = 0; i < face_vertex_count; ++i) {
-                            auto vert = face_polygon_vertices[i];
+                        g << cc_face_vcount << " 1 0\n";
+                        for (int i = 0; i < cc_face_vcount; ++i) {
+                            auto vert = cc_face_vcoords2d[i];
                             g << vert[0] << " " << vert[1] << " " << 0 << "\n";
                         }
-                        g << face_vertex_count << " ";
-                        for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                        g << cc_face_vcount << " ";
+                        for (uint32_t i = 0; i < cc_face_vcount; ++i) {
                             // a triangle computed from CDT
 
                             g << i << " ";
@@ -1517,48 +1711,51 @@ void get_connected_component_data_impl(
                         g.close();
 
                         std::ofstream h("polygon2d.txt");
-                        h << face_vertex_count << " " << face_vertex_count << "\n";
-                        for (int i = 0; i < face_vertex_count; ++i) {
-                            auto vert = face_vertex_coords_2d[i];
+                        h << cc_face_vcount << " " << cc_face_vcount << "\n";
+                        for (int i = 0; i < cc_face_vcount; ++i) {
+                            auto vert = cc_face_vcoords2d[i];
                             h << vert[0] << " " << vert[1] << "\n";
                         }
-                        for (uint32_t i = 0; i < face_vertex_count; ++i) {
+                        for (uint32_t i = 0; i < cc_face_vcount; ++i) {
                             // a triangle computed from CDT
 
-                            h << i << " " << (i + 1) % face_vertex_count << "\n";
+                            h << i << " " << (i + 1) % cc_face_vcount << "\n";
                         }
 
                         h.close();
                     }
-#endif
-                    // swap local triangle indices to global index values (in CC) and save
-                    // ===================================================================
+#endif                  
+                    //
+                    // Final sanity check
+                    //
 
-                    for (std::uint32_t i = 0; i < (std::uint32_t)vertex_is_used.size(); ++i) {
-                        if (vertex_is_used[i] != true) {
+                    for (std::uint32_t i = 0; i < (std::uint32_t)cc_face_vcount; ++i) {
+                        if (SAFE_ACCESS(cc_face_vtx_to_is_used_flag, i) != true) {
                             context_uptr->log(
                                 MC_DEBUG_SOURCE_KERNEL,
                                 MC_DEBUG_TYPE_OTHER, 0,
-                                MC_DEBUG_SEVERITY_HIGH, "triangulation on face " + std::to_string(*f) + " did not use vertex " + std::to_string(i));
+                                MC_DEBUG_SEVERITY_HIGH, "triangulation on face f" + std::to_string(*cc_face_iter) + " did not use vertex v" + std::to_string(i));
                         }
                     }
 
-                    const uint32_t face_triangulation_indices_count = (uint32_t)face_triangulation_indices.size();
+                    //
+                    // Change local triangle indices to global index values (in CC) and save
+                    //
 
-                    for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
-                        const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
+                    const uint32_t cc_face_triangulation_index_count = (uint32_t)cc_face_triangulation.size();
+                    cc_uptr->constrained_delaunay_triangulation_indices.reserve(
+                        cc_uptr->constrained_delaunay_triangulation_indices.size() + cc_face_triangulation_index_count
+                    );
 
-                        face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
+                    for (uint32_t i = 0; i < cc_face_triangulation_index_count; ++i) {
+                        const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
+                        const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx]; 
+
+                        cc_uptr->constrained_delaunay_triangulation_indices.push_back(global_idx);
                     }
+                } //  if (cc_face_vcount == 3)
 
-                    cc_uptr->constrained_delaunay_triangulation_indices.insert(
-                        cc_uptr->constrained_delaunay_triangulation_indices.end(),
-                        face_triangulation_indices.begin(),
-                        face_triangulation_indices.end());
-                } //  if (face_vertex_count == 3)
-
-                face_indices_offset += face_vertex_count;
+                face_indices_offset += cc_face_vcount;
             }
 
             MCUT_ASSERT(cc_uptr->constrained_delaunay_triangulation_indices.size() >= 3);

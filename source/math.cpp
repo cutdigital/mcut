@@ -207,7 +207,7 @@
         MCUT_ASSERT(polygon_vertex_count >= 3);
 
         std::vector<vec2> x;
-        project2D(x, polygon_vertices, polygon_normal, polygon_normal_largest_component);
+        project_to_2d(x, polygon_vertices, polygon_normal, polygon_normal_largest_component);
         MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
 
         /*
@@ -654,7 +654,31 @@
         return K * R;
     }
 
-    void project2D(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
+    // https://answers.unity.com/questions/1522620/converting-a-3d-polygon-into-a-2d-polygon.html
+    void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices, const vec3& polygon_normal)
+    {
+        const uint32_t N = polygon_vertices.size();
+        out.resize(N);
+
+        const vec3 normal = normalize(polygon_normal);
+
+        // first unit vector on plane (rotation by 90 degrees)
+        vec3 u(-normal.y(), normal.x(), normal.z());
+        vec3 v = normalize(cross_product(u, normal));
+
+        for(uint32_t i =0; i < N; ++i)
+        {
+            const vec3 point = polygon_vertices[i];
+            const vec2 projected(
+                dot_product(point, u),
+                dot_product(point, v)
+            );
+
+            out[i] = projected;
+        }
+    }
+
+    void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
         const vec3& polygon_normal, const int polygon_normal_largest_component)
     {
         const int polygon_vertex_count = (int)polygon_vertices.size();
@@ -683,7 +707,7 @@
 #endif
     }
 
-    // TODO: update this function to use "project2D" for projection step
+    // TODO: update this function to use "project_to_2d" for projection step
     char compute_point_in_polygon_test(const vec3& p, const std::vector<vec3>& polygon_vertices,
         const vec3& polygon_normal, const int polygon_normal_largest_component)
     {
