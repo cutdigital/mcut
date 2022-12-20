@@ -6105,9 +6105,10 @@ void dispatch(output_t& output, const input_t& input)
 
     // dump traced cut-mesh polygons
     if (input.keep_cutmesh_seam) {
-        bool all_cutpaths_linear_and_make_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == 0);
+        
+        //bool all_cutpaths_linear_and_make_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == 0);
 
-        if (sm_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_make_holes)) {
+        if (sm_is_watertight || (all_cutpaths_are_circular /*|| all_cutpaths_linear_and_make_holes*/)) {
             std::map<std::size_t, std::vector<std::pair<hmesh_t, connected_component_info_t>>> separated_cut_mesh_fragments;
             std::unordered_map<int, int> _1; 
             hmesh_t merged = extract_connected_components(

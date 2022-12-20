@@ -23,6 +23,10 @@
 #ifndef OFF_FILE_H_
 #define OFF_FILE_H_
 
+#include <mcut/mcut.h>
+#include <vector>
+#include <string>
+
 #if defined(_WIN32)
 #define _CRT_SECURE_NO_WARNINGS 1
 #endif
@@ -44,5 +48,15 @@ extern "C" void writeOFF(
     unsigned int numVertices,
     unsigned int numFaces,
     unsigned int numEdges);
+
+void writeOBJ(const std::string& fname, const std::vector<float>& vertices, const std::vector<uint32_t>& triangles);
+
+extern "C" void MCAPI_PTR mcDebugOutput(McDebugSource source,
+    McDebugType type,
+    unsigned int id,
+    McDebugSeverity severity,
+    size_t length,
+    const char* message,
+    const void* userParam);
 
 #endif

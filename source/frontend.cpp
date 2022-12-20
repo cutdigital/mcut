@@ -1026,7 +1026,12 @@ void get_connected_component_data_impl(
                         halfedge_descriptor_t h = *hiter;
                         halfedge_descriptor_t opph = cc.opposite(h);
                         face_descriptor_t neigh = cc.face(opph);
-                        const bool neighbour_exists = (neigh != hmesh_t::null_face());
+
+                        // NOTE: there is a bug in the kernel, where a seam cc (from cut-mesh)
+                        // will be produced even if the cut-mesh (face) was partially cut by the
+                        // source-mesh. This will need to be fixed.
+                        //const bool TODO_workaround_check = neigh != *cc_face_iter;
+                        const bool neighbour_exists = (neigh != hmesh_t::null_face() /*&& TODO_workaround_check*/);
 
                         // neighbour exists and we have not already traversed it
                         // by adding it into the WOT
@@ -1227,9 +1232,7 @@ void get_connected_component_data_impl(
                                 // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
                                 // that this threshold is too "small" a number for us to be able to reliably compute
                                 // stuff with the result of "orient2d()" that is near this threshold.
-                                // Our solution is to scale this threshold by six-orders of magnitude (I must
-                                // acknowledge that the choice of 1e6 is arbitrary).
-                                const double errbound = orient2d_ccwerrboundA * 1e6;
+                                const double errbound = 1e-2;
 
                                 // We use "errbound", rather than "orient2d_res", to determine if the incident edges
                                 // are parallel to give us sufficient room of numerical-precision to reliably compute
