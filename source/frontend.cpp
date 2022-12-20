@@ -970,10 +970,8 @@ void get_connected_component_data_impl(
                         
                         if(winding_order_flipped_due_to_projection)
                         {
-                            // Reverse the order of points
+                            // Reverse the order of points so that they are CCW
                             std::reverse(cc_face_vcoords2d.begin(), cc_face_vcoords2d.end());
-
-                            std::vector<vec2> cc_face_vcoords2d_tmp = cc_face_vcoords2d;
 
                             // for each vertex index in face
                             for(int32_t i =0; i < (int32_t)cc_face_vcount; ++i)
