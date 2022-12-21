@@ -52,6 +52,7 @@ int main()
     // 1. Create meshes.
     // -----------------
 
+#if 0
     // the cube
     // --------
     float cubeVertices[] = {
@@ -93,7 +94,59 @@ int main()
     //    3, 3};
     uint32_t numCutMeshVertices = 4;
     uint32_t numCutMeshFaces = 2;
+#else // triangulation bug fix
 
+    //Shape to Cut:
+ double cubeVertices[] = {
+            -1, -1, 1, //0
+ 1, -1, 1,//1
+ -1, 1, 1,//2
+ 1, 1, 1,//3
+ -1, -1, -1,//4
+ 1, -1, -1,//5
+ -1, 1, -1,//6
+ 1, 1, -1//7
+    };
+    uint32_t cubeFaces[] = {
+ 0, 3, 2,//0
+ 0, 1, 3,//1
+ 1,7, 3,//2
+ 1, 5, 7,//3
+ 5, 6, 7,//4
+ 5, 4, 6,//5
+ 4, 2, 6,//6
+ 4, 0,2,//7
+ 2, 7, 6,//8
+ 2, 3, 7,//9
+ 4, 1, 0,//10
+ 4, 5, 1,//11
+
+    };
+    int numCubeVertices = 8; 
+    int numCubeFaces = 12;
+
+    uint32_t cubeFaceSizes[] = {
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+
+        
+
+//Cutting Shape:
+
+    double cutMeshVertices[] = {
+        -1.2, 1.6, 0.994070,
+        1.4, -1.3, 0.994070,
+        -1.2, 1.6, -1.005929,
+        1.4, -1.3, -1.005929
+    };
+   
+    uint32_t cutMeshFaces[] = {
+       1,2,0,
+        1,3,2
+    };
+
+    uint32_t numCutMeshVertices = 4;
+    uint32_t numCutMeshFaces = 2;
+#endif
     // 2. create a context
     // -------------------
     McContext context = MC_NULL_HANDLE;
@@ -109,7 +162,7 @@ int main()
     // ----------------
     err = mcDispatch(
         context,
-        MC_DISPATCH_VERTEX_ARRAY_FLOAT,
+        MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
         cubeVertices,
         cubeFaces,
         cubeFaceSizes,

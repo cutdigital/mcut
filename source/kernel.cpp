@@ -128,17 +128,6 @@ std::string to_string(const cm_patch_winding_order_t& v)
     return s;
 }
 
-int wrap_integer(int x, const int lo, const int hi)
-{
-    const int range_size = hi - lo + 1;
-
-    if (x < lo) {
-        x += range_size * ((lo - x) / range_size + 1);
-    }
-
-    return lo + (x - lo) % range_size;
-}
-
 // returns whether a polygon-soup vertex is an intersection vertex/point
 inline bool m0_is_intersection_point(const vd_t& ps_vd, const int ps_vtx_cnt)
 {
@@ -6116,9 +6105,10 @@ void dispatch(output_t& output, const input_t& input)
 
     // dump traced cut-mesh polygons
     if (input.keep_cutmesh_seam) {
-        bool all_cutpaths_linear_and_make_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == 0);
+        
+        //bool all_cutpaths_linear_and_make_holes = (num_explicit_circular_cutpaths == 0) && (explicit_cutpaths_severing_srcmesh.size() == 0);
 
-        if (sm_is_watertight || (all_cutpaths_are_circular || all_cutpaths_linear_and_make_holes)) {
+        if (sm_is_watertight || (all_cutpaths_are_circular /*|| all_cutpaths_linear_and_make_holes*/)) {
             std::map<std::size_t, std::vector<std::pair<hmesh_t, connected_component_info_t>>> separated_cut_mesh_fragments;
             std::unordered_map<int, int> _1; 
             hmesh_t merged = extract_connected_components(

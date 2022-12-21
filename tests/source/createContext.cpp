@@ -22,6 +22,7 @@
 
 #include "utest.h"
 #include <mcut/mcut.h>
+#include "off.h"
 
 UTEST(CreateContext, noFlags)
 {
@@ -43,67 +44,6 @@ UTEST(ContextCreationTest, debugFlag)
 struct DebugContextConfig {
     McContext context_;
 };
-
-void MCAPI_PTR mcDebugOutput(McDebugSource source,
-    McDebugType type,
-    unsigned int id,
-    McDebugSeverity severity,
-    size_t length,
-    const char* message,
-    const void* userParam)
-{
-    printf("---------------\n");
-    printf("Debug message ( %d ), length=%zu\n%s\n--\n", id, length, message);
-    printf("userParam=%p\n", userParam);
-
-    switch (source) {
-    case MC_DEBUG_SOURCE_API:
-        printf("Source: API");
-        break;
-    case MC_DEBUG_SOURCE_KERNEL:
-        printf("Source: Kernel");
-        break;
-    case MC_DEBUG_SOURCE_ALL:
-        break;
-    }
-
-    printf("\n");
-
-    switch (type) {
-    case MC_DEBUG_TYPE_ERROR:
-        printf("Type: Error");
-        break;
-    case MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-        printf("Type: Deprecated Behaviour");
-        break;
-    case MC_DEBUG_TYPE_OTHER:
-        printf("Type: Other");
-        break;
-    case MC_DEBUG_TYPE_ALL:
-        break;
-    }
-
-    printf("\n");
-
-    switch (severity) {
-    case MC_DEBUG_SEVERITY_HIGH:
-        printf("Severity: high");
-        break;
-    case MC_DEBUG_SEVERITY_MEDIUM:
-        printf("Severity: medium");
-        break;
-    case MC_DEBUG_SEVERITY_LOW:
-        printf("Severity: low");
-        break;
-    case MC_DEBUG_SEVERITY_NOTIFICATION:
-        printf("Severity: notification");
-        break;
-    case MC_DEBUG_SEVERITY_ALL:
-        break;
-    }
-
-    printf("\n\n");
-}
 
 UTEST_F_SETUP(DebugContextConfig)
 {
