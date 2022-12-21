@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
+#include <numeric> // iota
 
 #include "mcut/internal/cdt/cdt.h"
 
@@ -1027,11 +1028,7 @@ void get_connected_component_data_impl(
                         halfedge_descriptor_t opph = cc.opposite(h);
                         face_descriptor_t neigh = cc.face(opph);
 
-                        // NOTE: there is a bug in the kernel, where a seam cc (from cut-mesh)
-                        // will be produced even if the cut-mesh (face) was partially cut by the
-                        // source-mesh. This will need to be fixed.
-                        //const bool TODO_workaround_check = neigh != *cc_face_iter;
-                        const bool neighbour_exists = (neigh != hmesh_t::null_face() /*&& TODO_workaround_check*/);
+                        const bool neighbour_exists = (neigh != hmesh_t::null_face());
 
                         // neighbour exists and we have not already traversed it
                         // by adding it into the WOT
@@ -1127,9 +1124,9 @@ void get_connected_component_data_impl(
                     // In the following section, we will check-for and handle
                     // the case of having duplicate vertices in "cc_face_iter".
                     //
-                    // Duplicate vertices arise when "cc_face_iter" has a
-                    // partial-cut. Example: source-mesh=triangle and cut-mesh=triangle,
-                    // where the cut-mesh does not split the source-mesh into
+                    // Duplicate vertices arise when "cc_face_iter" is from the source-mesh 
+                    // and it has a partial-cut. Example: source-mesh=triangle and 
+                    // cut-mesh=triangle, where the cut-mesh does not split the source-mesh into
                     // two disjoint parts (i.e. a triangle and a quad) but instead
                     // induces a slit
                     //
@@ -1140,7 +1137,8 @@ void get_connected_component_data_impl(
                         cc_face_vcoords2d.end(),
                         cdt::get_x_coord_vec2d<double>,
                         cdt::get_y_coord_vec2d<double>);
-
+                    
+                    // number of duplicate vertices (if any)
                     const uint32_t duplicate_vcount = (uint32_t)duplicates_info_pre.duplicates.size();
                     const bool have_duplicates = duplicate_vcount > 0;
 
@@ -1150,32 +1148,15 @@ void get_connected_component_data_impl(
                         for (std::vector<std::size_t>::const_iterator duplicate_vpair_iter = duplicates_info_pre.duplicates.cbegin();
                              duplicate_vpair_iter != duplicates_info_pre.duplicates.cend(); ++duplicate_vpair_iter) {
 
-                            // first vertex in pair (index into "cc_face_iter")
-                            //const std::uint32_t first_vertex_index = (std::uint32_t)(*duplicate_vpair_iter); // ... in the cc-face to be triangulated
-                            // second vertex in pair (index into "cc_face_iter")
-                            //const std::uint32_t second_vertex_index = (std::uint32_t)SAFE_ACCESS(duplicates_info_pre.mapping, first_vertex_index);
-
-                            // array of the current pair of two duplicate vertices
-                            //const std::uint32_t duplicate_vpair[] = { first_vertex_index, second_vertex_index };
-
                             //
                             // The two vertices are duplicates because they have the _exact_ same coordinates.
-                            // We make these points unique by perturbing their coordinates. This requires care
+                            // We make these points unique by perturbing the coordinates of one of them. This requires care
                             // because we want to ensure that "cc_face_iter" remains a simple polygon (without
                             // self-intersections) after perturbation. To do this, we must perturbation one
                             // vertex in the direction that lies on the left-side (i.e. CCW dir) of the two
-                            // halfedges incident to that vertex. We take care to account for the fact the two
+                            // halfedges incident to that vertex. We also take care to account for the fact the two
                             // incident edges may be parallel.
                             //
-
-                            //const uint32_t num_vertices_in_pair = 2;
-
-                            // for each duplicate vertex in pair
-                            //for (std::uint32_t dv_iter = 0; dv_iter < num_vertices_in_pair; ++dv_iter) {
-                                //
-                                // compute the perturbtion vector, which encodes the direction and magnitude to shift
-                                // the vertex's coordinates with (small amount).
-                                //
 
                                 // current duplicate vertex (index in "cc_face_iter")
                                 const std::int32_t perturbed_dvertex_id = (std::uint32_t)(*duplicate_vpair_iter);
@@ -1205,7 +1186,7 @@ void get_connected_component_data_impl(
                                 const double to_next_sqr_len = squared_length(to_next);
 
                                 //
-                                // Now we must determine which side is the perturbation_vector must 
+                                // Now we must determine which side is the perturbation_vector must be
                                 // pointing. i.e. the side of "perturbed_dvertex_coords" or the side 
                                 // of its duplicate
                                 //
@@ -1219,15 +1200,12 @@ void get_connected_component_data_impl(
                                 //
                                 // Compute the perturbation vector as the average of the two incident edges eminating
                                 // from the current vertex. NOTE: This perturbation vector should generally point in
-                                // the direction of the polygon-interior (i.e. analogous to pushing the polygon the
+                                // the direction of the polygon-interior (i.e. analogous to pushing the polygon at
                                 // the location represented by perturbed_dvertex_coords) to cause a minute dent due to small
                                 // loss of area.
                                 // Normalization happens below
                                 vec2 perturbation_vector = ((to_prev + to_next) / 2.0) * flip;
 
-                                // The floating-point error-bound used by the "orient2d" predicate to determine
-                                // if exact arthmetic should be used (see definition of "orient2d()")
-                                const double orient2d_ccwerrboundA = 3.3306690738754716e-16;
                                 // "orient2d()" is exact in the sense that it can depend on computations with numbers
                                 // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
                                 // that this threshold is too "small" a number for us to be able to reliably compute
@@ -1271,7 +1249,7 @@ void get_connected_component_data_impl(
                                 // largest length between any two vertices.
                                 //
                                 // This will be used to scale "perturbation_dir" so that we find the
-                                // closest edge (from "perturbed_dvertex_coords") that iss intersected by this edge.
+                                // closest edge (from "perturbed_dvertex_coords") that is intersected by this ray.
                                 // We will use the resulting information to determine the amount by-which
                                 // "perturbed_dvertex_coords" is to be perturbed.
                                 //
@@ -1297,7 +1275,7 @@ void get_connected_component_data_impl(
                                 }
 
                                 //
-                                // construct the segment with which will will find the closest
+                                // construct the segment with-which will will find the closest
                                 // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
                                 //
 
@@ -1391,12 +1369,7 @@ void get_connected_component_data_impl(
                                 // the interior of the polygon represented by "cc_face_iter".
                                 // Thus, the cases with "orient2d_sgn == sign_t::ON_POSITIVE_SIDE" and
                                 // "orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY", result in the same displacement vector
-                                vec2 displacement = (perturbation_dir * scale);
-
-                                // negative sign to point outside
-                                //if (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) {
-                                //    displacement = displacement * (-1.0);
-                                //}
+                                const vec2 displacement = (perturbation_dir * scale);
 
                                 // perturb
                                 perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
@@ -1424,13 +1397,13 @@ void get_connected_component_data_impl(
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_ERROR, 0,
-                            MC_DEBUG_SEVERITY_HIGH, "face " + std::to_string(*cc_face_iter) + " has duplicate vertices that could not be resolved (bug)");
+                            MC_DEBUG_SEVERITY_HIGH, "face f" + std::to_string(*cc_face_iter) + " has duplicate vertices that could not be resolved (bug)");
                         continue; // skip to next face (will leave a hole in the output)
                     }
 
                     // allocate triangulator
                     cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
-                    cdt.insert_vertices(cc_face_vcoords2d);
+                    cdt.insert_vertices(cc_face_vcoords2d); // potentially perturbed (if duplicates exist)
                     cdt.insert_edges(cc_face_edges);
                     cdt.erase_outer_triangles(); // do the constrained delaunay triangulation
 
@@ -1442,7 +1415,7 @@ void get_connected_component_data_impl(
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face " + std::to_string(*cc_face_iter) + " has invalid topology");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face f" + std::to_string(*cc_face_iter) + " has invalid topology");
 
                         continue; // skip to next face (will leave a hole in the output)
                     }
@@ -1451,7 +1424,7 @@ void get_connected_component_data_impl(
                         context_uptr->log(
                             MC_DEBUG_SOURCE_KERNEL,
                             MC_DEBUG_TYPE_OTHER, 0,
-                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face " + std::to_string(*cc_face_iter) + " produced zero faces");
+                            MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face f" + std::to_string(*cc_face_iter) + " produced zero faces");
 
                         continue; // skip to next face (will leave a hole in the output)
                     }
@@ -1640,7 +1613,7 @@ void get_connected_component_data_impl(
                             cc_face_triangulation.pop_back();
                             cc_face_triangulation.pop_back();
 
-                            const std::string msg = "triangulation on face " + std::to_string(*cc_face_iter) + " produced invalid triangles that could not be stored";
+                            const std::string msg = "triangulation on face f" + std::to_string(*cc_face_iter) + " produced invalid triangles that could not be stored";
 
                             context_uptr->log(
                                 MC_DEBUG_SOURCE_KERNEL,
@@ -1674,58 +1647,6 @@ void get_connected_component_data_impl(
                     // every triangle in the finalized CDT must be walked!
                     MCUT_ASSERT(traversed.size() == cdt.triangles.size()); // this might be violated if CDT produced duplicate triangles
 
-#if 0
-                    {
-                        const std::string fname("triangulation-" + std::to_string(*f) + ".obj");
-                        printf("dump %s\n", fname.c_str());
-
-                        std::ofstream file(fname);
-
-                        for (int i = 0; i < cdt.vertices.size(); ++i) {
-                            auto vert = cdt.vertices[i];
-                            file << "v " << vert.x() << " " << vert.y() << " " << 0.0 << "\n";
-                        }
-
-                        for (uint32_t i = 0; i < cdt.triangles.size(); ++i) {
-                            // a triangle computed from CDT
-                            const cdt::triangle_t& triangle = cdt.triangles[i];
-                            file << "f " << triangle.vertices[0] + 1 << " " << triangle.vertices[1] + 1 << " " << triangle.vertices[2] + 1 << "\n";
-                        }
-
-                        file.close();
-
-                        std::ofstream g("face-" + std::to_string(*f) + ".off");
-                        g << "OFF\n";
-                        g << cc_face_vcount << " 1 0\n";
-                        for (int i = 0; i < cc_face_vcount; ++i) {
-                            auto vert = cc_face_vcoords2d[i];
-                            g << vert[0] << " " << vert[1] << " " << 0 << "\n";
-                        }
-                        g << cc_face_vcount << " ";
-                        for (uint32_t i = 0; i < cc_face_vcount; ++i) {
-                            // a triangle computed from CDT
-
-                            g << i << " ";
-                        }
-                        g << "\n";
-
-                        g.close();
-
-                        std::ofstream h("polygon2d.txt");
-                        h << cc_face_vcount << " " << cc_face_vcount << "\n";
-                        for (int i = 0; i < cc_face_vcount; ++i) {
-                            auto vert = cc_face_vcoords2d[i];
-                            h << vert[0] << " " << vert[1] << "\n";
-                        }
-                        for (uint32_t i = 0; i < cc_face_vcount; ++i) {
-                            // a triangle computed from CDT
-
-                            h << i << " " << (i + 1) % cc_face_vcount << "\n";
-                        }
-
-                        h.close();
-                    }
-#endif                  
                     //
                     // Final sanity check
                     //
