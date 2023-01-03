@@ -21,6 +21,7 @@
  */
 #include <algorithm>
 #include <functional>
+#include <iterator>
 #include <numeric> // std::iota
 #include <queue>
 #include <set>
