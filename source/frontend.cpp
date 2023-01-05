@@ -327,9 +327,70 @@ void get_connected_component_data_impl(
             }
 
             const uint64_t num_vertices_to_copy = (nelems / 3);
-            uint64_t elem_offset = 0;
+
             float* casted_ptr = reinterpret_cast<float*>(pMem);
 
+            TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT");
+
+#if defined(MCUT_MULTI_THREADED)
+            {
+                typedef std::tuple<uint64_t> OutputStorageTypesTuple;
+                typedef vertex_array_iterator_t InputStorageIteratorType;
+
+                auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
+                    OutputStorageTypesTuple local_output;
+                    uint64_t& stub_LOCAL = std::get<0>(local_output);
+
+                    // thread starting offset (in vertex count) in the "array of vertices"
+                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
+
+                    uint64_t elem_offset = base_offset * 3;
+
+                    for (InputStorageIteratorType vertex_iter = block_start_; vertex_iter != block_end_; ++vertex_iter) {
+
+                        if ((elem_offset / 3) == num_vertices_to_copy) {
+                            break; // reach what the user asked for
+                        }
+
+                        const vertex_descriptor_t descr = *vertex_iter;
+                        const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(descr);
+
+                        // for each component of coordinate
+                        for (int i = 0; i < 3; ++i) {
+                            const float val = static_cast<float>(coords[i]);
+                            *(casted_ptr + elem_offset) = val;
+                            elem_offset += 1;
+                        }
+                    }
+
+                    stub_LOCAL = elem_offset;
+
+                    return local_output;
+                };
+
+                std::vector<std::future<OutputStorageTypesTuple>> futures;
+                OutputStorageTypesTuple partial_res;
+
+                parallel_fork_and_join(
+                    context_uptr->scheduler,
+                    cc_uptr->kernel_hmesh_data.mesh.vertices_begin(),
+                    cc_uptr->kernel_hmesh_data.mesh.vertices_end(),
+                    cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() / context_uptr->scheduler.get_num_threads(),
+                    fn_copy_vertex_coords,
+                    partial_res, // output computed by master thread
+                    futures);
+
+                // const uint64_t& final_offset_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
+
+                // wait for all worker-threads to finish copies
+                for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
+                    futures[i].wait();
+                }
+
+                MCUT_ASSERT((std::get<0>(partial_res) * sizeof(float)) <= allocated_bytes);
+            }
+#else // #if defined(MCUT_MULTI_THREADED)
+            uint64_t elem_offset = 0;
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
                 const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
 
@@ -345,6 +406,8 @@ void get_connected_component_data_impl(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(float)) <= allocated_bytes);
+#endif // #if defined(MCUT_MULTI_THREADED)
+            TIMESTACK_POP(); // TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT");
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE: {
@@ -370,7 +433,7 @@ void get_connected_component_data_impl(
             double* casted_ptr = reinterpret_cast<double*>(pMem);
 
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
-                
+
                 const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
@@ -416,7 +479,7 @@ void get_connected_component_data_impl(
 
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                
+
                 vertices_around_face.clear();
                 cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *fiter);
                 const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
@@ -483,10 +546,10 @@ void get_connected_component_data_impl(
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
             std::vector<fd_t> faces_around_face;
-            
+
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                
+
                 faces_around_face.clear();
                 cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
 
@@ -529,16 +592,16 @@ void get_connected_component_data_impl(
 
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices 
+            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices
         } else {
-            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2  * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
             if (bytes % (sizeof(uint32_t) * 2) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            
+
             uint64_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
@@ -570,7 +633,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT) {
             throw std::invalid_argument("invalid client pointer type");
         }
@@ -592,7 +655,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT && cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_PATCH) {
             throw std::invalid_argument("connected component must be a patch or a fragment");
         }
@@ -619,7 +682,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FRAGMENT_SEAL_TYPE: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_FRAGMENT) {
             throw std::invalid_argument("invalid client pointer type");
         }
@@ -640,7 +703,7 @@ void get_connected_component_data_impl(
     } break;
         //
     case MC_CONNECTED_COMPONENT_DATA_ORIGIN: {
-        
+
         if (cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_SEAM && cc_uptr->type != MC_CONNECTED_COMPONENT_TYPE_INPUT) {
             throw std::invalid_argument("invalid connected component type");
         }
@@ -673,7 +736,7 @@ void get_connected_component_data_impl(
         }
 
         const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data.seam_vertices.size();
-        
+
         if (pMem == nullptr) {
             *pNumBytes = seam_vertex_count * sizeof(uint32_t);
         } else {
@@ -688,10 +751,9 @@ void get_connected_component_data_impl(
             const uint32_t elems_to_copy = bytes / sizeof(uint32_t);
             uint32_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
-            
+
             // TODO: make parallel
-            for (uint32_t i = 0; i < elems_to_copy; ++i)
-            {
+            for (uint32_t i = 0; i < elems_to_copy; ++i) {
                 const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data.seam_vertices[i];
                 *(casted_ptr + elem_offset) = seam_vertex_idx;
                 elem_offset++;
@@ -731,11 +793,11 @@ void get_connected_component_data_impl(
             // TODO: make parallel
             for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each vertex in CC
             {
-                // Here we use whatever index value was assigned to the current vertex by the kernel, where the 
+                // Here we use whatever index value was assigned to the current vertex by the kernel, where the
                 // the kernel does not necessarilly know that the input meshes it was given where modified by
-                // the frontend (in this case via polygon partitioning) 
+                // the frontend (in this case via polygon partitioning)
                 // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
-                
+
                 uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data.data_maps.vertex_map[i];
                 // We use the same default value as that used by the kernel for intersection
                 // points (intersection points at mapped to uint_max i.e. null_vertex())
@@ -747,21 +809,20 @@ void get_connected_component_data_impl(
                     // NOTE: The kernel will assign/map a 'proper' index value to vertices that exist due to face partitioning.
                     // 'proper' here means that the kernel treats these vertices as 'original vertices' from a client-provided input
                     // mesh. In reality, the frontend added such vertices in order to partition a face. i.e. the kernel is not aware
-                    // that a given input mesh it is working with is modified by the frontend (it assumes that the meshes is exactly as was 
+                    // that a given input mesh it is working with is modified by the frontend (it assumes that the meshes is exactly as was
                     // provided by the client).
                     // So, here we have to fix that mapping information to correctly state that "any vertex added due to face
                     // partitioning was not in the user provided input mesh" and should therefore be treated/labelled as an intersection
                     // point i.e. it should map to UINT32_MAX because it does not map to any vertex in the client-provided input mesh.
                     bool vertex_exists_due_to_face_partitioning = false;
                     // this flag tells us whether the current vertex maps to one in the internal version of the source mesh
-                    // i.e. it does not map to the internal version cut-mesh 
+                    // i.e. it does not map to the internal version cut-mesh
                     const bool internal_input_mesh_vertex_is_for_source_mesh = (internal_input_mesh_vertex_idx < cc_uptr->internal_sourcemesh_vertex_count);
 
                     if (internal_input_mesh_vertex_is_for_source_mesh) {
                         const std::unordered_map<vd_t, vec3>::const_iterator fiter = cc_uptr->source_hmesh_new_poly_partition_vertices->find(vd_t(internal_input_mesh_vertex_idx));
                         vertex_exists_due_to_face_partitioning = (fiter != cc_uptr->source_hmesh_new_poly_partition_vertices->cend());
-                    }
-                    else // i.e. internal_input_mesh_vertex_is_for_cut_mesh
+                    } else // i.e. internal_input_mesh_vertex_is_for_cut_mesh
                     {
                         std::unordered_map<vd_t, vec3>::const_iterator fiter = cc_uptr->cut_hmesh_new_poly_partition_vertices->find(vd_t(internal_input_mesh_vertex_idx));
                         vertex_exists_due_to_face_partitioning = (fiter != cc_uptr->cut_hmesh_new_poly_partition_vertices->cend());
@@ -776,8 +837,7 @@ void get_connected_component_data_impl(
                             // vertices added due to face-partitioning will have an offsetted index/descriptor that is >= client_sourcemesh_vertex_count
                             const uint32_t internal_input_mesh_vertex_idx_without_offset = (internal_input_mesh_vertex_idx - cc_uptr->internal_sourcemesh_vertex_count);
                             client_input_mesh_vertex_idx = (internal_input_mesh_vertex_idx_without_offset + cc_uptr->client_sourcemesh_vertex_count); // ensure that we offset using number of [user-provided mesh] vertices
-                        }
-                        else {
+                        } else {
                             client_input_mesh_vertex_idx = internal_input_mesh_vertex_idx; // src-mesh vertices have no offset unlike cut-mesh vertices
                         }
                     }
@@ -791,7 +851,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
-        
+
         const uint32_t face_map_size = cc_uptr->kernel_hmesh_data.data_maps.face_map.size();
 
         if (face_map_size == 0) {
@@ -802,8 +862,7 @@ void get_connected_component_data_impl(
 
         if (pMem == nullptr) {
             *pNumBytes = face_map_size * sizeof(uint32_t); // each face has a map value (intersection point == uint_max)
-        }
-        else {
+        } else {
             if (bytes > (face_map_size * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
@@ -826,24 +885,21 @@ void get_connected_component_data_impl(
                 if (internal_input_mesh_face_idx_is_for_src_mesh) {
 
                     std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->source_hmesh_child_to_usermesh_birth_face->find(fd_t(internal_inputmesh_face_idx));
-                    
+
                     if (fiter != cc_uptr->source_hmesh_child_to_usermesh_birth_face->cend()) {
                         client_input_mesh_face_idx = fiter->second;
-                    }
-                    else {
+                    } else {
                         client_input_mesh_face_idx = internal_inputmesh_face_idx;
                     }
                     MCUT_ASSERT(client_input_mesh_face_idx < cc_uptr->client_sourcemesh_face_count);
-                }
-                else // internalInputMeshVertexDescrIsForCutMesh
+                } else // internalInputMeshVertexDescrIsForCutMesh
                 {
                     std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->cut_hmesh_child_to_usermesh_birth_face->find(fd_t(internal_inputmesh_face_idx));
-                    
+
                     if (fiter != cc_uptr->cut_hmesh_child_to_usermesh_birth_face->cend()) {
                         uint32_t unoffsettedDescr = (fiter->second - cc_uptr->internal_sourcemesh_face_count);
                         client_input_mesh_face_idx = unoffsettedDescr + cc_uptr->client_sourcemesh_face_count;
-                    }
-                    else {
+                    } else {
                         uint32_t unoffsettedDescr = (internal_inputmesh_face_idx - cc_uptr->internal_sourcemesh_face_count);
                         client_input_mesh_face_idx = unoffsettedDescr + cc_uptr->client_sourcemesh_face_count;
                     }
@@ -859,7 +915,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
-        
+
         if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
         {
             uint32_t face_indices_offset = 0;
@@ -892,20 +948,20 @@ void get_connected_component_data_impl(
             std::vector<vertex_descriptor_t> vertices_around_face;
 
             for (face_array_iterator_t f = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); f != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++f) {
-                
+
                 cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *f);
 
                 const uint32_t face_vertex_count = (uint32_t)vertices_around_face.size(); //->indexArrayMesh.pFaceSizes[f];
-                
+
                 MCUT_ASSERT(face_vertex_count >= 3);
 
                 const bool face_is_triangle = (face_vertex_count == 3);
-                //const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
+                // const bool is_adjacent_to_intersection_curve = false; // TODO: need to compute this info in kernel (or check if any vertex of face is an intpt)
 
                 if (face_is_triangle) {
 
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
-                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v];// cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
+                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
                         cc_uptr->constrained_delaunay_triangulation_indices.push_back(face_vertex_idx);
                     }
 
@@ -954,7 +1010,7 @@ void get_connected_component_data_impl(
 
                         const vec2& coords = face_vertex_coords_2d[i];
 
-                        face_polygon_vertices[i] = coords; //vec2_<double>::make(coords[0], coords[1]);
+                        face_polygon_vertices[i] = coords; // vec2_<double>::make(coords[0], coords[1]);
 
                         winding_order_enforcer.add_vertex(vec3(coords[0], coords[1], 0.0 /*dont care since polygon is 2D*/)); // .. in fact even the coordinates dont matter for the purposes of hmesh_t here
 
@@ -1123,14 +1179,14 @@ void get_connected_component_data_impl(
 
                     for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
                         const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];//cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
+                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
 
                         face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
                     }
 
                     cc_uptr->constrained_delaunay_triangulation_indices.insert(
-                        cc_uptr->constrained_delaunay_triangulation_indices.end(), 
-                        face_triangulation_indices.begin(), 
+                        cc_uptr->constrained_delaunay_triangulation_indices.end(),
+                        face_triangulation_indices.begin(),
                         face_triangulation_indices.end());
 
                 } //  if (face_vertex_count == 3)
@@ -1142,7 +1198,7 @@ void get_connected_component_data_impl(
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
-        const uint32_t num_triangulation_indices= (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
+        const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
 
         if (pMem == nullptr) // client pointer is null (asking for size)
         {

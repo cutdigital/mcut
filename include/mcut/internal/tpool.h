@@ -336,7 +336,7 @@ void parallel_fork_and_join(
     // end of of data elements to be processed in parallel (e.g. std::map::end())
     const InputStorageIteratorType& last,
     // the ideal size of the block assigned to each thread
-    typename InputStorageIteratorType::difference_type const block_size_default,
+    typename std::size_t const block_size_default,
     // the function that is executed on a sub-block of element within the range [first, last)
     FunctionType& task_func,
     // the part of the result/output that is computed by the master thread (i.e. the one that is scheduling)
@@ -347,17 +347,18 @@ void parallel_fork_and_join(
     std::vector<std::future<OutputStorageType>>& futures)
 {
 
-    typename InputStorageIteratorType::difference_type const length = std::distance(first, last);
-    typename InputStorageIteratorType::difference_type const block_size = std::min(block_size_default, length);
-    typename InputStorageIteratorType::difference_type const num_blocks = (length + block_size - 1) / block_size;
+    int64_t const length = std::distance(first, last);
+    int64_t const block_size = std::min((int64_t)block_size_default, length);
+    int64_t const num_blocks = (length + block_size - 1) / block_size;
 
     // std::cout << "length=" << length << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
 
     futures.resize(num_blocks - 1);
     InputStorageIteratorType block_start = first;
 
-    for (typename InputStorageIteratorType::difference_type i = 0; i < (num_blocks - 1); ++i) {
+    for (int64_t i = 0; i < (num_blocks - 1); ++i) {
         InputStorageIteratorType block_end = block_start;
+        
         std::advance(block_end, block_size);
 
         futures[i] = pool.submit(
