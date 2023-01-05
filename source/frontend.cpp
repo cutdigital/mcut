@@ -429,9 +429,68 @@ void get_connected_component_data_impl(
             }
 
             const uint64_t num_vertices_to_copy = (nelems / 3);
-            uint64_t elem_offset = 0;
-            double* casted_ptr = reinterpret_cast<double*>(pMem);
 
+            double* casted_ptr = reinterpret_cast<double*>(pMem);
+            TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE");
+#if defined(MCUT_MULTI_THREADED)
+            {
+                typedef std::tuple<uint64_t> OutputStorageTypesTuple;
+                typedef vertex_array_iterator_t InputStorageIteratorType;
+
+                auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
+                    OutputStorageTypesTuple local_output;
+                    uint64_t& stub_LOCAL = std::get<0>(local_output);
+
+                    // thread starting offset (in vertex count) in the "array of vertices"
+                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
+
+                    uint64_t elem_offset = base_offset * 3;
+
+                    for (InputStorageIteratorType vertex_iter = block_start_; vertex_iter != block_end_; ++vertex_iter) {
+
+                        if ((elem_offset / 3) == num_vertices_to_copy) {
+                            break; // reach what the user asked for
+                        }
+
+                        const vertex_descriptor_t descr = *vertex_iter;
+                        const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(descr);
+
+                        // for each component of coordinate
+                        for (int i = 0; i < 3; ++i) {
+                            const double val = static_cast<double>(coords[i]);
+                            *(casted_ptr + elem_offset) = val;
+                            elem_offset += 1;
+                        }
+                    }
+
+                    stub_LOCAL = elem_offset;
+
+                    return local_output;
+                };
+
+                std::vector<std::future<OutputStorageTypesTuple>> futures;
+                OutputStorageTypesTuple partial_res;
+
+                parallel_fork_and_join(
+                    context_uptr->scheduler,
+                    cc_uptr->kernel_hmesh_data.mesh.vertices_begin(),
+                    cc_uptr->kernel_hmesh_data.mesh.vertices_end(),
+                    cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() / context_uptr->scheduler.get_num_threads(),
+                    fn_copy_vertex_coords,
+                    partial_res, // output computed by master thread
+                    futures);
+
+                // const uint64_t& final_offset_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
+
+                // wait for all worker-threads to finish copies
+                for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
+                    futures[i].wait();
+                }
+
+                MCUT_ASSERT((std::get<0>(partial_res) * sizeof(double)) <= allocated_bytes);
+            }
+#else // #if defined(MCUT_MULTI_THREADED)
+            uint64_t elem_offset = 0;
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
 
                 const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
@@ -447,6 +506,9 @@ void get_connected_component_data_impl(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(float)) <= allocated_bytes);
+#endif // #if defined(MCUT_MULTI_THREADED)
+
+        TIMESTACK_POP(); // TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE");
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {

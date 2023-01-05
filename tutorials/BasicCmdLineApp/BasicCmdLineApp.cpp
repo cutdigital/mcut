@@ -188,13 +188,13 @@ int main(int argc, char* argv[])
 
         // vertex array
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes);
+        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         mcCheckError(err);
-        uint32_t numberOfVertices = numBytes / (sizeof(float)*3);
+        uint32_t numberOfVertices = numBytes / (sizeof(double)*3);
         ASSERT(numberOfVertices >= 3);
-        std::vector<float> vertices((size_t)numberOfVertices * 3u);
+        std::vector<double> vertices((size_t)numberOfVertices * 3u);
 
-        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, numBytes, (void*)vertices.data(), NULL);
+        err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)vertices.data(), NULL);
         mcCheckError(err);
 
         printf("vertices: %d\n", (int)vertices.size() / 3);
@@ -238,9 +238,12 @@ int main(int argc, char* argv[])
 
         char fnameBuf[512];
         sprintf(fnameBuf, "cc%d.obj", i);
-
+        
+        std::vector<float> f;
+        for(int i =0; i < (uint32_t)vertices.size(); ++i)
+            f.push_back(vertices[i]);
         writeOBJ(fnameBuf,
-            (float*)vertices.data(),
+            (float*)f.data(),
             (uint32_t)vertices.size() / 3,
             (uint32_t*)faceIndices.data(),
             (uint32_t*)faceSizes.data(),

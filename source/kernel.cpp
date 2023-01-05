@@ -4436,7 +4436,7 @@ void dispatch(output_t& output, const input_t& input)
             *input.scheduler,
             ps.edges_begin(),
             ps.edges_end(),
-            (1 << 10),
+            /*ps.number_of_edges() / (*input.scheduler).get_num_threads()*/ (1 << 10),
             fn_compute_polygon_boundary_edges,
             partial_res, // output computed by master thread
             futures);
