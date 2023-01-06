@@ -124,7 +124,7 @@ private:
     // via the construction of the unique_lock.
     // The warning is removed by annotating the function with "_Acquires_lock_(...)".
     // See here: https://developercommunity.visualstudio.com/t/unexpected-warning-c26115-for-returning-a-unique-l/1077322
-    _Acquires_lock_(return )
+    _Acquires_lock_(return)
 #endif
         std::unique_lock<std::mutex> wait_for_data()
     {
@@ -346,19 +346,30 @@ void parallel_fork_and_join(
     // Future promises of data (to be merged) that is computed by worker threads
     std::vector<std::future<OutputStorageType>>& futures)
 {
+    uint32_t const length = std::distance(first, last);
+    MCUT_ASSERT(length != 0);
+    uint32_t block_size_revised = block_size_default;
 
-    int64_t const length = std::distance(first, last);
-    int64_t const block_size = std::min((int64_t)block_size_default, length);
-    int64_t const num_blocks = (length + block_size - 1) / block_size;
+    if (block_size_default == 0) {
+        // split work even among available threads
+        const uint32_t num_threads = context_uptr->scheduler.get_num_threads();
+        const uint32_t bsize = length / num_threads;
+        block_size_revised = std::max(bsize, length);
+    }
 
-    // std::cout << "length=" << length << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
+    MCUT_ASSERT(block_size_revised != 0);
+
+    uint32_t const block_size = std::min((uint32_t)block_size_revised, length);
+    uint32_t const num_blocks = (length + block_size - 1) / block_size;
+
+    std::cout << "length=" << length << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
 
     futures.resize(num_blocks - 1);
     InputStorageIteratorType block_start = first;
 
-    for (int64_t i = 0; i < (num_blocks - 1); ++i) {
+    for (uint32_t i = 0; i < (num_blocks - 1); ++i) {
         InputStorageIteratorType block_end = block_start;
-        
+
         std::advance(block_end, block_size);
 
         futures[i] = pool.submit(

@@ -116,6 +116,20 @@ struct connected_component_t {
     // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
     // triangulating every non-triangle face in the connected component.
     std::vector<uint32_t> constrained_delaunay_triangulation_indices;
+#if defined(MCUT_MULTI_THREADED)
+    // Stores the number of vertices per face of CC. This is an optimization 
+    // because there is a possibility that face-sizes may (at-minimum) be queried 
+    // twice by user. The first case is during the populating (i.e. second) call to the API 
+    // mcGetConnectedComponentData(..., MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, ...);
+    // The second case is during the populating (i.e. second) call to the API 
+    // mcGetConnectedComponentData(..., MC_CONNECTED_COMPONENT_DATA_FACE, ...);.
+    // The key detail here is that the second case requires knowledge of the 
+    // number of vertices in each face in order to know how to schedule parallel 
+    // work with prefix-sums etc.. Thus, the optimization is useful only if 
+    // building MCUT with multi-threading
+    std::vector<uint32_t> face_sizes_cache;
+    bool face_sizes_cache_initialized = false;
+#endif // #if defined(MCUT_MULTI_THREADED)
 };
 
 // struct representing a fragment
