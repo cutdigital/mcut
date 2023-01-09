@@ -31,6 +31,8 @@
 #include <thread>
 #include <vector>
 
+#include "mcut/internal/utils.h"
+
 class function_wrapper {
 private:
     struct impl_base {
@@ -264,16 +266,16 @@ public:
         joiner(threads)
         , round_robin_scheduling_counter(0)
     {
-        unsigned int const thread_count = std::thread::hardware_concurrency();
+        int const machine_thread_count = (int)std::thread::hardware_concurrency();
+        unsigned int const pool_thread_count = std::max(1, machine_thread_count-1);
+
         thread_pool_terminate.store(false);
 
         try {
 
-            work_queues = std::vector<thread_safe_queue<function_wrapper>>(
-                thread_count);
+            work_queues = std::vector<thread_safe_queue<function_wrapper>>(pool_thread_count);
 
-            for (unsigned i = 0; i < thread_count; ++i) {
-
+            for (unsigned i = 0; i < pool_thread_count; ++i) {
                 threads.push_back(std::thread(&thread_pool::worker_thread, this, i));
             }
         } catch (...) {
@@ -328,6 +330,33 @@ public:
     }
 };
 
+static void get_scheduling_params(uint32_t& block_size,
+    uint32_t& num_blocks, const uint32_t block_size_default, const uint32_t length_, const uint32_t num_threads)
+{
+    uint32_t block_size_revised = block_size_default;
+
+    if (block_size_default == 0) {
+        // split work even among available threads
+        // const uint32_t num_threads = context_uptr->scheduler.get_num_threads();
+        const uint32_t work_per_thread = length_ / num_threads;
+        if(work_per_thread != 0)
+        {
+            MCUT_ASSERT(work_per_thread <= length_);
+            block_size_revised = work_per_thread;
+        }
+        else{
+            block_size_revised = length_;
+        }
+    }
+
+    // MCUT_ASSERT(block_size_revised != 0);
+
+    block_size = std::min((uint32_t)block_size_revised, length_);
+    num_blocks = (length_ + block_size - 1) / block_size;
+}
+
+#include <iostream>
+
 template <typename InputStorageIteratorType, typename OutputStorageType, typename FunctionType>
 void parallel_fork_and_join(
     thread_pool& pool,
@@ -346,23 +375,16 @@ void parallel_fork_and_join(
     // Future promises of data (to be merged) that is computed by worker threads
     std::vector<std::future<OutputStorageType>>& futures)
 {
-    uint32_t const length = std::distance(first, last);
-    MCUT_ASSERT(length != 0);
-    uint32_t block_size_revised = block_size_default;
+    uint32_t const length_ = std::distance(first, last);
 
-    if (block_size_default == 0) {
-        // split work even among available threads
-        const uint32_t num_threads = context_uptr->scheduler.get_num_threads();
-        const uint32_t bsize = length / num_threads;
-        block_size_revised = std::max(bsize, length);
-    }
+    MCUT_ASSERT(length_ != 0);
 
-    MCUT_ASSERT(block_size_revised != 0);
+    uint32_t block_size;
+    uint32_t num_blocks;
 
-    uint32_t const block_size = std::min((uint32_t)block_size_revised, length);
-    uint32_t const num_blocks = (length + block_size - 1) / block_size;
+    get_scheduling_params(block_size, num_blocks, block_size_default, length_, pool.get_num_threads());
 
-    std::cout << "length=" << length << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
+    std::cout << "length=" << length_ << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
 
     futures.resize(num_blocks - 1);
     InputStorageIteratorType block_start = first;
@@ -381,6 +403,55 @@ void parallel_fork_and_join(
     }
 
     master_thread_output = task_func(block_start, last);
+}
+
+template <typename InputStorageIteratorType, typename FunctionType>
+void parallel_for(
+    thread_pool& pool,
+    // start of data elements to be processed in parallel
+    const InputStorageIteratorType& first,
+    // end of of data elements to be processed in parallel (e.g. std::map::end())
+    const InputStorageIteratorType& last,
+    // the ideal size of the block assigned to each thread
+    typename std::size_t const block_size_default,
+    // the function that is executed on a sub-block of element within the range [first, last)
+    // return void
+    FunctionType& task_func)
+{
+    uint32_t const length_ = std::distance(first, last);
+
+    MCUT_ASSERT(length_ != 0);
+
+    uint32_t block_size;
+    uint32_t num_blocks;
+
+    get_scheduling_params(block_size, num_blocks, block_size_default, length_, pool.get_num_threads());
+
+    std::cout << "length=" << length_ << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
+
+    std::vector<std::future<void>> futures;
+    futures.resize(num_blocks - 1);
+    InputStorageIteratorType block_start = first;
+
+    for (uint32_t i = 0; i < (num_blocks - 1); ++i) {
+        InputStorageIteratorType block_end = block_start;
+
+        std::advance(block_end, block_size);
+
+        futures[i] = pool.submit(
+            [&, block_start, block_end]() {
+                task_func(block_start, block_end);
+            });
+
+        block_start = block_end;
+    }
+
+    task_func(block_start, last); // master thread work
+
+    for(uint32_t i = 0; i < (uint32_t)futures.size(); ++i)
+    {
+        futures[i].wait();
+    }
 }
 
 #endif // MCUT_SCHEDULER_H_

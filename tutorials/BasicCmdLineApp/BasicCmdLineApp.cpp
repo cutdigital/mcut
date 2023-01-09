@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
 
         printf("vertices: %d\n", (int)vertices.size() / 3);
 
-#if 1 // triangulated output
+#if 0 // triangulated output
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
         ASSERT(err == MC_NO_ERROR);
         std::vector<uint32_t> faceIndices(numBytes / sizeof(uint32_t), 0);

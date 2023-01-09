@@ -281,6 +281,23 @@ void get_connected_components_impl(
     }
 }
 
+template <class InputIt, class OutputIt>
+OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first)
+{
+    if (first == last)
+        return d_first;
+
+    typename std::iterator_traits<InputIt>::value_type sum = *first;
+    *d_first = sum;
+
+    while (++first != last) {
+        sum = sum + *first;
+        *++d_first = sum;
+    }
+
+    return ++d_first;
+}
+
 void get_connected_component_data_impl(
     const McContext context,
     const McConnectedComponent connCompId,
@@ -296,15 +313,15 @@ void get_connected_component_data_impl(
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
+    std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
-    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
+    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
 
     if (cc_entry_iter == context_uptr->connected_components.cend()) {
         throw std::invalid_argument("invalid connected component");
     }
 
-    const std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>& cc_uptr = cc_entry_iter->second;
+    std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>& cc_uptr = cc_entry_iter->second;
 
     switch (flags) {
 
@@ -437,10 +454,7 @@ void get_connected_component_data_impl(
                 typedef std::tuple<uint64_t> OutputStorageTypesTuple;
                 typedef vertex_array_iterator_t InputStorageIteratorType;
 
-                auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
-                    OutputStorageTypesTuple local_output;
-                    uint64_t& stub_LOCAL = std::get<0>(local_output);
-
+                auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
                     // thread starting offset (in vertex count) in the "array of vertices"
                     const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
 
@@ -462,32 +476,16 @@ void get_connected_component_data_impl(
                             elem_offset += 1;
                         }
                     }
-
-                    stub_LOCAL = elem_offset;
-
-                    return local_output;
                 };
 
                 std::vector<std::future<OutputStorageTypesTuple>> futures;
-                OutputStorageTypesTuple partial_res;
 
-                parallel_fork_and_join(
+                parallel_for(
                     context_uptr->scheduler,
                     cc_uptr->kernel_hmesh_data.mesh.vertices_begin(),
                     cc_uptr->kernel_hmesh_data.mesh.vertices_end(),
-                    cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() / context_uptr->scheduler.get_num_threads(),
-                    fn_copy_vertex_coords,
-                    partial_res, // output computed by master thread
-                    futures);
-
-                // const uint64_t& final_offset_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
-
-                // wait for all worker-threads to finish copies
-                for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
-                    futures[i].wait();
-                }
-
-                MCUT_ASSERT((std::get<0>(partial_res) * sizeof(double)) <= allocated_bytes);
+                    0,
+                    fn_copy_vertex_coords);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint64_t elem_offset = 0;
@@ -512,6 +510,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
+        TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE");
         if (pMem == nullptr) { // querying for number of bytes
             uint32_t num_indices = 0;
 
@@ -521,16 +520,14 @@ void get_connected_component_data_impl(
                 // to the number of faces in its range/block. The master thread
                 // will then sum the total from all threads
 
-                typedef std::tuple<uint32_t> OutputStorageTypesTuple; // store number of indices computed by worker
+                // typedef std::tuple<uint32_t> OutputStorageTypesTuple; // store number of indices computed by worker
                 typedef face_array_iterator_t InputStorageIteratorType;
 
-                auto fn_count_indices = [&cc_uptr](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
-                    OutputStorageTypesTuple local_output;
-                    uint32_t& num_indices_LOCAL = std::get<0>(local_output);
-                    num_indices_LOCAL = 0;
+                auto fn_count_indices = [&cc_uptr](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
+                    uint32_t num_indices_LOCAL = 0;
 
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    const uint64_t face_base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
+                    // const uint64_t face_base_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.faces_begin(), block_start_);
 
                     for (InputStorageIteratorType fiter = block_start_; fiter != block_end_; ++fiter) {
 
@@ -541,11 +538,11 @@ void get_connected_component_data_impl(
                         num_indices_LOCAL += num_vertices_around_face;
                     }
 
-                    return local_output;
+                    return num_indices_LOCAL;
                 };
 
-                std::vector<std::future<OutputStorageTypesTuple>> futures;
-                OutputStorageTypesTuple partial_res;
+                std::vector<std::future<uint32_t>> futures;
+                uint32_t partial_res;
 
                 parallel_fork_and_join(
                     context_uptr->scheduler,
@@ -556,7 +553,7 @@ void get_connected_component_data_impl(
                     partial_res, // output computed by master thread
                     futures);
 
-                const uint32_t& num_indices_MASTER_THREAD_LOCAL = std::get<0>(partial_res);
+                const uint32_t& num_indices_MASTER_THREAD_LOCAL = partial_res;
                 num_indices += num_indices_MASTER_THREAD_LOCAL;
 
                 // wait for all worker-threads to finish copies
@@ -593,7 +590,9 @@ void get_connected_component_data_impl(
                 // step 2: compute exclusive sum array ( in spirit of std::exclusive_scan)
                 // - for determining per-thread (work-block) output-array offsets
                 // step 3: copy face indices into output array using offsets from previous steps
-                // - final result that is stored in user-output array 
+                // - final result that is stored in user-output array
+
+                const uint32_t nfaces = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
 
                 //
                 // step 1
@@ -602,39 +601,98 @@ void get_connected_component_data_impl(
                 // If client already called mcGetConnectedComponentData(..., MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, faceSizes.data(), NULL)
                 // then we should have already cached the array of face sizes
 
-                if(!cc_uptr->face_sizes_cache_initialized)
-                { // fill the cache by calling the API, within the API!
-                    const uint32_t nfaces = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
-                    
+                if (!cc_uptr->face_sizes_cache_initialized) { // fill the cache by calling the API, within the API!
+
                     // this is like resizing output array in the client application, after knowing the number of faces in CC
-                    cc_uptr->face_sizes_cache.resize(nfaces); 
+                    cc_uptr->face_sizes_cache.resize(nfaces);
 
                     const std::size_t num_bytes = nfaces * sizeof(uint32_t);
 
-                    // Internal API call: populate cache here, which also sets "cc_uptr->face_sizes_cache_initialized" to true
+                    // recursive Internal API call: populate cache here, which also sets "cc_uptr->face_sizes_cache_initialized" to true
                     get_connected_component_data_impl(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, num_bytes, cc_uptr->face_sizes_cache.data(), NULL);
-                }
-                else
-                { // cache already initialized
+                } else { // cache already initialized
                     MCUT_ASSERT(cc_uptr->face_sizes_cache.empty() == false);
-                    MCUT_ASSERT(cc_uptr->face_sizes_cache_initialized);
+                    MCUT_ASSERT(cc_uptr->face_sizes_cache_initialized == true);
                 }
 
                 //
                 // step 2
                 //
+                std::vector<uint32_t> partial_sum_vec(nfaces);
+
+                // TODO: make parallel
+                // partial_sum(cc_uptr->face_sizes_cache.begin(), cc_uptr->face_sizes_cache.end(), partial_sum_vec.begin());
+                {
+                    std::vector<uint32_t>::iterator first = cc_uptr->face_sizes_cache.begin();
+                    std::vector<uint32_t>::iterator last = cc_uptr->face_sizes_cache.end();
+
+                    std::vector<uint32_t>::iterator d_first = partial_sum_vec.begin();
+                    if (first != last) {
+
+                        uint32_t sum = *first;
+                        *d_first = sum;
+
+                        while (++first != last) {
+                            sum = sum + *first;
+                            *++d_first = sum;
+                        }
+
+                        ++d_first;
+                    }
+                }
 
                 //
                 // step 3
                 //
 
+                auto fn_face_indices_copy = [&cc_uptr, &partial_sum_vec, &casted_ptr, &num_indices_to_copy](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.faces_begin(), block_start_);
+
+                    MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_sizes_cache.size());
+
+                    // the first face in the range between block start and end
+                    const uint32_t base_face_vertex_count = SAFE_ACCESS(cc_uptr->face_sizes_cache, base_face_offset);
+
+                    const uint32_t partial_sum_vec_val = SAFE_ACCESS(partial_sum_vec, base_face_offset);
+                    const uint32_t index_arr_base_offset = partial_sum_vec_val - base_face_vertex_count;
+                    uint32_t index_arr_offset = index_arr_base_offset;
+
+                    std::vector<vd_t> vertices_around_face; // tmp to prevent reallocations
+                    vertices_around_face.reserve(3);
+
+                    for (face_array_iterator_t f_iter = block_start_; f_iter != block_end_; ++f_iter) {
+
+                        vertices_around_face.clear();
+                        cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *f_iter);
+                        const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
+
+                        MCUT_ASSERT(num_vertices_around_face >= 3u);
+
+                        // for each vertex in face
+                        for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
+                            const uint32_t vertex_idx = (uint32_t)SAFE_ACCESS(vertices_around_face, i);
+                            *(casted_ptr + index_arr_offset) = vertex_idx;
+                            ++index_arr_offset;
+
+                            if (index_arr_offset == num_indices_to_copy) {
+                                break;
+                            }
+                        }
+                    }
+                };
+
+                parallel_for(
+                    context_uptr->scheduler,
+                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
+                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    0,
+                    fn_face_indices_copy); // blocks until all work is done
             }
 #else // #if defined(MCUT_MULTI_THREADED)
 
             std::vector<vd_t> vertices_around_face;
             uint32_t elem_offset = 0;
 
-            // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
 
                 vertices_around_face.clear();
@@ -648,7 +706,7 @@ void get_connected_component_data_impl(
                     *(casted_ptr + elem_offset) = vertex_idx;
                     ++elem_offset;
 
-                    if ((elem_offset / 3) == num_indices_to_copy) {
+                    if (elem_offset == num_indices_to_copy) {
                         break;
                     }
                 }
@@ -658,8 +716,12 @@ void get_connected_component_data_impl(
 #endif // #if defined(MCUT_MULTI_THREADED)
 
         } // if (pMem == nullptr) { // querying for number of bytes
+
+        TIMESTACK_POP(); // TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE");
+
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_SIZE: { // non-triangulated only (don't want to store redundant information)
+        TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE_SIZE");
         if (pMem == nullptr) {
             *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t); // each face has a size (num verts)
         } else {
@@ -671,12 +733,66 @@ void get_connected_component_data_impl(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            uint64_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-            // cc_uptr->face_sizes_cache_initialized = true
+#if defined(MCUT_MULTI_THREADED)
+            {
+                const uint32_t face_count = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
 
-            // TODO: make parallel
+                if (!cc_uptr->face_sizes_cache_initialized) { // init cache by storing data into it
+                     // the code execution reached here because we asked for the cache
+                // to be populated in order to compute/copy the face indices in parallel.
+                // see: MC_CONNECTED_COMPONENT_DATA_FACE case
+                const bool cache_allocated_prior = !cc_uptr->face_sizes_cache.empty();
+
+                    if (!cache_allocated_prior) {
+                        cc_uptr->face_sizes_cache.resize(face_count);
+                    }
+
+                    auto fn_face_size = [&cc_uptr](std::vector<uint32_t>::iterator block_start_, std::vector<uint32_t>::iterator block_end_) {
+                        const uint32_t face_base_offset = (uint32_t)std::distance(cc_uptr->face_sizes_cache.begin(), block_start_);
+                        uint32_t face_offset = face_base_offset;
+
+                        for (std::vector<uint32_t>::iterator fs_iter = block_start_; fs_iter != block_end_; ++fs_iter) {
+
+                            const face_descriptor_t descr(face_offset);
+
+                            const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(descr);
+
+                            MCUT_ASSERT(num_vertices_around_face >= 3);
+
+                            *fs_iter = num_vertices_around_face;
+
+                            face_offset++;
+                        }
+                    };
+
+                    parallel_for(
+                        context_uptr->scheduler,
+                        cc_uptr->face_sizes_cache.begin(),
+                        cc_uptr->face_sizes_cache.end(),
+                        0,
+                        fn_face_size); // blocks until all work is done
+
+                    cc_uptr->face_sizes_cache_initialized = true;
+                }
+
+                // the pointers are different if "cc_uptr->face_sizes_cache" is not 
+                // being populated in the current call
+                const void* src_ptr = reinterpret_cast<void*>(&(cc_uptr->face_sizes_cache[0]));
+                const void* dst_ptr = pMem;
+                const bool writing_to_client_pointer = (src_ptr != dst_ptr);
+
+                if (writing_to_client_pointer) // copy only if "casted_ptr" is client pointer
+                {
+                    // copy to user pointer
+                    memcpy(casted_ptr, &(cc_uptr->face_sizes_cache[0]), sizeof(uint32_t) * face_count);
+                }
+            }
+#else
+            //
+            uint64_t elem_offset = 0;
+
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
                 const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(*fiter);
 
@@ -685,7 +801,10 @@ void get_connected_component_data_impl(
                 *(casted_ptr + elem_offset) = num_vertices_around_face;
                 ++elem_offset;
             }
+#endif
         }
+        
+        TIMESTACK_POP(); // TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE_SIZE");
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE: {
         if (pMem == nullptr) {
