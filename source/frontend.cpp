@@ -510,7 +510,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
-        TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE");
+        TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE"); 
         if (pMem == nullptr) { // querying for number of bytes
             uint32_t num_indices = 0;
 
