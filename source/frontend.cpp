@@ -484,7 +484,6 @@ void get_connected_component_data_impl(
                     context_uptr->scheduler,
                     cc_uptr->kernel_hmesh_data.mesh.vertices_begin(),
                     cc_uptr->kernel_hmesh_data.mesh.vertices_end(),
-                    0,
                     fn_copy_vertex_coords);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
@@ -510,7 +509,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
-        TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE"); 
+        TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE");
         if (pMem == nullptr) { // querying for number of bytes
             uint32_t num_indices = 0;
 
@@ -618,28 +617,9 @@ void get_connected_component_data_impl(
                 //
                 // step 2
                 //
-                std::vector<uint32_t> partial_sum_vec(nfaces);
+                std::vector<uint32_t> partial_sum_vec = cc_uptr->face_sizes_cache; // copy
 
-                // TODO: make parallel
-                // partial_sum(cc_uptr->face_sizes_cache.begin(), cc_uptr->face_sizes_cache.end(), partial_sum_vec.begin());
-                {
-                    std::vector<uint32_t>::iterator first = cc_uptr->face_sizes_cache.begin();
-                    std::vector<uint32_t>::iterator last = cc_uptr->face_sizes_cache.end();
-
-                    std::vector<uint32_t>::iterator d_first = partial_sum_vec.begin();
-                    if (first != last) {
-
-                        uint32_t sum = *first;
-                        *d_first = sum;
-
-                        while (++first != last) {
-                            sum = sum + *first;
-                            *++d_first = sum;
-                        }
-
-                        ++d_first;
-                    }
-                }
+                parallel_partial_sum(context_uptr->scheduler, partial_sum_vec.begin(), partial_sum_vec.end());
 
                 //
                 // step 3
@@ -685,8 +665,8 @@ void get_connected_component_data_impl(
                     context_uptr->scheduler,
                     cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
                     cc_uptr->kernel_hmesh_data.mesh.faces_end(),
-                    0,
-                    fn_face_indices_copy); // blocks until all work is done
+                    fn_face_indices_copy,
+                    (1 << 14)); // blocks until all work is done
             }
 #else // #if defined(MCUT_MULTI_THREADED)
 
@@ -740,10 +720,10 @@ void get_connected_component_data_impl(
                 const uint32_t face_count = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
 
                 if (!cc_uptr->face_sizes_cache_initialized) { // init cache by storing data into it
-                     // the code execution reached here because we asked for the cache
-                // to be populated in order to compute/copy the face indices in parallel.
-                // see: MC_CONNECTED_COMPONENT_DATA_FACE case
-                const bool cache_allocated_prior = !cc_uptr->face_sizes_cache.empty();
+                    // the code execution can also reach here because we asked for the cache
+                    // to be populated in order to compute/copy the face indices in parallel.
+                    // see: MC_CONNECTED_COMPONENT_DATA_FACE case
+                    const bool cache_allocated_prior = !cc_uptr->face_sizes_cache.empty();
 
                     if (!cache_allocated_prior) {
                         cc_uptr->face_sizes_cache.resize(face_count);
@@ -771,13 +751,12 @@ void get_connected_component_data_impl(
                         context_uptr->scheduler,
                         cc_uptr->face_sizes_cache.begin(),
                         cc_uptr->face_sizes_cache.end(),
-                        0,
                         fn_face_size); // blocks until all work is done
 
                     cc_uptr->face_sizes_cache_initialized = true;
                 }
 
-                // the pointers are different if "cc_uptr->face_sizes_cache" is not 
+                // the pointers are different if "cc_uptr->face_sizes_cache" is not
                 // being populated in the current call
                 const void* src_ptr = reinterpret_cast<void*>(&(cc_uptr->face_sizes_cache[0]));
                 const void* dst_ptr = pMem;
@@ -803,7 +782,7 @@ void get_connected_component_data_impl(
             }
 #endif
         }
-        
+
         TIMESTACK_POP(); // TIMESTACK_PUSH("MC_CONNECTED_COMPONENT_DATA_FACE_SIZE");
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE: {
@@ -813,11 +792,51 @@ void get_connected_component_data_impl(
 
             uint32_t num_face_adjacent_face_indices = 0;
 
-            // TODO: make parallel
+#if defined(MCUT_MULTI_THREADED)
+            {
+                // each worker-thread will count the number of indices according
+                // to the number of faces in its range/block. The master thread
+                // will then sum the total from all threads
+
+                auto fn_count_faces_around_face = [&cc_uptr](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+                    uint32_t num_face_adjacent_face_indices_LOCAL = 0;
+
+                    for (face_array_iterator_t fiter = block_start_; fiter != block_end_; ++fiter) {
+
+                        const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
+                        num_face_adjacent_face_indices_LOCAL += num_faces_around_face;
+                    }
+
+                    return num_face_adjacent_face_indices_LOCAL;
+                };
+
+                std::vector<std::future<uint32_t>> futures;
+                uint32_t partial_res;
+
+                parallel_fork_and_join(
+                    context_uptr->scheduler,
+                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
+                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    0,
+                    fn_count_faces_around_face,
+                    partial_res, // output computed by master thread
+                    futures);
+
+                const uint32_t& num_face_adjacent_face_indices_MASTER_THREAD_LOCAL = partial_res;
+                num_face_adjacent_face_indices += num_face_adjacent_face_indices_MASTER_THREAD_LOCAL;
+
+                // wait for all worker-threads to finish copies
+                for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
+                    const uint32_t num_face_adjacent_face_indices_THREAD_LOCAL = futures[i].get();
+                    num_face_adjacent_face_indices += num_face_adjacent_face_indices_THREAD_LOCAL;
+                }
+            }
+#else // #if defined(MCUT_MULTI_THREADED)
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
                 const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
                 num_face_adjacent_face_indices += num_faces_around_face;
             }
+#endif
 
             *pNumBytes = num_face_adjacent_face_indices * sizeof(uint32_t);
         } else {
@@ -829,6 +848,95 @@ void get_connected_component_data_impl(
             uint64_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
+#if defined(MCUT_MULTI_THREADED)
+            {
+                // step 1: compute array storing face sizes (recursive API call)
+                // - for computing exclusive sum
+                // step 2: compute exclusive sum array ( in spirit of std::exclusive_scan)
+                // - for determining per-thread (work-block) output-array offsets
+                // step 3: copy adjacent face indices into output array using offsets from previous steps
+                // - final result that is stored in user-output array
+
+                const uint32_t nfaces = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
+
+                //
+                // step 1
+                //
+
+                // If client already called mcGetConnectedComponentData(..., MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, numBytes, faceAdjFaceSizes.data(), NULL)
+                // then we should have already cached the array of face sizes
+
+                if (!cc_uptr->face_adjacent_faces_size_cache_initialized) { // fill the cache by calling the API, within the API!
+
+                    // this is like resizing output array in the client application, after knowing the number of faces in CC
+                    cc_uptr->face_adjacent_faces_size_cache.resize(nfaces);
+
+                    const std::size_t num_bytes = nfaces * sizeof(uint32_t);
+
+                    // recursive Internal API call: populate cache here, which also sets "cc_uptr->face_sizes_cache_initialized" to true
+                    // TODO: needs to be implemented!!!
+                    get_connected_component_data_impl(
+                        context,
+                        connCompId,
+                        MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE,
+                        num_bytes,
+                        cc_uptr->face_adjacent_faces_size_cache.data(),
+                        NULL);
+                }
+
+                MCUT_ASSERT(cc_uptr->face_adjacent_faces_size_cache.empty() == false);
+                MCUT_ASSERT(cc_uptr->face_adjacent_faces_size_cache_initialized == true);
+
+                //
+                // step 2
+                //
+                std::vector<uint32_t> partial_sum_vec = cc_uptr->face_adjacent_faces_size_cache; // copy
+
+                parallel_partial_sum(context_uptr->scheduler, partial_sum_vec.begin(), partial_sum_vec.end());
+
+                //
+                // step 3
+                //
+
+                auto fn_face_indices_copy = [&cc_uptr, &partial_sum_vec, &casted_ptr](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.faces_begin(), block_start_);
+
+                    MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_adjacent_faces_size_cache.size());
+
+                    // the first face in the range between block start and end
+                    const uint32_t base_face_vertex_count = SAFE_ACCESS(cc_uptr->face_adjacent_faces_size_cache, base_face_offset);
+
+                    const uint32_t partial_sum_vec_val = SAFE_ACCESS(partial_sum_vec, base_face_offset);
+                    const uint32_t index_arr_base_offset = partial_sum_vec_val - base_face_vertex_count;
+                    uint32_t index_arr_offset = index_arr_base_offset;
+
+                    std::vector<fd_t> faces_around_face; // tmp to prevent reallocations
+                    faces_around_face.reserve(3);
+
+                    for (face_array_iterator_t f_iter = block_start_; f_iter != block_end_; ++f_iter) {
+
+                        faces_around_face.clear();
+                        cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *f_iter);
+                        const uint32_t num_faces_around_face = (uint32_t)faces_around_face.size();
+
+                        MCUT_ASSERT(num_faces_around_face >= 0u);
+
+                        // for each vertex in face
+                        for (uint32_t i = 0; i < num_faces_around_face; ++i) {
+                            const uint32_t face_idx = (uint32_t)SAFE_ACCESS(faces_around_face, i);
+                            *(casted_ptr + index_arr_offset) = face_idx;
+                            ++index_arr_offset;
+                        }
+                    }
+                };
+
+                parallel_for(
+                    context_uptr->scheduler,
+                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
+                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    fn_face_indices_copy); // blocks until all work is done
+            }
+#else // #if defined(MCUT_MULTI_THREADED)
             std::vector<fd_t> faces_around_face;
 
             // TODO: make parallel
@@ -846,6 +954,7 @@ void get_connected_component_data_impl(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
+#endif // #if defined(MCUT_MULTI_THREADED)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE: {
@@ -862,6 +971,8 @@ void get_connected_component_data_impl(
 
             uint64_t elem_offset = 0;
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            // cc_uptr->face_adjacent_faces_size_cache_initialized
 
             // TODO: make parallel
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {

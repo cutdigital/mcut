@@ -23,6 +23,7 @@
 #ifndef MCUT_SCHEDULER_H_
 #define MCUT_SCHEDULER_H_
 
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <future>
@@ -259,15 +260,18 @@ class thread_pool {
         } while (true);
     }
 
+    uint32_t machine_thread_count;
+
 public:
     thread_pool()
         : // thread_pool_terminate(false),
 
         joiner(threads)
-        , round_robin_scheduling_counter(0)
+        , round_robin_scheduling_counter(0),
+        machine_thread_count(0)
     {
-        int const machine_thread_count = (int)std::thread::hardware_concurrency();
-        unsigned int const pool_thread_count = std::max(1, machine_thread_count-1);
+        machine_thread_count = (uint32_t)std::thread::hardware_concurrency();
+        uint32_t const pool_thread_count = std::max(1u, machine_thread_count - 1);
 
         thread_pool_terminate.store(false);
 
@@ -324,12 +328,35 @@ public:
         return res;
     }
 
+    template <typename FunctionType>
+    void submit_and_forget(FunctionType f)
+    {
+        // typedef typename std::result_of<FunctionType()>::type result_type;
+
+        // std::packaged_task<result_type()> task(std::move(f));
+        // std::future<result_type> res(task.get_future());
+
+        unsigned long long worker_thread_id = (round_robin_scheduling_counter++) % (unsigned long long)get_num_threads();
+
+        // printf("[MCUT]: submit to thread %d\n", (int)worker_thread_id);
+
+        work_queues[worker_thread_id].push(std::move(f));
+
+        // return res;
+    }
+
     size_t get_num_threads() const
     {
         return threads.size();
     }
+
+    uint32_t get_num_hardware_threads()
+    {
+        return machine_thread_count;
+    }
 };
 
+#if 1
 static void get_scheduling_params(uint32_t& block_size,
     uint32_t& num_blocks, const uint32_t block_size_default, const uint32_t length_, const uint32_t num_threads)
 {
@@ -339,12 +366,10 @@ static void get_scheduling_params(uint32_t& block_size,
         // split work even among available threads
         // const uint32_t num_threads = context_uptr->scheduler.get_num_threads();
         const uint32_t work_per_thread = length_ / num_threads;
-        if(work_per_thread != 0)
-        {
+        if (work_per_thread != 0) {
             MCUT_ASSERT(work_per_thread <= length_);
             block_size_revised = work_per_thread;
-        }
-        else{
+        } else {
             block_size_revised = length_;
         }
     }
@@ -353,6 +378,33 @@ static void get_scheduling_params(uint32_t& block_size,
 
     block_size = std::min((uint32_t)block_size_revised, length_);
     num_blocks = (length_ + block_size - 1) / block_size;
+}
+#endif
+
+static void get_scheduling_parameters(
+    // the number of thread that will actually do some computation (including master)
+    uint32_t& num_threads,
+    // maximum possible number of threads that can be scheduled to perform the task.
+    uint32_t& max_threads,
+    // the size of each block of elements assigned to a thread (note: last thread,
+    // which is the master thread might have less)
+    uint32_t& block_size,
+    // number of data elements to process
+    const uint32_t length,
+    const uint32_t available_threads, // number of worker threads and master master thread
+    // minimum number of element assigned to a thread (below this threshold and we
+    // run just one thread)
+    const uint32_t min_per_thread = (1 << 10))
+{
+    // maximum possible number of threads that can be scheduled to perform the task.
+    max_threads = (length + min_per_thread - 1) / min_per_thread;
+
+    // the number of thread that will actually do some computation (including master)
+    num_threads = std::min(available_threads != 0 ? available_threads : 2, max_threads);
+
+    // the size of each block of elements assigned to a thread (note: last thread,
+    // which is the master thread might have less)
+    block_size = length / num_threads;
 }
 
 #include <iostream>
@@ -412,28 +464,61 @@ void parallel_for(
     const InputStorageIteratorType& first,
     // end of of data elements to be processed in parallel (e.g. std::map::end())
     const InputStorageIteratorType& last,
-    // the ideal size of the block assigned to each thread
-    typename std::size_t const block_size_default,
     // the function that is executed on a sub-block of element within the range [first, last)
     // return void
-    FunctionType& task_func)
+    FunctionType& task_func,
+    // minimum number of element assigned to a thread (below this threshold and we
+    // run just one thread)
+    const uint32_t min_per_thread = (1 << 10))
 {
     uint32_t const length_ = std::distance(first, last);
 
     MCUT_ASSERT(length_ != 0);
-
+    
     uint32_t block_size;
+
+#if 0
+    
     uint32_t num_blocks;
 
     get_scheduling_params(block_size, num_blocks, block_size_default, length_, pool.get_num_threads());
 
     std::cout << "length=" << length_ << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
+#else
+
+    uint32_t max_threads = 0;
+    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    uint32_t num_threads = 0;
+
+    get_scheduling_parameters(
+        num_threads,
+        max_threads,
+        block_size,
+        length_,
+        available_threads, 
+        min_per_thread);
+
+    if(num_threads == 0 || num_threads > pool.get_num_hardware_threads())
+    {
+        throw std::runtime_error("invalid number of threads (" + std::to_string(num_threads) + ")" );
+    }
+
+    if(max_threads == 0)
+    {
+        throw std::runtime_error("invalid maximum posible number of threads (" + std::to_string(max_threads) + ")" );
+    }
+
+    if(block_size == 0)
+    {
+        throw std::runtime_error("invalid work block-size per thread (" + std::to_string(block_size) + ")" );
+    }
+#endif
 
     std::vector<std::future<void>> futures;
-    futures.resize(num_blocks - 1);
+    futures.resize(num_threads - 1);
     InputStorageIteratorType block_start = first;
 
-    for (uint32_t i = 0; i < (num_blocks - 1); ++i) {
+    for (uint32_t i = 0; i < (num_threads - 1); ++i) {
         InputStorageIteratorType block_end = block_start;
 
         std::advance(block_end, block_size);
@@ -448,10 +533,141 @@ void parallel_for(
 
     task_func(block_start, last); // master thread work
 
-    for(uint32_t i = 0; i < (uint32_t)futures.size(); ++i)
-    {
+    for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
         futures[i].wait();
     }
+}
+
+template <typename Iterator>
+void partial_sum(Iterator first, Iterator last, Iterator d_first)
+{
+    // std::vector<uint32_t>::iterator first = cc_uptr->face_sizes_cache.begin();
+    // std::vector<uint32_t>::iterator last = cc_uptr->face_sizes_cache.end();
+    // Iterator d_first = first;
+
+    if (first != last) {
+
+        uint32_t sum = *first;
+        *d_first = sum;
+
+        while (++first != last) {
+            sum = sum + *first;
+            *++d_first = sum;
+        }
+
+        ++d_first;
+    }
+}
+
+
+
+template <typename Iterator>
+void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
+{
+    typedef typename Iterator::value_type value_type;
+    struct process_chunk {
+        void operator()(Iterator begin, Iterator last,
+            std::future<value_type>* previous_end_value,
+            std::promise<value_type>* end_value)
+        {
+            try {
+                Iterator end = last;
+                ++end;
+                partial_sum(begin, end, begin);
+                if (previous_end_value) {
+                    const value_type addend = previous_end_value->get();
+                    *last += addend;
+                    if (end_value) {
+                        end_value->set_value(*last);
+                    }
+                    std::for_each(begin, last, [addend](value_type& item) {
+                        item += addend;
+                    });
+                } else if (end_value) {
+                    end_value->set_value(*last);
+                }
+            } catch (...) {
+                if (end_value) {
+                    end_value->set_exception(std::current_exception());
+                } else {
+                    throw;
+                }
+            }
+        }
+    };
+
+    // number of elements in range
+    unsigned long const length = std::distance(first, last);
+
+    if (!length)
+        return;
+
+    uint32_t max_threads = 0;
+    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    uint32_t num_threads = 0;
+    uint32_t block_size = 0;
+
+    get_scheduling_parameters(
+        num_threads,
+        max_threads,
+        block_size,
+        length,
+        available_threads);
+
+    if(num_threads == 0 || num_threads > pool.get_num_hardware_threads())
+    {
+        throw std::runtime_error("invalid number of threads (" + std::to_string(num_threads) + ")" );
+    }
+
+    if(max_threads == 0)
+    {
+        throw std::runtime_error("invalid maximum posible number of threads (" + std::to_string(max_threads) + ")" );
+    }
+
+    if(block_size == 0)
+    {
+        throw std::runtime_error("invalid work block-size per thread (" + std::to_string(block_size) + ")" );
+    }
+
+    typedef typename Iterator::value_type value_type;
+
+    // promises holding the value of the last element of a block. Only the
+    // first N-1 blocks (i.e. threads) will have to update this value.
+    std::vector<std::promise<value_type>> end_values(num_threads - 1);
+    // futures that are used to wait for the end value (the last element) of
+    // previous block. Only the last N-1 blocks (i.e. threads) will have to wait
+    // on this value. That is, the first thread has no "previous" block to wait
+    // on,
+    std::vector<std::future<value_type>> previous_end_values;
+    previous_end_values.reserve(num_threads - 1);
+
+    Iterator block_start = first;
+
+    // for each pool-thread
+    for (unsigned long i = 0; i < (num_threads - 1); ++i) {
+        Iterator block_last = block_start;
+        std::advance(block_last, block_size - 1);
+
+        // process_chunk()" handles all synchronisation
+        pool.submit_and_forget(
+            [i /*NOTE: capture by-value*/, &previous_end_values, &end_values, block_start, block_last]() {
+                process_chunk()(block_start, block_last, (i != 0) ? &previous_end_values[i - 1] : 0, &end_values[i]);
+            });
+
+        block_start = block_last;
+        ++block_start;
+        previous_end_values.push_back(end_values[i].get_future()); // for next thread to wait on
+    }
+
+    Iterator final_element = block_start;
+    std::advance(final_element, std::distance(block_start, last) - 1);
+
+    // NOTE: this is a blocking call since the master thread has to wait
+    // for worker-threads assigned to preceeding chunks to finish before it can
+    // process its own chunk.
+    process_chunk()(block_start, final_element,
+        (num_threads > 1) ? &previous_end_values.back() : 0,
+        0);
 }
 
 #endif // MCUT_SCHEDULER_H_

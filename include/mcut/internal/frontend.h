@@ -129,6 +129,10 @@ struct connected_component_t {
     // building MCUT with multi-threading
     std::vector<uint32_t> face_sizes_cache;
     bool face_sizes_cache_initialized = false;
+    // see documentation of face_sizes_cache above
+    // Similar concepts but applied to MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE
+    std::vector<uint32_t> face_adjacent_faces_size_cache;
+    bool face_adjacent_faces_size_cache_initialized = false;
 #endif // #if defined(MCUT_MULTI_THREADED)
 };
 
