@@ -115,7 +115,7 @@ struct connected_component_t {
     // This vector is only populated if client invokes mcGetConnectedComponnentData
     // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
     // triangulating every non-triangle face in the connected component.
-    std::vector<uint32_t> constrained_delaunay_triangulation_indices;
+    std::vector<uint32_t> cdt_index_cache;
 #if defined(MCUT_MULTI_THREADED)
     // Stores the number of vertices per face of CC. This is an optimization 
     // because there is a possibility that face-sizes may (at-minimum) be queried 

@@ -1524,10 +1524,10 @@ void get_connected_component_data_impl(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
 
-        if (cc_uptr->constrained_delaunay_triangulation_indices.empty()) // compute triangulation if not yet available
+        if (cc_uptr->cdt_index_cache.empty()) // compute triangulation if not yet available
         {
             uint32_t face_indices_offset = 0;
-            cc_uptr->constrained_delaunay_triangulation_indices.reserve(cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
+            cc_uptr->cdt_index_cache.reserve(cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
 
             // -----
             std::vector<vec3> face_vertex_coords_3d;
@@ -1570,7 +1570,7 @@ void get_connected_component_data_impl(
 
                     for (uint32_t v = 0; v < face_vertex_count; ++v) {
                         const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
-                        cc_uptr->constrained_delaunay_triangulation_indices.push_back(face_vertex_idx);
+                        cc_uptr->cdt_index_cache.push_back(face_vertex_idx);
                     }
 
                 } else {
@@ -1792,8 +1792,8 @@ void get_connected_component_data_impl(
                         face_triangulation_indices[(std::size_t)i] = global_idx; // id in the connected component (mesh)
                     }
 
-                    cc_uptr->constrained_delaunay_triangulation_indices.insert(
-                        cc_uptr->constrained_delaunay_triangulation_indices.end(),
+                    cc_uptr->cdt_index_cache.insert(
+                        cc_uptr->cdt_index_cache.end(),
                         face_triangulation_indices.begin(),
                         face_triangulation_indices.end());
 
@@ -1802,11 +1802,11 @@ void get_connected_component_data_impl(
                 face_indices_offset += face_vertex_count;
             }
 
-            MCUT_ASSERT(cc_uptr->constrained_delaunay_triangulation_indices.size() >= 3);
+            MCUT_ASSERT(cc_uptr->cdt_index_cache.size() >= 3);
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
-        const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
+        const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->cdt_index_cache.size();
 
         if (pMem == nullptr) // client pointer is null (asking for size)
         {
@@ -1823,7 +1823,7 @@ void get_connected_component_data_impl(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->constrained_delaunay_triangulation_indices.data()), bytes);
+            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->cdt_index_cache.data()), bytes);
         }
     } break;
     default:
