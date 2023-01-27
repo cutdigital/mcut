@@ -11,10 +11,10 @@
 
 #include <memory>
 
+#include <numeric> // iota
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
-#include <numeric> // iota
 
 #include "mcut/internal/cdt/cdt.h"
 
@@ -1524,7 +1524,7 @@ void get_connected_component_data_impl(
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
-
+        SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION");
         if (cc_uptr->cdt_index_cache.empty()) // compute triangulation if not yet available
         {
             // internal halfedge data structure from the current connected component
@@ -1533,22 +1533,6 @@ void get_connected_component_data_impl(
             uint32_t face_indices_offset = 0;
             cc_uptr->cdt_index_cache.reserve(cc.number_of_faces());
 
-            // -----
-            std::vector<vec3> cc_face_vcoords3d;
-            // NOTE: the elements of this array might be reversed, which occurs
-            // when the winding-order/orientation of "cc_face_iter" is flipped
-            // due to projection (see call to project_to_2d())
-            std::vector<vec2> cc_face_vcoords2d; 
-
-            // edge of face, which are used by triangulator as "fixed edges" to
-            // constrain the CDT
-            std::vector<cdt::edge_t> cc_face_edges;
-            //  list of indices which define all triangles that result from the CDT
-            std::vector<uint32_t> cc_face_triangulation;
-            // used to check that all indices where used in the triangulation.
-            // If any entry is false after finshing triangulation then there will be a hole in the output
-            // This is use for sanity checking
-            std::vector<bool> cc_face_vtx_to_is_used_flag;
             // descriptors of vertices in face (they index into the CC)
             std::vector<vertex_descriptor_t> cc_face_vertices;
 
@@ -1582,11 +1566,25 @@ void get_connected_component_data_impl(
                     //
                     // init vars (which we do not want to be re-inititalizing)
                     //
+                    std::vector<vec3> cc_face_vcoords3d;
                     cc_face_vcoords3d.resize(cc_face_vcount);
-                    cc_face_vcoords2d.clear(); // resized by project_to_2d(...)
-                    cc_face_edges.clear();
-                    cc_face_triangulation.clear();
+
+                    // NOTE: the elements of this array might be reversed, which occurs
+                    // when the winding-order/orientation of "cc_face_iter" is flipped
+                    // due to projection (see call to project_to_2d())
+                    std::vector<vec2> cc_face_vcoords2d; // resized by project_to_2d(...)
+                                                         // edge of face, which are used by triangulator as "fixed edges" to
+                    // constrain the CDT
+                    std::vector<cdt::edge_t> cc_face_edges;
+                    //  list of indices which define all triangles that result from the CDT
+                    std::vector<uint32_t> cc_face_triangulation;
+                    // used to check that all indices where used in the triangulation.
+                    // If any entry is false after finshing triangulation then there will be a hole in the output
+                    // This is use for sanity checking
+                    std::vector<bool> cc_face_vtx_to_is_used_flag;
                     cc_face_vtx_to_is_used_flag.resize(cc_face_vcount);
+
+                    
 
                     // for each vertex in face: get its coordinates
                     for (uint32_t i = 0; i < cc_face_vcount; ++i) {
@@ -1602,15 +1600,15 @@ void get_connected_component_data_impl(
                     //
                     // NOTE: Although we are projecting using the plane normal of
                     // the plane, the shape and thus area of the face polygon is
-                    // unchanged (but the winding order might change!). 
+                    // unchanged (but the winding order might change!).
                     // See definition of "project_to_2d()"
                     // =====================================================
 
                     // Maps each vertex in face to the reversed index if the polygon
                     // winding order was reversed due to projection to 2D. Otherwise,
                     // Simply stores the indices from 0 to N-1
-                    std::vector<uint32_t> face_to_cdt_vmap(cc_face_vcount); 
-                    std::iota (std::begin(face_to_cdt_vmap), std::end(face_to_cdt_vmap), 0);
+                    std::vector<uint32_t> face_to_cdt_vmap(cc_face_vcount);
+                    std::iota(std::begin(face_to_cdt_vmap), std::end(face_to_cdt_vmap), 0);
 
                     {
                         vec3 cc_face_normal_vector;
@@ -1630,26 +1628,23 @@ void get_connected_component_data_impl(
 
                         double signed_area = 0;
 
-                        for(uint32_t i = 0; i < cc_face_vcount-2; ++i)
-                        {
+                        for (uint32_t i = 0; i < cc_face_vcount - 2; ++i) {
                             vec2 cur = cc_face_vcoords2d[i];
-                            vec2 nxt = cc_face_vcoords2d[(i+1) % cc_face_vcount];
-                            vec2 nxtnxt = cc_face_vcoords2d[(i+2) % cc_face_vcount];
+                            vec2 nxt = cc_face_vcoords2d[(i + 1) % cc_face_vcount];
+                            vec2 nxtnxt = cc_face_vcoords2d[(i + 2) % cc_face_vcount];
                             signed_area += orient2d(cur, nxt, nxtnxt);
                         }
 
                         const bool winding_order_flipped_due_to_projection = (signed_area < 0);
-                        
-                        if(winding_order_flipped_due_to_projection)
-                        {
+
+                        if (winding_order_flipped_due_to_projection) {
                             // Reverse the order of points so that they are CCW
                             std::reverse(cc_face_vcoords2d.begin(), cc_face_vcoords2d.end());
 
                             // for each vertex index in face
-                            for(int32_t i =0; i < (int32_t)cc_face_vcount; ++i)
-                            {
+                            for (int32_t i = 0; i < (int32_t)cc_face_vcount; ++i) {
                                 // save reverse index map
-                                face_to_cdt_vmap[i] = wrap_integer(-(i+1), 0, cc_face_vcount-1 );
+                                face_to_cdt_vmap[i] = wrap_integer(-(i + 1), 0, cc_face_vcount - 1);
                             }
                         }
                     }
@@ -1795,8 +1790,8 @@ void get_connected_component_data_impl(
                     // In the following section, we will check-for and handle
                     // the case of having duplicate vertices in "cc_face_iter".
                     //
-                    // Duplicate vertices arise when "cc_face_iter" is from the source-mesh 
-                    // and it has a partial-cut. Example: source-mesh=triangle and 
+                    // Duplicate vertices arise when "cc_face_iter" is from the source-mesh
+                    // and it has a partial-cut. Example: source-mesh=triangle and
                     // cut-mesh=triangle, where the cut-mesh does not split the source-mesh into
                     // two disjoint parts (i.e. a triangle and a quad) but instead
                     // induces a slit
@@ -1808,7 +1803,7 @@ void get_connected_component_data_impl(
                         cc_face_vcoords2d.end(),
                         cdt::get_x_coord_vec2d<double>,
                         cdt::get_y_coord_vec2d<double>);
-                    
+
                     // number of duplicate vertices (if any)
                     const uint32_t duplicate_vcount = (uint32_t)duplicates_info_pre.duplicates.size();
                     const bool have_duplicates = duplicate_vcount > 0;
@@ -1829,221 +1824,221 @@ void get_connected_component_data_impl(
                             // incident edges may be parallel.
                             //
 
-                                // current duplicate vertex (index in "cc_face_iter")
-                                const std::int32_t perturbed_dvertex_id = (std::uint32_t)(*duplicate_vpair_iter);
-                                // previous vertex (in "cc_face_iter") from current duplicate vertex
-                                const std::uint32_t prev_vtx_id = wrap_integer(perturbed_dvertex_id - 1, 0, cc_face_vcount - 1);
-                                // next vertex (in "cc_face_iter") from current duplicate vertex
-                                const std::uint32_t next_vtx_id = wrap_integer(perturbed_dvertex_id + 1, 0, cc_face_vcount - 1);
-                                // the other duplicate vertex of pair
-                                const std::int32_t other_dvertex_id = (std::uint32_t)SAFE_ACCESS(duplicates_info_pre.mapping, perturbed_dvertex_id);
+                            // current duplicate vertex (index in "cc_face_iter")
+                            const std::int32_t perturbed_dvertex_id = (std::uint32_t)(*duplicate_vpair_iter);
+                            // previous vertex (in "cc_face_iter") from current duplicate vertex
+                            const std::uint32_t prev_vtx_id = wrap_integer(perturbed_dvertex_id - 1, 0, cc_face_vcount - 1);
+                            // next vertex (in "cc_face_iter") from current duplicate vertex
+                            const std::uint32_t next_vtx_id = wrap_integer(perturbed_dvertex_id + 1, 0, cc_face_vcount - 1);
+                            // the other duplicate vertex of pair
+                            const std::int32_t other_dvertex_id = (std::uint32_t)SAFE_ACCESS(duplicates_info_pre.mapping, perturbed_dvertex_id);
 
-                                vec2& perturbed_dvertex_coords = SAFE_ACCESS(cc_face_vcoords2d, perturbed_dvertex_id); // will be modified by shifting/perturbation
-                                const vec2& prev_vtx_coords = SAFE_ACCESS(cc_face_vcoords2d, prev_vtx_id);
-                                const vec2& next_vtx_coords = SAFE_ACCESS(cc_face_vcoords2d, next_vtx_id);
+                            vec2& perturbed_dvertex_coords = SAFE_ACCESS(cc_face_vcoords2d, perturbed_dvertex_id); // will be modified by shifting/perturbation
+                            const vec2& prev_vtx_coords = SAFE_ACCESS(cc_face_vcoords2d, prev_vtx_id);
+                            const vec2& next_vtx_coords = SAFE_ACCESS(cc_face_vcoords2d, next_vtx_id);
 
-                                // vector along incident edge, pointing from current to previous vertex (NOTE: clockwise dir, reverse)
-                                const vec2 to_prev = prev_vtx_coords - perturbed_dvertex_coords;
-                                // vector along incident edge, pointing from current to next vertex (NOTE: counter-clockwise dir, normal)
-                                const vec2 to_next = next_vtx_coords - perturbed_dvertex_coords;
+                            // vector along incident edge, pointing from current to previous vertex (NOTE: clockwise dir, reverse)
+                            const vec2 to_prev = prev_vtx_coords - perturbed_dvertex_coords;
+                            // vector along incident edge, pointing from current to next vertex (NOTE: counter-clockwise dir, normal)
+                            const vec2 to_next = next_vtx_coords - perturbed_dvertex_coords;
 
-                                // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
-                                // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
-                                // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
-                                const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
-                                const sign_t orient2d_sgn = sign(orient2d_res);
+                            // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
+                            // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
+                            // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
+                            const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
+                            const sign_t orient2d_sgn = sign(orient2d_res);
 
-                                const double to_prev_sqr_len = squared_length(to_prev);
-                                const double to_next_sqr_len = squared_length(to_next);
+                            const double to_prev_sqr_len = squared_length(to_prev);
+                            const double to_next_sqr_len = squared_length(to_next);
 
+                            //
+                            // Now we must determine which side is the perturbation_vector must be
+                            // pointing. i.e. the side of "perturbed_dvertex_coords" or the side
+                            // of its duplicate
+                            //
+                            // NOTE: this is only really necessary if the partially cut polygon
+                            // Has more that 3 intersection points (i.e. more than the case of
+                            // one tip, and two duplicates)
+                            //
+
+                            const int32_t flip = (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) ? -1 : 1;
+
+                            //
+                            // Compute the perturbation vector as the average of the two incident edges eminating
+                            // from the current vertex. NOTE: This perturbation vector should generally point in
+                            // the direction of the polygon-interior (i.e. analogous to pushing the polygon at
+                            // the location represented by perturbed_dvertex_coords) to cause a minute dent due to small
+                            // loss of area.
+                            // Normalization happens below
+                            vec2 perturbation_vector = ((to_prev + to_next) / 2.0) * flip;
+
+                            // "orient2d()" is exact in the sense that it can depend on computations with numbers
+                            // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
+                            // that this threshold is too "small" a number for us to be able to reliably compute
+                            // stuff with the result of "orient2d()" that is near this threshold.
+                            const double errbound = 1e-2;
+
+                            // We use "errbound", rather than "orient2d_res", to determine if the incident edges
+                            // are parallel to give us sufficient room of numerical-precision to reliably compute
+                            // the perturbation vector.
+                            // In general, if the incident edges are not parallel then the perturbation vector
+                            // is computed as the mean of "to_prev" and "to_next". Thus, being "too close"
+                            // (within some threshold) to the edges being parallel, can induce unpredicatable
+                            // numerical instabilities, where the mean-vector will be too close to the zero-vector
+                            // and can complicate the task of perturbation.
+                            const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
+
+                            if (incident_edges_are_parallel) {
                                 //
-                                // Now we must determine which side is the perturbation_vector must be
-                                // pointing. i.e. the side of "perturbed_dvertex_coords" or the side 
-                                // of its duplicate
-                                //
-                                // NOTE: this is only really necessary if the partially cut polygon
-                                // Has more that 3 intersection points (i.e. more than the case of 
-                                // one tip, and two duplicates)
+                                // pick the shortest of the two incident edges and compute the
+                                // orthogonal perturbation vector as the counter-clockwise rotation
+                                // of this shortest incident edge.
                                 //
 
-                                const int32_t flip = (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) ? -1 : 1;
-                                
-                                //
-                                // Compute the perturbation vector as the average of the two incident edges eminating
-                                // from the current vertex. NOTE: This perturbation vector should generally point in
-                                // the direction of the polygon-interior (i.e. analogous to pushing the polygon at
-                                // the location represented by perturbed_dvertex_coords) to cause a minute dent due to small
-                                // loss of area.
-                                // Normalization happens below
-                                vec2 perturbation_vector = ((to_prev + to_next) / 2.0) * flip;
+                                // flip sign so that the edge is in the CCW dir by pointing from "prev" to "cur"
+                                vec2 edge_vec(-to_prev.x(), -to_prev.y());
 
-                                // "orient2d()" is exact in the sense that it can depend on computations with numbers
-                                // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
-                                // that this threshold is too "small" a number for us to be able to reliably compute
-                                // stuff with the result of "orient2d()" that is near this threshold.
-                                const double errbound = 1e-2;
-
-                                // We use "errbound", rather than "orient2d_res", to determine if the incident edges
-                                // are parallel to give us sufficient room of numerical-precision to reliably compute
-                                // the perturbation vector.
-                                // In general, if the incident edges are not parallel then the perturbation vector
-                                // is computed as the mean of "to_prev" and "to_next". Thus, being "too close"
-                                // (within some threshold) to the edges being parallel, can induce unpredicatable
-                                // numerical instabilities, where the mean-vector will be too close to the zero-vector
-                                // and can complicate the task of perturbation.
-                                const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
-
-                                if (incident_edges_are_parallel) {
-                                    //
-                                    // pick the shortest of the two incident edges and compute the
-                                    // orthogonal perturbation vector as the counter-clockwise rotation
-                                    // of this shortest incident edge.
-                                    //
-
-                                    // flip sign so that the edge is in the CCW dir by pointing from "prev" to "cur"
-                                    vec2 edge_vec(-to_prev.x(), -to_prev.y());
-
-                                    if (to_prev_sqr_len > to_next_sqr_len) {
-                                        edge_vec = to_next; // pick shortest (NOTE: "to_next" is already in CCW dir)
-                                    }
-
-                                    // rotate the selected edge by 90 degrees
-                                    const vec2 edge_vec_rotated90(-edge_vec.y(), edge_vec.x());
-
-                                    perturbation_vector = edge_vec_rotated90;
+                                if (to_prev_sqr_len > to_next_sqr_len) {
+                                    edge_vec = to_next; // pick shortest (NOTE: "to_next" is already in CCW dir)
                                 }
 
-                                const vec2 perturbation_dir = normalize(perturbation_vector);
+                                // rotate the selected edge by 90 degrees
+                                const vec2 edge_vec_rotated90(-edge_vec.y(), edge_vec.x());
 
-                                //
-                                // Compute the maximum length between any two vertices in "cc_face_iter" as the
-                                // largest length between any two vertices.
-                                //
-                                // This will be used to scale "perturbation_dir" so that we find the
-                                // closest edge (from "perturbed_dvertex_coords") that is intersected by this ray.
-                                // We will use the resulting information to determine the amount by-which
-                                // "perturbed_dvertex_coords" is to be perturbed.
-                                //
+                                perturbation_vector = edge_vec_rotated90;
+                            }
 
-                                // largest squared length between any two vertices in "cc_face_iter"
-                                double largest_sqrd_length = -1.0;
+                            const vec2 perturbation_dir = normalize(perturbation_vector);
 
-                                for (uint32_t i = 0; i < cc_face_vcount; ++i) {
+                            //
+                            // Compute the maximum length between any two vertices in "cc_face_iter" as the
+                            // largest length between any two vertices.
+                            //
+                            // This will be used to scale "perturbation_dir" so that we find the
+                            // closest edge (from "perturbed_dvertex_coords") that is intersected by this ray.
+                            // We will use the resulting information to determine the amount by-which
+                            // "perturbed_dvertex_coords" is to be perturbed.
+                            //
 
-                                    const vec2& a = SAFE_ACCESS(cc_face_vcoords2d, i);
+                            // largest squared length between any two vertices in "cc_face_iter"
+                            double largest_sqrd_length = -1.0;
 
-                                    for (uint32_t j = 0; j < cc_face_vcount; ++j) {
+                            for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
-                                        if (i == j) {
-                                            continue; // skip -> comparison is redundant
-                                        }
+                                const vec2& a = SAFE_ACCESS(cc_face_vcoords2d, i);
 
-                                        const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
+                                for (uint32_t j = 0; j < cc_face_vcount; ++j) {
 
-                                        const double sqrd_length = squared_length(b - a);
-                                        largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
+                                    if (i == j) {
+                                        continue; // skip -> comparison is redundant
                                     }
+
+                                    const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
+
+                                    const double sqrd_length = squared_length(b - a);
+                                    largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
                                 }
+                            }
 
-                                //
-                                // construct the segment with-which will will find the closest
-                                // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
-                                //
+                            //
+                            // construct the segment with-which will will find the closest
+                            // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
+                            //
 
-                                const double shift_len = std::sqrt(largest_sqrd_length);
-                                const vec2 shift = perturbation_dir * shift_len;
+                            const double shift_len = std::sqrt(largest_sqrd_length);
+                            const vec2 shift = perturbation_dir * shift_len;
 
-                                vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
+                            vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
 
-                                {
-                                    struct {
-                                        vec2 start;
-                                        vec2 end;
-                                    } segment;
-                                    segment.start = perturbed_dvertex_coords;
-                                    segment.end = perturbed_dvertex_coords + shift;
+                            {
+                                struct {
+                                    vec2 start;
+                                    vec2 end;
+                                } segment;
+                                segment.start = perturbed_dvertex_coords;
+                                segment.end = perturbed_dvertex_coords + shift;
 
-                                    // test segment against all edges to find closest intersection point
+                                // test segment against all edges to find closest intersection point
 
-                                    double segment_min_tval = 1.0;
+                                double segment_min_tval = 1.0;
 
-                                    // for each edge of face to be triangulated (number of vertices == number of edges)
-                                    for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
-                                        const std::uint32_t edge_start_idx = i;
-                                        const std::uint32_t edge_end_idx = (i + 1) % cc_face_vcount;
+                                // for each edge of face to be triangulated (number of vertices == number of edges)
+                                for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
+                                    const std::uint32_t edge_start_idx = i;
+                                    const std::uint32_t edge_end_idx = (i + 1) % cc_face_vcount;
 
-                                        if ((edge_start_idx == (uint32_t)perturbed_dvertex_id || edge_end_idx == (uint32_t)perturbed_dvertex_id) || //
-                                            (edge_start_idx == (uint32_t)other_dvertex_id || edge_end_idx == (uint32_t)other_dvertex_id)) {
-                                            continue; // impossible to properly intersect incident edges
+                                    if ((edge_start_idx == (uint32_t)perturbed_dvertex_id || edge_end_idx == (uint32_t)perturbed_dvertex_id) || //
+                                        (edge_start_idx == (uint32_t)other_dvertex_id || edge_end_idx == (uint32_t)other_dvertex_id)) {
+                                        continue; // impossible to properly intersect incident edges
+                                    }
+
+                                    const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
+                                    const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
+
+                                    double segment_tval; // parameter along segment
+                                    double edge_tval; // parameter along current edge
+                                    vec2 ipoint; // intersection point between segment and current edge
+
+                                    const char result = compute_segment_intersection(
+                                        segment.start, segment.end, edge_start_coords, edge_end_coords,
+                                        ipoint, segment_tval, edge_tval);
+
+                                    if (result == '1' && segment_min_tval > segment_tval) { // we have an clear intersection point
+                                        segment_min_tval = segment_tval;
+                                        intersection_point_on_edge = ipoint;
+                                    } else if (
+                                        // segment and edge are collinear
+                                        result == 'e' ||
+                                        // segment and edge are collinear, or one entity cuts through the vertex of the other
+                                        result == 'v') {
+                                        // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
+
+                                        // length from segment start to the start of edge
+                                        const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
+                                        // length from segment start to the end of edge
+                                        const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
+
+                                        // length from start of segment to either start of edge or end of edge (depending on which is closer)
+                                        double sqr_dist_to_closest = sqr_dist_to_edge_start;
+                                        const vec2* ipoint_ptr = &edge_start_coords;
+
+                                        if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
+                                            sqr_dist_to_closest = sqr_dist_to_edge_end;
+                                            ipoint_ptr = &edge_end_coords;
                                         }
 
-                                        const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
-                                        const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
+                                        // ratio along segment
+                                        segment_tval = std::sqrt(sqr_dist_to_closest) / shift_len;
 
-                                        double segment_tval; // parameter along segment
-                                        double edge_tval; // parameter along current edge
-                                        vec2 ipoint; // intersection point between segment and current edge
-
-                                        const char result = compute_segment_intersection(
-                                            segment.start, segment.end, edge_start_coords, edge_end_coords,
-                                            ipoint, segment_tval, edge_tval);
-
-                                        if (result == '1' && segment_min_tval > segment_tval) { // we have an clear intersection point
+                                        if (segment_min_tval > segment_tval) {
                                             segment_min_tval = segment_tval;
-                                            intersection_point_on_edge = ipoint;
-                                        } else if (
-                                            // segment and edge are collinear
-                                            result == 'e' ||
-                                            // segment and edge are collinear, or one entity cuts through the vertex of the other
-                                            result == 'v') {
-                                            // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
-
-                                            // length from segment start to the start of edge
-                                            const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
-                                            // length from segment start to the end of edge
-                                            const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
-
-                                            // length from start of segment to either start of edge or end of edge (depending on which is closer)
-                                            double sqr_dist_to_closest = sqr_dist_to_edge_start;
-                                            const vec2* ipoint_ptr = &edge_start_coords;
-
-                                            if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
-                                                sqr_dist_to_closest = sqr_dist_to_edge_end;
-                                                ipoint_ptr = &edge_end_coords;
-                                            }
-
-                                            // ratio along segment
-                                            segment_tval = std::sqrt(sqr_dist_to_closest) / shift_len;
-
-                                            if (segment_min_tval > segment_tval) {
-                                                segment_min_tval = segment_tval;
-                                                intersection_point_on_edge = *ipoint_ptr; // closest point
-                                            }
+                                            intersection_point_on_edge = *ipoint_ptr; // closest point
                                         }
                                     }
-
-                                    MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
                                 }
 
-                                // Shortened perturbation vector: shortening from the vector that is as long as the
-                                // max length between any two vertices in "cc_face_iter", to a vector that runs
-                                // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
-                                // "perturbation_vector" and passing through the interior of "cc_face_iter")
-                                const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
-                                const double revised_perturbation_len = length(revised_perturbation_vector);
+                                MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
+                            }
 
-                                const double scale = (errbound * revised_perturbation_len);
-                                // The translation by which we perturb "perturbed_dvertex_coords"
-                                //
-                                // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
-                                // "displacement" is by-default pointing in the positive/CCW direction, which is torward
-                                // the interior of the polygon represented by "cc_face_iter".
-                                // Thus, the cases with "orient2d_sgn == sign_t::ON_POSITIVE_SIDE" and
-                                // "orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY", result in the same displacement vector
-                                const vec2 displacement = (perturbation_dir * scale);
+                            // Shortened perturbation vector: shortening from the vector that is as long as the
+                            // max length between any two vertices in "cc_face_iter", to a vector that runs
+                            // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
+                            // "perturbation_vector" and passing through the interior of "cc_face_iter")
+                            const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
+                            const double revised_perturbation_len = length(revised_perturbation_vector);
 
-                                // perturb
-                                perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
+                            const double scale = (errbound * revised_perturbation_len);
+                            // The translation by which we perturb "perturbed_dvertex_coords"
+                            //
+                            // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
+                            // "displacement" is by-default pointing in the positive/CCW direction, which is torward
+                            // the interior of the polygon represented by "cc_face_iter".
+                            // Thus, the cases with "orient2d_sgn == sign_t::ON_POSITIVE_SIDE" and
+                            // "orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY", result in the same displacement vector
+                            const vec2 displacement = (perturbation_dir * scale);
+
+                            // perturb
+                            perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
 
                             //} // for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
                         } // for (std::vector<std::size_t>::const_iterator duplicate_vpair_iter = duplicates_info_pre.duplicates.cbegin(); ...
@@ -2241,14 +2236,13 @@ void get_connected_component_data_impl(
                         std::vector<vertex_descriptor_t> remapped_triangle(triangle_vertex_count, hmesh_t::null_vertex());
 
                         // for each vertex of triangle
-                        for (uint32_t i = 0; i < triangle_vertex_count; i++)
-                        {
+                        for (uint32_t i = 0; i < triangle_vertex_count; i++) {
                             // index of current vertex in CDT/"cc_face_iter"
                             const uint32_t cdt_vertex_id = SAFE_ACCESS(triangle.vertices, i);
                             const uint32_t cc_face_vertex_id = SAFE_ACCESS(face_to_cdt_vmap, cdt_vertex_id);
-                            
+
                             // mark vertex as used (for sanity check)
-                            SAFE_ACCESS(cc_face_vtx_to_is_used_flag, cc_face_vertex_id) = true; 
+                            SAFE_ACCESS(cc_face_vtx_to_is_used_flag, cc_face_vertex_id) = true;
 
                             // remap triangle vertex index
                             SAFE_ACCESS(remapped_triangle, i) = SAFE_ACCESS(cdt_to_wot_vmap, cc_face_vertex_id);
@@ -2298,11 +2292,11 @@ void get_connected_component_data_impl(
 
                         // for each CDT vertex
                         for (std::uint32_t i(0); i < triangle_vertex_count; ++i) {
-                            
+
                             const uint32_t next = triangle.vertices[cdt::ccw(i)];
                             const uint32_t prev = triangle.vertices[cdt::cw(i)];
                             const cdt::edge_t query_edge(next, prev);
-                            
+
                             if (cdt.fixedEdges.count(query_edge)) {
                                 continue; // current edge is fixed edge so there is no neighbour
                             }
@@ -2337,12 +2331,11 @@ void get_connected_component_data_impl(
 
                     const uint32_t cc_face_triangulation_index_count = (uint32_t)cc_face_triangulation.size();
                     cc_uptr->cdt_index_cache.reserve(
-                        cc_uptr->cdt_index_cache.size() + cc_face_triangulation_index_count
-                    );
+                        cc_uptr->cdt_index_cache.size() + cc_face_triangulation_index_count);
 
                     for (uint32_t i = 0; i < cc_face_triangulation_index_count; ++i) {
                         const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx]; 
+                        const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
 
                         cc_uptr->cdt_index_cache.push_back(global_idx);
                     }
