@@ -1531,7 +1531,7 @@ void get_connected_component_data_impl(
             const hmesh_t& cc = cc_uptr->kernel_hmesh_data.mesh;
 
             uint32_t face_indices_offset = 0;
-            cc_uptr->constrained_delaunay_triangulation_indices.reserve(cc.number_of_faces());
+            cc_uptr->cdt_index_cache.reserve(cc.number_of_faces());
 
             // -----
             std::vector<vec3> cc_face_vcoords3d;
@@ -1570,9 +1570,7 @@ void get_connected_component_data_impl(
                     for (uint32_t i = 0; i < cc_face_vcount; ++i) {
                         const uint32_t vertex_id_in_cc = (uint32_t)SAFE_ACCESS(cc_face_vertices, i);
 
-                    for (uint32_t v = 0; v < face_vertex_count; ++v) {
-                        const uint32_t face_vertex_idx = (uint32_t)vertices_around_face[v]; // cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + v];
-                        cc_uptr->cdt_index_cache.push_back(face_vertex_idx);
+                        cc_uptr->cdt_index_cache.push_back(vertex_id_in_cc);
                     }
 
                 } else {
@@ -2317,9 +2315,8 @@ void get_connected_component_data_impl(
                         }
                     } // while (!seeds.empty()) {
 
-                    for (uint32_t i = 0; i < face_triangulation_indices_count; ++i) {
-                        const uint32_t local_idx = face_triangulation_indices[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];//cc_uptr->indexArrayMesh.pFaceIndices[(std::size_t)face_indices_offset + local_idx];
+                    // every triangle in the finalized CDT must be walked!
+                    MCUT_ASSERT(traversed.size() == cdt.triangles.size()); // this might be violated if CDT produced duplicate triangles
 
                     //
                     // Final sanity check
@@ -2334,18 +2331,22 @@ void get_connected_component_data_impl(
                         }
                     }
 
-                    cc_uptr->cdt_index_cache.insert(
-                        cc_uptr->cdt_index_cache.end(),
-                        face_triangulation_indices.begin(),
-                        face_triangulation_indices.end());
+                    //
+                    // Change local triangle indices to global index values (in CC) and save
+                    //
 
                     const uint32_t cc_face_triangulation_index_count = (uint32_t)cc_face_triangulation.size();
-                    cc_uptr->constrained_delaunay_triangulation_indices.reserve(
-                        cc_uptr->constrained_delaunay_triangulation_indices.size() + cc_face_triangulation_index_count
+                    cc_uptr->cdt_index_cache.reserve(
+                        cc_uptr->cdt_index_cache.size() + cc_face_triangulation_index_count
                     );
 
-                face_indices_offset += face_vertex_count;
-            }
+                    for (uint32_t i = 0; i < cc_face_triangulation_index_count; ++i) {
+                        const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
+                        const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx]; 
+
+                        cc_uptr->cdt_index_cache.push_back(global_idx);
+                    }
+                } //  if (cc_face_vcount == 3)
 
                 face_indices_offset += cc_face_vcount;
             }
@@ -2354,7 +2355,7 @@ void get_connected_component_data_impl(
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
-        const uint32_t num_triangulation_indices= (uint32_t)cc_uptr->constrained_delaunay_triangulation_indices.size();
+        const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->cdt_index_cache.size();
 
         if (pMem == nullptr) // client pointer is null (asking for size)
         {
