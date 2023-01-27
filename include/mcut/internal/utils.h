@@ -93,7 +93,7 @@ typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
 #define EXCEPTION_THROWN 
 #endif
 
-//#define PEDANTIC_SUBSCRIPT_ACCESS 1
+#define PEDANTIC_SUBSCRIPT_ACCESS 1
 
 #if defined(PEDANTIC_SUBSCRIPT_ACCESS)
 #define SAFE_ACCESS(var, i) var.at(i)
@@ -130,6 +130,16 @@ typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
 #define TIMESTACK_RESET()
 #endif
 
+static inline int wrap_integer(int x, const int lo, const int hi)
+{
+    const int range_size = hi - lo + 1;
+
+    if (x < lo) {
+        x += range_size * ((lo - x) / range_size + 1);
+    }
+
+    return lo + (x - lo) % range_size;
+}
 
 #if defined(PROFILING_BUILD)
     class mini_timer

@@ -582,7 +582,7 @@ public:
      */
     void eraseSuperTriangle();
     /// Erase triangles outside of constrained boundary using growing
-    void eraseOuterTriangles();
+    void erase_outer_triangles();
     /**
      * Erase triangles outside of constrained boundary and auto-detected holes
      *
@@ -1104,7 +1104,7 @@ void triangulator_t<T, TNearPointLocator>::eraseSuperTriangle()
 }
 
 template <typename T, typename TNearPointLocator>
-void triangulator_t<T, TNearPointLocator>::eraseOuterTriangles()
+void triangulator_t<T, TNearPointLocator>::erase_outer_triangles()
 {
     // make dummy triangles adjacent to super-triangle's vertices
     const std::stack<std::uint32_t> seed(std::deque<std::uint32_t>(1, vertTris[0].front()));

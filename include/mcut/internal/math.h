@@ -112,9 +112,19 @@ public:
         return vec2_(m_x - other.m_x, m_y - other.m_y);
     }
 
+    const vec2_ operator+(const vec2_& other) const
+    {
+        return vec2_(m_x + other.m_x, m_y + other.m_y);
+    }
+
     const vec2_ operator/(const T& number) const
     {
         return vec2_(m_x / number, m_y / number);
+    }
+
+    const vec2_ operator*(const T& number) const
+    {
+        return vec2_(m_x * number, m_y * number);
     }
 
     const T& x() const
@@ -546,8 +556,11 @@ char compute_point_in_polygon_test(const vec3& p, const std::vector<vec3>& polyg
     const vec3& polygon_normal, const int polygon_normal_largest_component);
 
 // project a 3d polygon to 3d by eliminating the largest component of its normal
-void project2D(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
+void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
     const vec3& polygon_normal, const int polygon_normal_largest_component);
+
+void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
+    const vec3& polygon_normal);
 
 bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
     const vec3& pd);
@@ -639,6 +652,7 @@ struct bounding_box_t {
             return 2;
     }
 };
+
 
 template <typename T>
 inline bool intersect_bounding_boxes(const bounding_box_t<vec3_<T>>& a, const bounding_box_t<vec3_<T>>& b)

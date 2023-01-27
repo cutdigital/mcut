@@ -1,4 +1,4 @@
-# Overview
+# MCUT Overview
 
 Gist: _A simple and fast C++ library for mesh booleans and more..._ 
 
@@ -11,11 +11,13 @@ The project is called "MCUT" (short for 'mesh cutting'), and it provides functio
 
 <p align="center">
   <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/github-teaser.png?raw=true">
-  Figure 1: Generate, slice and perform Booleans without errors. Competitive with the best solids and polygon Boolean tools on the market.
+  Figure 1: Generate, slice and perform Booleans without errors.
 </p>
 
 
 The codebase provides a comprehensive tool for ensuring that computer-aided planning tasks for e.g. mine-design, rock strata boring (e.g. underground-tunnel excavations), oil-well drilling and general 3D modelling for animation are achievable with robustness. The tool is developed to take advantage of modern high-performance parallel computing hardware for you, and is demonstrably robust by using precise geometric algorithms that are implemented in C++ and accessed through an intuitive API that resembles the all-familiar C programming language.
+
+Importantly, MCUT is designed with the philosophy that users don't know or don't care about esoteric problems with floating point arithmetic.
 
 # Capabilities
 
@@ -27,8 +29,12 @@ MCUT is a tool for partitioning meshes that represent solids or open surfaces: I
 * **Concatenation**: merging a solids or open-surfaces with another.
 * **Sectioning**: elimination of material/volume on one side of a specified surface (e.g. a plane) 
 * **Splitting**: partitioning one mesh using another that might be open or solid. 
+* **Cross-platform**: tested on Windows, Linux (Ubuntu), and macOS
+* **Bloat-free**: no external dependencies.
+* **Performant**: continuously profiled, and optimized.
+* **Numerically robust**: Algorithms rely on robust geometric predicates.
 
-What is being offered is a general solution to the problem of resolving solid- and surface-mesh intersections. It is a solution that is sought by many companies, researchers, and private individuals for its ability to address extremely difficult problems relating to computational geometry in 3D. A classic application is constructive solid geometry (CSG) i.e. the “boolean operation”, which is shown below, where the resulting meshes/objects are produced with MCUT:
+What is being offered is a general solution to the problem of resolving solid- and/or open-mesh intersections. It is a solution that is sought by many companies, researchers, and private individuals for its ability to address extremely difficult problems relating to computational geometry in 3D. A classic application is constructive solid geometry (CSG) i.e. the “boolean operation”, which is shown below, where the resulting meshes/objects are produced with MCUT:
 
 <p align="center">
   <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/teaser2.png?raw=true">
@@ -37,7 +43,7 @@ What is being offered is a general solution to the problem of resolving solid- a
 
 # Practical benefits and advantages for users
 
-The expert capabilities of MCUT will allow companies, individuals and researchers-alike to develop robust (and fast) Computer-Aided Design (CAD) and Manufacturing (CAM) tools. For example, these tools could cater to the design of industry-specific structural models like tunnels, drill holes, mechanical instruments and rock-block models. All this alongside the ability to handle general 3D modelling tasks that are typical in industries and academic-fields related to computer graphics (e.g. game-engine level design) and mechanical engineering (e.g. fracture simulation). In essence, users of MCUT are provided with the capability to create robust derivative products for generating (and testing) structural designs in a virtual setting for short- and long-term production operations and feasibility tests/studies.
+The expert capabilities of MCUT will allow companies, individuals and researchers-alike to develop robust (and fast) Computer-Aided Design (CAD) and Manufacturing (CAM) tools. For example, these tools could cater to the design of industry-specific structural models like tunnels, drill holes, mechanical instruments and rock-block models. All this alongside the ability to handle general 3D modelling tasks that are typical in industry and academic-fields related to computer graphics (e.g. game-engine level design) and mechanical engineering (e.g. fracture simulation). In essence, users of MCUT are provided with the capability to create robust derivative products and tools for generating (and testing) structural designs in a virtual setting for short- and long-term production operations and feasibility tests/studies.
 
 The following images show more examples of what users can achieve with MCUT:
 
@@ -83,7 +89,7 @@ The following images show more examples of what users can achieve with MCUT:
 
 # Source code and test applications
 
-The source code is available for your perusal and evaluation. You can access right here on Github. This is an opportunity for you to trial and experiment with MCUT for you needs. Here is a quick example of how you clone and build the library:
+The source code is available for your perusal and evaluation. You can access right here on Github. This is an opportunity for you to trial and experiment with MCUT for your needs. Here is a quick example of how you clone and build the library:
 
 * `git clone https://github.com/cutdigital/mcut.git` 
 * `mkdir build`
@@ -95,6 +101,12 @@ Next, try out one of the tutorials!
 
 # Licensing
 
-MCUT is available under an Open Source license as well as a commercial license. Users choosing to use MCUT under the free-of-charge Open Source license (e.g. for academic purposes) simply need to comply to its terms, otherwise a commercial license is required. The Open Source license is the "GNU General Public License" (GPL). In cases where the constraints of the Open source license prevent you from using MCUT, a commercial license can be purchased. The library is licensed with an attractively low price which is a one-off sum, requiring no further loyalty fees with guarranteed future updates for free.   
+MCUT is available under an Open Source license as well as a commercial license. Users choosing to use MCUT under the free-of-charge Open Source license (e.g. for academic purposes) simply need to comply to its terms, otherwise a commercial license is required. The Open Source license is the "GNU General Public License" (GPL). In cases where the constraints of the Open source license prevent you from using MCUT, a commercial license can be purchased. The library is licensed with an attractively low price which is a one-off sum, requiring no further loyalty fees with guarranteed future updates for free. 
 
-_For more information about this library, you can refer to the project page [here](https://cutdigital.github.io/mcut.site/) or [email](floyd.m.chitalu@gmail.com) the author_.
+These options protect the project's commercial value and thus make it possible for the author to guarantee long term support, maintenance and further development of the code for the benefit of the project and its users.
+
+---
+
+If MCUT helped you please consider adding a star here on GitHub. This means a lot to the author.
+
+_You can also send an [email](floyd.m.chitalu@gmail.com) to the author if you have questions about MCUT_.
