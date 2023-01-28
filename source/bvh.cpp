@@ -952,7 +952,7 @@ void intersectOIBVHs(
                 std::vector<std::future<OutputStorageType>> futures;
                 OutputStorageType partial_res;
 
-                parallel_fork_and_join(
+                parallel_for(
                     scheduler,
                     todo.cbegin(),
                     todo.cend(),

@@ -1284,11 +1284,10 @@ void get_connected_component_data_impl(
                 std::vector<std::future<uint32_t>> futures;
                 uint32_t partial_res;
 
-                parallel_fork_and_join(
+                parallel_for(
                     context_uptr->scheduler,
                     cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
                     cc_uptr->kernel_hmesh_data.mesh.faces_end(),
-                    0,
                     fn_count_indices,
                     partial_res, // output computed by master thread
                     futures);
@@ -1550,11 +1549,10 @@ void get_connected_component_data_impl(
                 std::vector<std::future<uint32_t>> futures;
                 uint32_t partial_res;
 
-                parallel_fork_and_join(
+                parallel_for(
                     context_uptr->scheduler,
                     cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
                     cc_uptr->kernel_hmesh_data.mesh.faces_end(),
-                    0,
                     fn_count_faces_around_face,
                     partial_res, // output computed by master thread
                     futures);

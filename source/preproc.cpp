@@ -96,9 +96,13 @@ bool client_input_arrays_to_hmesh(
     const bool assume_triangle_mesh = (pFaceSizes == nullptr);
 
 #if defined(MCUT_MULTI_THREADED)
+    #if 0
     std::vector<uint32_t> partial_sums(numFaces, 0); // prefix sum result
     std::partial_sum(pFaceSizes, pFaceSizes + numFaces, partial_sums.data());
-
+#else
+    std::vector<uint32_t> partial_sums(pFaceSizes, pFaceSizes + numFaces);
+    parallel_partial_sum(context_uptr->scheduler, partial_sums.begin(), partial_sums.end());
+#endif
     {
         typedef std::vector<uint32_t>::const_iterator InputStorageIteratorType;
         typedef std::pair<InputStorageIteratorType, InputStorageIteratorType> OutputStorageType; // range of faces
@@ -166,11 +170,10 @@ bool client_input_arrays_to_hmesh(
         std::vector<std::future<OutputStorageType>> futures;
         OutputStorageType partial_res;
 
-        parallel_fork_and_join(
+        parallel_for(
             context_uptr->scheduler,
             partial_sums.cbegin(),
             partial_sums.cend(),
-            (1 << 8),
             fn_create_faces,
             partial_res, // output computed by master thread
             futures);
@@ -370,7 +373,7 @@ void hmesh_to_array_mesh(
         std::vector<std::future<int>> futures;
         int _1;
 
-        parallel_fork_and_join(
+        parallel_for(
             context_uptr->scheduler,
             halfedgeMeshInfo.mesh.vertices_begin(),
             halfedgeMeshInfo.mesh.vertices_end(),
@@ -575,7 +578,7 @@ void hmesh_to_array_mesh(
         fff += 1;
         // std::advance(fff, (std::size_t)1);
 
-        parallel_fork_and_join(
+        parallel_for(
             context_uptr->scheduler,
             halfedgeMeshInfo.mesh.faces_begin(),
             halfedgeMeshInfo.mesh.faces_end(),
@@ -703,7 +706,7 @@ void hmesh_to_array_mesh(
         std::vector<std::future<int>> futures;
         int _1;
 
-        parallel_fork_and_join(
+        parallel_for(
             context_uptr->scheduler,
             halfedgeMeshInfo.mesh.faces_begin(),
             halfedgeMeshInfo.mesh.faces_end(),
@@ -795,7 +798,7 @@ void hmesh_to_array_mesh(
         std::vector<std::future<int>> futures;
         int _1;
 
-        parallel_fork_and_join(
+        parallel_for(
             context_uptr->scheduler,
             halfedgeMeshInfo.mesh.edges_begin(),
             halfedgeMeshInfo.mesh.edges_end(),

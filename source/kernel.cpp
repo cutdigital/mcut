@@ -415,11 +415,10 @@ hmesh_t extract_connected_components(
         std::vector<std::future<OutputStorageTypesTuple>> futures;
         OutputStorageTypesTuple partial_res;
 
-        parallel_fork_and_join(
+        parallel_for(
             scheduler,
             mX_traced_polygons.cbegin(),
             mX_traced_polygons.cend(),
-            (1 << 8),
             fn_compute_inserted_faces,
             partial_res, // output computed by master thread
             futures);
@@ -740,11 +739,10 @@ hmesh_t extract_connected_components(
         std::vector<std::future<OutputStorageTypesTuple>> futures;
         OutputStorageTypesTuple partial_res;
 
-        parallel_fork_and_join(
+        parallel_for(
             scheduler,
             mesh.faces_begin(),
             mesh.faces_end(),
-            (1 << 8),
             fn_compute_remapped_cc_faces,
             partial_res, // output computed by master thread
             futures);
@@ -1652,11 +1650,10 @@ void dispatch(output_t& output, const input_t& input)
             return ps_edge_face_intersection_pairs_local;
         };
 
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             input.ps_face_to_potentially_intersecting_others->cbegin(),
             input.ps_face_to_potentially_intersecting_others->cend(),
-            (1 << 6),
             fn_compute_ps_edge_to_faces_map,
             ps_edge_face_intersection_pairs, // out
             futures);
@@ -1848,11 +1845,10 @@ void dispatch(output_t& output, const input_t& input)
 
         std::vector<std::future<OutputStorageType>> futures;
 
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             ps_edge_face_intersection_pairs.cbegin(),
             ps_edge_face_intersection_pairs.cend(),
-            (1 << 8),
             fn_compute_ps_edge_bbox,
             ps_edge_to_bbox, // out
             futures);
@@ -1936,11 +1932,10 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<std::future<int>> futures;
         int _1;
 
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             ps_edge_face_intersection_pairs.begin(),
             ps_edge_face_intersection_pairs.end(),
-            (1 << 8),
             fn_compute_edgefair_pair_culling,
             _1, // out
             futures);
@@ -2054,11 +2049,10 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<std::future<OutputStorageTypesTuple>> futures;
         OutputStorageTypesTuple partial_res;
 
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             input.ps_face_to_potentially_intersecting_others->cbegin(),
             input.ps_face_to_potentially_intersecting_others->cend(),
-            (1 << 7),
             fn_compute_intersecting_face_properties,
             partial_res, // out
             futures);
@@ -2427,11 +2421,10 @@ void dispatch(output_t& output, const input_t& input)
 
         std::vector<std::future<OutputStorageTypesTuple>> futures;
         OutputStorageTypesTuple partial_res;
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             ps_edge_face_intersection_pairs.cbegin(),
             ps_edge_face_intersection_pairs.cend(),
-            (1 << 6),
             fn_compute_intersection_points,
             partial_res, // output computed by master thread
             futures);
@@ -4422,11 +4415,10 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<std::future<OutputStorageTypesTuple>> futures;
         OutputStorageTypesTuple partial_res;
 
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             ps.edges_begin(),
             ps.edges_end(),
-            /*ps.number_of_edges() / (*input.scheduler).get_num_threads()*/ (1 << 10),
             fn_compute_polygon_boundary_edges,
             partial_res, // output computed by master thread
             futures);
@@ -5205,11 +5197,10 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<std::future<OutputStorageTypesTuple>> futures;
         OutputStorageTypesTuple partial_res;
 
-        parallel_fork_and_join(
+        parallel_for(
             *input.scheduler,
             ps.faces_begin(),
             ps.faces_end(),
-            (1 << 7),
             fn_trace_polygons,
             partial_res, // output computed by master thread
             futures);

@@ -267,8 +267,8 @@ public:
         : // thread_pool_terminate(false),
 
         joiner(threads)
-        , round_robin_scheduling_counter(0),
-        machine_thread_count(0)
+        , round_robin_scheduling_counter(0)
+        , machine_thread_count(0)
     {
         machine_thread_count = (uint32_t)std::thread::hardware_concurrency();
         uint32_t const pool_thread_count = std::max(1u, machine_thread_count - 1);
@@ -356,7 +356,7 @@ public:
     }
 };
 
-#if 1
+#if 0
 static void get_scheduling_params(uint32_t& block_size,
     uint32_t& num_blocks, const uint32_t block_size_default, const uint32_t length_, const uint32_t num_threads)
 {
@@ -405,28 +405,40 @@ static void get_scheduling_parameters(
     // the size of each block of elements assigned to a thread (note: last thread,
     // which is the master thread might have less)
     block_size = length / num_threads;
+
+    if (num_threads == 0 || num_threads > available_threads) {
+        throw std::runtime_error("invalid number of threads (" + std::to_string(num_threads) + ")");
+    }
+
+    if (max_threads == 0) {
+        throw std::runtime_error("invalid maximum posible number of threads (" + std::to_string(max_threads) + ")");
+    }
+
+    if (block_size == 0) {
+        throw std::runtime_error("invalid work block-size per thread (" + std::to_string(block_size) + ")");
+    }
 }
 
-class barrier_t
-{
+class barrier_t {
     unsigned const count;
     std::atomic<unsigned> spaces;
     std::atomic<unsigned> generation;
+
 public:
-    explicit barrier_t(unsigned count_):
-        count(count_),spaces(count),generation(0)
-    {}
+    explicit barrier_t(unsigned count_)
+        : count(count_)
+        , spaces(count)
+        , generation(0)
+    {
+    }
     void wait()
     {
-        unsigned const my_generation=generation;
-        if(!--spaces)
-        {
-            spaces=count;
+        unsigned const my_generation = generation;
+        if (!--spaces) {
+            spaces = count;
             ++generation;
-        }
-        else
-        {
-            while(generation==my_generation)
+        } else {
+            while (generation == my_generation)
                 std::this_thread::yield();
         }
     }
@@ -435,14 +447,12 @@ public:
 #include <iostream>
 
 template <typename InputStorageIteratorType, typename OutputStorageType, typename FunctionType>
-void parallel_fork_and_join(
+void parallel_for(
     thread_pool& pool,
     // start of data elements to be processed in parallel
     const InputStorageIteratorType& first,
     // end of of data elements to be processed in parallel (e.g. std::map::end())
     const InputStorageIteratorType& last,
-    // the ideal size of the block assigned to each thread
-    typename std::size_t const block_size_default,
     // the function that is executed on a sub-block of element within the range [first, last)
     FunctionType& task_func,
     // the part of the result/output that is computed by the master thread (i.e. the one that is scheduling)
@@ -450,23 +460,38 @@ void parallel_fork_and_join(
     // sub-block in the input ranges. This other data is accessed from the std::futures
     OutputStorageType& master_thread_output,
     // Future promises of data (to be merged) that is computed by worker threads
-    std::vector<std::future<OutputStorageType>>& futures)
+    std::vector<std::future<OutputStorageType>>& futures,
+    // minimum number of element assigned to a thread (below this threshold and we
+    // run just one thread)
+    const uint32_t min_per_thread = (1 << 10))
 {
     uint32_t const length_ = std::distance(first, last);
 
     MCUT_ASSERT(length_ != 0);
-
-    uint32_t block_size;
+    uint32_t block_size = 0;
+#if 0
     uint32_t num_blocks;
 
     get_scheduling_params(block_size, num_blocks, block_size_default, length_, pool.get_num_threads());
 
     std::cout << "length=" << length_ << " block_size=" << block_size << " num_blocks=" << num_blocks << std::endl;
+#else
+    uint32_t max_threads = 0;
+    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    uint32_t num_threads = 0;
 
-    futures.resize(num_blocks - 1);
+    get_scheduling_parameters(
+        num_threads,
+        max_threads,
+        block_size,
+        length_,
+        available_threads,
+        min_per_thread);
+#endif
+    futures.resize(num_threads - 1);
     InputStorageIteratorType block_start = first;
 
-    for (uint32_t i = 0; i < (num_blocks - 1); ++i) {
+    for (uint32_t i = 0; i < (num_threads - 1); ++i) {
         InputStorageIteratorType block_end = block_start;
 
         std::advance(block_end, block_size);
@@ -499,7 +524,7 @@ void parallel_for(
     uint32_t const length_ = std::distance(first, last);
 
     MCUT_ASSERT(length_ != 0);
-    
+
     uint32_t block_size;
 
 #if 0
@@ -520,23 +545,9 @@ void parallel_for(
         max_threads,
         block_size,
         length_,
-        available_threads, 
+        available_threads,
         min_per_thread);
 
-    if(num_threads == 0 || num_threads > pool.get_num_hardware_threads())
-    {
-        throw std::runtime_error("invalid number of threads (" + std::to_string(num_threads) + ")" );
-    }
-
-    if(max_threads == 0)
-    {
-        throw std::runtime_error("invalid maximum posible number of threads (" + std::to_string(max_threads) + ")" );
-    }
-
-    if(block_size == 0)
-    {
-        throw std::runtime_error("invalid work block-size per thread (" + std::to_string(block_size) + ")" );
-    }
 #endif
 
     std::vector<std::future<void>> futures;
@@ -583,8 +594,6 @@ void partial_sum(Iterator first, Iterator last, Iterator d_first)
         ++d_first;
     }
 }
-
-
 
 template <typename Iterator>
 void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
@@ -639,21 +648,6 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
         length,
         available_threads);
 
-    if(num_threads == 0 || num_threads > pool.get_num_hardware_threads())
-    {
-        throw std::runtime_error("invalid number of threads (" + std::to_string(num_threads) + ")" );
-    }
-
-    if(max_threads == 0)
-    {
-        throw std::runtime_error("invalid maximum posible number of threads (" + std::to_string(max_threads) + ")" );
-    }
-
-    if(block_size == 0)
-    {
-        throw std::runtime_error("invalid work block-size per thread (" + std::to_string(block_size) + ")" );
-    }
-
     typedef typename Iterator::value_type value_type;
 
     // promises holding the value of the last element of a block. Only the
@@ -693,6 +687,160 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
     process_chunk()(block_start, final_element,
         (num_threads > 1) ? &previous_end_values.back() : 0,
         0);
+}
+
+template <typename Iterator, typename MatchType>
+Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchType match)
+{
+    struct find_element {
+        void operator()(Iterator begin, Iterator end,
+            MatchType match,
+            std::promise<Iterator>* result,
+            std::atomic<bool>* done_flag)
+        {
+            try {
+                for (; (begin != end) && !done_flag->load(); ++begin) {
+                    if (*begin == match) {
+                        result->set_value(begin);
+                        done_flag->store(true);
+                        return;
+                    }
+                }
+            } catch (...) {
+                try {
+                    result->set_exception(std::current_exception());
+                    done_flag->store(true);
+                } catch (...) {
+                }
+            }
+        }
+    };
+
+    unsigned long const length = std::distance(first, last);
+
+    if (!length)
+        return last;
+#if 0
+    unsigned long const min_per_thread=25;
+    unsigned long const max_threads=
+        (length+min_per_thread-1)/min_per_thread;
+
+    unsigned long const hardware_threads=
+        std::thread::hardware_concurrency();
+
+    unsigned long const num_threads=
+        std::min(hardware_threads!=0?hardware_threads:2,max_threads);
+
+    unsigned long const block_size=length/num_threads;
+#else
+    uint32_t max_threads = 0;
+    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    uint32_t num_threads = 0;
+    uint32_t block_size = 0;
+
+    get_scheduling_parameters(
+        num_threads,
+        max_threads,
+        block_size,
+        length,
+        available_threads);
+#endif
+    std::promise<Iterator> result;
+    std::atomic<bool> done_flag(false);
+    
+    {
+        Iterator block_start = first;
+        for (unsigned long i = 0; i < (num_threads - 1); ++i) {
+            Iterator block_end = block_start;
+            std::advance(block_end, block_size);
+
+            // find_element()" handles all synchronisation
+            pool.submit_and_forget(
+                [&result, &done_flag, block_start, block_end, &match]() {
+                    find_element(),
+                        block_start, block_end, match,
+                        &result, &done_flag;
+                });
+            block_start = block_end;
+        }
+        find_element()(block_start, last, match, &result, &done_flag);
+    }
+    if (!done_flag.load()) {
+        return last; // if nothing found (by any thread), return "end"
+    }
+    return result.get_future().get();
+}
+
+
+template <typename Iterator, class UnaryPredicate>
+Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, UnaryPredicate predicate)
+{
+    struct find_element {
+        void operator()(Iterator begin, Iterator end,
+            UnaryPredicate pred,
+            std::promise<Iterator>* result,
+            std::atomic<bool>* done_flag)
+        {
+            try {
+                for (; (begin != end) && !done_flag->load(); ++begin) {
+                    const bool found = pred(*begin);
+                    if (found) {
+                        result->set_value(begin);
+                        done_flag->store(true);
+                        return;
+                    }
+                }
+            } catch (...) {
+                try {
+                    result->set_exception(std::current_exception());
+                    done_flag->store(true);
+                } catch (...) {
+                }
+            }
+        }
+    };
+
+    unsigned long const length = std::distance(first, last);
+
+    if (!length)
+        return last;
+
+    uint32_t max_threads = 0;
+    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    uint32_t num_threads = 0;
+    uint32_t block_size = 0;
+
+    get_scheduling_parameters(
+        num_threads,
+        max_threads,
+        block_size,
+        length,
+        available_threads);
+
+    std::promise<Iterator> result;
+    std::atomic<bool> done_flag(false);
+    
+    {
+        Iterator block_start = first;
+        for (unsigned long i = 0; i < (num_threads - 1); ++i) {
+            Iterator block_end = block_start;
+            std::advance(block_end, block_size);
+
+            // "done_flag" and scope handle all synchronisation
+            pool.submit_and_forget(
+                [&result, &done_flag, block_start, block_end, &predicate]() {
+                    find_element(),
+                        block_start, block_end, predicate,
+                        &result, &done_flag;
+                });
+            block_start = block_end;
+        }
+        find_element()(block_start, last, predicate, &result, &done_flag);
+    }
+    if (!done_flag.load()) {
+        return last; // if nothing found (by any thread), return "end"
+    }
+    return result.get_future().get();
 }
 
 #endif // MCUT_SCHEDULER_H_
