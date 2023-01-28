@@ -407,6 +407,31 @@ static void get_scheduling_parameters(
     block_size = length / num_threads;
 }
 
+class barrier_t
+{
+    unsigned const count;
+    std::atomic<unsigned> spaces;
+    std::atomic<unsigned> generation;
+public:
+    explicit barrier_t(unsigned count_):
+        count(count_),spaces(count),generation(0)
+    {}
+    void wait()
+    {
+        unsigned const my_generation=generation;
+        if(!--spaces)
+        {
+            spaces=count;
+            ++generation;
+        }
+        else
+        {
+            while(generation==my_generation)
+                std::this_thread::yield();
+        }
+    }
+};
+
 #include <iostream>
 
 template <typename InputStorageIteratorType, typename OutputStorageType, typename FunctionType>

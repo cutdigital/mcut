@@ -1123,7 +1123,6 @@ void get_connected_component_data_impl(
             {
 
                 auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
-                    
                     // thread starting offset (in vertex count) in the "array of vertices"
                     const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
 
@@ -1131,7 +1130,7 @@ void get_connected_component_data_impl(
 
                     for (vertex_array_iterator_t vertex_iter = block_start_; vertex_iter != block_end_; ++vertex_iter) {
 
-                        if (((elem_offset+1) / 3) == num_vertices_to_copy) {
+                        if (((elem_offset + 1) / 3) == num_vertices_to_copy) {
                             break; // reach what the user asked for
                         }
 
@@ -2276,6 +2275,105 @@ void get_connected_component_data_impl(
             // internal halfedge data structure from the current connected component
             const hmesh_t& cc = cc_uptr->kernel_hmesh_data.mesh;
 
+#if defined(MCUT_MULTI_THREADED)
+            {
+                // CDT indices computed per thread
+                thread_local std::vector<uint32_t> cdt_index_cache_local;
+                // the offset from which each thread will write its CDT indices
+                // into "cc_uptr->cdt_index_cache"
+                std::atomic_uint32_t atomic_write_offset;
+                atomic_write_offset.store(0);
+
+                // The following scheduling parameters are needed because we need
+                // to know how many threads will be schedule to perform triangulation.
+                // (for the barrier primitive).
+                // The _exact_ same information must be computed inside "parallel_for",
+                // which is why "min_per_thread" needs to be explicitly passed to
+                // "parallel_for" after setting it here.
+                uint32_t num_threads = 0;
+                {
+                    uint32_t max_threads = 0;
+                    const uint32_t available_threads = context_uptr->scheduler.get_num_threads() + 1; // workers and master (+1)
+                    uint32_t block_size_unused = 0;
+                    uint32_t length_unused = 0;
+                    uint32_t min_per_thread = 1 << 10;
+                    get_scheduling_parameters(
+                        num_threads,
+                        max_threads,
+                        block_size_unused,
+                        length_unused,
+                        available_threads,
+                        min_per_thread);
+                }
+
+                // wait on every thread to triangulate is local range of faces
+                // to the atomically compute the per-thread writing offsets 
+                // into "cc_uptr->cdt_index_cache" 
+                barrier_t triangulation_barrier(num_threads); 
+                
+                // TODO: add comment
+                std::atomic_bool cdt_index_cache_mem_allocated; 
+                cdt_index_cache_mem_allocated.store(false);
+
+                auto fn_triangulate_faces = [&context_uptr, &cc, &cc_uptr, &triangulation_barrier, &atomic_write_offset](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+                    // thread starting offset (in face count) in the "array of faces"
+                    const uint32_t base_offset = (uint32_t)std::distance(cc.faces_begin(), block_start_);
+
+                    uint32_t elem_offset = base_offset;
+
+                    std::vector<vertex_descriptor_t> cc_face_vertices;
+
+                    for (face_array_iterator_t cc_face_iter = block_start_; cc_face_iter != block_end_; ++cc_face_iter) {
+
+                        cc.get_vertices_around_face(cc_face_vertices, *cc_face_iter);
+
+                        // number of vertices of triangulated face
+                        const uint32_t cc_face_vcount = (uint32_t)cc_face_vertices.size();
+
+                        MCUT_ASSERT(cc_face_vcount >= 3);
+
+                        const bool cc_face_is_triangle = (cc_face_vcount == 3);
+
+                        if (cc_face_is_triangle) {
+
+                            for (uint32_t i = 0; i < cc_face_vcount; ++i) {
+                                const uint32_t vertex_id_in_cc = (uint32_t)SAFE_ACCESS(cc_face_vertices, i);
+                                cdt_index_cache_local.push_back(vertex_id_in_cc);
+                            }
+
+                        } else {
+
+                            std::vector<uint32_t> cc_face_triangulation;
+
+                            triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, cc, *cc_face_iter);
+
+                            cdt_index_cache_local.reserve(
+                                cc_face_triangulation.size() + cc_face_triangulation.size());
+
+                            for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
+                                const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
+                                const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
+
+                                cdt_index_cache_local.push_back(global_idx);
+                            }
+                        }
+                    }
+
+                    const uint32_t cdt_index_cache_local_len = cdt_index_cache_local.size();
+
+                    const uint32_t write_offset_local = atomic_write_offset.fetch_add(cdt_index_cache_local_len);
+
+                    triangulation_barrier.wait(); // .. for all threads to triangulate their range of faces
+                };
+
+                parallel_for(
+                    context_uptr->scheduler,
+                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
+                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    fn_triangulate_faces,
+                    min_per_thread);
+            }
+#else // #if defined(MCUT_MULTI_THREADED)
             uint32_t face_indices_offset = 0;
             cc_uptr->cdt_index_cache.reserve(cc.number_of_faces());
 
@@ -2336,6 +2434,7 @@ void get_connected_component_data_impl(
             }
 
             MCUT_ASSERT(cc_uptr->cdt_index_cache.size() >= 3);
+#endif // #if defined(MCUT_MULTI_THREADED)
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
