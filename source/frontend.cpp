@@ -1410,14 +1410,14 @@ void get_connected_component_data_impl(
             }
 #else // #if defined(MCUT_MULTI_THREADED)
 
-            std::vector<vd_t> vertices_around_face;
+            std::vector<vd_t> cc_face_vertices;
             uint32_t elem_offset = 0;
 
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
 
-                vertices_around_face.clear();
-                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *fiter);
-                const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
+                cc_face_vertices.clear();
+                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(cc_face_vertices, *fiter);
+                const uint32_t num_vertices_around_face = (uint32_t)cc_face_vertices.size();
 
                 MCUT_ASSERT(num_vertices_around_face >= 3u);
 
