@@ -96,11 +96,20 @@ bool client_input_arrays_to_hmesh(
     const bool assume_triangle_mesh = (pFaceSizes == nullptr);
 
 #if defined(MCUT_MULTI_THREADED)
-    #if 0
-    std::vector<uint32_t> partial_sums(numFaces, 0); // prefix sum result
-    std::partial_sum(pFaceSizes, pFaceSizes + numFaces, partial_sums.data());
+    // init partial sums vec
+    std::vector<uint32_t> partial_sums(numFaces,3); // assume that "pFaceSizes" is filled with 3's (which is the implication if pFaceSizes is null)
+    
+    if(pFaceSizes!=nullptr) // e.g. non-triangulated user mesh
+    {
+        for(uint32_t f=0;f<numFaces;++f)
+        {
+            SAFE_ACCESS(partial_sums, f) = pFaceSizes[f];
+        }
+    }
+
+#if 0
+    std::partial_sum(partial_sums.begin(), partial_sums.end(), partial_sums.data());
 #else
-    std::vector<uint32_t> partial_sums(pFaceSizes, pFaceSizes + numFaces);
     parallel_partial_sum(context_uptr->scheduler, partial_sums.begin(), partial_sums.end());
 #endif
     {
