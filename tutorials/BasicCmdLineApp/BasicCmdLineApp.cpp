@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
 
         printf("vertices: %d\n", (int)vertices.size() / 3);
 
-#if 0 // triangulated output
+#if 1 // triangulated output
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
         ASSERT(err == MC_NO_ERROR);
         std::vector<uint32_t> faceIndices(numBytes / sizeof(uint32_t), 0);
@@ -240,7 +240,7 @@ int main(int argc, char* argv[])
         sprintf(fnameBuf, "cc%d.obj", i);
         
         std::vector<float> f;
-        for(int i =0; i < (uint32_t)vertices.size(); ++i)
+        for(uint32_t i =0; i < (uint32_t)vertices.size(); ++i)
             f.push_back(vertices[i]);
         writeOBJ(fnameBuf,
             (float*)f.data(),

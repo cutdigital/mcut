@@ -2277,12 +2277,11 @@ void get_connected_component_data_impl(
 
 #if defined(MCUT_MULTI_THREADED)
             {
-                // CDT indices computed per thread
-                thread_local std::vector<uint32_t> cdt_index_cache_local;
+
                 // the offset from which each thread will write its CDT indices
                 // into "cc_uptr->cdt_index_cache"
-                std::atomic_uint32_t atomic_write_offset;
-                atomic_write_offset.store(0);
+                std::atomic_uint32_t cdt_index_cache_offset;
+                cdt_index_cache_offset.store(0);
 
                 // The following scheduling parameters are needed because we need
                 // to know how many threads will be schedule to perform triangulation.
@@ -2290,36 +2289,32 @@ void get_connected_component_data_impl(
                 // The _exact_ same information must be computed inside "parallel_for",
                 // which is why "min_per_thread" needs to be explicitly passed to
                 // "parallel_for" after setting it here.
+
+                // number of threads to perform task (some/all of the pool threads plus master thread)
                 uint32_t num_threads = 0;
+                const uint32_t min_per_thread = 1 << 10;
                 {
                     uint32_t max_threads = 0;
                     const uint32_t available_threads = context_uptr->scheduler.get_num_threads() + 1; // workers and master (+1)
                     uint32_t block_size_unused = 0;
-                    uint32_t length_unused = 0;
-                    uint32_t min_per_thread = 1 << 10;
+                    const uint32_t length = cc.number_of_faces();
+
                     get_scheduling_parameters(
                         num_threads,
                         max_threads,
                         block_size_unused,
-                        length_unused,
+                        length,
                         available_threads,
                         min_per_thread);
                 }
 
-                // wait on every thread to triangulate is local range of faces
-                // to the atomically compute the per-thread writing offsets 
-                // into "cc_uptr->cdt_index_cache" 
-                barrier_t triangulation_barrier(num_threads); 
-                
-                // TODO: add comment
-                std::atomic_bool cdt_index_cache_mem_allocated; 
-                cdt_index_cache_mem_allocated.store(false);
+                const std::thread::id master_thread_id = std::this_thread::get_id();
 
-                auto fn_triangulate_faces = [&context_uptr, &cc, &cc_uptr, &triangulation_barrier, &atomic_write_offset](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
-                    // thread starting offset (in face count) in the "array of faces"
-                    const uint32_t base_offset = (uint32_t)std::distance(cc.faces_begin(), block_start_);
+                barrier_t barrier(num_threads);
 
-                    uint32_t elem_offset = base_offset;
+                auto fn_triangulate_faces = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+                    // CDT indices computed per thread
+                    std::vector<uint32_t> cdt_index_cache_local;
 
                     std::vector<vertex_descriptor_t> cc_face_vertices;
 
@@ -2327,7 +2322,6 @@ void get_connected_component_data_impl(
 
                         cc.get_vertices_around_face(cc_face_vertices, *cc_face_iter);
 
-                        // number of vertices of triangulated face
                         const uint32_t cc_face_vcount = (uint32_t)cc_face_vertices.size();
 
                         MCUT_ASSERT(cc_face_vcount >= 3);
@@ -2361,9 +2355,19 @@ void get_connected_component_data_impl(
 
                     const uint32_t cdt_index_cache_local_len = cdt_index_cache_local.size();
 
-                    const uint32_t write_offset_local = atomic_write_offset.fetch_add(cdt_index_cache_local_len);
+                    const uint32_t write_offset = cdt_index_cache_offset.fetch_add(cdt_index_cache_local_len);
 
-                    triangulation_barrier.wait(); // .. for all threads to triangulate their range of faces
+                    barrier.wait(); // .. for all threads to triangulate their range of faces
+
+                    if (std::this_thread::get_id() == master_thread_id) {
+                        cc_uptr->cdt_index_cache.resize(cdt_index_cache_offset.load());
+                    }
+
+                    barrier.wait(); // .. for memory to be allocated
+
+                    for (uint32_t i = 0; i < cdt_index_cache_local_len; ++i) {
+                        SAFE_ACCESS(cc_uptr->cdt_index_cache, write_offset + i) = SAFE_ACCESS(cdt_index_cache_local, i);
+                    }
                 };
 
                 parallel_for(
