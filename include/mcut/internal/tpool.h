@@ -690,31 +690,34 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
 }
 
 template <typename Iterator, typename MatchType>
+void find_element(Iterator begin, Iterator end,
+    MatchType match,
+    std::promise<Iterator>* result,
+    std::atomic<bool>* done_flag) {
+    { try {
+        for (; (begin != end) && !done_flag->load(); ++begin) {
+            if (*begin == match) {
+                result->set_value(begin);
+done_flag->store(true);
+return;
+}
+}
+}
+catch (...)
+{
+    try {
+        result->set_exception(std::current_exception());
+        done_flag->store(true);
+    } catch (...) {
+    }
+}
+}
+}
+;
+
+template <typename Iterator, typename MatchType>
 Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchType match)
 {
-    struct find_element {
-        void operator()(Iterator begin, Iterator end,
-            MatchType match,
-            std::promise<Iterator>* result,
-            std::atomic<bool>* done_flag)
-        {
-            try {
-                for (; (begin != end) && !done_flag->load(); ++begin) {
-                    if (*begin == match) {
-                        result->set_value(begin);
-                        done_flag->store(true);
-                        return;
-                    }
-                }
-            } catch (...) {
-                try {
-                    result->set_exception(std::current_exception());
-                    done_flag->store(true);
-                } catch (...) {
-                }
-            }
-        }
-    };
 
     unsigned long const length = std::distance(first, last);
 
@@ -747,7 +750,7 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
 #endif
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
-    
+
     {
         Iterator block_start = first;
         for (unsigned long i = 0; i < (num_threads - 1); ++i) {
@@ -757,13 +760,13 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
             // find_element()" handles all synchronisation
             pool.submit_and_forget(
                 [&result, &done_flag, block_start, block_end, &match]() {
-                    find_element(),
+                    find_element<Iterator, MatchType>,
                         block_start, block_end, match,
                         &result, &done_flag;
                 });
             block_start = block_end;
         }
-        find_element()(block_start, last, match, &result, &done_flag);
+        find_element<Iterator, MatchType>(block_start, last, match, &result, &done_flag);
     }
     if (!done_flag.load()) {
         return last; // if nothing found (by any thread), return "end"
@@ -771,6 +774,97 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
     return result.get_future().get();
 }
 
+template <typename Iterator, typename KeyType>
+void find_map_element_by_key(Iterator begin, Iterator end,
+    KeyType match,
+    std::promise<Iterator>* result,
+    std::atomic<bool>* done_flag) {
+    { try {
+        for (; (begin != end) && !done_flag->load(); ++begin) {
+            if (begin->first == match) {
+                result->set_value(begin);
+done_flag->store(true);
+return;
+}
+}
+}
+catch (...)
+{
+    try {
+        result->set_exception(std::current_exception());
+        done_flag->store(true);
+    } catch (...) {
+    }
+}
+}
+}
+;
+
+template <typename Iterator, typename KeyType>
+Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator last, KeyType match)
+{
+
+    unsigned long const length = std::distance(first, last);
+
+    if (!length)
+        return last;
+#if 0
+    unsigned long const min_per_thread=25;
+    unsigned long const max_threads=
+        (length+min_per_thread-1)/min_per_thread;
+
+    unsigned long const hardware_threads=
+        std::thread::hardware_concurrency();
+
+    unsigned long const num_threads=
+        std::min(hardware_threads!=0?hardware_threads:2,max_threads);
+
+    unsigned long const block_size=length/num_threads;
+#else
+    uint32_t max_threads = 0;
+    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    uint32_t num_threads = 0;
+    uint32_t block_size = 0;
+
+    get_scheduling_parameters(
+        num_threads,
+        max_threads,
+        block_size,
+        length,
+        available_threads);
+#endif
+    std::promise<Iterator> result;
+    std::atomic<bool> done_flag(false);
+
+    {
+        std::vector<std::future<void>> futures;
+        futures.resize(num_threads - 1);
+
+        Iterator block_start = first;
+        for (unsigned long i = 0; i < (num_threads - 1); ++i) {
+            Iterator block_end = block_start;
+            std::advance(block_end, block_size);
+
+            futures[i] = pool.submit(
+                [&result, &done_flag, block_start, block_end, &match]() {
+                    find_map_element_by_key<Iterator, KeyType>(
+                        block_start, block_end, match,
+                        &result, &done_flag);
+                });
+            block_start = block_end;
+        }
+        find_map_element_by_key<Iterator, KeyType>(block_start, last, match, &result, &done_flag);
+
+        for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
+            futures[i].wait();
+        }
+    }
+    
+    if (!done_flag.load()) {
+        return last; // if nothing found (by any thread), return "end"
+    }
+    return result.get_future().get();
+}
 
 template <typename Iterator, class UnaryPredicate>
 Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, UnaryPredicate predicate)
@@ -819,7 +913,7 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
 
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
-    
+
     {
         Iterator block_start = first;
         for (unsigned long i = 0; i < (num_threads - 1); ++i) {

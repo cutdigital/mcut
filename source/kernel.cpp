@@ -6771,7 +6771,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // store's the (unsealed) connected components (fragments of the source-mesh)
     hmesh_t m1;
-
+    m1.reserve_for_additional_elements(m0.number_of_vertices() + m0.number_of_vertices()*0.25);
     // copy vertices from m0 t0 m1 (and save mapping to avoid assumptions).
     // This map DOES NOT include patch intersection points because they are new
     // i.e. we keep only the points represent original vertices in the source-mesh
@@ -6792,6 +6792,10 @@ void dispatch(output_t& output, const input_t& input)
 
     MCUT_ASSERT(m1.number_of_vertices() == m0.number_of_vertices());
 
+    TIMESTACK_POP();
+
+    TIMESTACK_PUSH("Map m0 to m1 halfedges");
+
     // copy m0 edges and halfedges [which are not intersection-halfedges] and
     // build a mapping between m0 and m1. This mapping is needed because as we
     // begin to transform halfedges incident to the cut-path, some of their opposites
@@ -6803,6 +6807,7 @@ void dispatch(output_t& output, const input_t& input)
     // along the cut-path.
 
     std::unordered_map<hd_t, hd_t> m0_to_m1_he;
+    m0_to_m1_he.reserve(m0.number_of_edges()*2);
 
     for (edge_array_iterator_t e = m0.edges_begin(); e != m0.edges_end(); ++e) {
         const ed_t& m0_edge = (*e);
@@ -7759,8 +7764,15 @@ void dispatch(output_t& output, const input_t& input)
             const int potential_seed_poly_idx = primary_interior_ihalfedge_pool_citer->first;
             // halfedge index in polygon
             const int potential_seed_poly_he_idx = primary_interior_ihalfedge_pool_citer->second;
+#if 0 //defined(MCUT_MULTI_THREADED)
+            const bool poly_patch_is_known =  parallel_find_in_map_by_key(
+                *input.scheduler, 
+                m0_cm_poly_to_patch_idx.cbegin(), 
+                m0_cm_poly_to_patch_idx.cend(), potential_seed_poly_idx) != m0_cm_poly_to_patch_idx.cend();
+#else
             // check if the polygon has already been associated with a patch
             const bool poly_patch_is_known = m0_cm_poly_to_patch_idx.find(potential_seed_poly_idx) != m0_cm_poly_to_patch_idx.cend();
+#endif
             primary_interior_ihalfedge_pool_citer = primary_interior_ihalfedge_pool.erase(primary_interior_ihalfedge_pool_citer);
 
             if (!poly_patch_is_known) {
@@ -8628,10 +8640,10 @@ void dispatch(output_t& output, const input_t& input)
                         cw_poly.push_back(SAFE_ACCESS(tmp, index));
                     }
 
-                    {
-                        for (traced_polygon_t::const_iterator cw_poly_he_iter = cw_poly.cbegin(); cw_poly_he_iter != cw_poly.cend(); ++cw_poly_he_iter) {
-                        }
-                    }
+                    //{
+                    //    for (traced_polygon_t::const_iterator cw_poly_he_iter = cw_poly.cbegin(); cw_poly_he_iter != cw_poly.cend(); ++cw_poly_he_iter) {
+                    ///    }
+                    //}
 
                     MCUT_ASSERT(m0.source(cw_poly.front()) == m0.target(cw_poly.back())); // must form loop
 
@@ -8735,6 +8747,7 @@ void dispatch(output_t& output, const input_t& input)
             // create mesh for patch
             //
             hmesh_t patch_mesh;
+            patch_mesh.reserve_for_additional_elements(m0.number_of_vertices());
 
             std::unordered_map<
                 vd_t, // vertex descriptor in "m0"
@@ -8798,14 +8811,93 @@ void dispatch(output_t& output, const input_t& input)
             //
 
             std::unordered_map<fd_t, int> patch_to_m0_face;
+            patch_to_m0_face.reserve(patch.size());
 
+#if defined(MCUT_MULTI_THREADED)
+            auto fn_remap_face_vertices = [&](std::vector<int>::const_iterator block_start_, std::vector<int>::const_iterator block_end_)
+            {
+                std::vector<std::pair<int, std::vector<vd_t>>> result;
+                result.resize(std::distance(block_start_, block_end_));
+
+                uint32_t counter = 0;
+                // for each polygon
+                for (std::vector<int>::const_iterator patch_poly_iter = block_start_; patch_poly_iter != block_end_; ++patch_poly_iter) {
+                    std::vector<vd_t>& remapped_poly_vertices = result[counter].second; // redefined face using "patch_mesh" descriptors
+                    const int& patch_poly_idx = *patch_poly_iter;
+                    result[counter].first = patch_poly_idx;
+                    const traced_polygon_t& patch_poly = SAFE_ACCESS(m0_polygons, patch_poly_idx);
+
+                    remapped_poly_vertices.reserve(patch_poly.size());
+
+                    // for each halfedge
+                    for (traced_polygon_t::const_iterator patch_poly_he_iter = patch_poly.cbegin();
+                        patch_poly_he_iter != patch_poly.cend();
+                        ++patch_poly_he_iter) {
+                        const vd_t m0_vertex = m0.target(*patch_poly_he_iter);
+                        const vd_t patch_mesh_vertex = SAFE_ACCESS(m0_to_patch_mesh_vertex, m0_vertex);
+                        remapped_poly_vertices.push_back(patch_mesh_vertex);
+                    }
+
+                    counter++;
+                }
+
+                return result;
+            };
+
+            std::vector<std::future<std::vector<std::pair<int, std::vector<vd_t>>>>> futures;
+            std::vector<std::pair<int, std::vector<vd_t>>> partial_res;
+
+            parallel_for(
+                *input.scheduler,
+                patch.cbegin(),
+                patch.cend(),
+                fn_remap_face_vertices,
+                partial_res, // output computed by master thread
+                futures);
+
+            auto add_face_and_save_mapping = [&](const std::pair<int, std::vector<vd_t>>& remapped_poly_info)
+            {
+                const std::vector<vd_t>& remapped_poly_vertices = remapped_poly_info.second;
+                const int patch_poly_idx = remapped_poly_info.first;
+                
+                const fd_t f = patch_mesh.add_face(remapped_poly_vertices);
+
+                MCUT_ASSERT(f != hmesh_t::null_face());
+
+                patch_to_m0_face.insert(std::make_pair(f, patch_poly_idx));
+            };
+
+            // to maintain face insertion order, we add according to the scheduling
+            
+            for (int i = 0; i < (int)futures.size(); ++i) {
+                std::future<std::vector<std::pair<int, std::vector<vd_t>>>>& f = futures[i];
+                MCUT_ASSERT(f.valid());
+                std::vector<std::pair<int, std::vector<vd_t>>> future_result = f.get(); // "get()" is a blocking function
+
+                // for each polygon
+                for(uint32_t j=0; j< (uint32_t)future_result.size(); ++j)
+                {
+                    const std::pair<int, std::vector<vd_t>>& remapped_poly_info = future_result[j];
+                    add_face_and_save_mapping(remapped_poly_info);
+                }
+            }
+
+            // for each polygon
+            for(uint32_t j=0; j< (uint32_t)partial_res.size(); ++j)
+            {
+                const std::pair<int, std::vector<vd_t>>& remapped_poly_info = partial_res[j];
+                add_face_and_save_mapping(remapped_poly_info);
+            }
+
+#else // #if defined(MCUT_MULTI_THREADED)
+            std::vector<vd_t> remapped_poly_vertices; // redefined face using "patch_mesh" descriptors
             // for each polygon
             for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter) {
 
                 const int& patch_poly_idx = *patch_poly_iter;
                 const traced_polygon_t& patch_poly = SAFE_ACCESS(m0_polygons, patch_poly_idx);
 
-                std::vector<vd_t> remapped_poly_vertices; // redefined face using "patch_mesh" descriptors
+                remapped_poly_vertices.clear();
                 remapped_poly_vertices.reserve(patch_poly.size());
 
                 // for each halfedge
@@ -8824,6 +8916,8 @@ void dispatch(output_t& output, const input_t& input)
                 patch_to_m0_face.insert(std::make_pair(f, patch_poly_idx));
             }
 
+#endif // #if defined(MCUT_MULTI_THREADED)
+
             if (input.verbose) {
                 dump_mesh(patch_mesh, ("patch" + std::to_string(cur_patch_idx) + "." + to_string(patch_location) + "." + cs_patch_descriptor_str).c_str());
             }
@@ -8837,6 +8931,39 @@ void dispatch(output_t& output, const input_t& input)
                 // ----------------------
 
                 omi.data_maps.vertex_map.resize(patch_mesh.number_of_vertices());
+
+#if defined(MCUT_MULTI_THREADED)
+                {
+                    auto fn_fill_vertex_map = [&](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_)
+                    {
+                        for (vertex_array_iterator_t v = block_start_; v != block_end_; ++v) {
+                            MCUT_ASSERT(patch_to_m0_vertex.count(*v) == 1);
+                            const vd_t as_m0_descr = SAFE_ACCESS(patch_to_m0_vertex, *v);
+                            vd_t as_cm_descr = hmesh_t::null_vertex();
+
+                            if ((int)as_m0_descr < (int)m0_to_ps_vtx.size() /*m0_to_ps_vtx.count(as_m0_descr) == 1*/) {
+                                vd_t as_ps_descr = SAFE_ACCESS(patch_to_m0_vertex, *v);
+
+                                MCUT_ASSERT((int)as_ps_descr < (int)ps_to_cm_vtx.size() /*ps_to_cm_vtx.count(as_ps_descr) == 1*/);
+                                as_cm_descr = SAFE_ACCESS(ps_to_cm_vtx, as_ps_descr);
+
+                                // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                                as_cm_descr = static_cast<vd_t>(as_cm_descr + sm_vtx_cnt);
+                            }
+
+                            MCUT_ASSERT(SAFE_ACCESS(omi.data_maps.vertex_map, *v) == hmesh_t::null_vertex() /*omi.data_maps.vertex_map.count(*v) == 0*/);
+                            omi.data_maps.vertex_map[*v] = as_cm_descr;
+                        }
+                    };
+
+                    parallel_for(
+                        *input.scheduler,
+                        patch_mesh.vertices_begin(),
+                        patch_mesh.vertices_end(),
+                        fn_fill_vertex_map
+                    );
+                }
+#else // #if defined(MCUT_MULTI_THREADED)
                 for (vertex_array_iterator_t v = patch_mesh.vertices_begin(); v != patch_mesh.vertices_end(); ++v) {
                     MCUT_ASSERT(patch_to_m0_vertex.count(*v) == 1);
                     const vd_t as_m0_descr = SAFE_ACCESS(patch_to_m0_vertex, *v);
@@ -8855,6 +8982,7 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(SAFE_ACCESS(omi.data_maps.vertex_map, *v) == hmesh_t::null_vertex() /*omi.data_maps.vertex_map.count(*v) == 0*/);
                     omi.data_maps.vertex_map[*v] = as_cm_descr;
                 }
+#endif // #if defined(MCUT_MULTI_THREADED)
             }
 
             if (input.populate_face_maps) {
@@ -8862,6 +8990,36 @@ void dispatch(output_t& output, const input_t& input)
                 // ----------------------
 
                 omi.data_maps.face_map.resize(patch_mesh.number_of_faces());
+#if defined(MCUT_MULTI_THREADED)
+                {
+                    auto fn_fill_face_map = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_)
+                    {
+                        for (face_array_iterator_t f = block_start_; f != block_end_; ++f) {
+                            MCUT_ASSERT(patch_to_m0_face.count(*f) == 1);
+                            const int as_m0_descr = SAFE_ACCESS(patch_to_m0_face, *f);
+
+                            MCUT_ASSERT(m0_to_ps_face.count(as_m0_descr) == 1);
+                            const fd_t as_ps_descr = SAFE_ACCESS(m0_to_ps_face, as_m0_descr);
+
+                            MCUT_ASSERT((int)as_ps_descr < (int)ps_to_cm_face.size() /*ps_to_cm_face.count(as_ps_descr) == 1*/);
+                            fd_t as_cm_descr = SAFE_ACCESS(ps_to_cm_face, as_ps_descr);
+
+                            // add an offset which allows users to deduce which birth/origin mesh (source or cut mesh) a face (map value) belongs to.
+                            as_cm_descr = static_cast<fd_t>(as_cm_descr + sm_face_count);
+
+                            MCUT_ASSERT(SAFE_ACCESS(omi.data_maps.face_map, *f) == hmesh_t::null_face() /*omi.data_maps.face_map.count(*f) == 0*/);
+                            omi.data_maps.face_map[*f] = as_cm_descr;
+                        }
+                    };
+
+                    parallel_for(
+                        *input.scheduler,
+                        patch_mesh.faces_begin(),
+                        patch_mesh.faces_end(),
+                        fn_fill_face_map
+                    );
+                }
+#else // #if defined(MCUT_MULTI_THREADED)
                 for (face_array_iterator_t f = patch_mesh.faces_begin(); f != patch_mesh.faces_end(); ++f) {
                     MCUT_ASSERT(patch_to_m0_face.count(*f) == 1);
                     const int as_m0_descr = SAFE_ACCESS(patch_to_m0_face, *f);
@@ -8878,6 +9036,7 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(SAFE_ACCESS(omi.data_maps.face_map, *f) == hmesh_t::null_face() /*omi.data_maps.face_map.count(*f) == 0*/);
                     omi.data_maps.face_map[*f] = as_cm_descr;
                 }
+#endif // #if defined(MCUT_MULTI_THREADED)
             }
 
             if (patch_location == cm_patch_location_t::INSIDE) {
@@ -9322,12 +9481,12 @@ void dispatch(output_t& output, const input_t& input)
 
                 do { // for each remaining halfedge of current polygon being stitched
 
-                    if (transformed_he_counter == 1) { // are we processing the second halfedge?
+                    //if (transformed_he_counter == 1) { // are we processing the second halfedge?
                                                        // log
                                                        // TODO: proper printing functions
 
                         //  << m1_colored.source(m1_cur_patch_cur_poly_1st_he) << " " << m1_colored.target(m1_cur_patch_cur_poly_1st_he) << ">" << std::endl;);
-                    }
+                    //}
 
                     // index of current halfedge index to be processed
                     const int m0_cur_patch_cur_poly_cur_he_idx = wrap_integer(m0_cur_patch_cur_poly_1st_he_idx + transformed_he_counter, 0, (int)m0_cur_patch_cur_poly.size() - 1);
@@ -10112,7 +10271,7 @@ void dispatch(output_t& output, const input_t& input)
                 // Update output (with the current polygon stitched into a cc)
                 ///////////////////////////////////////////////////////////////////////////
 
-                const std::string color_tag_stri = to_string(SAFE_ACCESS(patch_color_label_to_location, color_id)); // == cm_patch_location_t::OUTSIDE ? "e" : "i");
+                //const std::string color_tag_stri = to_string(SAFE_ACCESS(patch_color_label_to_location, color_id)); // == cm_patch_location_t::OUTSIDE ? "e" : "i");
 
                 // save meshes and dump
 

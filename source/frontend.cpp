@@ -2313,9 +2313,10 @@ void get_connected_component_data_impl(
                 auto fn_triangulate_faces = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
                     // CDT indices computed per thread
                     std::vector<uint32_t> cdt_index_cache_local;
+                    cdt_index_cache_local.reserve(std::distance(block_start_, block_end_)*4);
 
                     std::vector<vertex_descriptor_t> cc_face_vertices;
-
+                    std::vector<uint32_t> cc_face_triangulation;
                     for (face_array_iterator_t cc_face_iter = block_start_; cc_face_iter != block_end_; ++cc_face_iter) {
 
                         cc.get_vertices_around_face(cc_face_vertices, *cc_face_iter);
@@ -2335,13 +2336,11 @@ void get_connected_component_data_impl(
 
                         } else {
 
-                            std::vector<uint32_t> cc_face_triangulation;
+                            cc_face_triangulation.clear();
 
                             triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, cc, *cc_face_iter);
 
-                            cdt_index_cache_local.reserve(
-                                cc_face_triangulation.size() + cc_face_triangulation.size());
-
+                            
                             for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
                                 const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
                                 const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
