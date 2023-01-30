@@ -113,8 +113,8 @@ struct input_t {
 #if defined(MCUT_MULTI_THREADED)
     thread_pool* scheduler = nullptr;
 #endif
-    const hmesh_t* src_mesh = nullptr;
-    const hmesh_t* cut_mesh = nullptr;
+    /*const*/ std::shared_ptr<hmesh_t> src_mesh = nullptr;
+    /*const*/ std::shared_ptr<hmesh_t> cut_mesh = nullptr;
     // NOTE: we use std::map because it is beneficial that keys are sorted when
     // extracting edge-face intersection pairs
     const std::map<fd_t, std::vector<fd_t>>* ps_face_to_potentially_intersecting_others = nullptr;
@@ -169,7 +169,7 @@ struct output_mesh_data_maps_t {
 };
 
 struct output_mesh_info_t {
-    hmesh_t mesh;
+    std::shared_ptr<hmesh_t> mesh;
     std::vector<vd_t> seam_vertices;
     output_mesh_data_maps_t data_maps;
 };
@@ -187,15 +187,15 @@ struct output_t {
 
     logger_t logger;
     // fragments
-    std::map<sm_frag_location_t, std::map<cm_patch_location_t, std::vector<output_mesh_info_t>>> connected_components;
-    std::map<sm_frag_location_t, std::vector<output_mesh_info_t>> unsealed_cc; // connected components before hole-filling
+    std::map<sm_frag_location_t, std::map<cm_patch_location_t, std::vector<std::shared_ptr<output_mesh_info_t>>>> connected_components;
+    std::map<sm_frag_location_t, std::vector<std::shared_ptr<output_mesh_info_t>>> unsealed_cc; // connected components before hole-filling
     // patches
-    std::map<cm_patch_winding_order_t, std::vector<output_mesh_info_t>> inside_patches; // .. between neigbouring connected ccsponents (cs-sealing patches)
-    std::map<cm_patch_winding_order_t, std::vector<output_mesh_info_t>> outside_patches;
+    std::map<cm_patch_winding_order_t, std::vector<std::shared_ptr<output_mesh_info_t>>> inside_patches; // .. between neigbouring connected ccsponents (cs-sealing patches)
+    std::map<cm_patch_winding_order_t, std::vector<std::shared_ptr<output_mesh_info_t>>> outside_patches;
     // the input meshes which also include the edges that define the cut path
     // NOTE: not always defined (depending on the arising cutpath configurations)
-    output_mesh_info_t seamed_src_mesh;
-    output_mesh_info_t seamed_cut_mesh;
+    std::shared_ptr<output_mesh_info_t> seamed_src_mesh;
+    std::shared_ptr<output_mesh_info_t> seamed_cut_mesh;
 
     // floating polygon handling
     std::map<

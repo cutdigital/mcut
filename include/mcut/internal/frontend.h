@@ -87,7 +87,7 @@ struct connected_component_t {
     McConnectedComponentType type = (McConnectedComponentType)0;
     //array_mesh_t indexArrayMesh;
     //hmesh_t mesh;
-    output_mesh_info_t kernel_hmesh_data;
+    std::shared_ptr<output_mesh_info_t> kernel_hmesh_data;
 
     // 
     std::shared_ptr< //

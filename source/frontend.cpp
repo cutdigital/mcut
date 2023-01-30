@@ -1098,7 +1098,7 @@ void get_connected_component_data_impl(
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT");
 
-        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data->mesh->number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
 
         if (pMem == nullptr) {
             *pNumBytes = allocated_bytes;
@@ -1124,7 +1124,7 @@ void get_connected_component_data_impl(
 
                 auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
+                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data->mesh->vertices_begin(), block_start_);
 
                     uint64_t elem_offset = base_offset * 3;
 
@@ -1135,7 +1135,7 @@ void get_connected_component_data_impl(
                         }
 
                         const vertex_descriptor_t descr = *vertex_iter;
-                        const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(descr);
+                        const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(descr);
 
                         // for each component of coordinate
                         for (int i = 0; i < 3; ++i) {
@@ -1148,14 +1148,14 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.vertices_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.vertices_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->vertices_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint64_t elem_offset = 0;
-            for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
-                const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
+            for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data->mesh->vertices_begin(); viter != cc_uptr->kernel_hmesh_data->mesh->vertices_end(); ++viter) {
+                const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
                     const float val = static_cast<float>(coords[i]);
@@ -1174,7 +1174,7 @@ void get_connected_component_data_impl(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE");
-        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data.mesh.number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data->mesh->number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
 
         if (pMem == nullptr) {
             *pNumBytes = allocated_bytes;
@@ -1201,7 +1201,7 @@ void get_connected_component_data_impl(
 
                 auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data.mesh.vertices_begin(), block_start_);
+                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data->mesh->vertices_begin(), block_start_);
 
                     uint64_t elem_offset = base_offset * 3;
 
@@ -1212,7 +1212,7 @@ void get_connected_component_data_impl(
                         }
 
                         const vertex_descriptor_t descr = *vertex_iter;
-                        const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(descr);
+                        const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(descr);
 
                         // for each component of coordinate
                         for (int i = 0; i < 3; ++i) {
@@ -1225,15 +1225,15 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.vertices_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.vertices_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->vertices_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint64_t elem_offset = 0;
-            for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data.mesh.vertices_begin(); viter != cc_uptr->kernel_hmesh_data.mesh.vertices_end(); ++viter) {
+            for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data->mesh->vertices_begin(); viter != cc_uptr->kernel_hmesh_data->mesh->vertices_end(); ++viter) {
 
-                const vec3& coords = cc_uptr->kernel_hmesh_data.mesh.vertex(*viter);
+                const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(*viter);
 
                 for (int i = 0; i < 3; ++i) {
                     *(casted_ptr + elem_offset) = coords[i];
@@ -1267,11 +1267,11 @@ void get_connected_component_data_impl(
                     uint32_t num_indices_LOCAL = 0;
 
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    // const uint64_t face_base_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.faces_begin(), block_start_);
+                    // const uint64_t face_base_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     for (InputStorageIteratorType fiter = block_start_; fiter != block_end_; ++fiter) {
 
-                        const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(*fiter);
+                        const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_vertices_around_face(*fiter);
 
                         MCUT_ASSERT(num_vertices_around_face >= 3);
 
@@ -1286,8 +1286,8 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_count_indices,
                     partial_res, // output computed by master thread
                     futures);
@@ -1302,8 +1302,8 @@ void get_connected_component_data_impl(
                 }
             }
 #else // #if defined(MCUT_MULTI_THREADED)
-            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(*fiter);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
+                const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_vertices_around_face(*fiter);
 
                 MCUT_ASSERT(num_vertices_around_face >= 3);
 
@@ -1331,7 +1331,7 @@ void get_connected_component_data_impl(
                 // step 3: copy face indices into output array using offsets from previous steps
                 // - final result that is stored in user-output array
 
-                const uint32_t nfaces = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
+                const uint32_t nfaces = cc_uptr->kernel_hmesh_data->mesh->number_of_faces();
 
                 //
                 // step 1
@@ -1366,7 +1366,7 @@ void get_connected_component_data_impl(
                 //
 
                 auto fn_face_indices_copy = [&cc_uptr, &partial_sum_vec, &casted_ptr, &num_indices_to_copy](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
-                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.faces_begin(), block_start_);
+                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_sizes_cache.size());
 
@@ -1383,7 +1383,7 @@ void get_connected_component_data_impl(
                     for (face_array_iterator_t f_iter = block_start_; f_iter != block_end_; ++f_iter) {
 
                         vertices_around_face.clear();
-                        cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(vertices_around_face, *f_iter);
+                        cc_uptr->kernel_hmesh_data->mesh->get_vertices_around_face(vertices_around_face, *f_iter);
                         const uint32_t num_vertices_around_face = (uint32_t)vertices_around_face.size();
 
                         MCUT_ASSERT(num_vertices_around_face >= 3u);
@@ -1403,8 +1403,8 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_indices_copy,
                     (1 << 14)); // blocks until all work is done
             }
@@ -1413,10 +1413,10 @@ void get_connected_component_data_impl(
             std::vector<vd_t> cc_face_vertices;
             uint32_t elem_offset = 0;
 
-            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
 
                 cc_face_vertices.clear();
-                cc_uptr->kernel_hmesh_data.mesh.get_vertices_around_face(cc_face_vertices, *fiter);
+                cc_uptr->kernel_hmesh_data->mesh->get_vertices_around_face(cc_face_vertices, *fiter);
                 const uint32_t num_vertices_around_face = (uint32_t)cc_face_vertices.size();
 
                 MCUT_ASSERT(num_vertices_around_face >= 3u);
@@ -1440,9 +1440,9 @@ void get_connected_component_data_impl(
     case MC_CONNECTED_COMPONENT_DATA_FACE_SIZE: { // non-triangulated only (don't want to store redundant information)
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_SIZE");
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t); // each face has a size (num verts)
+            *pNumBytes = cc_uptr->kernel_hmesh_data->mesh->number_of_faces() * sizeof(uint32_t); // each face has a size (num verts)
         } else {
-            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data->mesh->number_of_faces() * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -1454,7 +1454,7 @@ void get_connected_component_data_impl(
 
 #if defined(MCUT_MULTI_THREADED)
             {
-                const uint32_t face_count = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
+                const uint32_t face_count = cc_uptr->kernel_hmesh_data->mesh->number_of_faces();
 
                 if (!cc_uptr->face_sizes_cache_initialized) { // init cache by storing data into it
                     // the code execution can also reach here because we asked for the cache
@@ -1474,7 +1474,7 @@ void get_connected_component_data_impl(
 
                             const face_descriptor_t descr(face_offset);
 
-                            const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(descr);
+                            const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_vertices_around_face(descr);
 
                             MCUT_ASSERT(num_vertices_around_face >= 3);
 
@@ -1509,8 +1509,8 @@ void get_connected_component_data_impl(
             //
             uint64_t elem_offset = 0;
 
-            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_vertices_around_face(*fiter);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
+                const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_vertices_around_face(*fiter);
 
                 MCUT_ASSERT(num_vertices_around_face >= 3);
 
@@ -1539,7 +1539,7 @@ void get_connected_component_data_impl(
 
                     for (face_array_iterator_t fiter = block_start_; fiter != block_end_; ++fiter) {
 
-                        const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
+                        const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(*fiter, nullptr);
                         num_face_adjacent_face_indices_LOCAL += num_faces_around_face;
                     }
 
@@ -1551,8 +1551,8 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_count_faces_around_face,
                     partial_res, // output computed by master thread
                     futures);
@@ -1567,8 +1567,8 @@ void get_connected_component_data_impl(
                 }
             }
 #else // #if defined(MCUT_MULTI_THREADED)
-            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
+                const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(*fiter, nullptr);
                 num_face_adjacent_face_indices += num_faces_around_face;
             }
 #endif
@@ -1591,7 +1591,7 @@ void get_connected_component_data_impl(
                 // step 3: copy adjacent face indices into output array using offsets from previous steps
                 // - final result that is stored in user-output array
 
-                const uint32_t nfaces = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
+                const uint32_t nfaces = cc_uptr->kernel_hmesh_data->mesh->number_of_faces();
 
                 //
                 // step 1
@@ -1632,7 +1632,7 @@ void get_connected_component_data_impl(
                 //
 
                 auto fn_face_adjface_indices_copy = [&cc_uptr, &partial_sum_vec, &casted_ptr](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
-                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.faces_begin(), block_start_);
+                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_adjacent_faces_size_cache.size());
 
@@ -1649,7 +1649,7 @@ void get_connected_component_data_impl(
                     for (face_array_iterator_t f_iter = block_start_; f_iter != block_end_; ++f_iter) {
 
                         faces_around_face.clear();
-                        cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *f_iter);
+                        cc_uptr->kernel_hmesh_data->mesh->get_faces_around_face(faces_around_face, *f_iter);
                         const uint32_t num_faces_around_face = (uint32_t)faces_around_face.size();
 
                         // for each vertex in face
@@ -1663,18 +1663,18 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_adjface_indices_copy); // blocks until all work is done
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint64_t elem_offset = 0;
             std::vector<fd_t> faces_around_face;
 
-            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
 
                 faces_around_face.clear();
-                cc_uptr->kernel_hmesh_data.mesh.get_faces_around_face(faces_around_face, *fiter, nullptr);
+                cc_uptr->kernel_hmesh_data->mesh->get_faces_around_face(faces_around_face, *fiter, nullptr);
 
                 if (!faces_around_face.empty()) {
                     for (uint32_t i = 0; i < (uint32_t)faces_around_face.size(); ++i) {
@@ -1692,9 +1692,9 @@ void get_connected_component_data_impl(
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE");
 
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t); // each face has a size value (num adjacent faces)
+            *pNumBytes = cc_uptr->kernel_hmesh_data->mesh->number_of_faces() * sizeof(uint32_t); // each face has a size value (num adjacent faces)
         } else {
-            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_faces() * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data->mesh->number_of_faces() * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -1706,7 +1706,7 @@ void get_connected_component_data_impl(
 
 #if defined(MCUT_MULTI_THREADED)
             {
-                const uint32_t face_count = cc_uptr->kernel_hmesh_data.mesh.number_of_faces();
+                const uint32_t face_count = cc_uptr->kernel_hmesh_data->mesh->number_of_faces();
 
                 if (!cc_uptr->face_adjacent_faces_size_cache_initialized) { // init cache by storing data into it
                     // the code execution can also reach here because we asked for the cache
@@ -1726,7 +1726,7 @@ void get_connected_component_data_impl(
 
                             const face_descriptor_t descr(face_offset);
 
-                            const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(descr);
+                            const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(descr);
 
                             *fs_iter = num_faces_around_face;
 
@@ -1757,8 +1757,8 @@ void get_connected_component_data_impl(
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint64_t elem_offset = 0;
-            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data.mesh.faces_begin(); fiter != cc_uptr->kernel_hmesh_data.mesh.faces_end(); ++fiter) {
-                const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data.mesh.get_num_faces_around_face(*fiter, nullptr);
+            for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
+                const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(*fiter, nullptr);
                 *(casted_ptr + elem_offset) = num_faces_around_face;
                 elem_offset++;
             }
@@ -1770,9 +1770,9 @@ void get_connected_component_data_impl(
 
     case MC_CONNECTED_COMPONENT_DATA_EDGE: {
         if (pMem == nullptr) {
-            *pNumBytes = cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices
+            *pNumBytes = cc_uptr->kernel_hmesh_data->mesh->number_of_edges() * 2 * sizeof(uint32_t); // each edge has two indices
         } else {
-            if (bytes > cc_uptr->kernel_hmesh_data.mesh.number_of_edges() * 2 * sizeof(uint32_t)) {
+            if (bytes > cc_uptr->kernel_hmesh_data->mesh->number_of_edges() * 2 * sizeof(uint32_t)) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -1786,17 +1786,17 @@ void get_connected_component_data_impl(
             {
                 auto fn_copy_edges = [&casted_ptr, &cc_uptr](edge_array_iterator_t block_start_, edge_array_iterator_t block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
-                    const uint64_t base_offset = std::distance(cc_uptr->kernel_hmesh_data.mesh.edges_begin(), block_start_);
+                    const uint64_t base_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->edges_begin(), block_start_);
 
                     uint64_t elem_offset = base_offset * 2; // two (vertex) indices per edge
 
                     for (edge_array_iterator_t edge_iter = block_start_; edge_iter != block_end_; ++edge_iter) {
 
-                        const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data.mesh.vertex(*edge_iter, 0);
+                        const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data->mesh->vertex(*edge_iter, 0);
                         *(casted_ptr + elem_offset) = (uint32_t)v0;
                         elem_offset++;
 
-                        const vertex_descriptor_t v1 = cc_uptr->kernel_hmesh_data.mesh.vertex(*edge_iter, 1);
+                        const vertex_descriptor_t v1 = cc_uptr->kernel_hmesh_data->mesh->vertex(*edge_iter, 1);
                         *(casted_ptr + elem_offset) = (uint32_t)v1;
                         elem_offset++;
                     }
@@ -1804,18 +1804,18 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.edges_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.edges_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->edges_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->edges_end(),
                     fn_copy_edges);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint64_t elem_offset = 0;
-            for (edge_array_iterator_t eiter = cc_uptr->kernel_hmesh_data.mesh.edges_begin(); eiter != cc_uptr->kernel_hmesh_data.mesh.edges_end(); ++eiter) {
-                const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data.mesh.vertex(*eiter, 0);
+            for (edge_array_iterator_t eiter = cc_uptr->kernel_hmesh_data->mesh->edges_begin(); eiter != cc_uptr->kernel_hmesh_data->mesh->edges_end(); ++eiter) {
+                const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data->mesh->vertex(*eiter, 0);
                 *(casted_ptr + elem_offset) = (uint32_t)v0;
                 elem_offset++;
 
-                const vertex_descriptor_t v1 = cc_uptr->kernel_hmesh_data.mesh.vertex(*eiter, 1);
+                const vertex_descriptor_t v1 = cc_uptr->kernel_hmesh_data->mesh->vertex(*eiter, 1);
                 *(casted_ptr + elem_offset) = (uint32_t)v1;
                 elem_offset++;
             }
@@ -1940,7 +1940,7 @@ void get_connected_component_data_impl(
             throw std::invalid_argument("cannot query seam vertices on input connected component");
         }
 
-        const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data.seam_vertices.size();
+        const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data->seam_vertices.size();
 
         if (pMem == nullptr) {
             *pNumBytes = seam_vertex_count * sizeof(uint32_t);
@@ -1961,7 +1961,7 @@ void get_connected_component_data_impl(
             {
                 auto fn_copy_seam_vertices = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<vd_t>::const_iterator block_start_, std::vector<vd_t>::const_iterator block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
-                    const uint64_t base_offset = std::distance(cc_uptr->kernel_hmesh_data.seam_vertices.cbegin(), block_start_);
+                    const uint64_t base_offset = std::distance(cc_uptr->kernel_hmesh_data->seam_vertices.cbegin(), block_start_);
 
                     uint64_t elem_offset = base_offset;
 
@@ -1978,14 +1978,14 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.seam_vertices.cbegin(),
-                    cc_uptr->kernel_hmesh_data.seam_vertices.cend(),
+                    cc_uptr->kernel_hmesh_data->seam_vertices.cbegin(),
+                    cc_uptr->kernel_hmesh_data->seam_vertices.cend(),
                     fn_copy_seam_vertices);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint32_t elem_offset = 0;
             for (uint32_t i = 0; i < elems_to_copy; ++i) {
-                const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data.seam_vertices[i];
+                const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data->seam_vertices[i];
                 *(casted_ptr + elem_offset) = seam_vertex_idx;
                 elem_offset++;
             }
@@ -1997,13 +1997,13 @@ void get_connected_component_data_impl(
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP");
 
-        const uint32_t vertex_map_size = cc_uptr->kernel_hmesh_data.data_maps.vertex_map.size();
+        const uint32_t vertex_map_size = cc_uptr->kernel_hmesh_data->data_maps.vertex_map.size();
 
         if (vertex_map_size == 0) {
             throw std::invalid_argument("vertex map not available"); // user probably forgot to set the dispatch flag
         }
 
-        MCUT_ASSERT(vertex_map_size == (uint32_t)cc_uptr->kernel_hmesh_data.mesh.number_of_vertices());
+        MCUT_ASSERT(vertex_map_size == (uint32_t)cc_uptr->kernel_hmesh_data->mesh->number_of_vertices());
 
         if (pMem == nullptr) {
             *pNumBytes = (vertex_map_size * sizeof(uint32_t)); // each each vertex has a map value (intersection point == uint_max)
@@ -2026,7 +2026,7 @@ void get_connected_component_data_impl(
             {
                 auto fn_copy_vertex_map = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<vd_t>::const_iterator block_start_, std::vector<vd_t>::const_iterator block_end_) {
                     // thread starting offset
-                    const uint32_t base_offset = (uint32_t)std::distance(cc_uptr->kernel_hmesh_data.data_maps.vertex_map.cbegin(), block_start_);
+                    const uint32_t base_offset = (uint32_t)std::distance(cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cbegin(), block_start_);
 
                     uint32_t elem_offset = base_offset;
 
@@ -2039,7 +2039,7 @@ void get_connected_component_data_impl(
                         uint32_t i = elem_offset;
 
                         // Refer to single-threaded code (below) for documentation
-                        uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data.data_maps.vertex_map[i];
+                        uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data->data_maps.vertex_map[i];
                         uint32_t client_input_mesh_vertex_idx = UINT32_MAX;
                         const bool internal_input_mesh_vertex_is_intersection_point = (internal_input_mesh_vertex_idx == UINT32_MAX);
 
@@ -2076,8 +2076,8 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.data_maps.vertex_map.cbegin(),
-                    cc_uptr->kernel_hmesh_data.data_maps.vertex_map.cend(),
+                    cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cbegin(),
+                    cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cend(),
                     fn_copy_vertex_map);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
@@ -2089,7 +2089,7 @@ void get_connected_component_data_impl(
                 // the frontend (in this case via polygon partitioning)
                 // Vertices that are polygon intersection points have a value of uint_max i.e. null_vertex().
 
-                uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data.data_maps.vertex_map[i];
+                uint32_t internal_input_mesh_vertex_idx = cc_uptr->kernel_hmesh_data->data_maps.vertex_map[i];
                 // We use the same default value as that used by the kernel for intersection
                 // points (intersection points at mapped to uint_max i.e. null_vertex())
                 uint32_t client_input_mesh_vertex_idx = UINT32_MAX;
@@ -2145,13 +2145,13 @@ void get_connected_component_data_impl(
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_MAP");
 
-        const uint32_t face_map_size = cc_uptr->kernel_hmesh_data.data_maps.face_map.size();
+        const uint32_t face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
 
         if (face_map_size == 0) {
             throw std::invalid_argument("face map not available"); // user probably forgot to set the dispatch flag
         }
 
-        MCUT_ASSERT(face_map_size == (uint32_t)cc_uptr->kernel_hmesh_data.mesh.number_of_faces());
+        MCUT_ASSERT(face_map_size == (uint32_t)cc_uptr->kernel_hmesh_data->mesh->number_of_faces());
 
         if (pMem == nullptr) {
             *pNumBytes = face_map_size * sizeof(uint32_t); // each face has a map value (intersection point == uint_max)
@@ -2173,7 +2173,7 @@ void get_connected_component_data_impl(
                 auto fn_copy_face_map = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<fd_t>::const_iterator block_start_, std::vector<fd_t>::const_iterator block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
                     // thread starting offset
-                    const uint32_t base_offset = (uint32_t)std::distance(cc_uptr->kernel_hmesh_data.data_maps.face_map.cbegin(), block_start_);
+                    const uint32_t base_offset = (uint32_t)std::distance(cc_uptr->kernel_hmesh_data->data_maps.face_map.cbegin(), block_start_);
 
                     uint32_t elem_offset = base_offset;
 
@@ -2186,7 +2186,7 @@ void get_connected_component_data_impl(
                         uint32_t i = elem_offset;
 
                         // Refer to single-threaded code (below) for documentation
-                        uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data.data_maps.face_map[i];
+                        uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[i];
                         uint32_t client_input_mesh_face_idx = INT32_MAX;
                         const bool internal_input_mesh_face_idx_is_for_src_mesh = (internal_inputmesh_face_idx < cc_uptr->internal_sourcemesh_face_count);
 
@@ -2221,15 +2221,15 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.data_maps.face_map.cbegin(),
-                    cc_uptr->kernel_hmesh_data.data_maps.face_map.cend(),
+                    cc_uptr->kernel_hmesh_data->data_maps.face_map.cbegin(),
+                    cc_uptr->kernel_hmesh_data->data_maps.face_map.cend(),
                     fn_copy_face_map);
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint32_t elem_offset = 0;
             for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each vertex (to copy) in CC
             {
-                uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data.data_maps.face_map[i];
+                uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[i];
                 uint32_t client_input_mesh_face_idx = INT32_MAX;
                 const bool internal_input_mesh_face_idx_is_for_src_mesh = (internal_inputmesh_face_idx < cc_uptr->internal_sourcemesh_face_count);
 
@@ -2271,7 +2271,7 @@ void get_connected_component_data_impl(
         if (cc_uptr->cdt_index_cache.empty()) // compute triangulation if not yet available
         {
             // internal halfedge data structure from the current connected component
-            const hmesh_t& cc = cc_uptr->kernel_hmesh_data.mesh;
+            const std::shared_ptr<hmesh_t> cc = cc_uptr->kernel_hmesh_data->mesh;
 
 #if defined(MCUT_MULTI_THREADED)
             {
@@ -2295,7 +2295,7 @@ void get_connected_component_data_impl(
                     uint32_t max_threads = 0;
                     const uint32_t available_threads = context_uptr->scheduler.get_num_threads() + 1; // workers and master (+1)
                     uint32_t block_size_unused = 0;
-                    const uint32_t length = cc.number_of_faces();
+                    const uint32_t length = cc->number_of_faces();
 
                     get_scheduling_parameters(
                         num_threads,
@@ -2319,7 +2319,7 @@ void get_connected_component_data_impl(
                     std::vector<uint32_t> cc_face_triangulation;
                     for (face_array_iterator_t cc_face_iter = block_start_; cc_face_iter != block_end_; ++cc_face_iter) {
 
-                        cc.get_vertices_around_face(cc_face_vertices, *cc_face_iter);
+                        cc->get_vertices_around_face(cc_face_vertices, *cc_face_iter);
 
                         const uint32_t cc_face_vcount = (uint32_t)cc_face_vertices.size();
 
@@ -2338,7 +2338,7 @@ void get_connected_component_data_impl(
 
                             cc_face_triangulation.clear();
 
-                            triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, cc, *cc_face_iter);
+                            triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, *cc.get(), *cc_face_iter);
 
                             
                             for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
@@ -2369,8 +2369,8 @@ void get_connected_component_data_impl(
 
                 parallel_for(
                     context_uptr->scheduler,
-                    cc_uptr->kernel_hmesh_data.mesh.faces_begin(),
-                    cc_uptr->kernel_hmesh_data.mesh.faces_end(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
+                    cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_triangulate_faces,
                     min_per_thread);
             }
