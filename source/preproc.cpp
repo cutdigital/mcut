@@ -28,7 +28,7 @@ bool client_input_arrays_to_hmesh(
     const uint32_t numFaces,
     const vec3* perturbation = NULL)
 {
-    TIMESTACK_PUSH(__FUNCTION__);
+    SCOPED_TIMER(__FUNCTION__);
 
     context_uptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
 
@@ -76,7 +76,7 @@ bool client_input_arrays_to_hmesh(
         }
     }
 
-    TIMESTACK_POP();
+    TIMESTACK_POP(); // TIMESTACK_PUSH("add vertices");
 
     // compute the mesh bounding box while we are at it (for numerical perturbation)
     vec3 bboxMin(1e10);
@@ -89,7 +89,7 @@ bool client_input_arrays_to_hmesh(
         bboxMax = compwise_max(bboxMax, coords);
     }
     bboxDiagonal = length(bboxMax - bboxMin);
-    TIMESTACK_POP();
+    TIMESTACK_POP(); // TIMESTACK_PUSH("create bbox");
 
     TIMESTACK_PUSH("create faces");
 
@@ -279,9 +279,7 @@ bool client_input_arrays_to_hmesh(
         faceSizeOffset += face_vertex_count;
     }
 #endif
-    TIMESTACK_POP();
-
-    TIMESTACK_POP();
+    TIMESTACK_POP(); //  TIMESTACK_PUSH("create faces");
 
     return true;
 }
@@ -2255,6 +2253,7 @@ extern "C" void preproc(
     // cut-mesh start [after] the source-mesh faces).
     // Refer to the function "hmesh_to_array_mesh()" on how we use this information.
     std::shared_ptr<std::unordered_map<fd_t, fd_t>> cut_hmesh_child_to_usermesh_birth_face_OFFSETTED = std::shared_ptr<std::unordered_map<fd_t, fd_t>>(new std::unordered_map<fd_t, fd_t>);//cut_hmesh_child_to_usermesh_birth_face;
+    cut_hmesh_child_to_usermesh_birth_face_OFFSETTED->reserve(cut_hmesh_child_to_usermesh_birth_face.size());
 
     for (std::unordered_map<fd_t, fd_t>::iterator i = cut_hmesh_child_to_usermesh_birth_face.begin();
          i != cut_hmesh_child_to_usermesh_birth_face.end(); ++i) {
@@ -2264,7 +2263,8 @@ extern "C" void preproc(
     }
 
     std::shared_ptr<std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices_OFFSETTED = std::shared_ptr<std::unordered_map<vd_t, vec3>>(new std::unordered_map<vd_t, vec3>);
-
+    cut_hmesh_new_poly_partition_vertices_OFFSETTED->reserve(cut_hmesh_new_poly_partition_vertices.size());
+    
     for (std::unordered_map<vd_t, vec3>::const_iterator i = cut_hmesh_new_poly_partition_vertices.begin();
          i != cut_hmesh_new_poly_partition_vertices.end(); ++i) {
         vd_t offsettedDescr = vd_t(i->first + source_hmesh.number_of_vertices());

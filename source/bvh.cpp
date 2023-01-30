@@ -206,7 +206,7 @@ unsigned int __inline clz_(unsigned int value)
         std::vector<bounding_box_t<vec3>>& face_bboxes,
         const double& slightEnlargmentEps)
     {
-        TIMESTACK_PUSH(__FUNCTION__);
+        SCOPED_TIMER(__FUNCTION__);
 
         const int meshFaceCount = mesh.number_of_faces();
         const int bvhNodeCount = get_ostensibly_implicit_bvh_size(meshFaceCount);
@@ -373,7 +373,6 @@ unsigned int __inline clz_(unsigned int value)
                 SAFE_ACCESS(bvhAABBs, node_memory_idx) = node_bbox;
             } // for each real node on level
         } // for each internal level
-        TIMESTACK_POP();
     }
 
 
