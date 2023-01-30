@@ -296,13 +296,13 @@ halfedge_descriptor_t hmesh_t::halfedge(const vertex_descriptor_t s, const verte
     const std::vector<halfedge_descriptor_t>& t_halfedges = tvd.m_halfedges;
 
     static thread_local std::vector<edge_descriptor_t> t_edges;
-    t_edges.resize(0);
-    t_edges.reserve(t_halfedges.size());
-
+    //t_edges.resize(0);
+    t_edges.resize(t_halfedges.size());
+    uint32_t counter = 0;
     for (std::vector<halfedge_descriptor_t>::const_iterator i = t_halfedges.cbegin(); i != t_halfedges.cend(); i++) {
         edge_descriptor_t e = edge(*i);
         MCUT_ASSERT(e != null_edge());
-        t_edges.push_back(e);
+        t_edges[counter++] = (e);
     }
 
     halfedge_descriptor_t result = null_halfedge();
@@ -525,6 +525,7 @@ face_descriptor_t hmesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
 
     face_data_t* face_data_ptr = reusing_removed_face_descr ? &m_faces[new_face_idx] : &new_face_data;
     face_data_ptr->m_halfedges.clear();
+    face_data_ptr->m_halfedges.reserve(face_vertex_count);
 
     for (int i = 0; i < face_vertex_count; ++i) {
         const vertex_descriptor_t v0 = vi[i]; // i.e. src

@@ -102,7 +102,7 @@ typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
 #endif
 
 
-#define PROFILING_BUILD
+//#define PROFILING_BUILD
 
 #if defined(PROFILING_BUILD)
 #include <chrono>
