@@ -851,8 +851,8 @@ hmesh_t extract_connected_components(
 
         MCUT_ASSERT(ccID_to_mesh.find(cc_id) != ccID_to_mesh.end());
 
-        hmesh_t& cc_mesh = SAFE_ACCESS(ccID_to_mesh, cc_id);
-        fd_t f = cc_mesh.add_face(remapped_face); // insert the face
+        std::shared_ptr<hmesh_t> cc_mesh = SAFE_ACCESS(ccID_to_mesh, cc_id);
+        fd_t f = cc_mesh->add_face(remapped_face); // insert the face
 
         MCUT_ASSERT(f != hmesh_t::null_face());
 

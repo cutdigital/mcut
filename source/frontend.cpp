@@ -2338,7 +2338,7 @@ void get_connected_component_data_impl(
 
                             cc_face_triangulation.clear();
 
-                            triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, *cc.get(), *cc_face_iter);
+                            triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, *(cc.get()), *cc_face_iter);
 
                             
                             for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
@@ -2376,15 +2376,15 @@ void get_connected_component_data_impl(
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint32_t face_indices_offset = 0;
-            cc_uptr->cdt_index_cache.reserve(cc.number_of_faces());
+            cc_uptr->cdt_index_cache.reserve(cc->number_of_faces());
 
             // descriptors of vertices in face (they index into the CC)
             std::vector<vertex_descriptor_t> cc_face_vertices;
 
             // for each face (TODO: make parallel)
-            for (face_array_iterator_t cc_face_iter = cc.faces_begin(); cc_face_iter != cc.faces_end(); ++cc_face_iter) {
+            for (face_array_iterator_t cc_face_iter = cc->faces_begin(); cc_face_iter != cc->faces_end(); ++cc_face_iter) {
 
-                cc.get_vertices_around_face(cc_face_vertices, *cc_face_iter);
+                cc->get_vertices_around_face(cc_face_vertices, *cc_face_iter);
 
                 // number of vertices of triangulated face
                 const uint32_t cc_face_vcount = (uint32_t)cc_face_vertices.size();
@@ -2413,7 +2413,7 @@ void get_connected_component_data_impl(
                     // triangulated!
                     std::vector<uint32_t> cc_face_triangulation;
 
-                    triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, cc, *cc_face_iter);
+                    triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, cc.get()[0], *cc_face_iter);
 
                     //
                     // Change local triangle indices to global index values (in CC) and save
