@@ -341,7 +341,11 @@ bool check_input_mesh(std::unique_ptr<context_t>& context_uptr, const hmesh_t& m
     std::vector<int> fccmap;
     std::vector<int> cc_to_vertex_count;
     std::vector<int> cc_to_face_count;
-    int n = find_connected_components(context_uptr->scheduler, fccmap, m, cc_to_vertex_count, cc_to_face_count);
+    int n = find_connected_components(
+#if defined(MCUT_MULTI_THREADED)
+        context_uptr->scheduler,
+#endif
+        fccmap, m, cc_to_vertex_count, cc_to_face_count);
 
     if (n != 1) {
         context_uptr->log(
