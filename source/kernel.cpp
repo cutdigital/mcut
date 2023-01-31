@@ -1447,20 +1447,25 @@ void update_neighouring_ps_iface_m0_edge_list(
 
 typedef std::vector<hd_t> traced_polygon_t;
 
-bool mesh_is_closed(thread_pool& scheduler, const hmesh_t& mesh)
+bool mesh_is_closed(
+#if defined(MCUT_MULTI_THREADED)
+    thread_pool& scheduler,
+#endif
+    const hmesh_t& mesh)
 {
     bool all_halfedges_incident_to_face = true;
 #if defined(MCUT_MULTI_THREADED)
     {
         printf("mesh=%d\n", (int)mesh.number_of_halfedges());
         all_halfedges_incident_to_face = parallel_find_if(
-            scheduler,
-            mesh.halfedges_begin(),
-            mesh.halfedges_end(),
-            [&](hd_t h) {
-                const fd_t f = mesh.face(h);
-                return (f == hmesh_t::null_face());
-            }) == mesh.halfedges_end();
+                                             scheduler,
+                                             mesh.halfedges_begin(),
+                                             mesh.halfedges_end(),
+                                             [&](hd_t h) {
+                                                 const fd_t f = mesh.face(h);
+                                                 return (f == hmesh_t::null_face());
+                                             })
+            == mesh.halfedges_end();
     }
 #else
     for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
@@ -1545,12 +1550,20 @@ void dispatch(output_t& output, const input_t& input)
     const int cs_vtx_count = cs.number_of_vertices();
 
     TIMESTACK_PUSH("Check source mesh is closed");
-    const bool sm_is_watertight = mesh_is_closed( *input.scheduler, sm);
+    const bool sm_is_watertight = mesh_is_closed(
+#if defined(MCUT_MULTI_THREADED)
+        *input.scheduler,
+#endif
+        sm);
 
     TIMESTACK_POP();
 
     TIMESTACK_PUSH("Check cut mesh is closed");
-    const bool cm_is_watertight = mesh_is_closed( *input.scheduler, cs);
+    const bool cm_is_watertight = mesh_is_closed(
+#if defined(MCUT_MULTI_THREADED)
+        *input.scheduler,
+#endif
+        cs);
 
     TIMESTACK_POP();
 
