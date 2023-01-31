@@ -554,7 +554,11 @@ hmesh_t extract_connected_components(
     TIMESTACK_PUSH("Extract CC: find connected components");
     std::vector<int> cc_to_vertex_count;
     std::vector<int> cc_to_face_count;
-    find_connected_components(scheduler, fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
+    find_connected_components(
+#if defined(MCUT_MULTI_THREADED)
+        scheduler,
+#endif
+        fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
     TIMESTACK_POP();
 
     //
