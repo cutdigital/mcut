@@ -7844,7 +7844,7 @@ void dispatch(output_t& output, const input_t& input)
             const int potential_seed_poly_idx = primary_interior_ihalfedge_pool_citer->first;
             // halfedge index in polygon
             const int potential_seed_poly_he_idx = primary_interior_ihalfedge_pool_citer->second;
-#if 1 // defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_MULTI_THREADED)
             const bool poly_patch_is_known = parallel_find_in_map_by_key(
                                                  *input.scheduler,
                                                  m0_cm_poly_to_patch_idx.cbegin(),

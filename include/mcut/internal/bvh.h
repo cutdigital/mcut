@@ -101,7 +101,9 @@ extern int get_node_mem_index(
     const int rightmostRealNodeImplicitIndexOnNodeLevel);
 
 extern void build_oibvh(
+#if defined(MCUT_MULTI_THREADED)
     thread_pool& pool,
+#endif
     const hmesh_t& mesh,
     std::vector<bounding_box_t<vec3>>& bvhAABBs,
     std::vector<fd_t>& bvhLeafNodeFaces,

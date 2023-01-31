@@ -200,7 +200,9 @@ unsigned int morton3D(float x, float y, float z)
 };
 
 void build_oibvh(
+    #if defined(MCUT_MULTI_THREADED)
     thread_pool& pool,
+    #endif
     const hmesh_t& mesh,
     std::vector<bounding_box_t<vec3>>& bvhAABBs,
     std::vector<fd_t>& bvhLeafNodeFaces,

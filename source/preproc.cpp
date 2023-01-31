@@ -1323,7 +1323,11 @@ extern "C" void preproc(
     std::vector<bounding_box_t<vec3>> source_hmesh_BVH_aabb_array;
     std::vector<fd_t> source_hmesh_BVH_leafdata_array;
     std::vector<bounding_box_t<vec3>> source_hmesh_face_aabb_array;
-    build_oibvh(context_uptr->scheduler, *source_hmesh.get(), source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
+    build_oibvh(
+#if defined(MCUT_MULTI_THREADED)
+        context_uptr->scheduler,
+#endif
+        *source_hmesh.get(), source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
 #else
     BoundingVolumeHierarchy source_hmesh_BVH;
     source_hmesh_BVH.buildTree(source_hmesh);
@@ -1485,7 +1489,11 @@ extern "C" void preproc(
 #if defined(USE_OIBVH)
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
-                build_oibvh(context_uptr->scheduler, *cut_hmesh.get(), cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array, cut_hmesh_face_face_aabb_array, numerical_perturbation_constant);
+                build_oibvh(
+#if defined(MCUT_MULTI_THREADED)
+                    context_uptr->scheduler,
+#endif
+                    *cut_hmesh.get(), cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array, cut_hmesh_face_face_aabb_array, numerical_perturbation_constant);
 #else
                 cut_hmesh_BVH.buildTree(cut_hmesh, numerical_perturbation_constant);
 #endif
@@ -1522,7 +1530,10 @@ extern "C" void preproc(
 #if defined(USE_OIBVH)
                 source_hmesh_BVH_aabb_array.clear();
                 source_hmesh_BVH_leafdata_array.clear();
-                build_oibvh(context_uptr->scheduler, 
+                build_oibvh(
+#if defined(MCUT_MULTI_THREADED)
+                    context_uptr->scheduler,
+#endif
                     *source_hmesh.get(),
                     source_hmesh_BVH_aabb_array,
                     source_hmesh_BVH_leafdata_array,
@@ -1537,7 +1548,9 @@ extern "C" void preproc(
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
-                    context_uptr->scheduler, 
+#if defined(MCUT_MULTI_THREADED)
+                    context_uptr->scheduler,
+#endif
                     *cut_hmesh.get(),
                     cut_hmesh_BVH_aabb_array,
                     cut_hmesh_BVH_leafdata_array,
@@ -1731,7 +1744,6 @@ extern "C" void preproc(
                 asFragPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
                 asFragPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
                 asFragPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
-
             }
         }
     }
@@ -1767,7 +1779,6 @@ extern "C" void preproc(
             asFragPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
             asFragPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
             asFragPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
-
         }
     }
     TIMESTACK_POP();
@@ -1798,7 +1809,6 @@ extern "C" void preproc(
         asPatchPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
         asPatchPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asPatchPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
-
     }
     TIMESTACK_POP();
 
@@ -1825,7 +1835,6 @@ extern "C" void preproc(
         asPatchPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
         asPatchPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asPatchPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
-
     }
     TIMESTACK_POP();
 
@@ -1984,7 +1993,7 @@ extern "C" void preproc(
 #if defined(MCUT_MULTI_THREADED)
             auto fn_fill_vertex_map = [&](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                 for (vertex_array_iterator_t i = block_start_; i != block_end_; ++i) {
-                     omi->data_maps.vertex_map[*i] = *i; // one to one mapping
+                    omi->data_maps.vertex_map[*i] = *i; // one to one mapping
                 }
             };
 
