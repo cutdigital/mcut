@@ -2278,7 +2278,7 @@ void get_connected_component_data_impl(
 
                 // the offset from which each thread will write its CDT indices
                 // into "cc_uptr->cdt_index_cache"
-                std::atomic_uint32_t cdt_index_cache_offset;
+                std::atomic<std::uint32_t> cdt_index_cache_offset;
                 cdt_index_cache_offset.store(0);
 
                 // The following scheduling parameters are needed because we need
