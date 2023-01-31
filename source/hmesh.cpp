@@ -725,6 +725,19 @@ std::vector<vertex_descriptor_t> hmesh_t::get_vertices_around_vertex(const verte
     return out;
 }
 
+void hmesh_t::get_vertices_around_vertex(std::vector<vertex_descriptor_t>& vertices_around_vertex, const vertex_descriptor_t v) const
+{
+    MCUT_ASSERT(v != null_vertex());
+    // halfedges whoe target is 'v'
+    const std::vector<halfedge_descriptor_t>& halfedges = get_halfedges_around_vertex(v);
+    
+    vertices_around_vertex.reserve(halfedges.size());
+    for (std::vector<halfedge_descriptor_t>::const_iterator h = halfedges.cbegin(); h != halfedges.cend(); ++h) {
+        vertex_descriptor_t src = source(*h);
+        vertices_around_vertex.push_back(src);
+    }
+}
+
 const std::vector<halfedge_descriptor_t>& hmesh_t::get_halfedges_around_face(const face_descriptor_t f) const
 {
     MCUT_ASSERT(f != null_face());

@@ -244,10 +244,10 @@ class thread_pool {
                 }
                 task();
 #else
-
+#if 1
             // if I can't pop any task from my queue, and I can't steal a task from
             // another thread's queue, then I'll just wait until is added to my queue.
-            if (!(work_queues[worker_thread_id].try_pop(task) || try_pop_from_other_thread_queue(task, worker_thread_id))) {
+            if (!(work_queues[worker_thread_id].try_pop(task) /*|| try_pop_from_other_thread_queue(task, worker_thread_id)*/)) {
                 work_queues[worker_thread_id].wait_and_pop(task);
             }
 
@@ -256,6 +256,26 @@ class thread_pool {
             }
 
             task(); // run the task
+#else
+#if 0
+            work_queues[worker_thread_id].wait_and_pop(task);
+            
+            if (thread_pool_terminate) {
+                break; 
+            }
+
+            task();
+#else
+            if (work_queues[worker_thread_id].try_pop(task)) {
+                task();
+            }
+
+            if (thread_pool_terminate) {
+                break;
+            }
+
+#endif
+#endif
 #endif
         } while (true);
     }
@@ -312,14 +332,14 @@ public:
     tasks and waits for the pool threads to finish.
 */
     template <typename FunctionType>
-    std::future<typename std::result_of<FunctionType()>::type> submit(FunctionType f)
+    std::future<typename std::result_of<FunctionType()>::type> submit(uint32_t worker_thread_id, FunctionType f)
     {
         typedef typename std::result_of<FunctionType()>::type result_type;
 
         std::packaged_task<result_type()> task(std::move(f));
         std::future<result_type> res(task.get_future());
 
-        unsigned long long worker_thread_id = (round_robin_scheduling_counter++) % (unsigned long long)get_num_threads();
+        // = (round_robin_scheduling_counter++) % (unsigned long long)get_num_threads();
 
         // printf("[MCUT]: submit to thread %d\n", (int)worker_thread_id);
 
@@ -329,14 +349,14 @@ public:
     }
 
     template <typename FunctionType>
-    void submit_and_forget(FunctionType f)
+    void submit_and_forget(uint32_t worker_thread_id, FunctionType f)
     {
         // typedef typename std::result_of<FunctionType()>::type result_type;
 
         // std::packaged_task<result_type()> task(std::move(f));
         // std::future<result_type> res(task.get_future());
 
-        unsigned long long worker_thread_id = (round_robin_scheduling_counter++) % (unsigned long long)get_num_threads();
+        // unsigned long long worker_thread_id = (round_robin_scheduling_counter++) % (unsigned long long)get_num_threads();
 
         // printf("[MCUT]: submit to thread %d\n", (int)worker_thread_id);
 
@@ -405,6 +425,8 @@ static void get_scheduling_parameters(
     // the size of each block of elements assigned to a thread (note: last thread,
     // which is the master thread might have less)
     block_size = length / num_threads;
+
+    // printf("max_threads=%u num_threads=%u block_size=%u\n", max_threads, num_threads, block_size);
 
     if (num_threads == 0 || num_threads > available_threads) {
         throw std::runtime_error("invalid number of threads (" + std::to_string(num_threads) + ")");
@@ -496,7 +518,7 @@ void parallel_for(
 
         std::advance(block_end, block_size);
 
-        futures[i] = pool.submit(
+        futures[i] = pool.submit(i,
             [&, block_start, block_end]() -> OutputStorageType {
                 return task_func(block_start, block_end);
             });
@@ -559,7 +581,7 @@ void parallel_for(
 
         std::advance(block_end, block_size);
 
-        futures[i] = pool.submit(
+        futures[i] = pool.submit(i,
             [&, block_start, block_end]() {
                 task_func(block_start, block_end);
             });
@@ -668,7 +690,7 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
         std::advance(block_last, block_size - 1);
 
         // process_chunk()" handles all synchronisation
-        pool.submit_and_forget(
+        pool.submit_and_forget(i,
             [i /*NOTE: capture by-value*/, &previous_end_values, &end_values, block_start, block_last]() {
                 process_chunk()(block_start, block_last, (i != 0) ? &previous_end_values[i - 1] : 0, &end_values[i]);
             });
@@ -758,7 +780,7 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
             std::advance(block_end, block_size);
 
             // find_element()" handles all synchronisation
-            pool.submit_and_forget(
+            pool.submit_and_forget(i,
                 [&result, &done_flag, block_start, block_end, &match]() {
                     find_element<Iterator, MatchType>,
                         block_start, block_end, match,
@@ -778,49 +800,36 @@ template <typename Iterator, typename KeyType>
 void find_map_element_by_key(Iterator begin, Iterator end,
     KeyType match,
     std::promise<Iterator>* result,
-    std::atomic<bool>* done_flag) {
-    { try {
+    std::atomic<bool>* done_flag,
+    barrier_t* barrier_ptr)
+
+{
+    try {
         for (; (begin != end) && !done_flag->load(); ++begin) {
             if (begin->first == match) {
                 result->set_value(begin);
-done_flag->store(true);
-return;
-}
-}
-}
-catch (...)
-{
-    try {
-        result->set_exception(std::current_exception());
-        done_flag->store(true);
+                done_flag->store(true);
+                break;//return;
+            }
+        }
     } catch (...) {
+        try {
+            result->set_exception(std::current_exception());
+            done_flag->store(true);
+        } catch (...) {
+        }
     }
+    barrier_ptr->wait();
 }
-}
-}
-;
 
 template <typename Iterator, typename KeyType>
 Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator last, KeyType match)
 {
-
     unsigned long const length = std::distance(first, last);
 
     if (!length)
         return last;
-#if 0
-    unsigned long const min_per_thread=25;
-    unsigned long const max_threads=
-        (length+min_per_thread-1)/min_per_thread;
 
-    unsigned long const hardware_threads=
-        std::thread::hardware_concurrency();
-
-    unsigned long const num_threads=
-        std::min(hardware_threads!=0?hardware_threads:2,max_threads);
-
-    unsigned long const block_size=length/num_threads;
-#else
     uint32_t max_threads = 0;
     const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
     uint32_t num_threads = 0;
@@ -832,7 +841,9 @@ Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator
         block_size,
         length,
         available_threads);
-#endif
+
+    barrier_t barrier(num_threads);
+
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
 
@@ -845,55 +856,56 @@ Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator
             Iterator block_end = block_start;
             std::advance(block_end, block_size);
 
-            futures[i] = pool.submit(
-                [&result, &done_flag, block_start, block_end, &match]() {
+            futures[i] = pool.submit(i,
+                [&result, &done_flag, block_start, block_end, &match, &barrier]() {
                     find_map_element_by_key<Iterator, KeyType>(
                         block_start, block_end, match,
-                        &result, &done_flag);
+                        &result, &done_flag, &barrier);
                 });
             block_start = block_end;
         }
-        find_map_element_by_key<Iterator, KeyType>(block_start, last, match, &result, &done_flag);
+        find_map_element_by_key<Iterator, KeyType>(block_start, last, match, &result, &done_flag, &barrier);
 
         for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
             futures[i].wait();
         }
     }
-    
+
     if (!done_flag.load()) {
         return last; // if nothing found (by any thread), return "end"
     }
     return result.get_future().get();
 }
 
+template <typename Iterator, typename UnaryPredicate>
+void find_element_with_pred(Iterator begin, Iterator end,
+    UnaryPredicate pred,
+    std::promise<Iterator>* result,
+    std::atomic<bool>* done_flag,
+    barrier_t* barrier_ptr)
+{
+    try {
+        for (; (begin != end) && !done_flag->load(); ++begin) {
+            const bool found = pred(*begin);
+            if (found) {
+                result->set_value(begin);
+                done_flag->store(true);
+                break;//return;
+            }
+        }
+    } catch (...) {
+        try {
+            result->set_exception(std::current_exception());
+            done_flag->store(true);
+        } catch (...) {
+        }
+    }
+    barrier_ptr->wait();
+}
+
 template <typename Iterator, class UnaryPredicate>
 Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, UnaryPredicate predicate)
 {
-    struct find_element {
-        void operator()(Iterator begin, Iterator end,
-            UnaryPredicate pred,
-            std::promise<Iterator>* result,
-            std::atomic<bool>* done_flag)
-        {
-            try {
-                for (; (begin != end) && !done_flag->load(); ++begin) {
-                    const bool found = pred(*begin);
-                    if (found) {
-                        result->set_value(begin);
-                        done_flag->store(true);
-                        return;
-                    }
-                }
-            } catch (...) {
-                try {
-                    result->set_exception(std::current_exception());
-                    done_flag->store(true);
-                } catch (...) {
-                }
-            }
-        }
-    };
-
     unsigned long const length = std::distance(first, last);
 
     if (!length)
@@ -911,26 +923,27 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
         length,
         available_threads);
 
+    barrier_t barrier(num_threads);
+
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
 
-    {
-        Iterator block_start = first;
-        for (unsigned long i = 0; i < (num_threads - 1); ++i) {
-            Iterator block_end = block_start;
-            std::advance(block_end, block_size);
+    Iterator block_start = first;
+    for (uint32_t i = 0; i < (num_threads - 1); ++i) {
+        Iterator block_end = block_start;
+        std::advance(block_end, block_size);
 
-            // "done_flag" and scope handle all synchronisation
-            pool.submit_and_forget(
-                [&result, &done_flag, block_start, block_end, &predicate]() {
-                    find_element(),
-                        block_start, block_end, predicate,
-                        &result, &done_flag;
-                });
-            block_start = block_end;
-        }
-        find_element()(block_start, last, predicate, &result, &done_flag);
+        // barrier handles all synchronisation
+        pool.submit_and_forget(i,
+            [&result, &done_flag, block_start, block_end, &predicate, &barrier]() {
+                find_element_with_pred<Iterator,UnaryPredicate >(
+                    block_start, block_end, predicate,
+                    &result, &done_flag, &barrier);
+            });
+        block_start = block_end;
     }
+    find_element_with_pred<Iterator,UnaryPredicate >(block_start, last, predicate, &result, &done_flag, &barrier);
+
     if (!done_flag.load()) {
         return last; // if nothing found (by any thread), return "end"
     }

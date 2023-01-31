@@ -212,7 +212,11 @@ struct output_t {
 // internal main
 void dispatch(output_t& out, const input_t& in);
 
-int find_connected_components(std::vector<int>& fccmap, const hmesh_t& mesh, std::vector<int>& cc_to_vertex_count,
+int find_connected_components(
+#if defined(MCUT_MULTI_THREADED)
+    thread_pool& scheduler,
+#endif
+    std::vector<int>& fccmap, const hmesh_t& mesh, std::vector<int>& cc_to_vertex_count,
     std::vector<int>& cc_to_face_count);
 
 // return true if point p lies on the plane of every three vertices of f

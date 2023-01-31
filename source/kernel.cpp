@@ -224,6 +224,9 @@ void dfs_cc(vd_t u, const hmesh_t& mesh, std::vector<int>& visited, int connecte
 }
 
 int find_connected_components(
+#if defined(MCUT_MULTI_THREADED)
+    thread_pool& scheduler,
+#endif
     std::vector<int>& fccmap,
     const hmesh_t& mesh,
     std::vector<int>& cc_to_vertex_count,
@@ -245,6 +248,9 @@ int find_connected_components(
     std::vector<bool> queued(mesh.number_of_vertices(), false);
     std::queue<vd_t> queue; // .. to discover all vertices of current connected component
 
+    std::vector<vd_t> vertices_of_v;
+    std::vector<vd_t> vertices_of_u;
+
     for (vertex_array_iterator_t u = mesh.vertices_begin(); u != mesh.vertices_end(); ++u) {
         if (visited[*u] == -1) {
             connected_component_id += 1;
@@ -253,7 +259,8 @@ int find_connected_components(
 
             cc_to_vertex_count.push_back(1); // each discovered cc has at least one vertex
 
-            std::vector<vd_t> vertices_of_u = mesh.get_vertices_around_vertex(*u);
+            vertices_of_u.clear();
+            mesh.get_vertices_around_vertex(vertices_of_u, *u);
 
             for (int i = 0; i < (int)vertices_of_u.size(); ++i) {
                 vd_t vou = vertices_of_u[i];
@@ -269,7 +276,9 @@ int find_connected_components(
                 {
                     visited[v] = connected_component_id;
                     cc_to_vertex_count[connected_component_id] += 1;
-                    std::vector<vd_t> vertices_of_v = mesh.get_vertices_around_vertex(v);
+
+                    vertices_of_v.clear();
+                    mesh.get_vertices_around_vertex(vertices_of_v, v);
 
                     for (int i = 0; i < (int)vertices_of_v.size(); ++i) {
                         vd_t vov = vertices_of_v[i];
@@ -289,10 +298,46 @@ int find_connected_components(
     fccmap.resize(mesh.number_of_faces());
     int num_connected_components = (connected_component_id + 1); // number of CCs
     cc_to_face_count.resize(num_connected_components);
+#if defined(MCUT_MULTI_THREADED)
+    auto fn_set_cc_to_face_count = [](std::vector<int>::iterator block_start_, std::vector<int>::iterator block_end_) {
+        for (std::vector<int>::iterator it = block_start_; it != block_end_; ++it) {
+            *it = 0;
+        }
+    };
+
+    parallel_for(
+        scheduler,
+        cc_to_face_count.begin(),
+        cc_to_face_count.end(),
+        fn_set_cc_to_face_count);
+#else
     for (int i = 0; i < (int)cc_to_face_count.size(); ++i) {
         cc_to_face_count[i] = 0;
     }
+#endif
 
+    fccmap.reserve(mesh.number_of_faces());
+
+#if defined(MCUT_MULTI_THREADED)
+    auto fn_map_faces = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+        for (face_array_iterator_t f = block_start_; f != block_end_; ++f) {
+            const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f);
+
+            int face_cc_id = SAFE_ACCESS(visited, vertices.front());
+
+            // all vertices belong to the same conn comp
+            fccmap[*f] = face_cc_id;
+
+            cc_to_face_count[face_cc_id] += 1;
+        }
+    };
+
+    parallel_for(
+        scheduler,
+        mesh.faces_begin(),
+        mesh.faces_end(),
+        fn_map_faces);
+#else
     // map each face to a connected component
     for (face_array_iterator_t f = mesh.faces_begin(); f != mesh.faces_end(); ++f) {
         const std::vector<vertex_descriptor_t> vertices = mesh.get_vertices_around_face(*f);
@@ -304,6 +349,7 @@ int find_connected_components(
 
         cc_to_face_count[face_cc_id] += 1;
     }
+#endif
 
     return num_connected_components;
 }
@@ -392,7 +438,7 @@ hmesh_t extract_connected_components(
         auto fn_compute_inserted_faces = [&mesh](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
             OutputStorageTypesTuple local_output;
             std::vector<std::vector<vd_t>>& faces_LOCAL = std::get<0>(local_output);
-
+            faces_LOCAL.reserve(std::distance(block_start_, block_end_));
             for (InputStorageIteratorType mX_traced_polygons_iter = block_start_; mX_traced_polygons_iter != block_end_; ++mX_traced_polygons_iter) {
                 const std::vector<hd_t>& mX_traced_polygon = *mX_traced_polygons_iter;
 
@@ -508,7 +554,7 @@ hmesh_t extract_connected_components(
     TIMESTACK_PUSH("Extract CC: find connected components");
     std::vector<int> cc_to_vertex_count;
     std::vector<int> cc_to_face_count;
-    find_connected_components(fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
+    find_connected_components(scheduler, fccmap, mesh, cc_to_vertex_count, cc_to_face_count);
     TIMESTACK_POP();
 
     //
@@ -536,7 +582,7 @@ hmesh_t extract_connected_components(
         }
 
         std::shared_ptr<hmesh_t> cc_mesh = ccID_to_mesh_fiter->second;
-        
+
         std::map<std::size_t, std::unordered_map<vd_t, vd_t>>::iterator ccID_to_mX_to_cc_vertex_fiter = ccID_to_mX_to_cc_vertex.find(face_cc_id);
 
         if (ccID_to_mX_to_cc_vertex_fiter == ccID_to_mX_to_cc_vertex.end()) {
@@ -687,9 +733,13 @@ hmesh_t extract_connected_components(
 
         auto fn_compute_remapped_cc_faces = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
             OutputStorageTypesTuple local_output;
+            const uint32_t num_elems = (uint32_t)std::distance(block_start_, block_end_);
             std::vector<std::vector<vd_t>>& remapped_faces_LOCAL = std::get<0>(local_output);
+            remapped_faces_LOCAL.reserve(num_elems);
             std::vector<int>& local_remapped_face_to_ccID = std::get<1>(local_output);
+            local_remapped_face_to_ccID.reserve(num_elems);
             std::vector<fd_t>& local_remapped_face_to_mX_face = std::get<2>(local_output);
+            local_remapped_face_to_mX_face.reserve(num_elems);
             for (face_array_iterator_t face_iter = block_start_; face_iter != block_end_; ++face_iter) {
                 face_descriptor_t fd = *face_iter;
                 const size_t cc_id = fccmap[fd]; // the connected component which contains the current face
@@ -1397,9 +1447,21 @@ void update_neighouring_ps_iface_m0_edge_list(
 
 typedef std::vector<hd_t> traced_polygon_t;
 
-bool mesh_is_closed(const hmesh_t& mesh)
+bool mesh_is_closed(thread_pool& scheduler, const hmesh_t& mesh)
 {
     bool all_halfedges_incident_to_face = true;
+#if defined(MCUT_MULTI_THREADED)
+    {
+        all_halfedges_incident_to_face = parallel_find_if(
+            scheduler,
+            mesh.halfedges_begin(),
+            mesh.halfedges_end(),
+            [&](hd_t h) {
+                const fd_t f = mesh.face(h);
+                return (f == hmesh_t::null_face());
+            }) != mesh.halfedges_end();
+    }
+#else
     for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
         const fd_t f = mesh.face(*iter);
         if (f == hmesh_t::null_face()) {
@@ -1407,6 +1469,7 @@ bool mesh_is_closed(const hmesh_t& mesh)
             break;
         }
     }
+#endif
     return all_halfedges_incident_to_face;
 }
 
@@ -1481,12 +1544,12 @@ void dispatch(output_t& output, const input_t& input)
     const int cs_vtx_count = cs.number_of_vertices();
 
     TIMESTACK_PUSH("Check source mesh is closed");
-    const bool sm_is_watertight = mesh_is_closed(sm);
+    const bool sm_is_watertight = mesh_is_closed( *input.scheduler, sm);
 
     TIMESTACK_POP();
 
     TIMESTACK_PUSH("Check cut mesh is closed");
-    const bool cm_is_watertight = mesh_is_closed(cs);
+    const bool cm_is_watertight = mesh_is_closed( *input.scheduler, cs);
 
     TIMESTACK_POP();
 
@@ -1577,7 +1640,7 @@ void dispatch(output_t& output, const input_t& input)
 
                 uint32_t counter = 0;
                 for (face_array_iterator_t i = block_start_; i != block_end_; ++i) {
-                    std::pair<fd_t, std::vector<vd_t>>& p =result[counter++];
+                    std::pair<fd_t, std::vector<vd_t>>& p = result[counter++];
                     std::vector<vd_t>& remapped_face_vertices = p.second;
                     cs.get_vertices_around_face(remapped_face_vertices, *i, sm_vtx_cnt);
                     p.first = *i;
@@ -1588,7 +1651,7 @@ void dispatch(output_t& output, const input_t& input)
 
             std::vector<std::future<std::vector<std::pair<fd_t, std::vector<vd_t>>>>> futures;
             std::vector<std::pair<fd_t, std::vector<vd_t>>> master_thread_res;
-            
+
             parallel_for(
                 *input.scheduler,
                 cs.faces_begin(),
@@ -1596,11 +1659,9 @@ void dispatch(output_t& output, const input_t& input)
                 fn_remap_ps_faces,
                 master_thread_res,
                 futures);
-            
-            auto add_faces = [&](const std::vector<std::pair<fd_t, std::vector<vd_t>>>& remapped_faces)
-            {
-                for(std::vector<std::pair<fd_t, std::vector<vd_t>>>::const_iterator it = remapped_faces.cbegin(); it != remapped_faces.cend(); ++it)
-                {
+
+            auto add_faces = [&](const std::vector<std::pair<fd_t, std::vector<vd_t>>>& remapped_faces) {
+                for (std::vector<std::pair<fd_t, std::vector<vd_t>>>::const_iterator it = remapped_faces.cbegin(); it != remapped_faces.cend(); ++it) {
                     const std::pair<fd_t, std::vector<vd_t>>& p = *it;
                     const fd_t f = ps.add_face(p.second);
 
@@ -1610,13 +1671,12 @@ void dispatch(output_t& output, const input_t& input)
                 }
             };
 
-            for(uint32_t i =0; i < (uint32_t)futures.size(); ++i)
-            {
+            for (uint32_t i = 0; i < (uint32_t)futures.size(); ++i) {
                 const std::vector<std::pair<fd_t, std::vector<vd_t>>> f_res = futures[i].get();
                 add_faces(f_res);
             }
 
-             add_faces(master_thread_res);
+            add_faces(master_thread_res);
         }
 #else // #if defined(MCUT_MULTI_THREADED)
 
@@ -4763,13 +4823,16 @@ void dispatch(output_t& output, const input_t& input)
                                      InputStorageIteratorType block_start_,
                                      InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
             OutputStorageTypesTuple local_output;
-
+            const uint32_t num_elems = (uint32_t)std::distance(block_start_, block_end_);
             std::vector<traced_polygon_t>& m0_polygons_LOCAL = std::get<0>(local_output);
+            m0_polygons_LOCAL.reserve(num_elems);
             std::vector<int>& m0_sm_cutpath_adjacent_polygons_LOCAL = std::get<1>(local_output);
+            m0_sm_cutpath_adjacent_polygons_LOCAL.reserve(ps_iface_to_m0_edge_list.size());
             std::vector<int>& m0_cm_cutpath_adjacent_polygons_LOCAL = std::get<2>(local_output);
+            m0_cm_cutpath_adjacent_polygons_LOCAL.reserve(ps_iface_to_m0_edge_list.size());
             int& traced_sm_polygon_count_LOCAL = std::get<3>(local_output);
             std::unordered_map<int, fd_t>& m0_to_ps_face_LOCAL = std::get<4>(local_output);
-
+            m0_to_ps_face_LOCAL.reserve(num_elems);
             traced_sm_polygon_count_LOCAL = 0;
 
             for (face_array_iterator_t ps_face_iter = block_start_; ps_face_iter != block_end_; ++ps_face_iter) {
@@ -7757,7 +7820,7 @@ void dispatch(output_t& output, const input_t& input)
         int // patch index
         >
         m0_cm_poly_to_patch_idx;
-        m0_cm_poly_to_patch_idx.reserve(cs_face_count);
+    m0_cm_poly_to_patch_idx.reserve(cs_face_count);
 
     // This map stores an interior intersection-halfedge for each patch. This
     // halfedge also represents the traced cut-mesh polygon from which we will
@@ -8637,7 +8700,7 @@ void dispatch(output_t& output, const input_t& input)
                 // all polygon are stored in the same array so we can use that to deduce
                 // index of new reversed polygon
                 int cw_poly_idx = (int)m0_polygons.size();
-                
+
                 // get the normal polygon
                 const traced_polygon_t& patch_poly = SAFE_ACCESS(m0_polygons, ccw_patch_poly_idx);
 #if 0
@@ -8679,7 +8742,9 @@ void dispatch(output_t& output, const input_t& input)
                     //
 
                     traced_polygon_t cw_poly;
+                    cw_poly.reserve(patch_poly.size());
                     traced_polygon_t tmp;
+                    tmp.reserve(patch_poly.size());
 
                     // for each halfedge of the ccw polygon
                     for (traced_polygon_t::const_iterator patch_poly_he_iter = patch_poly.cbegin();
@@ -8828,13 +8893,15 @@ void dispatch(output_t& output, const input_t& input)
             // create mesh for patch
             //
             std::shared_ptr<hmesh_t> patch_mesh = std::shared_ptr<hmesh_t>(new hmesh_t);
-            patch_mesh->reserve_for_additional_elements(m0.number_of_vertices());
+            patch_mesh->reserve_for_additional_elements(cs_face_count);
 
             std::unordered_map<
                 vd_t, // vertex descriptor in "m0"
                 vd_t // vertex descriptor in "patch_mesh"
                 >
                 m0_to_patch_mesh_vertex;
+
+            m0_to_patch_mesh_vertex.reserve(m0.number_of_vertices());
 
             // NOTE: ccw/normal patches are created before their reversed counterparts (hence the modulo Operator trick)
 
@@ -8853,6 +8920,7 @@ void dispatch(output_t& output, const input_t& input)
             std::vector<vd_t> seam_vertices; // vertices along cutpath
 
             std::unordered_map<vd_t, vd_t> patch_to_m0_vertex;
+            patch_to_m0_vertex.reserve(cs_face_count);
 
             // for each polygon in the patch
             for (std::vector<int>::const_iterator patch_poly_iter = patch.cbegin(); patch_poly_iter != patch.cend(); ++patch_poly_iter) {
