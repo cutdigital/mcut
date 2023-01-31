@@ -101,6 +101,7 @@ extern int get_node_mem_index(
     const int rightmostRealNodeImplicitIndexOnNodeLevel);
 
 extern void build_oibvh(
+    thread_pool& pool,
     const hmesh_t& mesh,
     std::vector<bounding_box_t<vec3>>& bvhAABBs,
     std::vector<fd_t>& bvhLeafNodeFaces,
