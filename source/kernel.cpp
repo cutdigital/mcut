@@ -1452,6 +1452,7 @@ bool mesh_is_closed(thread_pool& scheduler, const hmesh_t& mesh)
     bool all_halfedges_incident_to_face = true;
 #if defined(MCUT_MULTI_THREADED)
     {
+        printf("mesh=%d\n", (int)mesh.number_of_halfedges());
         all_halfedges_incident_to_face = parallel_find_if(
             scheduler,
             mesh.halfedges_begin(),
@@ -1459,7 +1460,7 @@ bool mesh_is_closed(thread_pool& scheduler, const hmesh_t& mesh)
             [&](hd_t h) {
                 const fd_t f = mesh.face(h);
                 return (f == hmesh_t::null_face());
-            }) != mesh.halfedges_end();
+            }) == mesh.halfedges_end();
     }
 #else
     for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
