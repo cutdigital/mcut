@@ -1478,6 +1478,7 @@ void dispatch(output_t& output, const input_t& input)
     const int sm_vtx_cnt = sm.number_of_vertices();
     const int sm_face_count = sm.number_of_faces();
     const int cs_face_count = cs.number_of_faces();
+    const int cs_vtx_count = cs.number_of_vertices();
 
     TIMESTACK_PUSH("Check source mesh is closed");
     const bool sm_is_watertight = mesh_is_closed(sm);
@@ -9350,12 +9351,13 @@ void dispatch(output_t& output, const input_t& input)
         // get the reference to the copy of "m1" to which patches of the current color will be stitched
         hmesh_t& m1_colored = SAFE_ACCESS(color_to_m1, color_id);
 
-        m1_colored.reserve_for_additional_elements(cs_face_count);
+        m1_colored.reserve_for_additional_elements(cs_vtx_count);
 
         // create entry
         color_to_m0_to_m1_he_instances.insert(std::make_pair(color_id, std::unordered_map<hd_t, std::map<int, hd_t>>()));
         // ref to entry
         std::unordered_map<hd_t, std::map<int, hd_t>>& m0_to_m1_he_instances = SAFE_ACCESS(color_to_m0_to_m1_he_instances, color_id);
+        m0_to_m1_he_instances.reserve(m0.number_of_halfedges());
         // copy all of the "m1_polygons" that were created before we got to the stitching stage
         // Note: Before stitching has began, "m1_polygons" contains only source-mesh polygons,
         // which have been partition to allow separation of unsealed connected components
@@ -9371,13 +9373,16 @@ void dispatch(output_t& output, const input_t& input)
         std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
 
         std::unordered_map<int, int>& m0_to_m1_face_colored = SAFE_ACCESS(color_to_m0_to_m1_face, color_id); // note: containing mappings only for traced source mesh polygons initially!
+        m0_to_m1_face_colored.reserve(m0_polygons.size());
         std::unordered_map<int, int>& m1_to_m0_face_colored = SAFE_ACCESS(color_to_m1_to_m0_face, color_id);
+        m1_to_m0_face_colored.reserve(m0_polygons.size());
         MCUT_ASSERT(!m0_to_m1_face_colored.empty());
         MCUT_ASSERT(!m1_to_m0_face_colored.empty());
 
         std::vector<vd_t>& m1_to_m0_sm_ovtx_colored = SAFE_ACCESS(color_to_m1_to_m0_sm_ovtx, color_id);
         // MCUT_ASSERT(!m0_to_m1_sm_ovtx_colored.empty());
         MCUT_ASSERT(!m1_to_m0_sm_ovtx_colored.empty());
+        m1_to_m0_sm_ovtx_colored.reserve(sm_vtx_cnt);
 
         // An original in "m0" that is used to trace a cut-mesh polygon will have
         // two "m1" versions - one for the ccw/normal patch and the other for the
