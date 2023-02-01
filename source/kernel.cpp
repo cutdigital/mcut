@@ -1458,7 +1458,7 @@ bool mesh_is_closed(
     const hmesh_t& mesh)
 {
     bool all_halfedges_incident_to_face = true;
-#if defined(MCUT_MULTI_THREADED)
+#if 0 //defined(MCUT_MULTI_THREADED)
     {
         printf("mesh=%d\n", (int)mesh.number_of_halfedges());
         all_halfedges_incident_to_face = parallel_find_if(
