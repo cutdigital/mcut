@@ -1068,6 +1068,15 @@ void triangulate_face(
     }
 }
 
+/* Helper function (to prevent code duplication), which maps a given index of
+ an internal-inputmesh face, to it corresponding face-index value in the user-provided
+ input-mesh.
+
+ This is needed because MCUT may modify the user-inputmesh (source mesh or cut mesh)
+ when it performs polygon partitioning (subject to teh nature of the intersection).
+
+ Refer to the comments about polygon partitioning
+  */
 uint32_t map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
     const uint32_t internal_inputmesh_face_idx,
     const std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>& cc_uptr)
@@ -2220,33 +2229,11 @@ void get_connected_component_data_impl(
                         uint32_t i = elem_offset;
 
                         // Refer to single-threaded code (below) for documentation
-                        uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[i];
-                        uint32_t user_inputmesh_face_idx = INT32_MAX;
-                        const bool internal_input_mesh_face_idx_is_for_src_mesh = (internal_inputmesh_face_idx < cc_uptr->internal_sourcemesh_face_count);
-
-                        if (internal_input_mesh_face_idx_is_for_src_mesh) {
-
-                            std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->source_hmesh_child_to_usermesh_birth_face->find(fd_t(internal_inputmesh_face_idx));
-
-                            if (fiter != cc_uptr->source_hmesh_child_to_usermesh_birth_face->cend()) {
-                                user_inputmesh_face_idx = fiter->second;
-                            } else {
-                                user_inputmesh_face_idx = internal_inputmesh_face_idx;
-                            }
-                            MCUT_ASSERT(user_inputmesh_face_idx < cc_uptr->client_sourcemesh_face_count);
-                        } else {
-                            std::unordered_map<fd_t, fd_t>::const_iterator fiter = cc_uptr->cut_hmesh_child_to_usermesh_birth_face->find(fd_t(internal_inputmesh_face_idx));
-
-                            if (fiter != cc_uptr->cut_hmesh_child_to_usermesh_birth_face->cend()) {
-                                uint32_t unoffsettedDescr = (fiter->second - cc_uptr->internal_sourcemesh_face_count);
-                                user_inputmesh_face_idx = unoffsettedDescr + cc_uptr->client_sourcemesh_face_count;
-                            } else {
-                                uint32_t unoffsettedDescr = (internal_inputmesh_face_idx - cc_uptr->internal_sourcemesh_face_count);
-                                user_inputmesh_face_idx = unoffsettedDescr + cc_uptr->client_sourcemesh_face_count;
-                            }
-                        }
-
-                        MCUT_ASSERT(user_inputmesh_face_idx != INT32_MAX);
+                        const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[i];
+                        // const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
+                        const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
+                            internal_inputmesh_face_idx,
+                            cc_uptr);
 
                         *(casted_ptr + elem_offset) = user_inputmesh_face_idx;
                         elem_offset++;
@@ -2278,19 +2265,23 @@ void get_connected_component_data_impl(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION");
+        // internal halfedge data structure from the current connected component
+        const std::shared_ptr<hmesh_t> cc = cc_uptr->kernel_hmesh_data->mesh;
+
+        const uint32_t nontri_face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
+
+        // user has set the dispatch flag to allow us to save the face maps.
+        const bool user_requested_cdt_face_maps = (nontri_face_map_size != 0);
+
         if (cc_uptr->cdt_index_cache_initialized == false) // compute triangulation if not yet available
         {
             MCUT_ASSERT(cc_uptr->cdt_index_cache.empty());
 
-            // internal halfedge data structure from the current connected component
-            const std::shared_ptr<hmesh_t> cc = cc_uptr->kernel_hmesh_data->mesh;
-
-            const uint32_t nontri_face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
-
-            // user has set the dispatch flag to allow us to save the face maps.
-            const bool user_requested_cdt_face_maps = (nontri_face_map_size != 0);
-
             const uint32_t cc_face_count = cc->number_of_faces();
+            if (user_requested_cdt_face_maps) {
+                cc_uptr->cdt_face_map_cache.reserve(cc_face_count * 1.2);
+            }
+
 #if defined(MCUT_MULTI_THREADED)
             {
 
@@ -2313,7 +2304,7 @@ void get_connected_component_data_impl(
                     uint32_t max_threads = 0;
                     const uint32_t available_threads = context_uptr->scheduler.get_num_threads() + 1; // workers and master (+1)
                     uint32_t block_size_unused = 0;
-                    const uint32_t length = cc->number_of_faces();
+                    const uint32_t length = cc_face_count;
 
                     get_scheduling_parameters(
                         num_threads,
@@ -2331,10 +2322,14 @@ void get_connected_component_data_impl(
                 auto fn_triangulate_faces = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
                     // CDT indices computed per thread
                     std::vector<uint32_t> cdt_index_cache_local;
-                    cdt_index_cache_local.reserve(std::distance(block_start_, block_end_) * 4);
+                    const uint32_t num_elems_to_process = (uint32_t)std::distance(block_start_, block_end_);
+                    cdt_index_cache_local.reserve(num_elems_to_process * 4);
+                    std::vector<uint32_t> cdt_face_map_cache_local;
+                    cdt_face_map_cache_local.reserve(num_elems_to_process * 1.2);
 
                     std::vector<vertex_descriptor_t> cc_face_vertices;
                     std::vector<uint32_t> cc_face_triangulation;
+
                     for (face_array_iterator_t cc_face_iter = block_start_; cc_face_iter != block_end_; ++cc_face_iter) {
 
                         cc->get_vertices_around_face(cc_face_vertices, *cc_face_iter);
@@ -2352,6 +2347,14 @@ void get_connected_component_data_impl(
                                 cdt_index_cache_local.push_back(vertex_id_in_cc);
                             }
 
+                            if (user_requested_cdt_face_maps) {
+                                const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
+                                const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
+                                    internal_inputmesh_face_idx,
+                                    cc_uptr);
+                                cdt_face_map_cache_local.push_back(user_inputmesh_face_idx);
+                            }
+
                         } else {
 
                             cc_face_triangulation.clear();
@@ -2363,10 +2366,22 @@ void get_connected_component_data_impl(
                                 const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
 
                                 cdt_index_cache_local.push_back(global_idx);
+
+                                if (user_requested_cdt_face_maps) {
+                                    if ((i % 3) == 0) { // every three indices constitute one triangle
+                                        // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter" (in the user input mesh)
+                                        const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
+                                        const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
+                                            internal_inputmesh_face_idx,
+                                            cc_uptr);
+                                        cdt_face_map_cache_local.push_back(user_inputmesh_face_idx);
+                                    }
+                                }
                             }
                         }
                     }
 
+                    // local num triangulation indices computed by thread
                     const uint32_t cdt_index_cache_local_len = cdt_index_cache_local.size();
 
                     const uint32_t write_offset = cdt_index_cache_offset.fetch_add(cdt_index_cache_local_len);
@@ -2374,13 +2389,39 @@ void get_connected_component_data_impl(
                     barrier.wait(); // .. for all threads to triangulate their range of faces
 
                     if (std::this_thread::get_id() == master_thread_id) {
-                        cc_uptr->cdt_index_cache.resize(cdt_index_cache_offset.load());
+                        //
+                        // allocate memory for threads to write in parallel
+                        //
+                        const uint32_t num_triangulation_indices_global = cdt_index_cache_offset.load();
+                        MCUT_ASSERT((num_triangulation_indices_global % 3) == 0);
+                        const uint32_t num_triangles_global = num_triangulation_indices_global / 3;
+                        MCUT_ASSERT(num_triangles_global >= 1);
+                        cc_uptr->cdt_index_cache.resize(num_triangulation_indices_global);
+
+                        if (user_requested_cdt_face_maps) {
+                            cc_uptr->cdt_face_map_cache.resize(num_triangles_global);
+                        }
                     }
 
                     barrier.wait(); // .. for memory to be allocated
 
+                    // for each local triangulation index (NOTE: num triangles local = "cdt_index_cache_local_len/3")
                     for (uint32_t i = 0; i < cdt_index_cache_local_len; ++i) {
-                        SAFE_ACCESS(cc_uptr->cdt_index_cache, write_offset + i) = SAFE_ACCESS(cdt_index_cache_local, i);
+
+                        // local triangulation cache index
+                        const uint32_t local_cache_idx = i;
+                        // global triangulation cache index
+                        const uint32_t global_cache_idx = write_offset + local_cache_idx;
+
+                        SAFE_ACCESS(cc_uptr->cdt_index_cache, global_cache_idx) = SAFE_ACCESS(cdt_index_cache_local, local_cache_idx);
+
+                        if (user_requested_cdt_face_maps && ((local_cache_idx % 3) == 0)) // every three cdt indices constitute a triangle
+                        {
+                            const uint32_t triangle_index_global = global_cache_idx / 3;
+                            const uint32_t triangle_index_local = local_cache_idx / 3;
+
+                            SAFE_ACCESS(cc_uptr->cdt_face_map_cache, triangle_index_global) = SAFE_ACCESS(cdt_face_map_cache_local, triangle_index_local);
+                        }
                     }
                 };
 
@@ -2394,10 +2435,6 @@ void get_connected_component_data_impl(
 #else // #if defined(MCUT_MULTI_THREADED)
             uint32_t face_indices_offset = 0;
             cc_uptr->cdt_index_cache.reserve(cc_face_count * 1.2);
-
-            if (user_requested_cdt_face_maps) {
-                cc_uptr->cdt_face_map_cache.reserve(cc_face_count * 1.2);
-            }
 
             // descriptors of vertices in face (they index into the CC)
             std::vector<vertex_descriptor_t> cc_face_vertices;
@@ -2485,11 +2522,16 @@ void get_connected_component_data_impl(
 
         MCUT_ASSERT(cc_uptr->cdt_index_cache_initialized == true);
 
+        if(user_requested_cdt_face_maps)
+        {
+            MCUT_ASSERT(!cc_uptr->cdt_face_map_cache.empty());
+        }
+
         // i.e. pMem is a pointer allocated by the user and not one that we allocated
         // here inside the API e.g. fool us into just computing the CDT triangulation
         // indices and face map caches.
         // See also the case for MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP below:
-        const bool proceed_and_copy_to_output_ptr = pMem != cc_uptr->cdt_face_map_cache.data();
+        const bool proceed_and_copy_to_output_ptr = user_requested_cdt_face_maps == false || pMem != cc_uptr->cdt_face_map_cache.data();
 
         if (proceed_and_copy_to_output_ptr) {
             const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->cdt_index_cache.size();
