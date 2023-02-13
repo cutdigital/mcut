@@ -119,8 +119,8 @@ struct connected_component_t {
     bool cdt_index_cache_initialized = false;
     // stores the mapping between a CDT triangle in the connected component and 
     // the original "birth-face" in an input mesh (source mesh or cut mesh)
-    std::vector<uint32_t> cdt_map_cache;
-    bool cdt_map_cache_initialized = false;
+    std::vector<uint32_t> cdt_face_map_cache;
+    bool cdt_face_map_cache_initialized = false;
 #if defined(MCUT_MULTI_THREADED)
     // Stores the number of vertices per face of CC. This is an optimization 
     // because there is a possibility that face-sizes may (at-minimum) be queried 

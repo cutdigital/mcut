@@ -2386,7 +2386,7 @@ void get_connected_component_data_impl(
             cc_uptr->cdt_index_cache.reserve(cc_face_count * 1.2);
 
             if (user_requested_cdt_face_maps) {
-                cc_uptr->cdt_map_cache.reserve(cc_face_count * 1.2);
+                cc_uptr->cdt_face_map_cache.reserve(cc_face_count * 1.2);
             }
 
             // descriptors of vertices in face (they index into the CC)
@@ -2413,7 +2413,7 @@ void get_connected_component_data_impl(
                     }
 
                     if (user_requested_cdt_face_maps) {
-                        cc_uptr->cdt_map_cache.push_back(*cc_face_iter);
+                        cc_uptr->cdt_face_map_cache.push_back(*cc_face_iter);
                     }
 
                 } else {
@@ -2446,7 +2446,7 @@ void get_connected_component_data_impl(
                         if (user_requested_cdt_face_maps) {
                             if ((i % 3) == 0) { // every three indices constitute one triangle
                                 // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter"
-                                cc_uptr->cdt_map_cache.push_back(*cc_face_iter);
+                                cc_uptr->cdt_face_map_cache.push_back(*cc_face_iter);
                             }
                         }
                     }
@@ -2460,36 +2460,97 @@ void get_connected_component_data_impl(
             cc_uptr->cdt_index_cache_initialized = true;
 
             if (user_requested_cdt_face_maps) {
-                MCUT_ASSERT(cc_uptr->cdt_map_cache.empty() == false);
-                cc_uptr->cdt_map_cache_initialized = true;
+                MCUT_ASSERT(cc_uptr->cdt_face_map_cache.empty() == false);
+                cc_uptr->cdt_face_map_cache_initialized = true;
             }
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
 
         MCUT_ASSERT(cc_uptr->cdt_index_cache_initialized == true);
+        
+        // i.e. pMem is a pointer allocated by the user and not one that we allocated
+        // here inside the API e.g. fool us into just computing the CDT triangulation 
+        // indices and face map caches.
+        // See also the case for MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP below:
+        const bool proceed_and_copy_to_output_ptr = pMem != cc_uptr->cdt_face_map_cache.data();
 
-        const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->cdt_index_cache.size();
+        if (proceed_and_copy_to_output_ptr) {
+            const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->cdt_index_cache.size();
 
-        if (pMem == nullptr) // client pointer is null (asking for size)
-        {
-            MCUT_ASSERT(num_triangulation_indices >= 3);
-            *pNumBytes = num_triangulation_indices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
-        } else {
-            MCUT_ASSERT(num_triangulation_indices >= 3);
+            if (pMem == nullptr) // client pointer is null (asking for size)
+            {
+                MCUT_ASSERT(num_triangulation_indices >= 3);
+                *pNumBytes = num_triangulation_indices * sizeof(uint32_t); // each each vertex has a map value (intersection point == uint_max)
+            } else {
+                MCUT_ASSERT(num_triangulation_indices >= 3);
 
-            if (bytes > num_triangulation_indices * sizeof(uint32_t)) {
-                throw std::invalid_argument("out of bounds memory access");
+                if (bytes > num_triangulation_indices * sizeof(uint32_t)) {
+                    throw std::invalid_argument("out of bounds memory access");
+                }
+
+                if (bytes % (sizeof(uint32_t)) != 0 || (bytes / sizeof(uint32_t)) % 3 != 0) {
+                    throw std::invalid_argument("invalid number of bytes");
+                }
+
+                memcpy(pMem, reinterpret_cast<void*>(cc_uptr->cdt_index_cache.data()), bytes);
             }
-
-            if (bytes % (sizeof(uint32_t)) != 0 || (bytes / sizeof(uint32_t)) % 3 != 0) {
-                throw std::invalid_argument("invalid number of bytes");
-            }
-
-            memcpy(pMem, reinterpret_cast<void*>(cc_uptr->cdt_index_cache.data()), bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP: {
+        // The default/standard non-tri face map. If this is defined then the tri-face map must also be defined
+        const uint32_t face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
 
+        if (face_map_size == 0) {
+            throw std::invalid_argument("face map not available"); // user probably forgot to set the dispatch flag
+        } else {
+            // Face maps are available (because they were requested by user) and
+            // so it follows that the triangulated-face maps should be available too.
+            MCUT_ASSERT(cc_uptr->cdt_face_map_cache_initialized == true);
+        }
+
+        MCUT_ASSERT(face_map_size == (uint32_t)cc_uptr->kernel_hmesh_data->mesh->number_of_faces());
+
+        // Did the user request the triangulated-face map BEFORE the triangulated face indices?
+        // That is call mcGetConnectedComponentData with MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP before calling with MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION
+        // If so, we need to compute the triangulated face indices anyway (and cache then) since
+        // that API call also compute the triangulated face maps (cache)  
+        if (cc_uptr->cdt_face_map_cache_initialized == false) {
+
+            // recursive Internal API call to compute CDT and populate caches and also set "cc_uptr->cdt_face_map_cache_initialized" to true
+            get_connected_component_data_impl(
+                context, 
+                connCompId, 
+                MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 
+                /*The next two parameters are actually unused (in the sense of writing data to them). 
+                They must be provided however, in order to fool the (internal) API call into deducing that we 
+                want to query triangulation data but what we really want to compute the CDT (cache) and 
+                populated the triangulated face maps (cache) */
+                sizeof(uint32_t) , // **
+                cc_uptr->cdt_face_map_cache.data(), // value of pointer will also be used to infer that no memcpy is actually performed
+                NULL);
+
+            MCUT_ASSERT(cc_uptr->cdt_face_map_cache_initialized == true);
+        }
+
+        const uint32_t triangulated_face_map_size = cc_uptr->cdt_face_map_cache.size();
+
+        MCUT_ASSERT(triangulated_face_map_size >= face_map_size);
+
+        if (pMem == nullptr) {
+            *pNumBytes = triangulated_face_map_size * sizeof(uint32_t); // each face has a map value (intersection point == uint_max)
+        } else {
+            if (bytes > (triangulated_face_map_size * sizeof(uint32_t))) {
+                throw std::invalid_argument("out of bounds memory access");
+            }
+
+            if ((bytes % sizeof(uint32_t)) != 0) {
+                throw std::invalid_argument("invalid number of bytes");
+            }
+
+            uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
+
+            memcpy(casted_ptr, &cc_uptr->cdt_face_map_cache[0], bytes);
+        }
     } break;
     default:
         throw std::invalid_argument("invalid enum flag");
