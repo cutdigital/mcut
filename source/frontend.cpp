@@ -2268,11 +2268,19 @@ void get_connected_component_data_impl(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION");
-        if (cc_uptr->cdt_index_cache.empty()) // compute triangulation if not yet available
+        if (cc_uptr->cdt_index_cache_initialized == false) // compute triangulation if not yet available
         {
+            MCUT_ASSERT(cc_uptr->cdt_index_cache.empty());
+
             // internal halfedge data structure from the current connected component
             const std::shared_ptr<hmesh_t> cc = cc_uptr->kernel_hmesh_data->mesh;
 
+            const uint32_t nontri_face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
+
+            // user has set the dispatch flag to allow us to save the face maps.
+            const bool user_requested_cdt_face_maps = (nontri_face_map_size != 0);
+
+            const uint32_t cc_face_count = cc->number_of_faces();
 #if defined(MCUT_MULTI_THREADED)
             {
 
@@ -2313,7 +2321,7 @@ void get_connected_component_data_impl(
                 auto fn_triangulate_faces = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
                     // CDT indices computed per thread
                     std::vector<uint32_t> cdt_index_cache_local;
-                    cdt_index_cache_local.reserve(std::distance(block_start_, block_end_)*4);
+                    cdt_index_cache_local.reserve(std::distance(block_start_, block_end_) * 4);
 
                     std::vector<vertex_descriptor_t> cc_face_vertices;
                     std::vector<uint32_t> cc_face_triangulation;
@@ -2340,7 +2348,6 @@ void get_connected_component_data_impl(
 
                             triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, *(cc.get()), *cc_face_iter);
 
-                            
                             for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
                                 const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
                                 const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
@@ -2376,12 +2383,15 @@ void get_connected_component_data_impl(
             }
 #else // #if defined(MCUT_MULTI_THREADED)
             uint32_t face_indices_offset = 0;
-            cc_uptr->cdt_index_cache.reserve(cc->number_of_faces());
+            cc_uptr->cdt_index_cache.reserve(cc_face_count * 1.2);
+
+            if (user_requested_cdt_face_maps) {
+                cc_uptr->cdt_map_cache.reserve(cc_face_count * 1.2);
+            }
 
             // descriptors of vertices in face (they index into the CC)
             std::vector<vertex_descriptor_t> cc_face_vertices;
 
-            // for each face (TODO: make parallel)
             for (face_array_iterator_t cc_face_iter = cc->faces_begin(); cc_face_iter != cc->faces_end(); ++cc_face_iter) {
 
                 cc->get_vertices_around_face(cc_face_vertices, *cc_face_iter);
@@ -2400,6 +2410,10 @@ void get_connected_component_data_impl(
                         const uint32_t vertex_id_in_cc = (uint32_t)SAFE_ACCESS(cc_face_vertices, i);
 
                         cc_uptr->cdt_index_cache.push_back(vertex_id_in_cc);
+                    }
+
+                    if (user_requested_cdt_face_maps) {
+                        cc_uptr->cdt_map_cache.push_back(*cc_face_iter);
                     }
 
                 } else {
@@ -2428,6 +2442,13 @@ void get_connected_component_data_impl(
                         const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
 
                         cc_uptr->cdt_index_cache.push_back(global_idx);
+
+                        if (user_requested_cdt_face_maps) {
+                            if ((i % 3) == 0) { // every three indices constitute one triangle
+                                // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter"
+                                cc_uptr->cdt_map_cache.push_back(*cc_face_iter);
+                            }
+                        }
                     }
                 } //  if (cc_face_vcount == 3)
 
@@ -2436,8 +2457,16 @@ void get_connected_component_data_impl(
 
             MCUT_ASSERT(cc_uptr->cdt_index_cache.size() >= 3);
 #endif // #if defined(MCUT_MULTI_THREADED)
+            cc_uptr->cdt_index_cache_initialized = true;
+
+            if (user_requested_cdt_face_maps) {
+                MCUT_ASSERT(cc_uptr->cdt_map_cache.empty() == false);
+                cc_uptr->cdt_map_cache_initialized = true;
+            }
 
         } // if(cc_uptr->indexArrayMesh.numTriangleIndices == 0)
+
+        MCUT_ASSERT(cc_uptr->cdt_index_cache_initialized == true);
 
         const uint32_t num_triangulation_indices = (uint32_t)cc_uptr->cdt_index_cache.size();
 
@@ -2458,6 +2487,9 @@ void get_connected_component_data_impl(
 
             memcpy(pMem, reinterpret_cast<void*>(cc_uptr->cdt_index_cache.data()), bytes);
         }
+    } break;
+    case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP: {
+
     } break;
     default:
         throw std::invalid_argument("invalid enum flag");

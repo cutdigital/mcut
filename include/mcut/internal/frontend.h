@@ -116,6 +116,11 @@ struct connected_component_t {
     // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
     // triangulating every non-triangle face in the connected component.
     std::vector<uint32_t> cdt_index_cache;
+    bool cdt_index_cache_initialized = false;
+    // stores the mapping between a CDT triangle in the connected component and 
+    // the original "birth-face" in an input mesh (source mesh or cut mesh)
+    std::vector<uint32_t> cdt_map_cache;
+    bool cdt_map_cache_initialized = false;
 #if defined(MCUT_MULTI_THREADED)
     // Stores the number of vertices per face of CC. This is an optimization 
     // because there is a possibility that face-sizes may (at-minimum) be queried 

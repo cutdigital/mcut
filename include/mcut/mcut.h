@@ -300,7 +300,7 @@ typedef enum McDispatchFlags {
     MC_DISPATCH_VERTEX_ARRAY_DOUBLE = (1 << 1), /**< Interpret the input mesh vertices as arrays of 64-bit floating-point numbers.*/
     MC_DISPATCH_REQUIRE_THROUGH_CUTS = (1 << 2), /**< Require that all intersection paths/curves/contours partition the source-mesh into two (or more) fully disjoint parts. Otherwise, ::mcDispatch is a no-op. This flag enforces the requirement that only through-cuts are valid cuts i.e it disallows partial cuts. NOTE: This flag may not be used with ::MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED.*/
     MC_DISPATCH_INCLUDE_VERTEX_MAP = (1 << 3), /**< Compute connected-component-to-input mesh vertex-id maps. See also: ::MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP */
-    MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 4), /**< Compute connected-component-to-input mesh face-id maps. . See also: ::MC_CONNECTED_COMPONENT_DATA_FACE_MAP*/
+    MC_DISPATCH_INCLUDE_FACE_MAP = (1 << 4), /**< Compute connected-component-to-input mesh face-id maps. . See also: ::MC_CONNECTED_COMPONENT_DATA_FACE_MAP and :MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP*/
     //
     MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE = (1 << 5), /**< Compute fragments that are above the cut-mesh.*/
     MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW = (1 << 6), /**< Compute fragments that are below the cut-mesh.*/
