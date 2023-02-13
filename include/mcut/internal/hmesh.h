@@ -193,12 +193,13 @@ template <typename V>
 class array_iterator_t;
 
 struct halfedge_data_t : id_<halfedge_descriptor_t> {
+    vertex_descriptor_t t; // target vertex
+    face_descriptor_t f; // face
     halfedge_descriptor_t o; // opposite halfedge
     halfedge_descriptor_t n; // next halfedge
     halfedge_descriptor_t p; // previous halfedge
-    vertex_descriptor_t t; // target vertex
     edge_descriptor_t e; // edge
-    face_descriptor_t f; // face
+    
 
     halfedge_data_t()
     //: o(null_halfedge()), n(null_halfedge()), p(null_halfedge()), t(null_vertex()), e(null_edge()), f(null_face())
@@ -216,7 +217,7 @@ struct face_data_t : id_<face_descriptor_t> {
 
 struct vertex_data_t : id_<vertex_descriptor_t> {
     vec3 p; // geometry coordinates
-    std::vector<face_descriptor_t> m_faces; // ... incident to vertex // TODO: this is not needed (can be inferred from "m_halfedges")
+    //std::vector<face_descriptor_t> m_faces; // ... incident to vertex // TODO: this is not needed (can be inferred from "m_halfedges")
     std::vector<halfedge_descriptor_t> m_halfedges; // ... which point to vertex (note: can be used to infer edges too)
 };
 
