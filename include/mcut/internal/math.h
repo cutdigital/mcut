@@ -33,6 +33,13 @@
 
 #include "mcut/internal/utils.h"
 
+#if defined(MCUT_USE_MULTI_PRECISION_FLOAT_INTERFACE)
+#include <mcut_mpf.h>
+typedef mcut_mpf_t real_t;
+#else
+typedef double real_t;
+#endif // #if defined(MCUT_MPF_INTERFACE)
+
 enum sign_t {
     ON_NEGATIVE_SIDE = -1, // left
     ON_ORIENTED_BOUNDARY = 0, // on boundary

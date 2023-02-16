@@ -33,3 +33,5 @@ add_subdirectory(CSGBoolean)
 add_subdirectory(AdjacentFaces)
 add_subdirectory(Triangulation)
 add_subdirectory(TriangulatedFaceMaps)
+add_subdirectory(MultiPrecisionFloatsWithHeader)
+

@@ -23,13 +23,38 @@
 #
 # You can configure MCUT with the following CMake options:
 #
-#	MCUT_BUILD_AS_SHARED_LIB [default=ON] - Build MCUT as a shared/dynamic library (.so/.dll).
-#	MCUT_BUILD_DOCUMENTATION [default=OFF] - Build documentation (explicit dependancy on Doxygen) 
-#	MCUT_BUILD_TESTS [default=OFF] - Build the tests (implicit dependancy on GoogleTest)
-#	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
-#	MCUT_BUILD_WITH_MULTITHREADING [default=ON] - Build as configurable multi-threaded library
+#	MCUT_BUILD_AS_SHARED_LIB [default=ON] 
+#		- Build MCUT as a shared/dynamic library (.so/.dll).
+#	MCUT_BUILD_DOCUMENTATION [default=OFF] 
+#		- Build documentation (explicit dependancy on Doxygen) 
+#	MCUT_BUILD_TESTS [default=OFF] 
+#		- Build the tests (implicit dependancy on utest)
+#	MCUT_BUILD_TUTORIALS [default=OFF] 
+#		- Build tutorials/examples
+#	MCUT_BUILD_WITH_MULTITHREADING [default=ON] 
+#		- Build as configurable multi-threaded library
+#	MCUT_MPF_INTERFACE_INCLUDE_DIRS [default=""] 
+#		- Path to directory containing header file(s) which represent the 
+#		interface to the client-provided multi-precision floating-point (MPF) 
+#		number implementation.
+#  	MCUT_MPF_INTERFACE_SOURCE_DIR [default=""] 
+#		- Path to directory containing source file(s) that define the interface 
+#		to the client-provided multi-precision floating-point (MPF) number 
+#		implementation. This is optional if a header-only MPF number interface 
+#		is used.
+#  	MCUT_MPF_INTERFACE_DEPENDENCIES [default=""] 
+#		- List of CMake targets that are the client application's own external 
+#		dependencies for implementing the multi-precision floating-point (MPF) 
+#		number interface. This should be provided as a list e.g. "mpfr;gmp". 
+#		The client applcation's own CMake file must have configured the named targets 
+#		to be available BEFORE invoking the MCUT CMake configuration file. 
+#		If "MCUT_MPF_INTERFACE_INCLUDE_DIRS" and "MCUT_MPF_INTERFACE_SOURCE_DIR" 
+#		contain all files necessary to implement MPF numbers, then this variable 
+#		can be left empty. It is merely provided as a helper in case the client 
+#		application wishes to rely on functionality provided by some other 
+#		third-party (e.g. open source) implementation of MPF numbers.
 #
-# This script will define the following CMake cache variables:
+# This CMake script will define the following CMake cache variables:
 #
 #	MCUT_INCLUDE_DIR - the MCUT include directory
 # 	MCUT_LIB_PATH - path to the MCUT library (i.e. .so/.dll or .a/.lib files)
@@ -117,9 +142,45 @@ option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-thread
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS) 
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
-#
-# machine-precision-numbers library targets
-#
+
+SET(MCUT_MPF_INTERFACE_INCLUDE_DIRS "" CACHE STRING "Some user-specified option")
+
+message(STATUS "[MCUT] MCUT_MPF_INTERFACE_INCLUDE_DIRS='${MCUT_MPF_INTERFACE_INCLUDE_DIRS}'")
+
+if(EXISTS ${MCUT_MPF_INTERFACE_INCLUDE_DIRS})
+	set(have_mpf_interface_incl_dir TRUE)
+else()
+	set(have_mpf_interface_incl_dir FALSE)
+endif()
+
+SET(MCUT_MPF_INTERFACE_SOURCE_DIR "" CACHE STRING "Some user-specified option")
+
+message(STATUS "[MCUT] MCUT_MPF_INTERFACE_SOURCE_DIR='${MCUT_MPF_INTERFACE_SOURCE_DIR}'")
+
+if(EXISTS ${MCUT_MPF_INTERFACE_SOURCE_DIR})
+	set(have_mpf_interface_src_dir TRUE)
+else()
+	set(have_mpf_interface_src_dir FALSE)
+endif()
+
+SET(MCUT_MPF_INTERFACE_DEPENDENCIES "" CACHE STRING "Some user-specified option")
+
+message(STATUS "[MCUT] MCUT_MPF_INTERFACE_DEPENDENCIES='${MCUT_MPF_INTERFACE_DEPENDENCIES}'")
+
+if(${MCUT_MPF_INTERFACE_DEPENDENCIES})
+	set(have_mpf_interface_dependencies TRUE)
+else()
+	set(have_mpf_interface_dependencies FALSE)
+endif()
+
+if(have_mpf_interface_dependencies)
+	foreach(dep_name ${MCUT_MPF_INTERFACE_DEPENDENCIES})
+		find_package(${dep_name} REQUIRED)
+		list(APPEND include_dirs ${${dep_name}_INCLUDE_DIR})
+		list(APPEND extra_libs ${${dep_name}_LIBRARIES}) 
+	endforeach()
+endif()
+
 set (target_name mcut)
 
 #
@@ -130,6 +191,11 @@ set (MCUT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE STRING "The MCUT
 message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 
 list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
+
+if(have_mpf_interface_incl_dir)
+	list(APPEND include_dirs  ${MCUT_MPF_INTERFACE_INCLUDE_DIRS})
+	list(APPEND preprocessor_defs -DMCUT_USE_MULTI_PRECISION_FLOAT_INTERFACE=1)
+endif()
 list(APPEND compilation_flags "")
 if(MCUT_BUILD_AS_SHARED_LIB)
 	list(APPEND preprocessor_defs -DMCUT_SHARED_LIB=1)
@@ -166,6 +232,17 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/source/frontend.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/preproc.cpp)
 
+if(have_mpf_interface_src_dir)
+	#
+	# add the client's source files to be compiled as part of the MCUT library
+	#
+	file(GLOB_RECURSE mpfloat_src_files RELATIVE ${have_mpf_interface_src_dir} 
+		"*.h"
+		"*.c"
+		"*.cpp")
+		message(STATUS "[MCUT] mpfloat_src_files=${mpfloat_src_files}")
+	list(APPEND project_source_files  ${mpfloat_src_files})
+endif()
 #
 # Create MCUT target(s)
 #
@@ -196,6 +273,12 @@ function(create_library_target LIBRARY_TYPE)
 		if(MSVC)
 			set_property(TARGET ${target_name} PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS ON)
 		endif()
+	endif()
+
+	include(CheckIPOSupported)
+	check_ipo_supported(RESULT result)
+	if(result)
+		set_target_properties(${target_name} PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 	endif()
 endfunction()
 
