@@ -33,6 +33,8 @@
 #		- Build tutorials/examples
 #	MCUT_BUILD_WITH_MULTITHREADING [default=ON] 
 #		- Build as configurable multi-threaded library
+#	MCUT_BUILD_WITH_MPF_INTERFACE [default=OFF] 
+#		- Build with user-provided multi-precision floating point number interface
 #	MCUT_MPF_INTERFACE_INCLUDE_DIRS [default=""] 
 #		- Path to directory containing header file(s) which represent the 
 #		interface to the client-provided multi-precision floating-point (MPF) 
@@ -142,43 +144,20 @@ option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-thread
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS) 
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
+option(MCUT_BUILD_WITH_MPF_INTERFACE "Configure to build MCUT user provided multiprecision floating point number interface" OFF)
 
-SET(MCUT_MPF_INTERFACE_INCLUDE_DIRS "" CACHE STRING "Some user-specified option")
+if(MCUT_BUILD_WITH_MPF_INTERFACE)
+	SET(MCUT_MPF_INTERFACE_INCLUDE_DIRS "" CACHE STRING "Some user-specified option")
 
-message(STATUS "[MCUT] MCUT_MPF_INTERFACE_INCLUDE_DIRS='${MCUT_MPF_INTERFACE_INCLUDE_DIRS}'")
+	message(STATUS "[MCUT] MCUT_MPF_INTERFACE_INCLUDE_DIRS='${MCUT_MPF_INTERFACE_INCLUDE_DIRS}'")
 
-if(EXISTS ${MCUT_MPF_INTERFACE_INCLUDE_DIRS})
-	set(have_mpf_interface_incl_dir TRUE)
-else()
-	set(have_mpf_interface_incl_dir FALSE)
-endif()
+	SET(MCUT_MPF_INTERFACE_SOURCE_DIR "" CACHE STRING "Some user-specified option")
 
-SET(MCUT_MPF_INTERFACE_SOURCE_DIR "" CACHE STRING "Some user-specified option")
+	message(STATUS "[MCUT] MCUT_MPF_INTERFACE_SOURCE_DIR='${MCUT_MPF_INTERFACE_SOURCE_DIR}'")
 
-message(STATUS "[MCUT] MCUT_MPF_INTERFACE_SOURCE_DIR='${MCUT_MPF_INTERFACE_SOURCE_DIR}'")
+	SET(MCUT_MPF_INTERFACE_DEPENDENCIES "" CACHE STRING "Some user-specified option")
 
-if(EXISTS ${MCUT_MPF_INTERFACE_SOURCE_DIR})
-	set(have_mpf_interface_src_dir TRUE)
-else()
-	set(have_mpf_interface_src_dir FALSE)
-endif()
-
-SET(MCUT_MPF_INTERFACE_DEPENDENCIES "" CACHE STRING "Some user-specified option")
-
-message(STATUS "[MCUT] MCUT_MPF_INTERFACE_DEPENDENCIES='${MCUT_MPF_INTERFACE_DEPENDENCIES}'")
-
-if(${MCUT_MPF_INTERFACE_DEPENDENCIES})
-	set(have_mpf_interface_dependencies TRUE)
-else()
-	set(have_mpf_interface_dependencies FALSE)
-endif()
-
-if(have_mpf_interface_dependencies)
-	foreach(dep_name ${MCUT_MPF_INTERFACE_DEPENDENCIES})
-		find_package(${dep_name} REQUIRED)
-		list(APPEND include_dirs ${${dep_name}_INCLUDE_DIR})
-		list(APPEND extra_libs ${${dep_name}_LIBRARIES}) 
-	endforeach()
+	message(STATUS "[MCUT] MCUT_MPF_INTERFACE_DEPENDENCIES='${MCUT_MPF_INTERFACE_DEPENDENCIES}'")
 endif()
 
 set (target_name mcut)
@@ -192,10 +171,17 @@ message(STATUS "[MCUT] MCUT_INCLUDE_DIR=${MCUT_INCLUDE_DIR}")
 
 list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
 
-if(have_mpf_interface_incl_dir)
+if(MCUT_BUILD_WITH_MPF_INTERFACE)
 	list(APPEND include_dirs  ${MCUT_MPF_INTERFACE_INCLUDE_DIRS})
 	list(APPEND preprocessor_defs -DMCUT_USE_MULTI_PRECISION_FLOAT_INTERFACE=1)
+
+	foreach(dep_name ${MCUT_MPF_INTERFACE_DEPENDENCIES})
+		find_package(${dep_name} REQUIRED)
+		list(APPEND include_dirs ${${dep_name}_INCLUDE_DIR})
+		list(APPEND extra_libs ${${dep_name}_LIBRARIES}) 
+	endforeach()
 endif()
+
 list(APPEND compilation_flags "")
 if(MCUT_BUILD_AS_SHARED_LIB)
 	list(APPEND preprocessor_defs -DMCUT_SHARED_LIB=1)
@@ -232,16 +218,16 @@ set (	project_source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/source/frontend.cpp
 		${CMAKE_CURRENT_SOURCE_DIR}/source/preproc.cpp)
 
-if(have_mpf_interface_src_dir)
+if(MCUT_BUILD_WITH_MPF_INTERFACE)
 	#
 	# add the client's source files to be compiled as part of the MCUT library
 	#
-	file(GLOB_RECURSE mpfloat_src_files RELATIVE ${have_mpf_interface_src_dir} 
+	file(GLOB_RECURSE mpf_interface_src_files RELATIVE ${MCUT_MPF_INTERFACE_SOURCE_DIR} 
 		"*.h"
 		"*.c"
 		"*.cpp")
-		message(STATUS "[MCUT] mpfloat_src_files=${mpfloat_src_files}")
-	list(APPEND project_source_files  ${mpfloat_src_files})
+		message(STATUS "[MCUT] mpf_interface_src_files=${mpf_interface_src_files}")
+	list(APPEND project_source_files  ${mpf_interface_src_files})
 endif()
 #
 # Create MCUT target(s)
