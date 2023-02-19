@@ -1112,7 +1112,7 @@ bool have_same_coordinate(
     bool is_duplicate = false;
     for (std::vector<std::pair<vd_t, vec3>>::const_iterator i = bin_vertices_sorted.begin(); i != bin_vertices_sorted.end(); ++i) {
         const vec3& vertex_i_coordinates = i->second;
-        const double vertex_i_coordinate = vertex_i_coordinates[coordinate_index];
+        const scalar_t vertex_i_coordinate = vertex_i_coordinates[coordinate_index];
         bool vertex_i_coordinate_is_duplicate = false;
 
         for (std::vector<std::pair<vd_t, vec3>>::const_iterator j = bin_vertices_sorted.begin(); j != bin_vertices_sorted.end(); ++j) {
@@ -1121,7 +1121,7 @@ bool have_same_coordinate(
             }
 
             const vec3& vertex_j_coordinates = j->second;
-            const double vertex_j_coordinate = vertex_j_coordinates[coordinate_index];
+            const scalar_t vertex_j_coordinate = vertex_j_coordinates[coordinate_index];
             vertex_i_coordinate_is_duplicate = (vertex_i_coordinate == vertex_j_coordinate);
 
             if (vertex_i_coordinate_is_duplicate) {
@@ -1502,7 +1502,7 @@ std::vector<vd_t> linear_projection_sort(const std::vector<std::pair<vd_t, vec3>
 
     vec3 orig_to_dst_vec = normalize(origin->second - dst->second);
 
-    std::vector<std::pair<vd_t, double>> point_projections;
+    std::vector<std::pair<vd_t, scalar_t>> point_projections;
 
     for (std::vector<std::pair<vd_t, vec3>>::const_iterator i = points.cbegin(); i != points.cend(); ++i) {
         vec3 orig_to_point_vec = (origin->second - i->second);
@@ -1510,12 +1510,12 @@ std::vector<vd_t> linear_projection_sort(const std::vector<std::pair<vd_t, vec3>
     }
 
     std::sort(point_projections.begin(), point_projections.end(),
-        [&](const std::pair<vd_t, double>& a, const std::pair<vd_t, double>& b) {
+        [&](const std::pair<vd_t, scalar_t>& a, const std::pair<vd_t, scalar_t>& b) {
             return a.second < b.second;
         });
 
     std::vector<vd_t> sorted_descriptors;
-    for (std::vector<std::pair<vd_t, double>>::const_iterator i = point_projections.cbegin(); i != point_projections.cend(); ++i) {
+    for (std::vector<std::pair<vd_t, scalar_t>>::const_iterator i = point_projections.cbegin(); i != point_projections.cend(); ++i) {
         sorted_descriptors.push_back(i->first);
     }
 
@@ -2151,7 +2151,7 @@ void dispatch(output_t& output, const input_t& input)
     //--------------------------------------------------------
 
     std::unordered_map<fd_t, vec3> ps_tested_face_to_plane_normal;
-    std::unordered_map<fd_t, double> ps_tested_face_to_plane_normal_d_param;
+    std::unordered_map<fd_t, scalar_t> ps_tested_face_to_plane_normal_d_param;
     std::unordered_map<fd_t, int> ps_tested_face_to_plane_normal_max_comp;
     std::unordered_map<fd_t, std::vector<vec3>> ps_tested_face_to_vertices;
 
@@ -2159,7 +2159,7 @@ void dispatch(output_t& output, const input_t& input)
     {
         typedef std::tuple<
             std::unordered_map<fd_t, vec3>, // ps_tested_face_to_plane_normal;
-            std::unordered_map<fd_t, double>, // ps_tested_face_to_plane_normal_d_param;
+            std::unordered_map<fd_t, scalar_t>, // ps_tested_face_to_plane_normal_d_param;
             std::unordered_map<fd_t, int>, // ps_tested_face_to_plane_normal_max_comp;
             std::unordered_map<fd_t, std::vector<vec3>> // ps_tested_face_to_vertices;
             >
@@ -2169,7 +2169,7 @@ void dispatch(output_t& output, const input_t& input)
         auto fn_compute_intersecting_face_properties = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
             OutputStorageTypesTuple output_res;
             std::unordered_map<fd_t, vec3>& ps_tested_face_to_plane_normal_LOCAL = std::get<0>(output_res);
-            std::unordered_map<fd_t, double>& ps_tested_face_to_plane_normal_d_param_LOCAL = std::get<1>(output_res);
+            std::unordered_map<fd_t, scalar_t>& ps_tested_face_to_plane_normal_d_param_LOCAL = std::get<1>(output_res);
             std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_LOCAL = std::get<2>(output_res);
             std::unordered_map<fd_t, std::vector<vec3>>& ps_tested_face_to_vertices_LOCAL = std::get<3>(output_res);
             std::vector<vd_t> tested_face_descriptors_tmp;
@@ -2187,7 +2187,7 @@ void dispatch(output_t& output, const input_t& input)
                 }
 
                 vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal_LOCAL[tested_faces_iter->first];
-                double& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param_LOCAL[tested_faces_iter->first];
+                scalar_t& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param_LOCAL[tested_faces_iter->first];
                 int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp_LOCAL[tested_faces_iter->first];
 
                 tested_face_plane_normal_max_comp = compute_polygon_plane_coefficients(
@@ -2226,7 +2226,7 @@ void dispatch(output_t& output, const input_t& input)
             OutputStorageTypesTuple future_res = f.get();
 
             std::unordered_map<fd_t, vec3>& ps_tested_face_to_plane_normal_FUTURE = std::get<0>(future_res);
-            std::unordered_map<fd_t, double>& ps_tested_face_to_plane_normal_d_param_FUTURE = std::get<1>(future_res);
+            std::unordered_map<fd_t, scalar_t>& ps_tested_face_to_plane_normal_d_param_FUTURE = std::get<1>(future_res);
             std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_FUTURE = std::get<2>(future_res);
             std::unordered_map<fd_t, std::vector<vec3>>& ps_tested_face_to_vertices_FUTURE = std::get<3>(future_res);
 
@@ -2268,7 +2268,7 @@ void dispatch(output_t& output, const input_t& input)
             }
 
             vec3& tested_face_plane_normal = ps_tested_face_to_plane_normal[tested_faces_iter->first];
-            double& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param[tested_faces_iter->first];
+            scalar_t& tested_face_plane_param_d = ps_tested_face_to_plane_normal_d_param[tested_faces_iter->first];
             int& tested_face_plane_normal_max_comp = ps_tested_face_to_plane_normal_max_comp[tested_faces_iter->first];
 
             tested_face_plane_normal_max_comp = compute_polygon_plane_coefficients(
@@ -2424,7 +2424,7 @@ void dispatch(output_t& output, const input_t& input)
                     MCUT_ASSERT(ps_tested_face_to_plane_normal.find(tested_face) != ps_tested_face_to_plane_normal.end());
                     const vec3& tested_face_plane_normal = SAFE_ACCESS(ps_tested_face_to_plane_normal, tested_face);
                     MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
-                    const double& tested_face_plane_param_d = SAFE_ACCESS(ps_tested_face_to_plane_normal_d_param, tested_face);
+                    const scalar_t& tested_face_plane_param_d = SAFE_ACCESS(ps_tested_face_to_plane_normal_d_param, tested_face);
                     MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
                     const int& tested_face_plane_normal_max_comp = SAFE_ACCESS(ps_tested_face_to_plane_normal_max_comp, tested_face); // compute_polygon_plane_coefficients(
 
@@ -2835,7 +2835,7 @@ void dispatch(output_t& output, const input_t& input)
             MCUT_ASSERT(ps_tested_face_to_plane_normal.find(tested_face) != ps_tested_face_to_plane_normal.end());
             const vec3& tested_face_plane_normal = SAFE_ACCESS(ps_tested_face_to_plane_normal, tested_face);
             MCUT_ASSERT(ps_tested_face_to_plane_normal_d_param.find(tested_face) != ps_tested_face_to_plane_normal_d_param.end());
-            const double& tested_face_plane_param_d = SAFE_ACCESS(ps_tested_face_to_plane_normal_d_param, tested_face);
+            const scalar_t& tested_face_plane_param_d = SAFE_ACCESS(ps_tested_face_to_plane_normal_d_param, tested_face);
             MCUT_ASSERT(ps_tested_face_to_plane_normal_max_comp.find(tested_face) != ps_tested_face_to_plane_normal_max_comp.end());
             const int& tested_face_plane_normal_max_comp = SAFE_ACCESS(ps_tested_face_to_plane_normal_max_comp, tested_face);
 
@@ -2925,7 +2925,7 @@ void dispatch(output_t& output, const input_t& input)
                 // and check whether it lies inside our polygon, or that GP has been violated,
                 // which happens if e.g. the intersection point lies on an edge/vertex of "tested_face")
 
-                // NOTE: if using fixed precision floats (i.e. double), then here we just care about getting the intersection point
+                // NOTE: if using fixed precision floats (i.e. scalar_t), then here we just care about getting the intersection point
                 // irrespective of whether "segment_intersection_result" is consistent with "segment_intersection_type" from above.
                 // The inconsistency can happen during edge cases. see e.g. test 42.
                 compute_segment_plane_intersection(
@@ -3017,12 +3017,12 @@ void dispatch(output_t& output, const input_t& input)
                     if (!on_face)
                     { 
                         const vec3 normal = normalize(tested_face_plane_normal);
-                        const double length = length(normal) ;
+                        const scalar_t length = length(normal) ;
 
-                        //MCUT_ASSERT(length == double(1.0));
+                        //MCUT_ASSERT(length == scalar_t(1.0));
                         const vec3& point_on_plane = tested_face_vertices.back(); // any vertex will do (assuming all vertices of face are coplanar)
                         const vec3 vec = (intersection_point - point_on_plane);
-                        const double dot = dot_product(normal, vec);
+                        const scalar_t dot = dot_product(normal, vec);
                         intersection_point = intersection_point - (normal * dot);
                         point_on_face_plane(ps, tested_face, intersection_point, fv_count);
                     }
@@ -3440,7 +3440,7 @@ void dispatch(output_t& output, const input_t& input)
                     // compute edge mid-point (could be any point along the edge that is not one of the vertices)
                     const vec3& src_vertex_coords = m0.vertex(src_vertex);
                     const vec3& tgt_vertex_coords = m0.vertex(tgt_vertex);
-                    const vec3 midpoint = (tgt_vertex_coords + src_vertex_coords) * double(0.5);
+                    const vec3 midpoint = (tgt_vertex_coords + src_vertex_coords) * scalar_t(0.5);
 
                     std::vector<int> shared_faces_containing_edge;
                     // for each shared face
@@ -6549,14 +6549,14 @@ void dispatch(output_t& output, const input_t& input)
                 // get normal of face
                 const vec3& polygon_normal = SAFE_ACCESS(ps_tested_face_to_plane_normal, *tested_face); // SAFE_ACCESS(m0_ivtx_to_tested_polygon_normal, cs_poly_he_tgt);
                 // const vec3& polygon_normal = geometric_data.first; // source-mesh face normal
-                // const double& orig_scalar_prod = geometric_data.second; // the dot product result we computed earlier
+                // const scalar_t& orig_scalar_prod = geometric_data.second; // the dot product result we computed earlier
 
                 // MCUT_ASSERT(sign(orig_scalar_prod) == NEGATIVE);
 
                 // calculate the vector represented by the current halfedge
                 const vec3 cs_poly_he_vector = m0.vertex(cs_poly_he_tgt) - m0.vertex(cs_poly_he_src);
                 // calculate dot product with the src-mesh normal
-                const double scalar_prod = dot_product(polygon_normal, cs_poly_he_vector);
+                const scalar_t scalar_prod = dot_product(polygon_normal, cs_poly_he_vector);
                 // the original ps-halfedge was "incoming" (pointing inwards) and gave a
                 // negative scalar-product with the src-mesh face normal.
                 // check that it is the same
@@ -6700,12 +6700,12 @@ void dispatch(output_t& output, const input_t& input)
             const vec3& polygon_normal = SAFE_ACCESS(ps_tested_face_to_plane_normal, *tested_face);
             // const vec3& polygon_normal = SAFE_ACCESS(m0_ivtx_to_tested_polygon_normal, sm_poly_he_tgt);
             // const vec3& polygon_normal = geometric_data.first;
-            // const double& orig_scalar_prod = geometric_data.second;
+            // const scalar_t& orig_scalar_prod = geometric_data.second;
 
             // MCUT_ASSERT(sign(orig_scalar_prod) == NEGATIVE);
 
             const vec3 sm_poly_he_vector = m0.vertex(sm_poly_he_tgt) - m0.vertex(sm_poly_he_src);
-            const double scalar_prod = dot_product(polygon_normal, sm_poly_he_vector);
+            const scalar_t scalar_prod = dot_product(polygon_normal, sm_poly_he_vector);
 
             // Again, the notion of exterior is denoted by a negative dot-product.
             // Original ps-halfedge was "incoming" and gave a negative scalar-product

@@ -35,9 +35,9 @@
 
 #if defined(MCUT_USE_MULTI_PRECISION_FLOAT_INTERFACE)
 #include <mcut_mpf.h>
-typedef mcut_mpf_t real_t;
+typedef mcut_mpf_t scalar_t;
 #else
-typedef double real_t;
+typedef double scalar_t;
 #endif // #if defined(MCUT_MPF_INTERFACE)
 
 enum sign_t {
@@ -372,9 +372,12 @@ private:
     std::vector<T> m_entries;
 };
 
-extern double square_root(const double& number);
-extern double absolute_value(const double& number);
-extern sign_t sign(const double& number);
+extern scalar_t min(const scalar_t& a, const scalar_t& b);
+extern scalar_t max(const scalar_t& a, const scalar_t& b);
+extern scalar_t square_root(const scalar_t& number);
+extern scalar_t absolute_value(const scalar_t& number);
+extern sign_t sign(const scalar_t& number);
+
 extern std::ostream& operator<<(std::ostream& os, const vec3& v);
 
 template <typename U>
@@ -387,17 +390,6 @@ std::ostream& operator<<(std::ostream& os, const matrix_t<U>& m)
         os << "\n";
     }
     return os;
-}
-
-template <typename T>
-const T& min(const T& a, const T& b)
-{
-    return ((b < a) ? b : a);
-}
-template <typename T>
-const T& max(const T& a, const T& b)
-{
-    return ((a < b) ? b : a);
 }
 
 extern bool operator==(const vec3& a, const vec3& b);
@@ -489,8 +481,8 @@ vector_type normalize(const vector_type& v)
     return v / length(v);
 }
 
-double orient2d(const vec2& pa, const vec2& pb, const vec2& pc);
-double orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
+scalar_t orient2d(const vec2& pa, const vec2& pb, const vec2& pc);
+scalar_t orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
     const vec3& pd);
 
 // Compute a polygon's plane coefficients (i.e. normal and d parameters).
@@ -689,6 +681,8 @@ void make_bbox(bounding_box_t<vector_type>& bbox, const vector_type* vertices, c
     }
 }
 
+#if defined(MCUT_USE_MULTIPRECISION_FLOAT_INTERFACE)
+
 // Shewchuk predicates : shewchuk.c
 extern "C" {
 // void exactinit();
@@ -698,5 +692,7 @@ double orient3dfast(const double* pa, const double* pb, const double* pc, const 
 double incircle(const double* pa, const double* pb, const double* pc, const double* pd);
 double insphere(const double* pa, const double* pb, const double* pc, const double* pd, const double* pe);
 }
+
+#endif
 
 #endif // MCUT_MATH_H_
