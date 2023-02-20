@@ -12,7 +12,7 @@
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
-const double GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-4;
+const scalar_t GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-4;
 const int MAX_PERTUBATION_ATTEMPTS = 1 << 3;
 
 // this function converts an index array mesh (e.g. as recieved by the dispatch
@@ -49,9 +49,9 @@ bool client_input_arrays_to_hmesh(
 
             // insert our vertex into halfedge mesh
             vd_t vd = halfedgeMesh.add_vertex(
-                double(x) + (perturbation != NULL ? (*perturbation).x() : double(0.)),
-                double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
-                double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
+                scalar_t(x) + (perturbation != NULL ? (*perturbation).x() : scalar_t(0.)),
+                scalar_t(y) + (perturbation != NULL ? (*perturbation).y() : scalar_t(0.)),
+                scalar_t(z) + (perturbation != NULL ? (*perturbation).z() : scalar_t(0.)));
 
             MCUT_ASSERT(vd != hmesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
@@ -68,9 +68,9 @@ bool client_input_arrays_to_hmesh(
 
             // insert our vertex into halfedge mesh
             vd_t vd = halfedgeMesh.add_vertex(
-                double(x) + (perturbation != NULL ? (*perturbation).x() : double(0.)),
-                double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
-                double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
+                scalar_t(x) + (perturbation != NULL ? (*perturbation).x() : scalar_t(0.)),
+                scalar_t(y) + (perturbation != NULL ? (*perturbation).y() : scalar_t(0.)),
+                scalar_t(z) + (perturbation != NULL ? (*perturbation).z() : scalar_t(0.)));
 
             MCUT_ASSERT(vd != hmesh_t::null_vertex() && (uint32_t)vd < numVertices);
         }
@@ -611,8 +611,8 @@ void resolve_floating_polygons(
                             const vec2& fp_edge_v1 = floating_poly_vertices_2d[(((size_t)fp_face_edge_iter) + 1) % floating_poly_vertex_count];
 
                             // placeholders
-                            double _1; // unused
-                            double _2; // unused
+                            scalar_t _1; // unused
+                            scalar_t _2; // unused
                             vec2 _3; // unused
 
                             const char res = compute_segment_intersection(face_edge_v0, face_edge_v1, fp_edge_v0, fp_edge_v1, _3, _1, _2);
@@ -731,8 +731,8 @@ void resolve_floating_polygons(
                 fp_get_edge_vertex_coords(edgeIdx, edgeV0, edgeV1);
 
                 const vec2 midPoint(
-                    (edgeV0.x() + edgeV1.x()) / double(2.0), //
-                    (edgeV0.y() + edgeV1.y()) / double(2.0));
+                    (edgeV0.x() + edgeV1.x()) / scalar_t(2.0), //
+                    (edgeV0.y() + edgeV1.y()) / scalar_t(2.0));
 
                 return midPoint;
             };
@@ -740,7 +740,7 @@ void resolve_floating_polygons(
             auto fp_get_midpoint_distance = [&](std::pair<int, int> edgePair) {
                 const vec2 edge0MidPoint = fp_get_edge_midpoint(edgePair.first);
                 const vec2 edge1MidPoint = fp_get_edge_midpoint(edgePair.second);
-                const double dist = squared_length(edge1MidPoint - edge0MidPoint);
+                const scalar_t dist = squared_length(edge1MidPoint - edge0MidPoint);
                 return dist;
             };
 
@@ -750,8 +750,8 @@ void resolve_floating_polygons(
             // We pick edges based on this which are closest. No worries about colinear edges
             // because they will be detected later and skipped!
             auto fp_max_dist_predicate = [&](std::pair<int, int> edgePairA, std::pair<int, int> edgePairB) -> bool {
-                const double aDist = fp_get_midpoint_distance(edgePairA);
-                const double bDist = fp_get_midpoint_distance(edgePairB);
+                const scalar_t aDist = fp_get_midpoint_distance(edgePairA);
+                const scalar_t bDist = fp_get_midpoint_distance(edgePairB);
                 return aDist < bDist;
             };
 
@@ -801,14 +801,14 @@ void resolve_floating_polygons(
                                             const vec2& segStart,
                                             const vec2& segEnd,
                                             const std::vector<vec2>& polyVerts) -> bool {
-                    double predResult(0xdeadbeef);
+                    scalar_t predResult(0xdeadbeef);
                     for (std::vector<vec2>::const_iterator it = polyVerts.cbegin(); it != polyVerts.cend(); ++it) {
 
                         bool are_collinear = collinear(segStart, segEnd, (*it), predResult);
                         // last ditch attempt to prevent the possibility of creating a partitioning
                         // edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
                         // see: test41
-                        const double epsilon = 1e-6;
+                        const scalar_t epsilon = 1e-6;
                         if (are_collinear || (!are_collinear && epsilon > std::fabs(predResult))) {
                             return true;
                         }
@@ -858,7 +858,7 @@ void resolve_floating_polygons(
                     int,
                     std::pair<
                         vec2, // intersection point coords
-                        double //  parameter value (t) of intersection point along our edge (used to recover 3D coords)
+                        scalar_t //  parameter value (t) of intersection point along our edge (used to recover 3D coords)
                         >>>
                 originFaceIntersectedEdgeInfo;
 
@@ -875,11 +875,11 @@ void resolve_floating_polygons(
                 const vec2& origFaceEdgeV0 = SAFE_ACCESS(origin_face_vertices_2d, ((size_t)origFaceEdgeIter) + 0);
                 const vec2& origFaceEdgeV1 = SAFE_ACCESS(origin_face_vertices_2d, ((origFaceEdgeIter) + 1) % originFaceVertexCount);
 
-                const double garbageVal(0xdeadbeef);
+                const scalar_t garbageVal(0xdeadbeef);
                 vec2 intersectionPoint(garbageVal);
 
-                double origFaceEdgeParam;
-                double fpEdgeParam;
+                scalar_t origFaceEdgeParam;
+                scalar_t fpEdgeParam;
 
                 char intersectionResult = compute_segment_intersection(
                     origFaceEdgeV0, origFaceEdgeV1, fpSegment.first, fpSegment.second, intersectionPoint, origFaceEdgeParam, fpEdgeParam);
@@ -905,8 +905,8 @@ void resolve_floating_polygons(
             // compute mid-point of "fpSegment", which we will used to find closest intersection points
 
             const vec2 fpSegmentMidPoint(
-                (fpSegment.first.x() + fpSegment.second.x()) * double(0.5), //
-                (fpSegment.first.y() + fpSegment.second.y()) * double(0.5));
+                (fpSegment.first.x() + fpSegment.second.x()) * scalar_t(0.5), //
+                (fpSegment.first.y() + fpSegment.second.y()) * scalar_t(0.5));
 
             // Get the two closest [valid] intersection points to "fpSegmentMidPoint".
             // We do this by sorting elements of "originFaceIntersectedEdgeInfo" by the distance
@@ -915,15 +915,15 @@ void resolve_floating_polygons(
             // and that they are technically not usable (i.e. they are outside "origin_face").
 
             std::sort(originFaceIntersectedEdgeInfo.begin(), originFaceIntersectedEdgeInfo.end(),
-                [&](const std::pair<int, std::pair<vec2, double>>& a, //
-                    const std::pair<int, std::pair<vec2, double>>& b) {
-                    double aDist(std::numeric_limits<double>::max()); // bias toward points inside polygon
+                [&](const std::pair<int, std::pair<vec2, scalar_t>>& a, //
+                    const std::pair<int, std::pair<vec2, scalar_t>>& b) {
+                    scalar_t aDist(std::numeric_limits<double>::max()); // bias toward points inside polygon
                     // char aOnEdge = compute_point_in_polygon_test(
                     //     a.second.first,
                     //     origin_face_vertices_2d.data(),
                     //     (int)origin_face_vertices_2d.size());
 
-                    bool aOnEdge = (double(.0) <= a.second.second && double(1.) >= a.second.second);
+                    bool aOnEdge = (scalar_t(.0) <= a.second.second && scalar_t(1.) >= a.second.second);
                     // for (int i = 0; i < (int)origin_face_vertices_2d.size(); ++i) {
                     //     int i0 = i;
                     //     int i1 = (i0 + 1) % (int)origin_face_vertices_2d.size();
@@ -938,12 +938,12 @@ void resolve_floating_polygons(
                         aDist = squared_length(aVec);
                     }
 
-                    double bDist(std::numeric_limits<double>::max());
+                    scalar_t bDist(std::numeric_limits<double>::max());
                     // char bOnEdge = compute_point_in_polygon_test(
                     //     b.second.first,
                     //     origin_face_vertices_2d.data(),
                     //     (int)origin_face_vertices_2d.size());
-                    bool bOnEdge = (double(.0) <= b.second.second && double(1.) >= b.second.second);
+                    bool bOnEdge = (scalar_t(.0) <= b.second.second && scalar_t(1.) >= b.second.second);
 
                     // for (int i = 0; i < (int)origin_face_vertices_2d.size(); ++i) {
                     //     int i0 = i;
@@ -975,9 +975,9 @@ void resolve_floating_polygons(
             // origFaceEdge0: This is the first edge in the list after sorting.
             // ---------------------------------------------------------------
 
-            const std::pair<int, std::pair<vec2, double>>& originFaceIntersectedEdge0Info = originFaceIntersectedEdgeInfo[0]; // first elem
+            const std::pair<int, std::pair<vec2, scalar_t>>& originFaceIntersectedEdge0Info = originFaceIntersectedEdgeInfo[0]; // first elem
             const int origFaceEdge0Idx = originFaceIntersectedEdge0Info.first;
-            const double& origFaceEdge0IntPointEqnParam = originFaceIntersectedEdge0Info.second.second;
+            const scalar_t& origFaceEdge0IntPointEqnParam = originFaceIntersectedEdge0Info.second.second;
 
             // NOTE: minus-1 since "get_vertices_around_face(origin_face)" builds a list using halfedge target vertices
             // See the starred note above
@@ -1011,9 +1011,9 @@ void resolve_floating_polygons(
             // origFaceEdge1: This is the second edge in the list after sorting.
             // ---------------------------------------------------------------
 
-            const std::pair<int, std::pair<vec2, double>>& originFaceIntersectedEdge1Info = originFaceIntersectedEdgeInfo[1]; // second elem
+            const std::pair<int, std::pair<vec2, scalar_t>>& originFaceIntersectedEdge1Info = originFaceIntersectedEdgeInfo[1]; // second elem
             const int origFaceEdge1Idx = originFaceIntersectedEdge1Info.first;
-            const double& origFaceEdge1IntPointEqnParam = originFaceIntersectedEdge1Info.second.second;
+            const scalar_t& origFaceEdge1IntPointEqnParam = originFaceIntersectedEdge1Info.second.second;
 
             halfedgeIdx = origFaceEdge1Idx; /// wrap_integer(origFaceEdge1Idx - 1, 0, (int)originFaceEdgeCount - 1); // (origFaceEdge1Idx + 1) % originFaceEdgeCount;
             const hd_t origFaceEdge1Halfedge = SAFE_ACCESS(origin_face_halfedges, halfedgeIdx);
