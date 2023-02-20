@@ -354,7 +354,7 @@ void triangulate_face(
 
     {
         vec3 cc_face_normal_vector;
-        double cc_face_plane_eq_dparam; //
+        scalar_t cc_face_plane_eq_dparam; //
         const int largest_component_of_normal = compute_polygon_plane_coefficients(
             cc_face_normal_vector,
             cc_face_plane_eq_dparam,
@@ -368,7 +368,7 @@ void triangulate_face(
         // is CW (negative) or CCW (positive)
         //
 
-        double signed_area = 0;
+        scalar_t signed_area = 0;
 
         for (uint32_t i = 0; i < cc_face_vcount - 2; ++i) {
             vec2 cur = cc_face_vcoords2d[i];
@@ -540,11 +540,11 @@ void triangulate_face(
     //
 
     // Find the duplicates (if any)
-    const cdt::duplicates_info_t duplicates_info_pre = cdt::find_duplicates<double>(
+    const cdt::duplicates_info_t duplicates_info_pre = cdt::find_duplicates<scalar_t>(
         cc_face_vcoords2d.begin(),
         cc_face_vcoords2d.end(),
-        cdt::get_x_coord_vec2d<double>,
-        cdt::get_y_coord_vec2d<double>);
+        cdt::get_x_coord_vec2d<scalar_t>,
+        cdt::get_y_coord_vec2d<scalar_t>);
 
     // number of duplicate vertices (if any)
     const uint32_t duplicate_vcount = (uint32_t)duplicates_info_pre.duplicates.size();
@@ -587,11 +587,11 @@ void triangulate_face(
             // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
             // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
             // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
-            const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
+            const scalar_t orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
             const sign_t orient2d_sgn = sign(orient2d_res);
 
-            const double to_prev_sqr_len = squared_length(to_prev);
-            const double to_next_sqr_len = squared_length(to_next);
+            const scalar_t to_prev_sqr_len = squared_length(to_prev);
+            const scalar_t to_next_sqr_len = squared_length(to_next);
 
             //
             // Now we must determine which side is the perturbation_vector must be
@@ -618,7 +618,7 @@ void triangulate_face(
             // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
             // that this threshold is too "small" a number for us to be able to reliably compute
             // stuff with the result of "orient2d()" that is near this threshold.
-            const double errbound = 1e-2;
+            const scalar_t errbound = 1e-2;
 
             // We use "errbound", rather than "orient2d_res", to determine if the incident edges
             // are parallel to give us sufficient room of numerical-precision to reliably compute
@@ -663,7 +663,7 @@ void triangulate_face(
             //
 
             // largest squared length between any two vertices in "cc_face_iter"
-            double largest_sqrd_length = -1.0;
+            scalar_t largest_sqrd_length = -1.0;
 
             for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
@@ -677,8 +677,8 @@ void triangulate_face(
 
                     const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
 
-                    const double sqrd_length = squared_length(b - a);
-                    largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
+                    const scalar_t sqrd_length = squared_length(b - a);
+                    largest_sqrd_length = max(sqrd_length, largest_sqrd_length);
                 }
             }
 
@@ -687,7 +687,7 @@ void triangulate_face(
             // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
             //
 
-            const double shift_len = std::sqrt(largest_sqrd_length);
+            const scalar_t shift_len = square_root(largest_sqrd_length);
             const vec2 shift = perturbation_dir * shift_len;
 
             vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
@@ -702,7 +702,7 @@ void triangulate_face(
 
                 // test segment against all edges to find closest intersection point
 
-                double segment_min_tval = 1.0;
+                scalar_t segment_min_tval = 1.0;
 
                 // for each edge of face to be triangulated (number of vertices == number of edges)
                 for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
@@ -717,8 +717,8 @@ void triangulate_face(
                     const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
                     const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
 
-                    double segment_tval; // parameter along segment
-                    double edge_tval; // parameter along current edge
+                    scalar_t segment_tval; // parameter along segment
+                    scalar_t edge_tval; // parameter along current edge
                     vec2 ipoint; // intersection point between segment and current edge
 
                     const char result = compute_segment_intersection(
@@ -736,12 +736,12 @@ void triangulate_face(
                         // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
 
                         // length from segment start to the start of edge
-                        const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
+                        const scalar_t sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
                         // length from segment start to the end of edge
-                        const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
+                        const scalar_t sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
 
                         // length from start of segment to either start of edge or end of edge (depending on which is closer)
-                        double sqr_dist_to_closest = sqr_dist_to_edge_start;
+                        scalar_t sqr_dist_to_closest = sqr_dist_to_edge_start;
                         const vec2* ipoint_ptr = &edge_start_coords;
 
                         if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
@@ -767,9 +767,9 @@ void triangulate_face(
             // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
             // "perturbation_vector" and passing through the interior of "cc_face_iter")
             const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
-            const double revised_perturbation_len = length(revised_perturbation_vector);
+            const scalar_t revised_perturbation_len = length(revised_perturbation_vector);
 
-            const double scale = (errbound * revised_perturbation_len);
+            const scalar_t scale = (errbound * revised_perturbation_len);
             // The translation by which we perturb "perturbed_dvertex_coords"
             //
             // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
@@ -794,11 +794,11 @@ void triangulate_face(
     }
 
     // check for duplicate vertices again
-    const cdt::duplicates_info_t duplicates_info_post = cdt::find_duplicates<double>(
+    const cdt::duplicates_info_t duplicates_info_post = cdt::find_duplicates<scalar_t>(
         cc_face_vcoords2d.begin(),
         cc_face_vcoords2d.end(),
-        cdt::get_x_coord_vec2d<double>,
-        cdt::get_y_coord_vec2d<double>);
+        cdt::get_x_coord_vec2d<scalar_t>,
+        cdt::get_y_coord_vec2d<scalar_t>);
 
     if (!duplicates_info_post.duplicates.empty()) {
         // This should not happen! Probably a good idea to email the author
@@ -810,7 +810,7 @@ void triangulate_face(
     }
 
     // allocate triangulator
-    cdt::triangulator_t<double> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
+    cdt::triangulator_t<scalar_t> cdt(cdt::vertex_insertion_order_t::AS_GIVEN);
     cdt.insert_vertices(cc_face_vcoords2d); // potentially perturbed (if duplicates exist)
     cdt.insert_edges(cc_face_edges);
     cdt.erase_outer_triangles(); // do the constrained delaunay triangulation

@@ -347,13 +347,13 @@ edge_descriptor_t hmesh_t::edge(const vertex_descriptor_t s, const vertex_descri
 
 vertex_descriptor_t hmesh_t::add_vertex(const vec3& point)
 {
-    const double& x = point.x();
-    const double& y = point.y();
-    const double& z = point.z();
+    const scalar_t& x = point.x();
+    const scalar_t& y = point.y();
+    const scalar_t& z = point.z();
     return add_vertex(x, y, z);
 }
 
-vertex_descriptor_t hmesh_t::add_vertex(const double& x, const double& y, const double& z)
+vertex_descriptor_t hmesh_t::add_vertex(const scalar_t& x, const scalar_t& y, const scalar_t& z)
 {
     vertex_descriptor_t vd = hmesh_t::null_vertex();
     vertex_data_t* data_ptr = nullptr;

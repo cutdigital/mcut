@@ -158,9 +158,10 @@ protected:
     T m_x, m_y;
 }; // vec2_
 
-typedef vec2_<> vec2;
+typedef vec2_<scalar_t> vec2;
+typedef vec2_<double> native_vec2;
 
-template <typename T = double>
+template <typename T>
 class vec3_ : public vec2_<T> {
 public:
     vec3_()
@@ -242,7 +243,8 @@ protected:
     T m_z;
 }; // vec3_
 
-typedef vec3_<> vec3;
+typedef vec3_<scalar_t> vec3;
+typedef vec3_<double> native_vec3;
 
 template <typename T = int>
 class matrix_t {
@@ -286,7 +288,7 @@ public:
         return result;
     }
 
-    matrix_t<T> operator*(const double& s) const
+    matrix_t<T> operator*(const scalar_t& s) const
     {
         matrix_t<T> result(m_rows, m_cols);
 
@@ -299,7 +301,7 @@ public:
         return result;
     }
 
-    matrix_t<T> operator/(const double& s) const
+    matrix_t<T> operator/(const scalar_t& s) const
     {
         matrix_t<T> result(m_rows, m_cols);
 
@@ -332,7 +334,7 @@ public:
     vec2 operator*(const vec3& v) const
     {
         MCUT_ASSERT(this->cols() == vec3::cardinality());
-        vec2 result(double(0.0));
+        vec2 result(scalar_t(0.0));
         MCUT_ASSERT(this->rows() == vec2::cardinality());
 
         for (int col = 0; col < this->cols(); ++col) {
@@ -421,9 +423,9 @@ vec3_<T> compwise_max(const vec3_<T>& a, const vec3_<T>& b)
 extern vec3 cross_product(const vec3& a, const vec3& b);
 
 template <typename vector_type>
-double dot_product(const vector_type& a, const vector_type& b)
+scalar_t dot_product(const vector_type& a, const vector_type& b)
 {
-    double out(0.0);
+    scalar_t out(0.0);
     for (int i = 0; i < vector_type::cardinality(); ++i) {
         out += (a[i] * b[i]);
     }
@@ -464,13 +466,13 @@ matrix_t<typename vector_type::element_type> outer_product(const vector_type& a,
 }
 
 template <typename vector_type>
-double squared_length(const vector_type& v)
+scalar_t squared_length(const vector_type& v)
 {
     return dot_product(v, v);
 }
 
 template <typename vector_type>
-double length(const vector_type& v)
+scalar_t length(const vector_type& v)
 {
     return square_root(squared_length(v));
 }
@@ -487,7 +489,7 @@ scalar_t orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
 
 // Compute a polygon's plane coefficients (i.e. normal and d parameters).
 // The computed normal is not normalized. This function returns the largest component of the normal.
-int compute_polygon_plane_coefficients(vec3& normal, double& d_coeff,
+int compute_polygon_plane_coefficients(vec3& normal, scalar_t& d_coeff,
     const vec3* polygon_vertices, const int polygon_vertex_count);
 
 // Compute the intersection point between a line (not a segment) and a plane defined by a polygon.
@@ -519,7 +521,7 @@ char compute_line_plane_intersection(vec3& p, // intersection point
 // 'r' : The(second) r endpoint is on the plane (but not 'p').
 // '0' : The segment lies strictly to one side or the other of the plane.
 // '1': The segment intersects the plane, and none of {p, q, r} hold.
-char compute_segment_plane_intersection(vec3& p, const vec3& normal, const double& d_coeff,
+char compute_segment_plane_intersection(vec3& p, const vec3& normal, const scalar_t& d_coeff,
     const vec3& q, const vec3& r);
 
 // Similar to "compute_segment_plane_intersection" but simply checks the [type] of intersection using
@@ -564,7 +566,7 @@ void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vert
 bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
     const vec3& pd);
 
-bool collinear(const vec2& a, const vec2& b, const vec2& c, double& predResult);
+bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult);
 
 bool collinear(const vec2& a, const vec2& b, const vec2& c);
 
@@ -586,7 +588,7 @@ Return values:
 '0': The segments do not intersect (i.e., they share no points); '0' stands for FALSE
 */
 char compute_segment_intersection(const vec2& a, const vec2& b, const vec2& c, const vec2& d,
-    vec2& p, double& s, double& t);
+    vec2& p, scalar_t& s, scalar_t& t);
 
 template <typename vector_type>
 struct bounding_box_t {
@@ -681,7 +683,7 @@ void make_bbox(bounding_box_t<vector_type>& bbox, const vector_type* vertices, c
     }
 }
 
-#if defined(MCUT_USE_MULTIPRECISION_FLOAT_INTERFACE)
+#if !defined(MCUT_USE_MULTIPRECISION_FLOAT_INTERFACE)
 
 // Shewchuk predicates : shewchuk.c
 extern "C" {
