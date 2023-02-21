@@ -85,6 +85,28 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags c
     return return_value;
 }
 
+MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags, uint32_t nthreads)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (pOutContext == nullptr) {
+        per_thread_api_log_str = "context ptr undef (NULL)";
+        return_value = McResult::MC_INVALID_VALUE;
+    } else {
+        try {
+            create_context_impl(pOutContext, contextFlags, nthreads);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (return_value != McResult::MC_NO_ERROR) {
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+    }
+
+    return return_value;
+}
+
 MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mcDebugOutput_CALLBACK cb, const void* userParam)
 {
     McResult return_value = McResult::MC_NO_ERROR;
@@ -204,7 +226,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 {
     TIMESTACK_RESET(); // reset tracking vars
 
-    TIMESTACK_PUSH(__FUNCTION__);
+    SCOPED_TIMER(__FUNCTION__);
 
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -228,7 +250,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         per_thread_api_log_str = "source-mesh face-index array ptr undef (NULL)";
     } /*else if (pSrcMeshFaceSizes == nullptr) {
         per_thread_api_log_str = "source-mesh face-size array ptr undef (NULL)";
-    }*/ else if (numSrcMeshFaces < 1) {
+    }*/
+    else if (numSrcMeshFaces < 1) {
         per_thread_api_log_str = "invalid source-mesh vertex count";
     } else if (pCutMeshVertices == nullptr) {
         per_thread_api_log_str = "cut-mesh vertex-position array ptr undef (NULL)";
@@ -238,7 +261,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         per_thread_api_log_str = "cut-mesh face-index array ptr undef (NULL)";
     } /*else if (pCutMeshFaceSizes == nullptr) {
         per_thread_api_log_str = "cut-mesh face-size array ptr undef (NULL)";
-    } */else if (numCutMeshFaces < 1) {
+    } */
+    else if (numCutMeshFaces < 1) {
         per_thread_api_log_str = "invalid cut-mesh vertex count";
     } else {
         try {
@@ -270,6 +294,224 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     }
 
     TIMESTACK_POP();
+
+    return return_value;
+}
+
+MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if(pEventWaitList == nullptr && numEventsInWaitlist > 0)
+    {
+        per_thread_api_log_str = "invalid event waitlist ptr (NULL)";
+    }
+    else if(pEventWaitList != nullptr && numEventsInWaitlist == 0)
+    {
+        per_thread_api_log_str = "invalid event waitlist size (zero)";
+    }
+    else
+    {
+        try {
+            wait_for_events_impl(numEventsInWaitlist, pEventWaitList);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+}
+
+MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
+    const McContext context,
+    McFlags dispatchFlags,
+    const void* pSrcMeshVertices,
+    const uint32_t* pSrcMeshFaceIndices,
+    const uint32_t* pSrcMeshFaceSizes,
+    uint32_t numSrcMeshVertices,
+    uint32_t numSrcMeshFaces,
+    const void* pCutMeshVertices,
+    const uint32_t* pCutMeshFaceIndices,
+    const uint32_t* pCutMeshFaceSizes,
+    uint32_t numCutMeshVertices,
+    uint32_t numCutMeshFaces,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent)
+{
+    TIMESTACK_RESET(); // reset tracking vars
+
+    SCOPED_TIMER(__FUNCTION__);
+
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (context == nullptr) {
+        per_thread_api_log_str = "context ptr (param0) undef (NULL)";
+    } else if (dispatchFlags == 0) {
+        per_thread_api_log_str = "dispatch flags unspecified";
+    } else if ((dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS) && //
+        (dispatchFlags & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED)) {
+        // The user states that she does not want a partial cut but yet also states that she
+        // wants to keep fragments with partial cuts. These two options are mutually exclusive!
+        per_thread_api_log_str = "use of mutually-exclusive flags: MC_DISPATCH_REQUIRE_THROUGH_CUTS & MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED";
+    } else if ((dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT) == 0 && (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) == 0) {
+        per_thread_api_log_str = "dispatch vertex aray type unspecified";
+    } else if (pSrcMeshVertices == nullptr) {
+        per_thread_api_log_str = "source-mesh vertex-position array ptr undef (NULL)";
+    } else if (numSrcMeshVertices < 3) {
+        per_thread_api_log_str = "invalid source-mesh vertex count";
+    } else if (pSrcMeshFaceIndices == nullptr) {
+        per_thread_api_log_str = "source-mesh face-index array ptr undef (NULL)";
+    } /*else if (pSrcMeshFaceSizes == nullptr) {
+        per_thread_api_log_str = "source-mesh face-size array ptr undef (NULL)";
+    }*/
+    else if (numSrcMeshFaces < 1) {
+        per_thread_api_log_str = "invalid source-mesh vertex count";
+    } else if (pCutMeshVertices == nullptr) {
+        per_thread_api_log_str = "cut-mesh vertex-position array ptr undef (NULL)";
+    } else if (numCutMeshVertices < 3) {
+        per_thread_api_log_str = "invalid cut-mesh vertex count";
+    } else if (pCutMeshFaceIndices == nullptr) {
+        per_thread_api_log_str = "cut-mesh face-index array ptr undef (NULL)";
+    } /*else if (pCutMeshFaceSizes == nullptr) {
+        per_thread_api_log_str = "cut-mesh face-size array ptr undef (NULL)";
+    } */
+    else if (numCutMeshFaces < 1) {
+        per_thread_api_log_str = "invalid cut-mesh vertex count";
+    }
+    else if(pEventWaitList == nullptr && numEventsInWaitlist > 0)
+    {
+        per_thread_api_log_str = "invalid event waitlist ptr (NULL)";
+    }
+    else if(pEventWaitList != nullptr && numEventsInWaitlist == 0)
+    {
+        per_thread_api_log_str = "invalid event waitlist size (zero)";
+    }
+    else if(pEventWaitList == nullptr && numEventsInWaitlist == 0 && pEvent == nullptr)
+    {
+        per_thread_api_log_str = "invalid event ptr (zero)";
+    }
+    else if(pEventWaitList != nullptr && numEventsInWaitlist > 0 && pEvent != nullptr)
+    {
+        per_thread_api_log_str = "invalid event parameters";
+    }
+    else {
+        try {
+            dispatch_impl(
+                context,
+                dispatchFlags,
+                pSrcMeshVertices,
+                pSrcMeshFaceIndices,
+                pSrcMeshFaceSizes,
+                numSrcMeshVertices,
+                numSrcMeshFaces,
+                pCutMeshVertices,
+                pCutMeshFaceIndices,
+                pCutMeshFaceSizes,
+                numCutMeshVertices,
+                numCutMeshFaces,
+                numEventsInWaitlist,
+                pEventWaitList,
+                pEvent);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+
+    TIMESTACK_POP();
+
+    return return_value;
+}
+
+MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
+    const McContext context,
+    const McConnectedComponentType connectedComponentType,
+    const uint32_t numEntries,
+    McConnectedComponent* pConnComps,
+    uint32_t* numConnComps,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (context == nullptr) {
+        per_thread_api_log_str = "context ptr (param0) undef (NULL)";
+    } else if (connectedComponentType == 0) {
+        per_thread_api_log_str = "invalid type-parameter (param1) (0)";
+    } else if (numConnComps == nullptr && pConnComps == nullptr) {
+        per_thread_api_log_str = "output parameters undef (param3 & param4)";
+    } 
+    else if(pEventWaitList == nullptr && numEventsInWaitlist > 0)
+    {
+        per_thread_api_log_str = "invalid event waitlist ptr (NULL)";
+    }
+    else if(pEventWaitList != nullptr && numEventsInWaitlist == 0)
+    {
+        per_thread_api_log_str = "invalid event waitlist size (zero)";
+    }
+    else if(pEventWaitList == nullptr && numEventsInWaitlist == 0 && pEvent == nullptr)
+    {
+        per_thread_api_log_str = "invalid event ptr (zero)";
+    }
+    else if(pEventWaitList != nullptr && numEventsInWaitlist > 0 && pEvent != nullptr)
+    {
+        per_thread_api_log_str = "invalid event parameters";
+    }
+    else {
+        try {
+            const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
+
+            if(have_events_to_wait_for)
+            {
+                wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+            }
+
+            // create handle (ptr) which will be returned and used by client to access rest of API
+            const McEvent handle = reinterpret_cast<McEvent>(g_objects_counter++);
+
+            // allocate internal event object
+            g_events.add_or_update_mapping(handle, std::shared_ptr<event_t>(new event_t));
+
+            std::shared_ptr<event_t> event_ptr = g_events.value_for(handle);
+
+            MCUT_ASSERT(event_ptr != nullptr); 
+
+            get_connected_components_impl(context, connectedComponentType, numEntries, pConnComps, numConnComps,numEventsInWaitlist,pEventWaitList,pEvent);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
 
     return return_value;
 }
@@ -320,7 +562,7 @@ McResult MCAPI_CALL mcGetConnectedComponentData(
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
-    
+
     if (context == nullptr) {
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     }

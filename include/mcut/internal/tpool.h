@@ -32,6 +32,11 @@
 #include <thread>
 #include <vector>
 
+#include <functional>
+#include <list>
+#include <shared_mutex>
+#include <utility>
+
 #include "mcut/internal/utils.h"
 
 class function_wrapper {
@@ -239,7 +244,7 @@ class thread_pool {
     uint32_t machine_thread_count;
 
 public:
-    thread_pool()
+    thread_pool(uint32_t nthreads)
         : // thread_pool_terminate(false),
 
         joiner(threads)
@@ -572,7 +577,7 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
     std::vector<std::future<value_type>> previous_end_values;
     previous_end_values.reserve(num_threads - 1);
     std::vector<std::future<void>> futures;
-        futures.resize(num_threads - 1);
+    futures.resize(num_threads - 1);
 
     Iterator block_start = first;
 
@@ -649,7 +654,7 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
     std::vector<std::future<void>> futures;
-        futures.resize(num_threads - 1);
+    futures.resize(num_threads - 1);
 
     {
         Iterator block_start = first;
@@ -658,7 +663,7 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
             std::advance(block_end, block_size);
 
             // find_element()" handles all synchronisation
-            futures [i] =pool.submit(i,
+            futures[i] = pool.submit(i,
                 [&result, &done_flag, block_start, block_end, &match]() {
                     find_element<Iterator, MatchType>,
                         block_start, block_end, match,
@@ -806,7 +811,7 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
     std::vector<std::future<void>> futures;
-        futures.resize(num_threads - 1);
+    futures.resize(num_threads - 1);
 
     Iterator block_start = first;
     for (uint32_t i = 0; i < (num_threads - 1); ++i) {
@@ -814,7 +819,7 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
         std::advance(block_end, block_size);
 
         // barrier handles all synchronisation
-        futures[i]=pool.submit(i,
+        futures[i] = pool.submit(i,
             [&result, &done_flag, block_start, block_end, &predicate, &barrier]() {
                 find_element_with_pred<Iterator, UnaryPredicate>(
                     block_start, block_end, predicate,
@@ -829,5 +834,144 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
     }
     return result.get_future().get();
 }
+
+template <typename Key, typename Value, typename Hash = std::hash<Key>>
+class threadsafe_lookup_table {
+private:
+    class bucket_type {
+    private:
+        typedef std::pair<Key, Value> bucket_value;
+        typedef std::list<bucket_value> bucket_data;
+        typedef typename bucket_data::iterator bucket_iterator;
+
+        bucket_data data;
+        mutable std::shared_mutex mutex;
+
+        bucket_iterator find_entry_for(Key const& key) const
+        {
+            return std::find_if(data.begin(), data.end(),
+                [&](bucket_value const& item) { return item.first == key; });
+        }
+
+    public:
+        Value value_for(Key const& key, Value const& default_value) const
+        {
+            std::shared_lock<std::shared_mutex> lock(mutex);
+            bucket_iterator const found_entry = find_entry_for(key);
+            return (found_entry == data.end()) ? default_value : found_entry->second;
+        }
+
+        void add_or_update_mapping(Key const& key, Value const& value)
+        {
+            std::unique_lock<std::shared_mutex> lock(mutex);
+            bucket_iterator const found_entry = find_entry_for(key);
+            if (found_entry == data.end()) {
+                data.push_back(bucket_value(key, value));
+            } else {
+                found_entry->second = value;
+            }
+        }
+
+        void remove_mapping(Key const& key)
+        {
+            std::unique_lock<std::shared_mutex> lock(mutex);
+            bucket_iterator const found_entry = find_entry_for(key);
+            if (found_entry != data.end()) {
+                data.erase(found_entry);
+            }
+        }
+    };
+
+    std::vector<std::unique_ptr<bucket_type>> buckets;
+    Hash hasher;
+
+    bucket_type& get_bucket(Key const& key) const
+    {
+        std::size_t const bucket_index = hasher(key) % buckets.size();
+        return *buckets[bucket_index];
+    }
+
+public:
+    typedef Key key_type;
+    typedef Value mapped_type;
+    typedef Hash hash_type;
+
+    threadsafe_lookup_table(
+        unsigned num_buckets = 19, Hash const& hasher_ = Hash())
+        : buckets(num_buckets)
+        , hasher(hasher_)
+    {
+        for (unsigned i = 0; i < num_buckets; ++i) {
+            buckets[i].reset(new bucket_type);
+        }
+    }
+
+    threadsafe_lookup_table(threadsafe_lookup_table const& other) = delete;
+    threadsafe_lookup_table& operator=(
+        threadsafe_lookup_table const& other)
+        = delete;
+
+    Value value_for(Key const& key,
+        Value const& default_value = Value()) const
+    {
+        return get_bucket(key).value_for(key, default_value);
+    }
+
+    void add_or_update_mapping(Key const& key, Value const& value)
+    {
+        get_bucket(key).add_or_update_mapping(key, value);
+    }
+
+    void remove_mapping(Key const& key)
+    {
+        get_bucket(key).remove_mapping(key);
+    }
+
+    /*
+        retrieves a snapshot of the current state into an std::map<>.
+        locks the entire container in order to ensure that a consistent copy of
+        the state is retrieved, which requires locking all the buckets.
+    */
+    std::map<Key, Value> threadsafe_lookup_table::get_map() const
+    {
+        std::vector<std::unique_lock<std::shared_mutex>> locks;
+        for (unsigned i = 0; i < buckets.size(); ++i) {
+            locks.push_back(
+                std::unique_lock<std::shared_mutex>(buckets[i].mutex));
+        }
+        std::map<Key, Value> res;
+        for (unsigned i = 0; i < buckets.size(); ++i) {
+            for (bucket_iterator it = buckets[i].data.begin();
+                 it != buckets[i].data.end();
+                 ++it) {
+                res.insert(*it);
+            }
+        }
+        return res;
+    }
+
+    /*
+        retrieves a snapshot of the current state into an std::vector<>.
+        locks the entire container in order to ensure that a consistent copy of
+        the state is retrieved, which requires locking all the buckets.
+    */
+    std::vector<Key> threadsafe_lookup_table::get_lookup_keys() const
+    {
+        std::vector<std::unique_lock<std::shared_mutex>> locks;
+        for (unsigned i = 0; i < buckets.size(); ++i) {
+            locks.push_back(
+                std::unique_lock<std::shared_mutex>(buckets[i].mutex));
+        }
+        std::vector<Key> res;
+        for (unsigned i = 0; i < buckets.size(); ++i) {
+            for (bucket_iterator it = buckets[i].data.begin();
+                 it != buckets[i].data.end();
+                 ++it) {
+                res.push_back(it->first);
+            }
+        }
+        return res;
+    }
+};
 
 #endif // MCUT_SCHEDULER_H_

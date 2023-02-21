@@ -89,6 +89,13 @@ typedef struct McConnectedComponent_T* McConnectedComponent;
 typedef struct McContext_T* McContext;
 
 /**
+ * @brief Event handle.
+ *
+ * Opaque type that can be used to identify async tasks.
+ */
+typedef struct McEvent_T* McEvent;
+
+/**
  * @brief Bitfield type.
  *
  * Integral type representing a 32-bit bitfield for storing parameter values.
@@ -400,6 +407,9 @@ typedef void (MCAPI_PTR *pfn_mcDebugOutput_CALLBACK)(
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(
     McContext* pContext, McFlags flags);
+
+extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextAsync(
+    McContext* pContext, McFlags flags, uint32_t nthreads);
 
 /** @brief Specify a callback to receive debugging messages from the MCUT library.
 *

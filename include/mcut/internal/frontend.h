@@ -163,6 +163,39 @@ struct input_cc_t : public connected_component_t {
     McInputOrigin origin = (McInputOrigin)0;
 };
 
+
+struct event_t
+{    
+    std::future<void> m_future;
+    std::atomic<bool> m_valid;
+    std::chrono::time_point<std::chrono::steady_clock> m_timestart;
+};
+
+// init in frontened.cpp
+extern threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
+extern std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McObject handle that will be returned to the user
+extern std::once_flag g_objcts_counter_init_flag;
+
+class device_t
+{
+private:
+    std::unique_ptr<thread_pool> m_threadpool;
+public:
+    device_t(uint32_t nthreads):
+        m_threadpool(std::unique_ptr<thread_pool>(new thread_pool(nthreads)))
+    {
+
+    }
+
+    template <typename FunctionType>
+    std::future<typename std::result_of<FunctionType()>::type> enqueue(FunctionType api_fun)
+    {
+        return m_threadpool->submit(api_fun);
+    }
+};
+
+
+
 // our custome deleter function for std::unique_ptr variable of an array type
 template <typename Derived>
 void fn_delete_cc(connected_component_t* p)
@@ -172,17 +205,62 @@ void fn_delete_cc(connected_component_t* p)
 
 // struct defining the state of a context object
 struct context_t {
-#if defined(MCUT_MULTI_THREADED)
-    // work scheduling state
-    thread_pool scheduler;
-#endif
+private:
+    thread_safe_queue<function_wrapper> m_queue;
+    std::atomic<bool> done;
+
+    void device_main()
+    {
+        do {
+            function_wrapper api_fn;
+
+            if (!(m_queue.try_pop(api_fn))) {
+                m_queue.wait_and_pop(api_fn);
+            }
+
+            if (done) {
+                break; 
+            }
+
+            api_fn(); 
+
+        } while (true);
+    }
+
+public:
+    context_t (uint32_t num_workers):done(false)
+    {   
+        m_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_workers));
+
+        auto device_future = std::async(std::launch::async, context_t::device_main);
+    }
+
+    ~context_t()
+    {
+
+    }
+
+    template <typename FunctionType>
+    std::future<typename std::result_of<FunctionType()>::type> enqueue(FunctionType api_fn)
+    {
+        typedef typename std::result_of<FunctionType()>::type result_type;
+
+        std::packaged_task<result_type()> task(std::move(f));
+        std::future<result_type> res(task.get_future());
+
+        m_device_queue.push(std::move(task));
+
+        return res;
+    }
+
+    std::unique_ptr<thread_pool> m_threadpool;
 
     // the current set of connected components associated with context
-    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>> connected_components = {};
+    threadsafe_lookup_table<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>> connected_components;
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags flags = (McFlags)0;
-    McFlags dispatchFlags = (McFlags)0;
+    //McFlags dispatchFlags = (McFlags)0;
 
     // client/user debugging variable
     // ------------------------------
@@ -214,7 +292,7 @@ struct context_t {
 };
 
 // list of contexts created by client/user
-extern "C" std::map<McContext, std::unique_ptr<context_t>> g_contexts;
+extern "C" threadsafe_lookup_table<McContext, std::unique_ptr<context_t>> g_contexts;
 
 extern "C" void create_context_impl(
     McContext* pContext, McFlags flags) noexcept(false);
@@ -238,6 +316,10 @@ extern "C" void get_info_impl(
     void* pMem,
     uint64_t* pNumBytes) noexcept(false);
 
+extern "C" void wait_for_events_impl(
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList)noexcept(false); 
+
 extern "C" void dispatch_impl(
     McContext context,
     McFlags flags,
@@ -250,14 +332,21 @@ extern "C" void dispatch_impl(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces) noexcept(false);
+    uint32_t numCutMeshFaces
+    ,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false);
 
 extern "C" void get_connected_components_impl(
     const McContext context,
     const McConnectedComponentType connectedComponentType,
     const uint32_t numEntries,
     McConnectedComponent* pConnComps,
-    uint32_t* numConnComps) noexcept(false);
+    uint32_t* numConnComps,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false);
 
 extern "C" void get_connected_component_data_impl(
     const McContext context,

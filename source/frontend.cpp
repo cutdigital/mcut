@@ -27,34 +27,48 @@ std::atomic_bool thread_pool_terminate(false);
 std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr<mini_timer>>();
 #endif
 
-std::map<McContext, std::unique_ptr<context_t>> g_contexts = {};
+threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts = {};
+threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
+std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McContext handle that will be returned to the user
+std::once_flag g_objcts_counter_init_flag; // flag used to initialise "g_objects_counter" with "std::call_once"
 
-void create_context_impl(McContext* pOutContext, McFlags flags)
+void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t nthreads)
 {
     MCUT_ASSERT(pOutContext != nullptr);
 
+    std::call_once(g_objcts_counter_init_flag, []() { g_objects_counter.store(0); });
+
+    const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
+
     // allocate internal context object (including associated threadpool etc.)
-    std::unique_ptr<context_t> context_uptr = std::unique_ptr<context_t>(new context_t());
+    g_contexts.add_or_update_mapping(handle, std::shared_ptr<context_t>(new context_t(nthreads)));
+
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(handle);
+    MCUT_ASSERT(context_ptr != nullptr);
+
+    //
+    // NOTE: the current API function is thread-safe since each user thread that calls
+    // it will create a new context with a new handle
+    // Thus, we do not need a lock here to ensure that only one client-app thread
+    // can modify/read-from context.
 
     // copy context configuration flags
-    context_uptr->flags = flags;
+    context_ptr->flags = flags;
 
-    // create handle (ptr) which will be returned and used by client to access rest of API
-    const McContext handle = reinterpret_cast<McContext>(context_uptr.get());
+    // TODO: ensures that only one client-app thread can modify/read-from context-map
+    // const std::pair<std::map<McContext, std::unique_ptr<context_t>>::iterator, bool> insertion_result = g_contexts.emplace(handle, std::move(context_uptr));
 
-    const std::pair<std::map<McContext, std::unique_ptr<context_t>>::iterator, bool> insertion_result = g_contexts.emplace(handle, std::move(context_uptr));
+    // const bool context_inserted_ok = insertion_result.second;
 
-    const bool context_inserted_ok = insertion_result.second;
+    // if (!context_inserted_ok) {
+    //     throw std::runtime_error("failed to create context");
+    // }
 
-    if (!context_inserted_ok) {
-        throw std::runtime_error("failed to create context");
-    }
+    // const std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = insertion_result.first;
 
-    const std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = insertion_result.first;
+    // MCUT_ASSERT(handle == context_entry_iter->first);
 
-    MCUT_ASSERT(handle == context_entry_iter->first);
-
-    *pOutContext = context_entry_iter->first;
+    *pOutContext = handle;
 }
 
 void debug_message_callback_impl(
@@ -65,19 +79,20 @@ void debug_message_callback_impl(
     MCUT_ASSERT(contextHandle != nullptr);
     MCUT_ASSERT(cb != nullptr);
 
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
+    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
+
+    if (context_ptr == nullptr) {
         // "contextHandle" may not be NULL but that does not mean it maps to
         // a valid object in "g_contexts"
         throw std::invalid_argument("invalid context");
     }
-
-    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
+    // const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     // set callback function ptr, and user pointer
-    context_uptr->debugCallback = cb;
-    context_uptr->debugCallbackUserParam = userParam;
+    context_ptr->debugCallback = cb;
+    context_ptr->debugCallbackUserParam = userParam;
 }
 
 // find the number of trailing zeros in v
@@ -127,72 +142,83 @@ void debug_message_control_impl(
     McDebugSeverity severity,
     bool enabled)
 {
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
+    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
+    // if (context_entry_iter == g_contexts.end()) {
+    //     throw std::invalid_argument("invalid context");
+    // }
+
+    // const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
+
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+
+    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
+
+    if (context_ptr == nullptr) {
+        // "contextHandle" may not be NULL but that does not mean it maps to
+        // a valid object in "g_contexts"
         throw std::invalid_argument("invalid context");
     }
-
-    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
-
     // reset
-    context_uptr->debugSource = 0;
+    context_ptr->debugSource = 0;
 
     for (auto i : { MC_DEBUG_SOURCE_API, MC_DEBUG_SOURCE_KERNEL }) {
         if ((source & i) && enabled) {
 
             int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i);
 
-            context_uptr->debugSource = set_bit(context_uptr->debugSource, n);
+            context_ptr->debugSource = set_bit(context_ptr->debugSource, n);
         }
     }
 
     // reset
-    context_uptr->debugType = 0;
+    context_ptr->debugType = 0;
 
     for (auto i : { MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, MC_DEBUG_TYPE_ERROR, MC_DEBUG_TYPE_OTHER }) {
         if ((type & i) && enabled) {
 
             int n = trailing_zeroes(MC_DEBUG_TYPE_ALL & i);
 
-            context_uptr->debugType = set_bit(context_uptr->debugType, n);
+            context_ptr->debugType = set_bit(context_ptr->debugType, n);
         }
     }
 
     // reset
-    context_uptr->debugSeverity = 0;
+    context_ptr->debugSeverity = 0;
 
     for (auto i : { MC_DEBUG_SEVERITY_HIGH, MC_DEBUG_SEVERITY_LOW, MC_DEBUG_SEVERITY_MEDIUM, MC_DEBUG_SEVERITY_NOTIFICATION }) {
         if ((severity & i) && enabled) {
 
             int n = trailing_zeroes(MC_DEBUG_SEVERITY_ALL & i);
 
-            context_uptr->debugSeverity = set_bit(context_uptr->debugSeverity, n);
+            context_ptr->debugSeverity = set_bit(context_ptr->debugSeverity, n);
         }
     }
 }
 
 void get_info_impl(
-    const McContext context,
+    const McContext contextHandle,
     McFlags info,
     uint64_t bytes,
     void* pMem,
     uint64_t* pNumBytes)
 {
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
+    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
+
+    if (context_ptr == nullptr) {
+        // "contextHandle" may not be NULL but that does not mean it maps to
+        // a valid object in "g_contexts"
         throw std::invalid_argument("invalid context");
     }
-
-    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     switch (info) {
     case MC_CONTEXT_FLAGS:
         if (pMem == nullptr) {
-            *pNumBytes = sizeof(context_uptr->flags);
+            *pNumBytes = sizeof(context_ptr->flags);
         } else {
-            memcpy(pMem, reinterpret_cast<void*>(&context_uptr->flags), bytes);
+            memcpy(pMem, reinterpret_cast<void*>(&context_ptr->flags), bytes);
         }
         break;
     default:
@@ -201,9 +227,31 @@ void get_info_impl(
     }
 }
 
+void wait_for_events_impl(
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList)
+{
+    for (uint32_t i = 0; i < numEventsInWaitlist; ++i) {
+        McEvent eventHandle = pEventWaitList[i];
+
+        std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+
+        if (event_ptr == nullptr) {
+            // "contextHandle" may not be NULL but that does not mean it maps to
+            // a valid object in "g_contexts"
+            throw std::invalid_argument("null event object");
+        } else if (event_ptr->m_valid == false) {
+            // event has already been waited on
+            throw std::invalid_argument("invalid event object");
+        } else {
+            event_ptr->m_future.wait(); // block until contect-device is done
+        }
+    }
+}
+
 void dispatch_impl(
-    McContext context,
-    McFlags flags,
+    McContext contextHandle,
+    McFlags dispatchFlags,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
@@ -213,73 +261,149 @@ void dispatch_impl(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces)
+    uint32_t numCutMeshFaces,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent)
 {
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
+    if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
     }
 
-    std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
+    const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
-    context_uptr->dispatchFlags = flags;
+    g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
 
-    preproc(
-        context_uptr,
-        pSrcMeshVertices,
-        pSrcMeshFaceIndices,
-        pSrcMeshFaceSizes,
-        numSrcMeshVertices,
-        numSrcMeshFaces,
-        pCutMeshVertices,
-        pCutMeshFaceIndices,
-        pCutMeshFaceSizes,
-        numCutMeshVertices,
-        numCutMeshFaces);
+    std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
+
+    MCUT_ASSERT(event_ptr != nullptr);
+
+    // submit the dispatch call to be executed asynchronously and return the future
+    // object that will be waited on as an event
+    event_ptr->m_future = context_ptr->enqueue(
+        [=, &context_ptr]() {
+            // asynch task will have to wait for the events in the waitlist!
+            const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
+
+            if (have_events_to_wait_for) {
+                wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+            }
+
+            preproc(
+                context_ptr,
+                dispatchFlags,
+                pSrcMeshVertices,
+                pSrcMeshFaceIndices,
+                pSrcMeshFaceSizes,
+                numSrcMeshVertices,
+                numSrcMeshFaces,
+                pCutMeshVertices,
+                pCutMeshFaceIndices,
+                pCutMeshFaceSizes,
+                numCutMeshVertices,
+                numCutMeshFaces);
+        });
+
+    MCUT_ASSERT(pEvent != nullptr);
+
+    *pEvent = event_handle;
 }
 
 void get_connected_components_impl(
-    const McContext context,
+    const McContext contextHandle,
     const McConnectedComponentType connectedComponentType,
     const uint32_t numEntries,
     McConnectedComponent* pConnComps,
-    uint32_t* numConnComps)
+    uint32_t* numConnComps,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent)
 {
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
+    if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
+    const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
-    if (numConnComps != nullptr) {
-        (*numConnComps) = 0; // reset
-    }
+    g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
 
-    uint32_t valid_cc_counter = 0;
+    std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
 
-    for (std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator i = context_uptr->connected_components.cbegin();
-         i != context_uptr->connected_components.cend();
-         ++i) {
+    MCUT_ASSERT(event_ptr != nullptr);
 
-        const bool is_valid = (i->second->type & connectedComponentType) != 0;
+    event_ptr->m_future = context_ptr->enqueue(
+        [=, &context_ptr]() {
+            // asynch task will have to wait for the events in the waitlist!
+            const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
 
-        if (is_valid) {
-            if (pConnComps == nullptr) // query number
+            if (have_events_to_wait_for) {
+                wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+            }
+
+            // After waiting for preceeding tasks, the device can now go on to do actual work            
+
+            if (numConnComps != nullptr) {
+                (*numConnComps) = 0; // reset
+            }
+
+            uint32_t valid_cc_counter = 0;
+
+#if 1
+            std::vector<McConnectedComponent> cc_vec = context_ptr->connected_components.get_lookup_keys();
+
+            for(std::vector<McConnectedComponent>::const_iterator it = cc_vec.cbegin(); it != cc_vec.cend(); ++it)
             {
-                (*numConnComps)++;
-            } else // populate pConnComps
-            {
-                pConnComps[valid_cc_counter] = i->first;
-                valid_cc_counter += 1;
-                if (valid_cc_counter == numEntries) {
-                    break;
+                const McConnectedComponent cc_handle = *it;
+                const std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> cc_ptr = context_ptr->connected_components.value_for(cc_handle);
+
+                if(cc_ptr != nullptr) // i.e. the handle was not deleted somewhere in time between "get_lookup_keys()" and now
+                {
+                    const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
+
+                    if (is_valid) {
+                        if (pConnComps == nullptr) // query number
+                        {
+                            (*numConnComps)++;
+                        } else // populate pConnComps
+                        {
+                            pConnComps[valid_cc_counter] = cc_handle;
+                            valid_cc_counter += 1;
+                            if (valid_cc_counter == numEntries) {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
-        }
-    }
+#else
+            for (std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator i = context_uptr->connected_components.cbegin();
+                 i != context_uptr->connected_components.cend();
+                 ++i) {
+
+                const bool is_valid = (i->second->type & connectedComponentType) != 0;
+
+                if (is_valid) {
+                    if (pConnComps == nullptr) // query number
+                    {
+                        (*numConnComps)++;
+                    } else // populate pConnComps
+                    {
+                        pConnComps[valid_cc_counter] = i->first;
+                        valid_cc_counter += 1;
+                        if (valid_cc_counter == numEntries) {
+                            break;
+                        }
+                    }
+                }
+            }
+#endif
+        });
+
+    *pEvent = event_handle;
 }
 
 template <class InputIt, class OutputIt>
@@ -2522,8 +2646,7 @@ void get_connected_component_data_impl(
 
         MCUT_ASSERT(cc_uptr->cdt_index_cache_initialized == true);
 
-        if(user_requested_cdt_face_maps)
-        {
+        if (user_requested_cdt_face_maps) {
             MCUT_ASSERT(!cc_uptr->cdt_face_map_cache.empty());
         }
 
