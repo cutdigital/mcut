@@ -240,13 +240,26 @@ void wait_for_events_impl(
             // "contextHandle" may not be NULL but that does not mean it maps to
             // a valid object in "g_contexts"
             throw std::invalid_argument("null event object");
-        } else if (event_ptr->m_valid == false) {
-            // event has already been waited on
-            throw std::invalid_argument("invalid event object");
         } else {
             event_ptr->m_future.wait(); // block until contect-device is done
         }
     }
+}
+
+void set_event_callback_impl(
+    McEvent eventHandle,
+    pfn_McEvent_CALLBACK eventCallback,
+    void* data)
+{
+    std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+
+    if (event_ptr == nullptr) {
+        // "contextHandle" may not be NULL but that does not mean it maps to
+        // a valid object in "g_contexts"
+        throw std::invalid_argument("null event object");
+    }
+
+    event_ptr->set_callback_data(eventHandle, eventCallback, data);
 }
 
 void dispatch_impl(
@@ -304,6 +317,8 @@ void dispatch_impl(
                 pCutMeshFaceSizes,
                 numCutMeshVertices,
                 numCutMeshFaces);
+
+            event_ptr->notify_task_complete(event_handle);
         });
 
     MCUT_ASSERT(pEvent != nullptr);
@@ -344,7 +359,7 @@ void get_connected_components_impl(
                 wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
             }
 
-            // After waiting for preceeding tasks, the device can now go on to do actual work            
+            // After waiting for preceeding tasks, the device can now go on to do actual work
 
             if (numConnComps != nullptr) {
                 (*numConnComps) = 0; // reset
@@ -355,12 +370,11 @@ void get_connected_components_impl(
 #if 1
             std::vector<McConnectedComponent> cc_vec = context_ptr->connected_components.get_lookup_keys();
 
-            for(std::vector<McConnectedComponent>::const_iterator it = cc_vec.cbegin(); it != cc_vec.cend(); ++it)
-            {
+            for (std::vector<McConnectedComponent>::const_iterator it = cc_vec.cbegin(); it != cc_vec.cend(); ++it) {
                 const McConnectedComponent cc_handle = *it;
-                const std::unique_ptr<connected_component_t, void (*)(connected_component_t*)> cc_ptr = context_ptr->connected_components.value_for(cc_handle);
+                const std::shared_ptr<connected_component_t> cc_ptr = context_ptr->connected_components.value_for(cc_handle);
 
-                if(cc_ptr != nullptr) // i.e. the handle was not deleted somewhere in time between "get_lookup_keys()" and now
+                if (cc_ptr != nullptr) // i.e. the handle was not deleted somewhere in time between "get_lookup_keys()" and now
                 {
                     const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
 
@@ -380,7 +394,7 @@ void get_connected_components_impl(
                 }
             }
 #else
-            for (std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator i = context_uptr->connected_components.cbegin();
+            for (std::map<McConnectedComponent, std::shared_ptr<connected_component_t>>::const_iterator i = context_uptr->connected_components.cbegin();
                  i != context_uptr->connected_components.cend();
                  ++i) {
 
@@ -426,7 +440,7 @@ OutputIt partial_sum(InputIt first, InputIt last, OutputIt d_first)
 void triangulate_face(
     //  list of indices which define all triangles that result from the CDT
     std::vector<uint32_t>& cc_face_triangulation,
-    const std::unique_ptr<context_t>& context_uptr,
+    const std::shared_ptr<context_t>& context_uptr,
     const uint32_t cc_face_vcount,
     const std::vector<vertex_descriptor_t>& cc_face_vertices,
     const hmesh_t& cc,
@@ -1203,7 +1217,7 @@ void triangulate_face(
   */
 uint32_t map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
     const uint32_t internal_inputmesh_face_idx,
-    const std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>& cc_uptr)
+    const std::shared_ptr<connected_component_t>& cc_uptr)
 {
     // uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[i];
     uint32_t user_inputmesh_face_idx = INT32_MAX; // return value
@@ -1235,15 +1249,15 @@ uint32_t map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
     return user_inputmesh_face_idx;
 }
 
-void get_connected_component_data_impl(
-    const McContext context,
+void get_connected_component_data_impl_detail(
+    std::shared_ptr<context_t> context_ptr,
     const McConnectedComponent connCompId,
     McFlags flags,
     uint64_t bytes,
     void* pMem,
     uint64_t* pNumBytes)
 {
-
+#if 0
     std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
 
     if (context_entry_iter == g_contexts.end()) {
@@ -1252,13 +1266,16 @@ void get_connected_component_data_impl(
 
     std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
-    std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
+    std::map<McConnectedComponent, std::shared_ptr<connected_component_t>>::iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
 
     if (cc_entry_iter == context_uptr->connected_components.cend()) {
         throw std::invalid_argument("invalid connected component");
     }
 
-    std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>& cc_uptr = cc_entry_iter->second;
+    std::shared_ptr<connected_component_t>& cc_uptr = cc_entry_iter->second;
+#endif
+
+    std::shared_ptr<connected_component_t> cc_uptr = context_ptr->connected_components.value_for(connCompId);
 
     switch (flags) {
 
@@ -1314,7 +1331,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->vertices_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
@@ -1391,7 +1408,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->vertices_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
@@ -1452,7 +1469,7 @@ void get_connected_component_data_impl(
                 uint32_t partial_res;
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_count_indices,
@@ -1515,7 +1532,7 @@ void get_connected_component_data_impl(
                     const std::size_t num_bytes = nfaces * sizeof(uint32_t);
 
                     // recursive Internal API call: populate cache here, which also sets "cc_uptr->face_sizes_cache_initialized" to true
-                    get_connected_component_data_impl(context, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, num_bytes, cc_uptr->face_sizes_cache.data(), NULL);
+                    get_connected_component_data_impl_detail(context_ptr, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, num_bytes, cc_uptr->face_sizes_cache.data(), NULL);
                 } else { // cache already initialized
                     MCUT_ASSERT(cc_uptr->face_sizes_cache.empty() == false);
                     MCUT_ASSERT(cc_uptr->face_sizes_cache_initialized == true);
@@ -1526,7 +1543,7 @@ void get_connected_component_data_impl(
                 //
                 std::vector<uint32_t> partial_sum_vec = cc_uptr->face_sizes_cache; // copy
 
-                parallel_partial_sum(context_uptr->scheduler, partial_sum_vec.begin(), partial_sum_vec.end());
+                parallel_partial_sum(context_ptr->m_threadpool.get()[0], partial_sum_vec.begin(), partial_sum_vec.end());
 
                 //
                 // step 3
@@ -1569,7 +1586,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_indices_copy,
@@ -1652,7 +1669,7 @@ void get_connected_component_data_impl(
                     };
 
                     parallel_for(
-                        context_uptr->scheduler,
+                        context_ptr->m_threadpool.get()[0],
                         cc_uptr->face_sizes_cache.begin(),
                         cc_uptr->face_sizes_cache.end(),
                         fn_face_size); // blocks until all work is done
@@ -1717,7 +1734,7 @@ void get_connected_component_data_impl(
                 uint32_t partial_res;
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_count_faces_around_face,
@@ -1775,8 +1792,8 @@ void get_connected_component_data_impl(
                     const std::size_t num_bytes = nfaces * sizeof(uint32_t);
 
                     // recursive Internal API call: populate cache here, which also sets "cc_uptr->face_adjacent_faces_size_cache" to true
-                    get_connected_component_data_impl(
-                        context,
+                    get_connected_component_data_impl_detail(
+                        context_ptr,
                         connCompId,
                         MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE,
                         num_bytes,
@@ -1792,7 +1809,7 @@ void get_connected_component_data_impl(
                 //
                 std::vector<uint32_t> partial_sum_vec = cc_uptr->face_adjacent_faces_size_cache; // copy
 
-                parallel_partial_sum(context_uptr->scheduler, partial_sum_vec.begin(), partial_sum_vec.end());
+                parallel_partial_sum(context_ptr->m_threadpool.get()[0], partial_sum_vec.begin(), partial_sum_vec.end());
 
                 //
                 // step 3
@@ -1829,7 +1846,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_adjface_indices_copy); // blocks until all work is done
@@ -1902,7 +1919,7 @@ void get_connected_component_data_impl(
                     };
 
                     parallel_for(
-                        context_uptr->scheduler,
+                        context_ptr->m_threadpool.get()[0],
                         cc_uptr->face_adjacent_faces_size_cache.begin(),
                         cc_uptr->face_adjacent_faces_size_cache.end(),
                         fn_face_adj_face_size); // blocks until all work is done
@@ -1970,7 +1987,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->edges_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->edges_end(),
                     fn_copy_edges);
@@ -2144,7 +2161,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->seam_vertices.cbegin(),
                     cc_uptr->kernel_hmesh_data->seam_vertices.cend(),
                     fn_copy_seam_vertices);
@@ -2242,7 +2259,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cbegin(),
                     cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cend(),
                     fn_copy_vertex_map);
@@ -2365,7 +2382,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->data_maps.face_map.cbegin(),
                     cc_uptr->kernel_hmesh_data->data_maps.face_map.cend(),
                     fn_copy_face_map);
@@ -2426,7 +2443,7 @@ void get_connected_component_data_impl(
                 const uint32_t min_per_thread = 1 << 10;
                 {
                     uint32_t max_threads = 0;
-                    const uint32_t available_threads = context_uptr->scheduler.get_num_threads() + 1; // workers and master (+1)
+                    const uint32_t available_threads = context_ptr->m_threadpool.get()[0].get_num_threads() + 1; // workers and master (+1)
                     uint32_t block_size_unused = 0;
                     const uint32_t length = cc_face_count;
 
@@ -2483,7 +2500,7 @@ void get_connected_component_data_impl(
 
                             cc_face_triangulation.clear();
 
-                            triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, *(cc.get()), *cc_face_iter);
+                            triangulate_face(cc_face_triangulation, context_ptr, cc_face_vcount, cc_face_vertices, *(cc.get()), *cc_face_iter);
 
                             for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
                                 const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
@@ -2550,7 +2567,7 @@ void get_connected_component_data_impl(
                 };
 
                 parallel_for(
-                    context_uptr->scheduler,
+                    context_ptr->m_threadpool.get()[0],
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_triangulate_faces,
@@ -2700,8 +2717,8 @@ void get_connected_component_data_impl(
         if (cc_uptr->cdt_face_map_cache_initialized == false) {
 
             // recursive Internal API call to compute CDT and populate caches and also set "cc_uptr->cdt_face_map_cache_initialized" to true
-            get_connected_component_data_impl(
-                context,
+            get_connected_component_data_impl_detail(
+                context_ptr,
                 connCompId,
                 MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION,
                 /*The next two parameters are actually unused (in the sense of writing data to them).
@@ -2740,50 +2757,120 @@ void get_connected_component_data_impl(
     }
 }
 
-void release_connected_components_impl(
-    const McContext context,
-    uint32_t numConnComps,
-    const McConnectedComponent* pConnComps)
+void get_connected_component_data_impl(
+    const McContext contextHandle,
+    const McConnectedComponent connCompId,
+    McFlags flags,
+    uint64_t bytes,
+    void* pMem,
+    uint64_t* pNumBytes,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent)
 {
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
+    if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
     }
 
-    const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
+    const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
-    if (numConnComps > (uint32_t)context_uptr->connected_components.size()) {
+    g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
+
+    std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
+
+    MCUT_ASSERT(event_ptr != nullptr);
+
+    event_ptr->m_future = context_ptr->enqueue([=, &context_ptr]() {
+        // asynch task will have to wait for the events in the waitlist!
+        const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
+
+        if (have_events_to_wait_for) {
+            wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+        }
+
+        // After waiting for preceeding tasks, the device can now go on to do actual work
+
+        // asynchronously get the data and write to user provided pointer
+        get_connected_component_data_impl_detail(
+            context_ptr,
+            connCompId,
+            flags,
+            bytes,
+            pMem,
+            pNumBytes);
+    });
+
+    *pEvent = event_handle;
+}
+
+void release_event_impl(
+    McEvent eventHandle)
+{
+    std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+
+    if (event_ptr == nullptr) {
+        throw std::invalid_argument("invalid event handle");
+    }
+
+    g_events.remove_mapping(eventHandle);
+}
+
+void release_connected_components_impl(
+    const McContext contextHandle,
+    uint32_t numConnComps,
+    const McConnectedComponent* pConnComps)
+{
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+
+    if (context_ptr == nullptr) {
+        throw std::invalid_argument("invalid context");
+    }
+
+    std::vector<McConnectedComponent> cc_vec = context_ptr->connected_components.get_lookup_keys();
+
+    if (numConnComps > (uint32_t)cc_vec.size()) {
         throw std::invalid_argument("invalid connected component count");
     }
 
     bool freeAll = numConnComps == 0 && pConnComps == NULL;
 
-    if (freeAll) {
-        context_uptr->connected_components.clear();
-    } else {
-        for (int i = 0; i < (int)numConnComps; ++i) {
-            McConnectedComponent connCompId = pConnComps[i];
+    if (!cc_vec.empty()) {
+        if (freeAll) {
+            std::vector<McConnectedComponent>::const_iterator it;
+            do {
+                it = cc_vec.cbegin();
+                McConnectedComponent cc_handle = *it;
+                context_ptr->connected_components.remove_mapping(cc_handle); // delete cc
+                it = cc_vec.erase(it);
+            } while (it != cc_vec.cend());
 
-            std::map<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>>::const_iterator cc_entry_iter = context_uptr->connected_components.find(connCompId);
+        } else {
+            for (int i = 0; i < (int)numConnComps; ++i) {
+                McConnectedComponent connCompId = pConnComps[i];
 
-            if (cc_entry_iter == context_uptr->connected_components.cend()) {
-                throw std::invalid_argument("invalid connected component id");
+                std::vector<McConnectedComponent>::const_iterator it = std::find_if(cc_vec.cbegin(), cc_vec.cend(), connCompId);
+
+                if (it == cc_vec.cend()) {
+                    throw std::invalid_argument("invalid connected component handle");
+                }
+
+                // remove if "connCompId" still exists between "get_lookup_keys" and now
+                context_ptr->connected_components.remove_mapping(connCompId);
             }
-
-            context_uptr->connected_components.erase(cc_entry_iter);
         }
     }
 }
 
 void release_context_impl(
-    McContext context)
+    McContext contextHandle)
 {
-    std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
+    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
 
-    if (context_entry_iter == g_contexts.end()) {
-        throw std::invalid_argument("invalid context");
+    if (context_ptr == nullptr) {
+        throw std::invalid_argument("invalid context handle");
     }
 
-    g_contexts.erase(context_entry_iter);
+    g_contexts.remove_mapping(contextHandle);
 }

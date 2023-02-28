@@ -80,57 +80,57 @@ struct array_mesh_t {
 };
 #endif
 
-
 // base struct from which other structs represent connected components inherit
 struct connected_component_t {
     virtual ~connected_component_t() {};
     McConnectedComponentType type = (McConnectedComponentType)0;
-    //array_mesh_t indexArrayMesh;
-    //hmesh_t mesh;
+    // array_mesh_t indexArrayMesh;
+    // hmesh_t mesh;
     std::shared_ptr<output_mesh_info_t> kernel_hmesh_data;
 
-    // 
+    //
     std::shared_ptr< //
         std::unordered_map< //
-        fd_t /*child face*/,
-        fd_t /*parent face in the [user-provided] source mesh*/
-        > //
-    > source_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputSrcMeshFace
-    std::shared_ptr < //
-        std::unordered_map< //
-        fd_t /*child face*/,
-        fd_t /*parent face in the [user-provided] cut mesh*/
+            fd_t /*child face*/,
+            fd_t /*parent face in the [user-provided] source mesh*/
+            > //
         >
-    > cut_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputCutMeshFace
+        source_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputSrcMeshFace
+    std::shared_ptr< //
+        std::unordered_map< //
+            fd_t /*child face*/,
+            fd_t /*parent face in the [user-provided] cut mesh*/
+            >>
+        cut_hmesh_child_to_usermesh_birth_face; // fpPartitionChildFaceToCorrespondingInputCutMeshFace
     // descriptors and coordinates of new vertices that are added into an input mesh (source mesh or cut mesh)
     // in order to carry out partitioning
-    std::shared_ptr < std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputSrcMesh
-    std::shared_ptr < std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputCutMesh
+    std::shared_ptr<std::unordered_map<vd_t, vec3>> source_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputSrcMesh
+    std::shared_ptr<std::unordered_map<vd_t, vec3>> cut_hmesh_new_poly_partition_vertices; // addedFpPartitioningVerticesOnCorrespondingInputCutMesh
     uint32_t internal_sourcemesh_vertex_count; // init from source_hmesh.number_of_vertices()
     uint32_t client_sourcemesh_vertex_count; // init from numSrcMeshVertices
     uint32_t internal_sourcemesh_face_count; // init from source_hmesh.number_of_faces()
     uint32_t client_sourcemesh_face_count; // init from source_hmesh_face_count OR numSrcMeshFaces
     // Stores the contiguous array of unsigned integers that define
-    // a triangulation of all [non-triangle faces] of the connected component. 
+    // a triangulation of all [non-triangle faces] of the connected component.
     // This vector is only populated if client invokes mcGetConnectedComponnentData
     // with flag MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION and has the effect of
     // triangulating every non-triangle face in the connected component.
     std::vector<uint32_t> cdt_index_cache;
     bool cdt_index_cache_initialized = false;
-    // stores the mapping between a CDT triangle in the connected component and 
+    // stores the mapping between a CDT triangle in the connected component and
     // the original "birth-face" in an input mesh (source mesh or cut mesh)
     std::vector<uint32_t> cdt_face_map_cache;
     bool cdt_face_map_cache_initialized = false;
 #if defined(MCUT_MULTI_THREADED)
-    // Stores the number of vertices per face of CC. This is an optimization 
-    // because there is a possibility that face-sizes may (at-minimum) be queried 
-    // twice by user. The first case is during the populating (i.e. second) call to the API 
+    // Stores the number of vertices per face of CC. This is an optimization
+    // because there is a possibility that face-sizes may (at-minimum) be queried
+    // twice by user. The first case is during the populating (i.e. second) call to the API
     // mcGetConnectedComponentData(..., MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, ...);
-    // The second case is during the populating (i.e. second) call to the API 
+    // The second case is during the populating (i.e. second) call to the API
     // mcGetConnectedComponentData(..., MC_CONNECTED_COMPONENT_DATA_FACE, ...);.
-    // The key detail here is that the second case requires knowledge of the 
-    // number of vertices in each face in order to know how to schedule parallel 
-    // work with prefix-sums etc.. Thus, the optimization is useful only if 
+    // The key detail here is that the second case requires knowledge of the
+    // number of vertices in each face in order to know how to schedule parallel
+    // work with prefix-sums etc.. Thus, the optimization is useful only if
     // building MCUT with multi-threading
     std::vector<uint32_t> face_sizes_cache;
     bool face_sizes_cache_initialized = false;
@@ -163,12 +163,47 @@ struct input_cc_t : public connected_component_t {
     McInputOrigin origin = (McInputOrigin)0;
 };
 
+struct event_t {
+    std::future<void> m_future; // used to wait on event
+    // used to synch access to the callback function e.g. to guard the setting of associated variables
+    // Also allows us to overcome the edge case that mcSetEventCallback is called after the task
+    // associated with an event has been completed, in which case the new callback invoked immediately.
+    // see "set_callback_data()" below
+    std::mutex m_callback_fn_mutex;
+    // optional user callback, which is invoked when associated task is finished
+    pfn_McEvent_CALLBACK m_callback_fn_ptr;
+    void* m_callback_fn_data_param_ptr;
+    std::atomic<bool> m_associated_task_is_complete;
+    event_t()
+        : m_callback_fn_ptr(nullptr)
+        , m_callback_fn_data_param_ptr(nullptr)
+        , m_associated_task_is_complete(false)
+    {
+    }
 
-struct event_t
-{    
-    std::future<void> m_future;
-    std::atomic<bool> m_valid;
-    std::chrono::time_point<std::chrono::steady_clock> m_timestart;
+    void set_callback_data(McEvent handle, pfn_McEvent_CALLBACK fn_ptr, void* data_param_ptr)
+    {
+        std::lock_guard<std::mutex> lock(m_callback_fn_mutex);
+
+        m_callback_fn_ptr = fn_ptr;
+        m_callback_fn_data_param_ptr = data_param_ptr;
+
+        if (m_associated_task_is_complete.load() == true) { // see mutex documentation
+            // immediately invoke the callback
+            (*(m_callback_fn_ptr))(handle, m_callback_fn_data_param_ptr);
+        }
+    }
+
+    void notify_task_complete(McEvent handle)
+    {
+        std::lock_guard<std::mutex> lock(m_callback_fn_mutex);
+
+        m_associated_task_is_complete = true;
+
+        if (m_callback_fn_ptr != nullptr) {
+            (*(m_callback_fn_ptr))(handle, m_callback_fn_data_param_ptr);
+        }
+    }
 };
 
 // init in frontened.cpp
@@ -176,15 +211,14 @@ extern threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
 extern std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McObject handle that will be returned to the user
 extern std::once_flag g_objcts_counter_init_flag;
 
-class device_t
-{
+class device_t {
 private:
     std::unique_ptr<thread_pool> m_threadpool;
-public:
-    device_t(uint32_t nthreads):
-        m_threadpool(std::unique_ptr<thread_pool>(new thread_pool(nthreads)))
-    {
 
+public:
+    device_t(uint32_t nthreads)
+        : m_threadpool(std::unique_ptr<thread_pool>(new thread_pool(nthreads)))
+    {
     }
 
     template <typename FunctionType>
@@ -193,8 +227,6 @@ public:
         return m_threadpool->submit(api_fun);
     }
 };
-
-
 
 // our custome deleter function for std::unique_ptr variable of an array type
 template <typename Derived>
@@ -219,17 +251,18 @@ private:
             }
 
             if (done) {
-                break; 
+                break;
             }
 
-            api_fn(); 
+            api_fn();
 
         } while (true);
     }
 
 public:
-    context_t (uint32_t num_workers):done(false)
-    {   
+    context_t(uint32_t num_workers)
+        : done(false)
+    {
         m_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_workers));
 
         auto device_future = std::async(std::launch::async, context_t::device_main);
@@ -237,7 +270,6 @@ public:
 
     ~context_t()
     {
-
     }
 
     template <typename FunctionType>
@@ -256,11 +288,11 @@ public:
     std::unique_ptr<thread_pool> m_threadpool;
 
     // the current set of connected components associated with context
-    threadsafe_lookup_table<McConnectedComponent, std::unique_ptr<connected_component_t, void (*)(connected_component_t*)>> connected_components;
+    threadsafe_lookup_table<McConnectedComponent, std::shared_ptr<connected_component_t>> connected_components;
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags flags = (McFlags)0;
-    //McFlags dispatchFlags = (McFlags)0;
+    // McFlags dispatchFlags = (McFlags)0;
 
     // client/user debugging variable
     // ------------------------------
@@ -292,7 +324,7 @@ public:
 };
 
 // list of contexts created by client/user
-extern "C" threadsafe_lookup_table<McContext, std::unique_ptr<context_t>> g_contexts;
+extern "C" threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts;
 
 extern "C" void create_context_impl(
     McContext* pContext, McFlags flags) noexcept(false);
@@ -316,9 +348,14 @@ extern "C" void get_info_impl(
     void* pMem,
     uint64_t* pNumBytes) noexcept(false);
 
+extern "C" void set_event_callback_impl(
+    McEvent eventHandle,
+    pfn_McEvent_CALLBACK eventCallback,
+    void* data);
+
 extern "C" void wait_for_events_impl(
     uint32_t numEventsInWaitlist,
-    const McEvent* pEventWaitList)noexcept(false); 
+    const McEvent* pEventWaitList) noexcept(false);
 
 extern "C" void dispatch_impl(
     McContext context,
@@ -332,8 +369,7 @@ extern "C" void dispatch_impl(
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces
-    ,
+    uint32_t numCutMeshFaces,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
     McEvent* pEvent) noexcept(false);

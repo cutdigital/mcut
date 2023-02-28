@@ -378,6 +378,8 @@ typedef void (MCAPI_PTR *pfn_mcDebugOutput_CALLBACK)(
     const char* message,
     const void* userParam);
 
+typedef void (MCAPI_PTR *pfn_McEvent_CALLBACK)(McEvent event, void *data);
+
 /** @brief Create an MCUT context.
 *
 * This method creates a context object, which is a handle used by a client application to control the API state and access data.
