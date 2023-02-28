@@ -252,8 +252,6 @@ MCAPI_ATTR pfn_McEvent_CALLBACK MCAPI_CALL mcSetEventCallback(
     } else {
         try {
             set_event_callback_impl(eventHandle, eventCallback, data);
-
-            
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -550,7 +548,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
 }
 
 MCAPI_ATTR McResult MCAPI_CALL mcReleaseEvents(
-    const McContext context,
     uint32_t numEvents,
     const McEvent* pEvents)
 {
@@ -563,7 +560,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcReleaseEvents(
         per_thread_api_log_str = "number of events not set";
     } else {
         try {
-            release_events_impl(numConnComps, pConnComps);
+            release_events_impl(numEvents, pEvents);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }

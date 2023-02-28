@@ -1,22 +1,22 @@
 /**
  * Copyright (c) 2021-2022 Floyd M. Chitalu.
  * All rights reserved.
- * 
- * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from Floyd M. Chitalu. 
- *  
+ *
+ * NOTE: This file is licensed under GPL-3.0-or-later (default).
+ * A commercial license can be purchased from Floyd M. Chitalu.
+ *
  * License details:
- * 
- * (A)  GNU General Public License ("GPL"); a copy of which you should have 
+ *
+ * (A)  GNU General Public License ("GPL"); a copy of which you should have
  *      recieved with this file.
  * 	    - see also: <http://www.gnu.org/licenses/>
  * (B)  Commercial license.
  *      - email: floyd.m.chitalu@gmail.com
- * 
- * The commercial license options is for users that wish to use MCUT in 
- * their products for comercial purposes but do not wish to release their 
- * software products under the GPL license. 
- * 
+ *
+ * The commercial license options is for users that wish to use MCUT in
+ * their products for comercial purposes but do not wish to release their
+ * software products under the GPL license.
+ *
  * Author(s)     : Floyd M. Chitalu
  */
 
@@ -24,12 +24,12 @@
  * @file mcut.h
  * @author Floyd M. Chitalu
  * @date 1 Jan 2021
- * 
+ *
  * @brief File containing the MCUT applications programming interface (API).
- * 
+ *
  * NOTE: This header file defines all the functionality and accessible features of MCUT.
- * The interface is a standard C API.  
- * 
+ * The interface is a standard C API.
+ *
  */
 
 #ifndef MCUT_API_H_
@@ -141,7 +141,7 @@ typedef enum McResult {
  * \enum McConnectedComponentType
  * @brief The possible types of connected components.
  *
- * This enum structure defines the possible types of connected components which can be queried from the API after a dispatch call. 
+ * This enum structure defines the possible types of connected components which can be queried from the API after a dispatch call.
  */
 typedef enum McConnectedComponentType {
     MC_CONNECTED_COMPONENT_TYPE_FRAGMENT = (1 << 0), /**< A connected component that originates from the source-mesh. */
@@ -155,7 +155,7 @@ typedef enum McConnectedComponentType {
  * \enum McFragmentLocation
  * @brief The possible geometrical locations of a fragment (connected component), which are defined with-respect-to the cut-mesh.
  *
- * This enum structure defines the possible locations where a fragment can be relative to the cut-mesh. Note that the labels of 'above' or 'below' here are defined with-respect-to the winding-order (and hence, normal orientation) of the cut-mesh. 
+ * This enum structure defines the possible locations where a fragment can be relative to the cut-mesh. Note that the labels of 'above' or 'below' here are defined with-respect-to the winding-order (and hence, normal orientation) of the cut-mesh.
  */
 typedef enum McFragmentLocation {
     MC_FRAGMENT_LOCATION_ABOVE = 1 << 0, /**< Fragment is located above the cut-mesh. */
@@ -193,7 +193,7 @@ typedef enum McPatchLocation {
  * \enum McSeamOrigin
  * @brief The input mesh from which a seam is derived.
  *
- * This enum structure defines the possible origins of a seam connected component, which can be either the source-mesh or the cut-mesh. 
+ * This enum structure defines the possible origins of a seam connected component, which can be either the source-mesh or the cut-mesh.
  */
 typedef enum McSeamOrigin {
     MC_SEAM_ORIGIN_SRCMESH = 1 << 0, /**< Seam connected component is from the input source-mesh. */
@@ -206,7 +206,7 @@ typedef enum McSeamOrigin {
  * @brief The user-provided input mesh from which an input connected component is derived.
  *
  * This enum structure defines the possible origins of an input connected component, which can be either the source-mesh or the cut-mesh.
- * Note: the number of elements (faces and vertices) in an input connected component will be the same [or greater] than the corresponding user-provided input mesh from which the respective connected component came from. The input connect component will contain more elements if MCUT detected an intersection configuration where one input mesh will create a hole in a face of the other input mesh but without severing it edges (and vice versa). 
+ * Note: the number of elements (faces and vertices) in an input connected component will be the same [or greater] than the corresponding user-provided input mesh from which the respective connected component came from. The input connect component will contain more elements if MCUT detected an intersection configuration where one input mesh will create a hole in a face of the other input mesh but without severing it edges (and vice versa).
  */
 typedef enum McInputOrigin {
     MC_INPUT_ORIGIN_SRCMESH = 1 << 0, /**< Input connected component from the input source mesh.*/
@@ -221,13 +221,13 @@ typedef enum McInputOrigin {
  * This enum structure defines the different types of data that are associated with a connected component and can be queried from the API after a dispatch call.
  */
 typedef enum McConnectedComponentData {
-    //MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT = (1 << 0), /**< Number of vertices. */
+    // MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT = (1 << 0), /**< Number of vertices. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
-    //MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
+    // MC_CONNECTED_COMPONENT_DATA_FACE_COUNT = (1 << 4), /**< Number of faces. */
     MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. Each face can also be understood as a "planar straight line graph" (PSLG), which is a collection of vertices and segments that lie on the same plane. Segments are edges whose endpoints are vertices in the PSLG.*/
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
-    //MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
+    // MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
     MC_CONNECTED_COMPONENT_DATA_EDGE = (1 << 8), /**< List of edges as an array of indices. */
     MC_CONNECTED_COMPONENT_DATA_TYPE = (1 << 9), /**< The type of a connected component (See also: ::McConnectedComponentType.). */
     MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION = (1 << 10), /**< The location of a fragment connected component with respect to the cut mesh (See also: ::McFragmentLocation). */
@@ -243,7 +243,7 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION = (1 << 19), /**< List of 3*N triangulated face indices, where N is the number of triangles that are produced using a [Constrained] Delaunay triangulation. Such a triangulation is similar to a Delaunay triangulation, but each (non-triangulated) face segment is present as a single edge in the triangulation. A constrained Delaunay triangulation is not truly a Delaunay triangulation. Some of its triangles might not be Delaunay, but they are all constrained Delaunay. */
     MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP = (1 << 20), /**< List of a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected-component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all triangulated-faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces. The input connected component (source-mesh or cut-mesh) that is referred to must be one stored internally by MCUT (i.e. a connected component queried from the API via ::McInputOrigin), to ensure consistency with any modification done internally by MCUT. */
     // TODO MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_CDT = (1<<20) /**< List of 3*N triangulated face indices, where N is the number of triangles that are produced using a [Conforming] Delaunay triangulation. A conforming Delaunay triangulation (CDT) of a PSLG (i.e. a face of in the given connected component) is a true Delaunay triangulation in which each PSLG segment/edge may have been subdivided into several edges by the insertion of additional vertices, called Steiner points. Steiner points are necessary to allow the segments to exist in the mesh while maintaining the Delaunay property. This Delaunay property follows from the definition of a "Delaunay triangulation": the Delaunay triangulation is the triangulation such that, if you circumscribe a circle around every triangle, none of those circles will contain any other points. Alternatively, the Delaunay triangulation is the triangulation that “maximizes the minimum angle in all of the triangles.”. Steiner points are not inserted to meet constraints on the minimum angle and maximum triangle area. MCUT computes a CDT of a given connected component starting only from the faces that have more than three vertices. Neighbouring (triangle) faces will also be processed (i.e. refined) if their incident edges are split as a result of performing CDT on the current face. */
-    
+
 } McConnectedComponentData;
 
 /**
@@ -255,7 +255,7 @@ typedef enum McConnectedComponentData {
 typedef enum McDebugSource {
     MC_DEBUG_SOURCE_API = 1 << 0, /**< messages generated by usage of the MCUT API. */
     MC_DEBUG_SOURCE_KERNEL = 1 << 1, /**< messages generated by internal logic implementing the kernel, which is responsible for resolving mesh intersections and connectivity. */
-    //MC_DEBUG_SOURCE_FRONTEND = 1 << 2, /**< messages generated by internal logic implementing the front-end, which is responsible for pre- and post-processing of meshes and connected components. */
+    // MC_DEBUG_SOURCE_FRONTEND = 1 << 2, /**< messages generated by internal logic implementing the front-end, which is responsible for pre- and post-processing of meshes and connected components. */
     MC_DEBUG_SOURCE_ALL = 0xFFFFFFFF /**< Wildcard (match all) . */
 } McDebugSource;
 
@@ -263,7 +263,7 @@ typedef enum McDebugSource {
  * \enum McDebugType
  * @brief Type of debug messages.
  *
- * This enum structure defines the types of debug a message relating to an error. 
+ * This enum structure defines the types of debug a message relating to an error.
  */
 typedef enum McDebugType {
     MC_DEBUG_TYPE_ERROR = 1 << 0, /**< Explicit error message.*/
@@ -335,28 +335,28 @@ typedef enum McDispatchFlags {
         MC_DISPATCH_FILTER_PATCH_OUTSIDE | //
         MC_DISPATCH_FILTER_SEAM_SRCMESH | //
         MC_DISPATCH_FILTER_SEAM_CUTMESH), /**< Keep all connected components resulting from the dispatched cut. */
-        /** 
-         * Allow MCUT to perturb the cut-mesh if the inputs are not in general position. 
-         * 
-         * MCUT is formulated for inputs in general position. Here the notion of general position is defined with
-        respect to the orientation predicate (as evaluated on the intersecting polygons). Thus, a set of points 
-        is in general position if no three points are collinear and also no four points are coplanar.
+    /**
+     * Allow MCUT to perturb the cut-mesh if the inputs are not in general position.
+     *
+     * MCUT is formulated for inputs in general position. Here the notion of general position is defined with
+    respect to the orientation predicate (as evaluated on the intersecting polygons). Thus, a set of points
+    is in general position if no three points are collinear and also no four points are coplanar.
 
-        MCUT uses the "GENERAL_POSITION_VIOLATION" flag to inform of when to use perturbation (of the
-        cut-mesh) so as to bring the input into general position. In such cases, the idea is to solve the cutting
-        problem not on the given input, but on a nearby input. The nearby input is obtained by perturbing the given
-        input. The perturbed input will then be in general position and, since it is near the original input,
-        the result for the perturbed input will hopefully still be useful.  This is justified by the fact that
-        the task of MCUT is not to decide whether the input is in general position but rather to make perturbation
-        on the input (if) necessary within the available precision of the computing device. */
-    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15) 
+    MCUT uses the "GENERAL_POSITION_VIOLATION" flag to inform of when to use perturbation (of the
+    cut-mesh) so as to bring the input into general position. In such cases, the idea is to solve the cutting
+    problem not on the given input, but on a nearby input. The nearby input is obtained by perturbing the given
+    input. The perturbed input will then be in general position and, since it is near the original input,
+    the result for the perturbed input will hopefully still be useful.  This is justified by the fact that
+    the task of MCUT is not to decide whether the input is in general position but rather to make perturbation
+    on the input (if) necessary within the available precision of the computing device. */
+    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15)
 } McDispatchFlags;
 
 /**
  * \enum McQueryFlags
  * @brief Flags for querying fixed API state.
  *
- * This enum structure defines the flags which are used to query for specific information about the state of the API and/or a given context. 
+ * This enum structure defines the flags which are used to query for specific information about the state of the API and/or a given context.
  */
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
@@ -364,12 +364,12 @@ typedef enum McQueryFlags {
 } McQueryFlags;
 
 /**
- *  
+ *
  * @brief Debug callback function signature type.
  *
  * The callback function should have this prototype (in C), or be otherwise compatible with such a prototype.
  */
-typedef void (MCAPI_PTR *pfn_mcDebugOutput_CALLBACK)(
+typedef void(MCAPI_PTR* pfn_mcDebugOutput_CALLBACK)(
     McDebugSource source,
     McDebugType type,
     unsigned int id,
@@ -378,15 +378,15 @@ typedef void (MCAPI_PTR *pfn_mcDebugOutput_CALLBACK)(
     const char* message,
     const void* userParam);
 
-typedef void (MCAPI_PTR *pfn_McEvent_CALLBACK)(McEvent event, void *data);
+typedef void(MCAPI_PTR* pfn_McEvent_CALLBACK)(McEvent event, void* data);
 
 /** @brief Create an MCUT context.
-*
-* This method creates a context object, which is a handle used by a client application to control the API state and access data.
-* 
-* @param [out] pContext a pointer to the allocated context handle
-* @param [in] flags bitfield containing the context creation flags
-*
+ *
+ * This method creates a context object, which is a handle used by a client application to control the API state and access data.
+ *
+ * @param [out] pContext a pointer to the allocated context handle
+ * @param [in] flags bitfield containing the context creation flags
+ *
  * An example of usage:
  * @code
  * McContext myContext = MC_NULL_HANDLE;
@@ -396,17 +396,17 @@ typedef void (MCAPI_PTR *pfn_McEvent_CALLBACK)(McEvent event, void *data);
  *  // deal with error
  * }
  * @endcode
-*
-* @return Error code.
-* 
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL
-*   -# Failure to allocate resources
-*   -# \p flags defines an invalid bitfield.
-*/
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL
+ *   -# Failure to allocate resources
+ *   -# \p flags defines an invalid bitfield.
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(
     McContext* pContext, McFlags flags);
 
@@ -414,22 +414,22 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextAsync(
     McContext* pContext, McFlags flags, uint32_t nthreads);
 
 /** @brief Specify a callback to receive debugging messages from the MCUT library.
-*
-* ::mcDebugMessageCallback sets the current debug output callback function to the function whose address is
-* given in callback.
-*
-* This function is defined to have the same calling convention as the MCUT API functions. In most cases
-* this is defined as MCAPI_ATTR, although it will vary depending on platform, language and compiler.
-*
-* Each time a debug message is generated the debug callback function will be invoked with source, type,
-* and severity associated with the message, and length set to the length of debug message whose
-* character string is in the array pointed to by message userParam will be set to the value passed in
-* the userParam parameter to the most recent call to mcDebugMessageCallback.
-*
-* @param[in] context The context handle that was created by a previous call to mcCreateContext.
-* @param[in] cb The address of a callback function that will be called when a debug message is generated. 
-* @param[in] userParam A user supplied pointer that will be passed on each invocation of callback.
-*
+ *
+ * ::mcDebugMessageCallback sets the current debug output callback function to the function whose address is
+ * given in callback.
+ *
+ * This function is defined to have the same calling convention as the MCUT API functions. In most cases
+ * this is defined as MCAPI_ATTR, although it will vary depending on platform, language and compiler.
+ *
+ * Each time a debug message is generated the debug callback function will be invoked with source, type,
+ * and severity associated with the message, and length set to the length of debug message whose
+ * character string is in the array pointed to by message userParam will be set to the value passed in
+ * the userParam parameter to the most recent call to mcDebugMessageCallback.
+ *
+ * @param[in] context The context handle that was created by a previous call to mcCreateContext.
+ * @param[in] cb The address of a callback function that will be called when a debug message is generated.
+ * @param[in] userParam A user supplied pointer that will be passed on each invocation of callback.
+ *
  * An example of usage:
  * @code
  * // define my callback (with type pfn_mcDebugOutput_CALLBACK)
@@ -437,9 +437,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextAsync(
  * {
  *  // do stuff
  * }
- * 
+ *
  * // ...
- * 
+ *
  * void* someData = NULL;
  * McResult err = mcDebugMessageCallback(myContext, mcDebugOutput, someData);
  * if(err != MC_NO_ERROR)
@@ -447,54 +447,54 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextAsync(
  *  // deal with error
  * }
  * @endcode
- * 
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p cb is NULL.
-*
-*/
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p cb is NULL.
+ *
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
     McContext context,
     pfn_mcDebugOutput_CALLBACK cb,
     const void* userParam);
 
 /**
-* Control the reporting of debug messages in a debug context.
-*
-* @param[in] context The context handle that was created by a previous call to @see mcCreateContext.
-* @param[in] source The source of debug messages to enable or disable.
-* @param[in] type The type of debug messages to enable or disable.
-* @param[in] severity The severity of debug messages to enable or disable.
-* @param[in] enabled A Boolean flag determining whether the selected messages should be enabled or disabled.
-*
-* ::mcDebugMessageControl controls the reporting of debug messages generated by a debug context. The parameters 
-* source, type and severity form a filter to select messages from the pool of potential messages generated by 
-* the MCUT library.
-*
-* \p source may be #MC_DEBUG_SOURCE_API, #MC_DEBUG_SOURCE_KERNEL to select messages 
-* generated by usage of the MCUT API, the MCUT kernel or by the input, respectively. It may also take the 
-* value #MC_DEBUG_SOURCE_ALL. If source is not #MC_DEBUG_SOURCE_ALL then only messages whose source matches 
-* source will be referenced.
-*
-* \p type may be one of #MC_DEBUG_TYPE_ERROR, #MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, or #MC_DEBUG_TYPE_OTHER to indicate 
-* the type of messages describing MCUT errors, attempted use of deprecated features, and other types of messages, 
-* respectively. It may also take the value #MC_DONT_CARE. If type is not #MC_DEBUG_TYPE_ALL then only messages whose 
-* type matches type will be referenced.
-*
-* \p severity may be one of #MC_DEBUG_SEVERITY_LOW, #MC_DEBUG_SEVERITY_MEDIUM, or #MC_DEBUG_SEVERITY_HIGH to 
-* select messages of low, medium or high severity messages or to #MC_DEBUG_SEVERITY_NOTIFICATION for notifications. 
-* It may also take the value #MC_DEBUG_SEVERITY_ALL. If severity is not #MC_DEBUG_SEVERITY_ALL then only 
-* messages whose severity matches severity will be referenced.
-*
-* If \p enabled is true then messages that match the filter formed by source, type and severity are enabled. 
-* Otherwise, those messages are disabled.
-*
-*
+ * Control the reporting of debug messages in a debug context.
+ *
+ * @param[in] context The context handle that was created by a previous call to @see mcCreateContext.
+ * @param[in] source The source of debug messages to enable or disable.
+ * @param[in] type The type of debug messages to enable or disable.
+ * @param[in] severity The severity of debug messages to enable or disable.
+ * @param[in] enabled A Boolean flag determining whether the selected messages should be enabled or disabled.
+ *
+ * ::mcDebugMessageControl controls the reporting of debug messages generated by a debug context. The parameters
+ * source, type and severity form a filter to select messages from the pool of potential messages generated by
+ * the MCUT library.
+ *
+ * \p source may be #MC_DEBUG_SOURCE_API, #MC_DEBUG_SOURCE_KERNEL to select messages
+ * generated by usage of the MCUT API, the MCUT kernel or by the input, respectively. It may also take the
+ * value #MC_DEBUG_SOURCE_ALL. If source is not #MC_DEBUG_SOURCE_ALL then only messages whose source matches
+ * source will be referenced.
+ *
+ * \p type may be one of #MC_DEBUG_TYPE_ERROR, #MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, or #MC_DEBUG_TYPE_OTHER to indicate
+ * the type of messages describing MCUT errors, attempted use of deprecated features, and other types of messages,
+ * respectively. It may also take the value #MC_DONT_CARE. If type is not #MC_DEBUG_TYPE_ALL then only messages whose
+ * type matches type will be referenced.
+ *
+ * \p severity may be one of #MC_DEBUG_SEVERITY_LOW, #MC_DEBUG_SEVERITY_MEDIUM, or #MC_DEBUG_SEVERITY_HIGH to
+ * select messages of low, medium or high severity messages or to #MC_DEBUG_SEVERITY_NOTIFICATION for notifications.
+ * It may also take the value #MC_DEBUG_SEVERITY_ALL. If severity is not #MC_DEBUG_SEVERITY_ALL then only
+ * messages whose severity matches severity will be referenced.
+ *
+ * If \p enabled is true then messages that match the filter formed by source, type and severity are enabled.
+ * Otherwise, those messages are disabled.
+ *
+ *
  * An example of usage:
  * @code
  * // ... typically after setting debug callback with ::mcDebugMessageCallback
@@ -504,18 +504,18 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
  *  // deal with error
  * }
  * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p source is not a value define in ::McDebugSource.
-*   -# \p type is not a value define in ::McDebugType.
-*   -# \p severity is not a value define in ::McDebugSeverity.
-*/
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p source is not a value define in ::McDebugSource.
+ *   -# \p type is not a value define in ::McDebugType.
+ *   -# \p severity is not a value define in ::McDebugSeverity.
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
     McContext context,
     McDebugSource source,
@@ -524,74 +524,177 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
     bool enabled);
 
 /**
-* @brief Execute a cutting operation with two meshes - the source mesh, and the cut mesh.
-*
-* @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
-* @param[in] flags The flags indicating how to interprete input data and configure the execution.
-* @param[in] pSrcMeshVertices The array of vertex coordinates (i.e. in xyzxyzxyz... format) of the source mesh.
-* @param[in] pSrcMeshFaceIndices The array of vertex indices of the faces (polygons) in the source mesh.
-* @param[in] pSrcMeshFaceSizes The array of the sizes (in terms of number of vertex indices) of the faces in the source mesh.
-* @param[in] numSrcMeshVertices The number of vertices in the source mesh.
-* @param[in] numSrcMeshFaces The number of faces in the source mesh.
-* @param[in] pCutMeshVertices The array of vertex coordinates (i.e. in xyzxyzxyz... format) of the cut mesh.
-* @param[in] pCutMeshFaceIndices The array of vertex indices of the faces (polygons) in the cut mesh.
-* @param[in] pCutMeshFaceSizes The array of the sizes (in terms of number of vertex indices) of the faces in the cut mesh.
-* @param[in] numCutMeshVertices The number of vertices in the cut mesh.
-* @param[in] numCutMeshFaces The number of faces in the cut mesh.
-*
-* This function specifies the two mesh objects to operate on. The 'source mesh' is the mesh to be cut 
-* (i.e. partitioned) along intersection paths prescribed by the 'cut mesh'. 
-*
-* An example of usage:
-* @code
-*  McResult err = mcDispatch(
-*        myContext,
-*        // parse vertex arrays as 32 bit vertex coordinates (float*)
-*        MC_DISPATCH_VERTEX_ARRAY_FLOAT,
-*        // source mesh data
-*        pSrcMeshVertices, 
-*        pSrcMeshFaceIndices,
-*        pSrcMeshFaceSizes,
-*        numSrcMeshVertices,
+ * @brief Registers a user callback function.
+ *
+ * @param[in] event A valid event object returned by the MCUT API.
+ * @param[in] pfn_notify The event callback function that can be registered by the application..
+ * @param[in] user_data Will be passed as the user_data argument when pfn_notify is called. user_data can be NULL.
+ *
+ * The registered callback function will be called when the execution of the
+ * command associated with event is complete.
+ * Each call to clSetEventCallback registers the specified user callback function
+ * and replaces any previously specified callback.
+ * An enqueued callbacks shall be called before the event object is destroyed.
+ * The callback must return promptly. The behavior of calling expensive system
+ * routines, or blocking MCUT operations etc. in a callback is undefined.
+ * It is the application's responsibility to ensure that the callback function is
+ * thread-safe.
+ *
+ * An example of usage:
+ * @code
+ *  McResult err = mcSetEventCallback(ev, someFunctionPointer, NULL);
+ *  if(err != MC_NO_ERROR)
+ *  {
+ *   // deal with error
+ *  }
+ * @endcode
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - ::MC_NO_ERROR
+ *   -# proper exit
+ * - ::MC_INVALID_VALUE
+ *   -# \p event is not a valid object
+ *   -# \p eventCallback is NULL
+ */
+extern MCAPI_ATTR pfn_McEvent_CALLBACK MCAPI_CALL mcSetEventCallback(
+    McEvent event,
+    pfn_McEvent_CALLBACK pfn_notify,
+    void* user_data);
+
+/**
+ * @brief Execute a cutting operation with two meshes - the source mesh, and the cut mesh.
+ *
+ * @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
+ * @param[in] flags The flags indicating how to interprete input data and configure the execution.
+ * @param[in] pSrcMeshVertices The array of vertex coordinates (i.e. in xyzxyzxyz... format) of the source mesh.
+ * @param[in] pSrcMeshFaceIndices The array of vertex indices of the faces (polygons) in the source mesh.
+ * @param[in] pSrcMeshFaceSizes The array of the sizes (in terms of number of vertex indices) of the faces in the source mesh.
+ * @param[in] numSrcMeshVertices The number of vertices in the source mesh.
+ * @param[in] numSrcMeshFaces The number of faces in the source mesh.
+ * @param[in] pCutMeshVertices The array of vertex coordinates (i.e. in xyzxyzxyz... format) of the cut mesh.
+ * @param[in] pCutMeshFaceIndices The array of vertex indices of the faces (polygons) in the cut mesh.
+ * @param[in] pCutMeshFaceSizes The array of the sizes (in terms of number of vertex indices) of the faces in the cut mesh.
+ * @param[in] numCutMeshVertices The number of vertices in the cut mesh.
+ * @param[in] numCutMeshFaces The number of faces in the cut mesh.
+ * @param[in] numEventsInWaitlist Number of events in the waitlist.
+ * @param[in] pEventWaitList Events that need to complete before this particular command can be executed.
+ * @param[out] pEvent Returns an event object that identifies this particular command and can be used to query or queue a wait for this particular command to complete.  pEvent can be NULL in which case it will not be possible for the application to query the status of this command or queue a wait for this command to complete. If the pEventWaitList and the event arguments are not NULL, the pEvent argument should not refer to an element of the pEventWaitList array.
+ *
+ * This function specifies the two mesh objects to operate on. The 'source mesh' is the mesh to be cut
+ * (i.e. partitioned) along intersection paths prescribed by the 'cut mesh'.
+ *
+ * If pEventWaitList is NULL, then this particular command does not wait on any event to complete. If pEventWaitList
+ * is NULL, numEventsInWaitlist must be 0. If pEventWaitList is not NULL, the list of events pointed to
+ * by pEventWaitList must be valid and numEventsInWaitlist must be greater than 0. The events specified in
+ * pEventWaitList act as synchronization points. The memory associated with pEventWaitList can be reused or
+ * freed after the function returns.
+ *
+ * An example of usage:
+ * @code
+ *  McEvent event;
+ *  //...
+ *  McResult err = mcEnqueueDispatch(..., 0, NULL, &event);
+ * if(err != MC_NO_ERROR)
+ * {
+ *  // deal with error...
+ * }
+ *
+ * err = mcWaitForEvents(1, &event);
+ * if(err != MC_NO_ERROR)
+ * {
+ *  // deal with error...
+ * }
+ * @endcode
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - ::MC_NO_ERROR
+ *   -# proper exit
+ * - ::MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p flags contains an invalid value.
+ *   -# A vertex index in \p pSrcMeshFaceIndices or \p pCutMeshFaceIndices is out of bounds.
+ *   -# Invalid face/polygon definition (vertex list) implying non-manifold mesh \p pSrcMeshFaceIndices or \p pCutMeshFaceIndices is out of bounds.
+ *   -# The MC_DISPATCH_VERTEX_ARRAY_... value has not been specified in \p flags
+ *   -# An input mesh contains multiple connected components.
+ *   -# \p pSrcMeshVertices is NULL.
+ *   -# \p pSrcMeshFaceIndices is NULL.
+ *   -# \p pSrcMeshFaceSizes is NULL.
+ *   -# \p numSrcMeshVertices is less than three.
+ *   -# \p numSrcMeshFaces is less than one.
+ *   -# \p pCutMeshVertices is NULL.
+ *   -# \p pCutMeshFaceIndices is NULL.
+ *   -# \p pCutMeshFaceSizes is NULL.
+ *   -# \p numCutMeshVertices is less than three.
+ *   -# \p numCutMeshFaces is less than one.
+ *   -# \p numEventsInWaitlist Number of events in the waitlist.
+ *   -# \p pEventWaitList events that need to complete before this particular command can be executed
+ *   -# ::MC_DISPATCH_ENFORCE_GENERAL_POSITION is not set and: 1) Found two intersecting edges between the source-mesh and the cut-mesh and/or 2) An intersection test between a face and an edge failed because an edge vertex only touches (but does not penetrate) the face, and/or 3) One or more source-mesh vertices are colocated with one or more cut-mesh vertices.
+ * - ::MC_OUT_OF_MEMORY
+ *   -# Insufficient memory to perform operation.
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
+    const McContext context,
+    McFlags dispatchFlags,
+    const void* pSrcMeshVertices,
+    const uint32_t* pSrcMeshFaceIndices,
+    const uint32_t* pSrcMeshFaceSizes,
+    uint32_t numSrcMeshVertices,
+    uint32_t numSrcMeshFaces,
+    const void* pCutMeshVertices,
+    const uint32_t* pCutMeshFaceIndices,
+    const uint32_t* pCutMeshFaceSizes,
+    uint32_t numCutMeshVertices,
+    uint32_t numCutMeshFaces,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent);
+
+/**
+ * @brief Non-asychronous version of ::mcEnqueueDispatch. This
+ * function blocks until the operation is completed
+ *
+ * @param context
+ * @param flags
+ * @param pSrcMeshVertices
+ * @param pSrcMeshFaceIndices
+ * @param pSrcMeshFaceSizes
+ * @param numSrcMeshVertices
+ * @param numSrcMeshFaces
+ * @param pCutMeshVertices
+ * @param pCutMeshFaceIndices
+ * @param pCutMeshFaceSizes
+ * @param numCutMeshVertices
+ * @param numCutMeshFaces
+ * @return MCAPI_ATTR
+ *
+ * An example of usage:
+ * @code
+ *  McResult err = mcDispatch(
+ *        myContext,
+ *        // parse vertex arrays as 32 bit vertex coordinates (float*)
+ *        MC_DISPATCH_VERTEX_ARRAY_FLOAT,
+ *        // source mesh data
+ *        pSrcMeshVertices,
+ *        pSrcMeshFaceIndices,
+ *        pSrcMeshFaceSizes,
+ *        numSrcMeshVertices,
  *       numSrcMeshFaces,
-*        // cut mesh data
-*        pCutMeshVertices,
-*        pCutMeshFaceIndices,
-*        pCutMeshFaceSizes,
-*        numCutMeshVertices,
-*        numCutMeshFaces);
+ *        // cut mesh data
+ *        pCutMeshVertices,
+ *        pCutMeshFaceIndices,
+ *        pCutMeshFaceSizes,
+ *        numCutMeshVertices,
+ *        numCutMeshFaces);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
  * }
  * @endcode
-* 
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - ::MC_NO_ERROR  
-*   -# proper exit 
-* - ::MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p flags contains an invalid value.
-*   -# A vertex index in \p pSrcMeshFaceIndices or \p pCutMeshFaceIndices is out of bounds.
-*   -# Invalid face/polygon definition (vertex list) implying non-manifold mesh \p pSrcMeshFaceIndices or \p pCutMeshFaceIndices is out of bounds.
-*   -# The MC_DISPATCH_VERTEX_ARRAY_... value has not been specified in \p flags
-*   -# An input mesh contains multiple connected components.
-*   -# \p pSrcMeshVertices is NULL.
-*   -# \p pSrcMeshFaceIndices is NULL.
-*   -# \p pSrcMeshFaceSizes is NULL.
-*   -# \p numSrcMeshVertices is less than three.
-*   -# \p numSrcMeshFaces is less than one.
-*   -# \p pCutMeshVertices is NULL.
-*   -# \p pCutMeshFaceIndices is NULL.
-*   -# \p pCutMeshFaceSizes is NULL.
-*   -# \p numCutMeshVertices is less than three.
-*   -# \p numCutMeshFaces is less than one.
-*   -# ::MC_DISPATCH_ENFORCE_GENERAL_POSITION is not set and: 1) Found two intersecting edges between the source-mesh and the cut-mesh and/or 2) An intersection test between a face and an edge failed because an edge vertex only touches (but does not penetrate) the face, and/or 3) One or more source-mesh vertices are colocated with one or more cut-mesh vertices.
-* - ::MC_OUT_OF_MEMORY
-*   -# Insufficient memory to perform operation.
-*/
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     McContext context,
     McFlags flags,
@@ -607,15 +710,15 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     uint32_t numCutMeshFaces);
 
 /**
-* @brief Return the value of a selected parameter.
-*
-* @param[in] context The context handle that was created by a previous call to ::mcCreateContext. 
-* @param[in] info Information object being queried. ::McQueryFlags
-* @param[in] bytes Size in bytes of memory pointed to by \p pMem. This size must be great than or equal to the return type size of data type queried.
-* @param[out] pMem Pointer to memory where the appropriate result being queried is returned. If \p pMem is NULL, it is ignored.
-* @param[out] pNumBytes returns the actual size in bytes of data being queried by info. If \p pNumBytes is NULL, it is ignored.
-*
-*
+ * @brief Return the value of a selected parameter.
+ *
+ * @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
+ * @param[in] info Information object being queried. ::McQueryFlags
+ * @param[in] bytes Size in bytes of memory pointed to by \p pMem. This size must be great than or equal to the return type size of data type queried.
+ * @param[out] pMem Pointer to memory where the appropriate result being queried is returned. If \p pMem is NULL, it is ignored.
+ * @param[out] pNumBytes returns the actual size in bytes of data being queried by info. If \p pNumBytes is NULL, it is ignored.
+ *
+ *
  * An example of usage:
  * @code
  * uint64_t numBytes = 0;
@@ -625,24 +728,24 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
  * {
  *  // deal with error
  * }
-*
+ *
  *   err = mcGetInfo(context, MC_CONTEXT_FLAGS, numBytes, &contextFlags, nullptr);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
  * }
  * @endcode
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p bytes is greater than the returned size of data type queried
-*
-* @note Event synchronisation is not implemented.
-*/
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p bytes is greater than the returned size of data type queried
+ *
+ * @note Event synchronisation is not implemented.
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
     const McContext context,
     McFlags info,
@@ -651,19 +754,28 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
     uint64_t* pNumBytes);
 
 /**
-* @brief Query the connected components available in a context.
-* 
-* This function will return an array of connected components matching the given description of flags.
-*  
-* @param[in] context The context handle
-* @param[in] connectedComponentType The type(s) of connected component sought. See also ::McConnectedComponentType.
-* @param[in] numEntries The number of ::McConnectedComponent entries that can be added to \p pConnComps. If \p pConnComps is not NULL, \p numEntries must be the number of elements in \p pConnComps.
-* @param[out] pConnComps Returns a list of connected components found. The ::McConnectedComponentType values returned in \p pConnComps can be used 
-* to identify a specific connected component. If \p pConnComps is NULL, this argument is ignored. The number of connected components returned 
-* is the minimum of the value specified by \p numEntries or the number of connected components whose type matches \p connectedComponentType.
-* @param[out] numConnComps Returns the number of connected components available that match \p connectedComponentType. If \p numConnComps is NULL, 
-* this argument is ignored.
-*
+ * @brief Query the connected components available in a context.
+ *
+ * This function will return an array of connected components matching the given description of flags.
+ *
+ * @param[in] context The context handle
+ * @param[in] connectedComponentType The type(s) of connected component sought. See also ::McConnectedComponentType.
+ * @param[in] numEntries The number of ::McConnectedComponent entries that can be added to \p pConnComps. If \p pConnComps is not NULL, \p numEntries must be the number of elements in \p pConnComps.
+ * @param[out] pConnComps Returns a list of connected components found. The ::McConnectedComponentType values returned in \p pConnComps can be used
+ * to identify a specific connected component. If \p pConnComps is NULL, this argument is ignored. The number of connected components returned
+ * is the minimum of the value specified by \p numEntries or the number of connected components whose type matches \p connectedComponentType.
+ * @param[out] numConnComps Returns the number of connected components available that match \p connectedComponentType. If \p numConnComps is NULL,
+ * this argument is ignored.
+ * @param[in] numEventsInWaitlist Number of events in the waitlist.
+ * @param[in] pEventWaitList Events that need to complete before this particular command can be executed.
+ * @param[out] pEvent Returns an event object that identifies this particular command and can be used to query or queue a wait for this particular command to complete.  pEvent can be NULL in which case it will not be possible for the application to query the status of this command or queue a wait for this command to complete. If the pEventWaitList and the event arguments are not NULL, the pEvent argument should not refer to an element of the pEventWaitList array.
+ * 
+ * If pEventWaitList is NULL, then this particular command does not wait on any event to complete. If pEventWaitList
+ * is NULL, numEventsInWaitlist must be 0. If pEventWaitList is not NULL, the list of events pointed to
+ * by pEventWaitList must be valid and numEventsInWaitlist must be greater than 0. The events specified in
+ * pEventWaitList act as synchronization points. The memory associated with pEventWaitList can be reused or
+ * freed after the function returns.
+ *
  * An example of usage:
  * @code
  * uint32_t numConnComps = 0;
@@ -686,18 +798,41 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  *  // deal with error
  * }
  * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
-*   -# \p numConnComps and \p pConnComps are both NULL.
-*   -# \p numConnComps is zero and \p pConnComps is not NULL.
-*/
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
+ *   -# \p numConnComps and \p pConnComps are both NULL.
+ *   -# \p numConnComps is zero and \p pConnComps is not NULL.
+ *   -# \p numEventsInWaitlist Number of events in the waitlist.
+ *   -# \p pEventWaitList events that need to complete before this particular command can be executed
+ */
+MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
+    const McContext context,
+    const McConnectedComponentType connectedComponentType,
+    const uint32_t numEntries,
+    McConnectedComponent* pConnComps,
+    uint32_t* numConnComps,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent);
+
+/**
+ * @brief Non-asychronous version of ::mcEnqueueGetConnectedComponents. This
+ * function blocks until the operation is completed
+ * 
+ * @param context 
+ * @param connectedComponentType 
+ * @param numEntries 
+ * @param pConnComps 
+ * @param numConnComps 
+ * @return MCAPI_ATTR 
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     const McContext context,
     const McConnectedComponentType connectedComponentType,
@@ -706,17 +841,78 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     uint32_t* numConnComps);
 
 /**
-* @brief Query specific information about a connected component.
-*
-* @param[in] context The context handle that was created by a previous call to ::mcCreateContext. 
-* @param[in] connCompId A connected component returned by ::mcGetConnectedComponents whose data is to be read.
-* @param[in] flags An enumeration constant that identifies the connected component information being queried.
-* @param[in] bytes Specifies the size in bytes of memory pointed to by \p flags.
-* @param[out] pMem A pointer to memory location where appropriate values for a given \p flags will be returned. If \p pMem is NULL, it is ignored.
-* @param[out] pNumBytes Returns the actual size in bytes of data being queried by \p flags. If \p pNumBytes is NULL, it is ignored.
-*
-* The connected component queries described in the ::McConnectedComponentData should return the same information for a connected component returned by ::mcGetConnectedComponents.
-*
+ * @brief Query specific information about a connected component.
+ *
+ * @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
+ * @param[in] connCompId A connected component returned by ::mcGetConnectedComponents whose data is to be read.
+ * @param[in] flags An enumeration constant that identifies the connected component information being queried.
+ * @param[in] bytes Specifies the size in bytes of memory pointed to by \p flags.
+ * @param[out] pMem A pointer to memory location where appropriate values for a given \p flags will be returned. If \p pMem is NULL, it is ignored.
+ * @param[out] pNumBytes Returns the actual size in bytes of data being queried by \p flags. If \p pNumBytes is NULL, it is ignored.
+ *
+ * The connected component queries described in the ::McConnectedComponentData should return the same information for a connected component returned by ::mcGetConnectedComponents.
+ * If pEventWaitList is NULL, then this particular command does not wait on any event to complete. If pEventWaitList
+ * is NULL, numEventsInWaitlist must be 0. If pEventWaitList is not NULL, the list of events pointed to
+ * by pEventWaitList must be valid and numEventsInWaitlist must be greater than 0. The events specified in
+ * pEventWaitList act as synchronization points. The memory associated with pEventWaitList can be reused or
+ * freed after the function returns.
+ * 
+ * An example of usage:
+ * @code
+ * uint64_t numBytes = 0;
+ * McEvent bytesQueryEvent=MC_NULL_HANDLE;
+ * McResult err = mcEnqueueGetConnectedComponentData(myContext,  connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes, 0, NULL, &bytesQueryEvent);
+ * if(err != MC_NO_ERROR)
+ * {
+ *  // deal with error
+ * }
+ *
+ * double* pVertices = (double*)malloc(numBytes);
+ * // this operation shall happen AFTER the preceding operation associated with "bytesQueryEvent".
+ * err = mcEnqueueGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL, 1, &bytesQueryEvent, NULL);
+ * if(err != MC_NO_ERROR)
+ * {
+ *  // deal with error
+ * }
+ * @endcode
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
+ *   -# \p pMem and \p pNumBytes are both NULL (or not NULL).
+ *   -# \p bytes is zero and \p pMem is not NULL.
+ *   -# \p flag is MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP when \p context dispatch flags did not include flag MC_DISPATCH_INCLUDE_VERTEX_MAP
+ *   -# \p flag is MC_CONNECTED_COMPONENT_DATA_FACE_MAP when \p context dispatch flags did not include flag MC_DISPATCH_INCLUDE_FACE_MAP
+ *   -# \p numEventsInWaitlist Number of events in the waitlist.
+ *   -# \p pEventWaitList events that need to complete before this particular command can be executed
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
+    const McContext context,
+    const McConnectedComponent connCompId,
+    McFlags queryFlags,
+    uint64_t bytes,
+    void* pMem,
+    uint64_t* pNumBytes,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent);
+
+/**
+ * @brief Non-asychronous version of ::mcEnqueueGetConnectedComponents. This
+ * function blocks until the operation is completed.
+ * 
+ * @param context 
+ * @param connCompId 
+ * @param flags 
+ * @param bytes 
+ * @param pMem 
+ * @param pNumBytes 
+ * 
  * An example of usage:
  * @code
  * uint64_t numBytes = 0;
@@ -725,7 +921,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  * {
  *  // deal with error
  * }
- * 
+ *
  * double* pVertices = (double*)malloc(numBytes);
  *
  * err = mcGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL);
@@ -735,19 +931,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  * }
  * @endcode
  * 
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
-*   -# \p pMem and \p pNumBytes are both NULL (or not NULL).
-*   -# \p bytes is zero and \p pMem is not NULL.
-*   -# \p flag is MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP when \p context dispatch flags did not include flag MC_DISPATCH_INCLUDE_VERTEX_MAP
-*   -# \p flag is MC_CONNECTED_COMPONENT_DATA_FACE_MAP when \p context dispatch flags did not include flag MC_DISPATCH_INCLUDE_FACE_MAP
-*/
+ * 
+ * @return MCAPI_ATTR 
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
     const McConnectedComponent connCompId,
@@ -757,35 +943,75 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     uint64_t* pNumBytes);
 
 /**
-* @brief To release the memory of a connected component, call this function.
-*
-* If \p numConnComps is zero and \p pConnComps is NULL, the memory of all connected components associated with the context is freed.
-*
-* @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
-* @param[in] numConnComps Number of connected components in \p pConnComps whose memory to release.
-* @param[in] pConnComps The connected components whose memory will be released.
-*
+ * @brief Waits on the user thread for commands identified by event objects to complete.
+ * 
+ * @param[in] numEventsInWaitlist Number of events to wait for 
+ * @param[in] pEventWaitList  List of events to wait for 
+ * 
+ * Waits on the user thread for commands identified by event objects in \p pEventWaitList to complete. 
+ * The events specified in \p pEventWaitList act as synchronization points.
+ * 
+ * @return Error code. 
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p numEventsInWaitlist is greater than 0 and \p pEventWaitList is NULL (and vice versa).
+ *   -# If an event object in \p pEventWaitList is not a valid event object.
+ */
+MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList);
+
+/**
+ * @brief Decrements the event reference count.
+ * 
+ * @param numEvents Number of event objects to release
+ * @param pEvents Array of event objects to release
+ * 
+ * The event object is deleted once the reference count becomes zero, the specific 
+ * command identified by this event has completed (or terminated) and there are 
+ * no commands in the command-queue of a context that require a wait for this 
+ * event to complete.
+ * 
+ * @return Error code. 
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p numEvents is greater than 0 and \p pEvents is NULL (and vice versa).
+ *   -# If an event object in \p pEvents is not a valid event object.
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcReleaseEvents(
+    uint32_t numEvents,
+    const McEvent* pEvents);
+
+/**
+ * @brief To release the memory of a connected component, call this function.
+ *
+ * If \p numConnComps is zero and \p pConnComps is NULL, the memory of all connected components associated with the context is freed.
+ *
+ * @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
+ * @param[in] numConnComps Number of connected components in \p pConnComps whose memory to release.
+ * @param[in] pConnComps The connected components whose memory will be released.
+ *
  * An example of usage:
  * @code
  * McResult err = mcReleaseConnectedComponents(myContext, pConnComps, numConnComps);
- * // OR (delete all connected components in context) 
+ * // OR (delete all connected components in context)
  * //McResult err = mcReleaseConnectedComponents(myContext, NULL, 0);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
  * }
  * @endcode
-*
-* @return Error code.
-*
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
-*   -# \p pContext is NULL or \p pContext is not an existing context.
-*   -# \p numConnComps is zero and \p pConnComps is not NULL (and vice versa).
-* 
-*/
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p numConnComps is zero and \p pConnComps is not NULL (and vice versa).
+ *
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcReleaseConnectedComponents(
     const McContext context,
     uint32_t numConnComps,
@@ -796,7 +1022,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcReleaseConnectedComponents(
 *
 * This function ensures that all the state attached to context (such as unreleased connected components, and threads) are released, and the memory is deleted.
 
-* @param[in] context The context handle that was created by a previous call to ::mcCreateContext. 
+* @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
 *
 *
  * An example of usage:
@@ -810,10 +1036,10 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcReleaseConnectedComponents(
 *
 * @return Error code.
 *
-* <b>Error codes</b> 
-* - MC_NO_ERROR  
-*   -# proper exit 
-* - MC_INVALID_VALUE 
+* <b>Error codes</b>
+* - MC_NO_ERROR
+*   -# proper exit
+* - MC_INVALID_VALUE
 *   -# \p pContext is NULL or \p pContext is not an existing context.
 */
 extern MCAPI_ATTR McResult MCAPI_CALL mcReleaseContext(

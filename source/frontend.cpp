@@ -256,7 +256,7 @@ void set_event_callback_impl(
     if (event_ptr == nullptr) {
         // "contextHandle" may not be NULL but that does not mean it maps to
         // a valid object in "g_contexts"
-        throw std::invalid_argument("null event object");
+        throw std::invalid_argument("unknown event object");
     }
 
     event_ptr->set_callback_data(eventHandle, eventCallback, data);
@@ -293,15 +293,18 @@ void dispatch_impl(
 
     MCUT_ASSERT(event_ptr != nullptr);
 
+    // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
+    std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
+
     // submit the dispatch call to be executed asynchronously and return the future
     // object that will be waited on as an event
     event_ptr->m_future = context_ptr->enqueue(
         [=, &context_ptr]() {
             // asynch task will have to wait for the events in the waitlist!
-            const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
+            const bool have_events_to_wait_for = event_waitlist.empty() == false;
 
             if (have_events_to_wait_for) {
-                wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+                wait_for_events_impl(event_waitlist.size(), event_waitlist.data()); // block unti events are done
             }
 
             preproc(
@@ -318,7 +321,7 @@ void dispatch_impl(
                 numCutMeshVertices,
                 numCutMeshFaces);
 
-            event_ptr->notify_task_complete(event_handle);
+            event_ptr->notify_task_complete();
         });
 
     MCUT_ASSERT(pEvent != nullptr);
@@ -350,13 +353,16 @@ void get_connected_components_impl(
 
     MCUT_ASSERT(event_ptr != nullptr);
 
+    // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
+    std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
+
     event_ptr->m_future = context_ptr->enqueue(
         [=, &context_ptr]() {
             // asynch task will have to wait for the events in the waitlist!
-            const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
+            const bool have_events_to_wait_for = event_waitlist.empty() == false;
 
             if (have_events_to_wait_for) {
-                wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+                wait_for_events_impl(event_waitlist.size(), event_waitlist.data()); // block until events are done
             }
 
             // After waiting for preceeding tasks, the device can now go on to do actual work
@@ -2782,12 +2788,15 @@ void get_connected_component_data_impl(
 
     MCUT_ASSERT(event_ptr != nullptr);
 
+    // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
+    std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
+
     event_ptr->m_future = context_ptr->enqueue([=, &context_ptr]() {
         // asynch task will have to wait for the events in the waitlist!
-        const bool have_events_to_wait_for = pEventWaitList != nullptr || numEventsInWaitlist > 0;
+        const bool have_events_to_wait_for = event_waitlist.empty() == false;
 
         if (have_events_to_wait_for) {
-            wait_for_events_impl(numEventsInWaitlist, pEventWaitList); // block unti events are done
+            wait_for_events_impl(event_waitlist.size(), event_waitlist.data()); // block unti events are done
         }
 
         // After waiting for preceeding tasks, the device can now go on to do actual work
@@ -2814,7 +2823,39 @@ void release_event_impl(
         throw std::invalid_argument("invalid event handle");
     }
 
-    g_events.remove_mapping(eventHandle);
+    if (event_ptr.use_count() == 2) // here and in "g_events"
+    {
+        g_events.remove_mapping(eventHandle);
+    }
+}
+
+void release_events_impl(uint32_t numEvents, const McEvent* pEvents)
+{
+    std::vector<McEvent> e_vec = g_events.get_lookup_keys();
+
+    if (numEvents > (uint32_t)e_vec.size()) {
+        throw std::invalid_argument("invalid event count");
+    }
+
+    for (uint32_t i = 0; i < numEvents; ++i) {
+        McEvent eventHandle = pEvents[i];
+        std::vector<McEvent>::const_iterator it = std::find_if(e_vec.cbegin(), e_vec.cend(), eventHandle);
+
+        if (it == e_vec.cend()) {
+            throw std::invalid_argument("invalid event handle");
+        }
+
+        std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+
+        if (event_ptr == nullptr) {
+            throw std::invalid_argument("invalid event handle");
+        }
+
+        if (event_ptr.use_count() == 2) // here and in "g_events"
+        {
+            g_events.remove_mapping(eventHandle);
+        }
+    }
 }
 
 void release_connected_components_impl(

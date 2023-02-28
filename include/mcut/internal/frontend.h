@@ -165,43 +165,71 @@ struct input_cc_t : public connected_component_t {
 
 struct event_t {
     std::future<void> m_future; // used to wait on event
-    // used to synch access to the callback function e.g. to guard the setting of associated variables
-    // Also allows us to overcome the edge case that mcSetEventCallback is called after the task
-    // associated with an event has been completed, in which case the new callback invoked immediately.
+    // used to synchronise access to variables associated with the callback 
+    // function.
+    // This also also allows us to overcome the edgecase that mcSetEventCallback 
+    // is called after the task associated with an event has been completed, 
+    // in which case the new callback will be invoked immediately.
     // see "set_callback_data()" below
-    std::mutex m_callback_fn_mutex;
-    // optional user callback, which is invoked when associated task is finished
-    pfn_McEvent_CALLBACK m_callback_fn_ptr;
-    void* m_callback_fn_data_param_ptr;
-    std::atomic<bool> m_associated_task_is_complete;
-    event_t()
-        : m_callback_fn_ptr(nullptr)
-        , m_callback_fn_data_param_ptr(nullptr)
-        , m_associated_task_is_complete(false)
+    std::mutex m_callback_mutex;
+    struct {
+        // optional user callback, which is invoked when associated task is finished
+        pfn_McEvent_CALLBACK m_fn_ptr;
+        // pointer passed to user provided callback function
+        void* m_data_ptr;
+        // atomic boolean flag indicating whether the task associated with event
+        // object has completed running
+        std::atomic<bool> m_finished;
+        // atomic boolean flag indicating whether the callback associated with event
+        // object has been called
+        std::atomic<bool> m_invoked;
+    } m_callback_info;
+    McEvent m_user_handle; // handle used by client app to reference this event object
+    event_t() : m_user_handle(MC_NULL_HANDLE)
     {
+        m_callback_info.m_fn_ptr = nullptr;
+        m_callback_info.m_data_ptr = nullptr;
+        m_callback_info.m_finished.store(false);
+        m_callback_info.m_invoked.store(true); // so that we do not call a null pointer/needless invoke the callback in the destructor
     }
 
-    void set_callback_data(McEvent handle, pfn_McEvent_CALLBACK fn_ptr, void* data_param_ptr)
+    ~event_t()
     {
-        std::lock_guard<std::mutex> lock(m_callback_fn_mutex);
-
-        m_callback_fn_ptr = fn_ptr;
-        m_callback_fn_data_param_ptr = data_param_ptr;
-
-        if (m_associated_task_is_complete.load() == true) { // see mutex documentation
-            // immediately invoke the callback
-            (*(m_callback_fn_ptr))(handle, m_callback_fn_data_param_ptr);
+        if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr)
+        {
+            MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
+            (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
     }
 
-    void notify_task_complete(McEvent handle)
+    // thread-safe function to set the callback function for an event object
+    void set_callback_data(McEvent handle, pfn_McEvent_CALLBACK fn_ptr, void* data_ptr)
     {
-        std::lock_guard<std::mutex> lock(m_callback_fn_mutex);
+        std::lock_guard<std::mutex> lock(m_callback_mutex); // exclusive access
 
-        m_associated_task_is_complete = true;
+        m_user_handle = handle;
+        m_callback_info.m_fn_ptr = fn_ptr;
+        m_callback_info.m_data_ptr = data_ptr;
+        m_callback_info.m_invoked.store(false);
 
-        if (m_callback_fn_ptr != nullptr) {
-            (*(m_callback_fn_ptr))(handle, m_callback_fn_data_param_ptr);
+        if (m_callback_info.m_finished.load() == true) { // see mutex documentation
+            // immediately invoke the callback
+            (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
+            m_callback_info.m_invoked.store(true);
+        }
+    }
+
+    // update the status of the event object to "finished"
+    void notify_task_complete()
+    {
+        std::lock_guard<std::mutex> lock(m_callback_mutex);
+
+        m_callback_info.m_finished = true;
+
+        if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
+            MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
+            (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
+            m_callback_info.m_invoked.store(true);
         }
     }
 };
@@ -399,5 +427,7 @@ extern "C" void release_connected_components_impl(
 
 extern "C" void release_context_impl(
     McContext context) noexcept(false);
+
+extern "C" void release_events_impl(uint32_t numEvents, const McEvent* pEvents);
 
 #endif // #ifndef _FRONTEND_H_
