@@ -163,7 +163,7 @@ public:
 
     void disrupt_wait_for_data()
     {
-        data_cond.notify_one();
+        data_cond.notify_all();
     }
 
     void push(T new_value)
@@ -251,7 +251,7 @@ public:
         , machine_thread_count(0)
     {
         machine_thread_count = (uint32_t)std::thread::hardware_concurrency();
-        uint32_t const pool_thread_count = std::max(1u, machine_thread_count - 1);
+        uint32_t const pool_thread_count = std::min(nthreads, machine_thread_count - 1);
 
         thread_pool_terminate.store(false);
 

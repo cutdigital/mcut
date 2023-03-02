@@ -294,6 +294,8 @@ typedef enum McDebugSeverity {
  */
 typedef enum McContextCreationFlags {
     MC_DEBUG = (1 << 0), /**< Enable debug mode (message logging etc.).*/
+    MC_OUT_OF_ORDER_EXEC_MODE_ENABLE = (1 << 1), /**< Determines whether the commands queued in the context-queue are executed in-order or out-of-order. If set, the commands in the context-queue are executed out-of-order. Otherwise, commands are executed in-order..*/
+    MC_PROFILING_ENABLE = (1 << 2) /**< Enable or disable profiling of commands in the context-queue. If set, the profiling of commands is enabled. Otherwise profiling of commands is disabled. See ::mcGetEventProfilingInfo for more information. */
 } McContextCreationFlags;
 
 /**
@@ -378,6 +380,12 @@ typedef void(MCAPI_PTR* pfn_mcDebugOutput_CALLBACK)(
     const char* message,
     const void* userParam);
 
+/**
+ *
+ * @brief Event callback function signature type.
+ *
+ * The callback function should have this prototype (in C), or be otherwise compatible with such a prototype.
+ */
 typedef void(MCAPI_PTR* pfn_McEvent_CALLBACK)(McEvent event, void* data);
 
 /** @brief Create an MCUT context.
@@ -769,7 +777,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  * @param[in] numEventsInWaitlist Number of events in the waitlist.
  * @param[in] pEventWaitList Events that need to complete before this particular command can be executed.
  * @param[out] pEvent Returns an event object that identifies this particular command and can be used to query or queue a wait for this particular command to complete.  pEvent can be NULL in which case it will not be possible for the application to query the status of this command or queue a wait for this command to complete. If the pEventWaitList and the event arguments are not NULL, the pEvent argument should not refer to an element of the pEventWaitList array.
- * 
+ *
  * If pEventWaitList is NULL, then this particular command does not wait on any event to complete. If pEventWaitList
  * is NULL, numEventsInWaitlist must be 0. If pEventWaitList is not NULL, the list of events pointed to
  * by pEventWaitList must be valid and numEventsInWaitlist must be greater than 0. The events specified in
@@ -825,13 +833,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
 /**
  * @brief Non-asychronous version of ::mcEnqueueGetConnectedComponents. This
  * function blocks until the operation is completed
- * 
- * @param context 
- * @param connectedComponentType 
- * @param numEntries 
- * @param pConnComps 
- * @param numConnComps 
- * @return MCAPI_ATTR 
+ *
+ * @param context
+ * @param connectedComponentType
+ * @param numEntries
+ * @param pConnComps
+ * @param numConnComps
+ * @return MCAPI_ATTR
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     const McContext context,
@@ -856,7 +864,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  * by pEventWaitList must be valid and numEventsInWaitlist must be greater than 0. The events specified in
  * pEventWaitList act as synchronization points. The memory associated with pEventWaitList can be reused or
  * freed after the function returns.
- * 
+ *
  * An example of usage:
  * @code
  * uint64_t numBytes = 0;
@@ -905,14 +913,14 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
 /**
  * @brief Non-asychronous version of ::mcEnqueueGetConnectedComponents. This
  * function blocks until the operation is completed.
- * 
- * @param context 
- * @param connCompId 
- * @param flags 
- * @param bytes 
- * @param pMem 
- * @param pNumBytes 
- * 
+ *
+ * @param context
+ * @param connCompId
+ * @param flags
+ * @param bytes
+ * @param pMem
+ * @param pNumBytes
+ *
  * An example of usage:
  * @code
  * uint64_t numBytes = 0;
@@ -930,9 +938,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
  *  // deal with error
  * }
  * @endcode
- * 
- * 
- * @return MCAPI_ATTR 
+ *
+ *
+ * @return MCAPI_ATTR
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
@@ -944,14 +952,14 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
 
 /**
  * @brief Waits on the user thread for commands identified by event objects to complete.
- * 
- * @param[in] numEventsInWaitlist Number of events to wait for 
- * @param[in] pEventWaitList  List of events to wait for 
- * 
- * Waits on the user thread for commands identified by event objects in \p pEventWaitList to complete. 
+ *
+ * @param[in] numEventsInWaitlist Number of events to wait for
+ * @param[in] pEventWaitList  List of events to wait for
+ *
+ * Waits on the user thread for commands identified by event objects in \p pEventWaitList to complete.
  * The events specified in \p pEventWaitList act as synchronization points.
- * 
- * @return Error code. 
+ *
+ * @return Error code.
  *   -# proper exit
  * - MC_INVALID_VALUE
  *   -# \p numEventsInWaitlist is greater than 0 and \p pEventWaitList is NULL (and vice versa).
@@ -963,16 +971,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
 
 /**
  * @brief Decrements the event reference count.
- * 
+ *
  * @param numEvents Number of event objects to release
  * @param pEvents Array of event objects to release
- * 
- * The event object is deleted once the reference count becomes zero, the specific 
- * command identified by this event has completed (or terminated) and there are 
- * no commands in the command-queue of a context that require a wait for this 
+ *
+ * The event object is deleted once the reference count becomes zero, the specific
+ * command identified by this event has completed (or terminated) and there are
+ * no commands in the command-queue of a context that require a wait for this
  * event to complete.
- * 
- * @return Error code. 
+ *
+ * @return Error code.
  *   -# proper exit
  * - MC_INVALID_VALUE
  *   -# \p numEvents is greater than 0 and \p pEvents is NULL (and vice versa).

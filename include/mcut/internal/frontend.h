@@ -165,10 +165,10 @@ struct input_cc_t : public connected_component_t {
 
 struct event_t {
     std::future<void> m_future; // used to wait on event
-    // used to synchronise access to variables associated with the callback 
+    // used to synchronise access to variables associated with the callback
     // function.
-    // This also also allows us to overcome the edgecase that mcSetEventCallback 
-    // is called after the task associated with an event has been completed, 
+    // This also also allows us to overcome the edgecase that mcSetEventCallback
+    // is called after the task associated with an event has been completed,
     // in which case the new callback will be invoked immediately.
     // see "set_callback_data()" below
     std::mutex m_callback_mutex;
@@ -185,7 +185,8 @@ struct event_t {
         std::atomic<bool> m_invoked;
     } m_callback_info;
     McEvent m_user_handle; // handle used by client app to reference this event object
-    event_t() : m_user_handle(MC_NULL_HANDLE)
+    event_t()
+        : m_user_handle(MC_NULL_HANDLE)
     {
         m_callback_info.m_fn_ptr = nullptr;
         m_callback_info.m_data_ptr = nullptr;
@@ -195,8 +196,7 @@ struct event_t {
 
     ~event_t()
     {
-        if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr)
-        {
+        if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
@@ -237,22 +237,22 @@ struct event_t {
 // init in frontened.cpp
 extern threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
 extern std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McObject handle that will be returned to the user
-extern std::once_flag g_objcts_counter_init_flag;
+extern std::once_flag g_objects_counter_init_flag;
 
 class device_t {
 private:
-    std::unique_ptr<thread_pool> m_threadpool;
+    std::unique_ptr<thread_pool> m_compute_threadpool;
 
 public:
     device_t(uint32_t nthreads)
-        : m_threadpool(std::unique_ptr<thread_pool>(new thread_pool(nthreads)))
+        : m_compute_threadpool(std::unique_ptr<thread_pool>(new thread_pool(nthreads)))
     {
     }
 
     template <typename FunctionType>
     std::future<typename std::result_of<FunctionType()>::type> enqueue(FunctionType api_fun)
     {
-        return m_threadpool->submit(api_fun);
+        return m_compute_threadpool->submit(api_fun);
     }
 };
 
@@ -266,38 +266,75 @@ void fn_delete_cc(connected_component_t* p)
 // struct defining the state of a context object
 struct context_t {
 private:
+    std::atomic<bool> m_done;
     thread_safe_queue<function_wrapper> m_queue;
-    std::atomic<bool> done;
+    // Master/Manager thread(s) which are responsible for running the API calls 
+    // When a user of MCUT calls one of the APIs (e.g. mcEnqueueDispatch) the task
+    // of actually executing everything related to that task will be handled by
+    // one Manager thread. This manager thread itself will be involved in 
+    // computing some/all part of the respective task (think of it as the "main"
+    // thread insofar as the API task is concerned). Some API tasks contain code 
+    // sections that run in parallel, which is where the Manager thread will also
+    // submit tasks to the shared compute threadpool ("m_compute_threadpool"). 
+    // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
+    std::vector<std::thread> m_api_threadpool; 
+    join_threads m_joiner;
 
-    void device_main()
+    // A pool of threads that is shared by manager threads to execute e.g. parallel
+    // section of MCUT API tasks (see e.g. frontend.cpp and kernel.cpp) 
+    std::unique_ptr<thread_pool> m_compute_threadpool;
+
+    // The state and flag variable current used to configure the next dispatch call
+    McFlags m_flags = (McFlags)0;
+
+    void manager_thread_main()
     {
         do {
-            function_wrapper api_fn;
+            function_wrapper task;
 
-            if (!(m_queue.try_pop(api_fn))) {
-                m_queue.wait_and_pop(api_fn);
-            }
+            m_queue.wait_and_pop(task);
 
-            if (done) {
+            if (m_done) {
                 break;
             }
 
-            api_fn();
+            task();
 
         } while (true);
     }
 
 public:
-    context_t(uint32_t num_workers)
-        : done(false)
+    context_t(McFlags flags, uint32_t num_compute_threads)
+        : m_joiner(m_api_threadpool)
+        , m_done(false),
+        m_flags(flags)
     {
-        m_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_workers));
+        try {
+            const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
 
-        auto device_future = std::async(std::launch::async, context_t::device_main);
+            for (uint32_t i = 0; i < manager_thread_count; ++i) {
+                m_api_threadpool.push_back(std::thread(&context_t::manager_thread_main, this, i));
+            }
+
+            // create the pool of compute threads. These are the worker threads that
+            // can be tasked with work from any manager-thread. Thus, manager threads
+            // share the available/user-specified compute threads.
+            m_compute_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_compute_threads));
+
+        } catch (...) {
+            m_done = true;
+            throw;
+        }
     }
 
     ~context_t()
     {
+        m_done = true;
+    }
+
+    std::unique_ptr<thread_pool>& get_compute_threadpool()
+    {
+        return m_compute_threadpool;
     }
 
     template <typename FunctionType>
@@ -308,18 +345,16 @@ public:
         std::packaged_task<result_type()> task(std::move(f));
         std::future<result_type> res(task.get_future());
 
-        m_device_queue.push(std::move(task));
+        m_queue.push(std::move(task));
 
         return res;
     }
 
-    std::unique_ptr<thread_pool> m_threadpool;
-
+    
     // the current set of connected components associated with context
     threadsafe_lookup_table<McConnectedComponent, std::shared_ptr<connected_component_t>> connected_components;
 
-    // The state and flag variable current used to configure the next dispatch call
-    McFlags flags = (McFlags)0;
+    
     // McFlags dispatchFlags = (McFlags)0;
 
     // client/user debugging variable
@@ -355,7 +390,7 @@ public:
 extern "C" threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts;
 
 extern "C" void create_context_impl(
-    McContext* pContext, McFlags flags) noexcept(false);
+    McContext* pContext, McFlags flags, uint32_t nthreads) noexcept(false);
 
 extern "C" void debug_message_callback_impl(
     McContext context,

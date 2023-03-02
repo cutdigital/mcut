@@ -30,43 +30,24 @@ std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr
 threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts = {};
 threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
 std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McContext handle that will be returned to the user
-std::once_flag g_objcts_counter_init_flag; // flag used to initialise "g_objects_counter" with "std::call_once"
+std::once_flag g_objects_counter_init_flag; // flag used to initialise "g_objects_counter" with "std::call_once"
 
 void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t nthreads)
 {
     MCUT_ASSERT(pOutContext != nullptr);
+    MCUT_ASSERT(nthreads >= 1);
 
-    std::call_once(g_objcts_counter_init_flag, []() { g_objects_counter.store(0); });
+    std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0); });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
 
     // allocate internal context object (including associated threadpool etc.)
-    g_contexts.add_or_update_mapping(handle, std::shared_ptr<context_t>(new context_t(nthreads)));
+    // we pass the number of threads as "nthreads-1" because of the existance of 
+    // manager threads, which are like the "main" thread in each API task. 
+    g_contexts.add_or_update_mapping(handle, std::shared_ptr<context_t>(new context_t(flags, nthreads-1)));
 
     std::shared_ptr<context_t> context_ptr = g_contexts.value_for(handle);
     MCUT_ASSERT(context_ptr != nullptr);
-
-    //
-    // NOTE: the current API function is thread-safe since each user thread that calls
-    // it will create a new context with a new handle
-    // Thus, we do not need a lock here to ensure that only one client-app thread
-    // can modify/read-from context.
-
-    // copy context configuration flags
-    context_ptr->flags = flags;
-
-    // TODO: ensures that only one client-app thread can modify/read-from context-map
-    // const std::pair<std::map<McContext, std::unique_ptr<context_t>>::iterator, bool> insertion_result = g_contexts.emplace(handle, std::move(context_uptr));
-
-    // const bool context_inserted_ok = insertion_result.second;
-
-    // if (!context_inserted_ok) {
-    //     throw std::runtime_error("failed to create context");
-    // }
-
-    // const std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = insertion_result.first;
-
-    // MCUT_ASSERT(handle == context_entry_iter->first);
 
     *pOutContext = handle;
 }
