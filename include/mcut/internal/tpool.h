@@ -34,7 +34,6 @@
 
 #include <functional>
 #include <list>
-#include <shared_mutex>
 #include <utility>
 
 #include "mcut/internal/utils.h"
@@ -85,11 +84,10 @@ public:
     function_wrapper& operator=(const function_wrapper&) = delete;
 };
 
-extern std::atomic_bool thread_pool_terminate; // mcut.cpp
-
 template <typename T>
 class thread_safe_queue {
 private:
+    std::atomic<bool>* m_done;
     struct node {
         std::shared_ptr<T> data;
         std::unique_ptr<node> next;
@@ -136,7 +134,7 @@ private:
         std::unique_lock<std::mutex> wait_for_data()
     {
         std::unique_lock<std::mutex> head_lock(head_mutex);
-        auto until = [&]() { return thread_pool_terminate.load() || head.get() != get_tail(); };
+        auto until = [&]() { return m_done->load() || head.get() != get_tail(); };
         data_cond.wait(head_lock, until);
         return head_lock;
     }
@@ -144,7 +142,7 @@ private:
     std::unique_ptr<node> wait_pop_head(T& value)
     {
         std::unique_lock<std::mutex> head_lock(wait_for_data());
-        if (thread_pool_terminate.load() == false) {
+        if (m_done->load() == false) {
             value = std::move(*head->data);
             return pop_head();
         } else {
@@ -154,12 +152,17 @@ private:
 
 public:
     thread_safe_queue()
-        : head(new node)
+        :  head(new node)
         , tail(head.get()) /*, can_wait_for_data(true)*/
     {
     }
     thread_safe_queue(const thread_safe_queue& other) = delete;
     thread_safe_queue& operator=(const thread_safe_queue& other) = delete;
+
+    void set_done_ptr(std::atomic<bool>* done)
+    {
+        m_done = done;
+    }
 
     void disrupt_wait_for_data()
     {
@@ -191,7 +194,7 @@ public:
         return !(!(old_head)); // https://stackoverflow.com/questions/30521849/error-on-implicit-cast-from-stdunique-ptr-to-bool
     }
 
-    void empty()
+    bool empty()
     {
         std::lock_guard<std::mutex> head_lock(head_mutex);
         return (head.get() == get_tail());
@@ -216,23 +219,24 @@ public:
 };
 
 class thread_pool {
-
+    std::atomic<bool> m_done;
     std::vector<thread_safe_queue<function_wrapper>> work_queues;
 
     std::vector<std::thread> threads; // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
     join_threads joiner;
 
-    void worker_thread(int worker_thread_id)
+    void worker_thread(int thread_id)
     {
+        std::cout << "[MCUT] Launch helper thread " << std::this_thread::get_id() << " (" << thread_id << ")" << std::endl;
 
         do {
             function_wrapper task;
 
-            if (!(work_queues[worker_thread_id].try_pop(task))) {
-                work_queues[worker_thread_id].wait_and_pop(task);
+            if (!(work_queues[thread_id].try_pop(task))) {
+                work_queues[thread_id].wait_and_pop(task);
             }
 
-            if (thread_pool_terminate) {
+            if (m_done) {
                 break; // finished (i.e. MCUT context was destroyed)
             }
 
@@ -245,25 +249,25 @@ class thread_pool {
 
 public:
     thread_pool(uint32_t nthreads)
-        : // thread_pool_terminate(false),
+        :  m_done(false),
 
         joiner(threads)
         , machine_thread_count(0)
     {
+        std::cout << "[MCUT] Helper threadpool " << this << std::endl;
         machine_thread_count = (uint32_t)std::thread::hardware_concurrency();
         uint32_t const pool_thread_count = std::min(nthreads, machine_thread_count - 1);
-
-        thread_pool_terminate.store(false);
 
         try {
 
             work_queues = std::vector<thread_safe_queue<function_wrapper>>(pool_thread_count);
-
+            
             for (unsigned i = 0; i < pool_thread_count; ++i) {
+                work_queues[i].set_done_ptr(&m_done);
                 threads.push_back(std::thread(&thread_pool::worker_thread, this, i));
             }
         } catch (...) {
-            thread_pool_terminate = true;
+            m_done.store(true);
             wakeup_and_shutdown();
             throw;
         }
@@ -271,7 +275,7 @@ public:
 
     ~thread_pool()
     {
-        thread_pool_terminate.store(true);
+        m_done.store(true);
         wakeup_and_shutdown();
     }
 
@@ -835,142 +839,101 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
     return result.get_future().get();
 }
 
-template <typename Key, typename Value, typename Hash = std::hash<Key>>
-class threadsafe_lookup_table {
-private:
-    class bucket_type {
-    private:
-        typedef std::pair<Key, Value> bucket_value;
-        typedef std::list<bucket_value> bucket_data;
-        typedef typename bucket_data::iterator bucket_iterator;
-
-        bucket_data data;
-        mutable std::shared_mutex mutex;
-
-        bucket_iterator find_entry_for(Key const& key) const
-        {
-            return std::find_if(data.begin(), data.end(),
-                [&](bucket_value const& item) { return item.first == key; });
-        }
-
-    public:
-        Value value_for(Key const& key, Value const& default_value) const
-        {
-            std::shared_lock<std::shared_mutex> lock(mutex);
-            bucket_iterator const found_entry = find_entry_for(key);
-            return (found_entry == data.end()) ? default_value : found_entry->second;
-        }
-
-        void add_or_update_mapping(Key const& key, Value const& value)
-        {
-            std::unique_lock<std::shared_mutex> lock(mutex);
-            bucket_iterator const found_entry = find_entry_for(key);
-            if (found_entry == data.end()) {
-                data.push_back(bucket_value(key, value));
-            } else {
-                found_entry->second = value;
-            }
-        }
-
-        void remove_mapping(Key const& key)
-        {
-            std::unique_lock<std::shared_mutex> lock(mutex);
-            bucket_iterator const found_entry = find_entry_for(key);
-            if (found_entry != data.end()) {
-                data.erase(found_entry);
-            }
-        }
-    };
-
-    std::vector<std::unique_ptr<bucket_type>> buckets;
-    Hash hasher;
-
-    bucket_type& get_bucket(Key const& key) const
+template<typename T>
+class threadsafe_list
+{
+    struct node
     {
-        std::size_t const bucket_index = hasher(key) % buckets.size();
-        return *buckets[bucket_index];
-    }
+        std::mutex m;
+        std::shared_ptr<T> data;
+        std::unique_ptr<node> next;
+
+        node():
+            next()
+        {}
+        
+        node(T const& value):
+            data(std::make_shared<T>(value))
+        {}
+    };
+    
+    node head;
 
 public:
-    typedef Key key_type;
-    typedef Value mapped_type;
-    typedef Hash hash_type;
+    threadsafe_list()
+    {}
 
-    threadsafe_lookup_table(
-        unsigned num_buckets = 19, Hash const& hasher_ = Hash())
-        : buckets(num_buckets)
-        , hasher(hasher_)
+    ~threadsafe_list()
     {
-        for (unsigned i = 0; i < num_buckets; ++i) {
-            buckets[i].reset(new bucket_type);
+        remove_if([](T const&){return true;});
+    }
+
+    threadsafe_list(threadsafe_list const& other)=delete;
+    threadsafe_list& operator=(threadsafe_list const& other)=delete;
+    
+    void push_front(T const& value)
+    {
+        std::unique_ptr<node> new_node(new node(value));
+        std::lock_guard<std::mutex> lk(head.m);
+        new_node->next=std::move(head.next);
+        head.next=std::move(new_node);
+    }
+
+    template<typename Function>
+    void for_each(Function f)
+    {
+        node* current=&head;
+        std::unique_lock<std::mutex> lk(head.m);
+        while(node* const next=current->next.get())
+        {
+            std::unique_lock<std::mutex> next_lk(next->m);
+            lk.unlock();
+            f(*next->data);
+            current=next;
+            lk=std::move(next_lk);
         }
     }
 
-    threadsafe_lookup_table(threadsafe_lookup_table const& other) = delete;
-    threadsafe_lookup_table& operator=(
-        threadsafe_lookup_table const& other)
-        = delete;
-
-    Value value_for(Key const& key,
-        Value const& default_value = Value()) const
+    template<typename Predicate>
+    std::shared_ptr<T> find_first_if(Predicate p)
     {
-        return get_bucket(key).value_for(key, default_value);
-    }
-
-    void add_or_update_mapping(Key const& key, Value const& value)
-    {
-        get_bucket(key).add_or_update_mapping(key, value);
-    }
-
-    void remove_mapping(Key const& key)
-    {
-        get_bucket(key).remove_mapping(key);
-    }
-
-    /*
-        retrieves a snapshot of the current state into an std::map<>.
-        locks the entire container in order to ensure that a consistent copy of
-        the state is retrieved, which requires locking all the buckets.
-    */
-    std::map<Key, Value> threadsafe_lookup_table::get_map() const
-    {
-        std::vector<std::unique_lock<std::shared_mutex>> locks;
-        for (unsigned i = 0; i < buckets.size(); ++i) {
-            locks.push_back(
-                std::unique_lock<std::shared_mutex>(buckets[i].mutex));
+        node* current=&head;
+        std::unique_lock<std::mutex> lk(head.m);
+        while(node* const next=current->next.get())
+        {
+            std::unique_lock<std::mutex> next_lk(next->m);
+            lk.unlock();
+            if(p(*next->data))
+            {
+                return next->data;
+            }
+            current=next;
+            lk=std::move(next_lk);
         }
-        std::map<Key, Value> res;
-        for (unsigned i = 0; i < buckets.size(); ++i) {
-            for (bucket_iterator it = buckets[i].data.begin();
-                 it != buckets[i].data.end();
-                 ++it) {
-                res.insert(*it);
+        return std::shared_ptr<T>();
+    }
+
+    template<typename Predicate>
+    void remove_if(Predicate p)
+    {
+        node* current=&head;
+        std::unique_lock<std::mutex> lk(head.m);
+        while(node* const next=current->next.get())
+        {
+            std::unique_lock<std::mutex> next_lk(next->m);
+            if(p(*next->data))
+            {
+                std::unique_ptr<node> old_next=std::move(current->next);
+                current->next=std::move(next->next);
+                next_lk.unlock();
+            }
+            else
+            {
+                lk.unlock();
+                current=next;
+                lk=std::move(next_lk);
             }
         }
-        return res;
-    }
-
-    /*
-        retrieves a snapshot of the current state into an std::vector<>.
-        locks the entire container in order to ensure that a consistent copy of
-        the state is retrieved, which requires locking all the buckets.
-    */
-    std::vector<Key> threadsafe_lookup_table::get_lookup_keys() const
-    {
-        std::vector<std::unique_lock<std::shared_mutex>> locks;
-        for (unsigned i = 0; i < buckets.size(); ++i) {
-            locks.push_back(
-                std::unique_lock<std::shared_mutex>(buckets[i].mutex));
-        }
-        std::vector<Key> res;
-        for (unsigned i = 0; i < buckets.size(); ++i) {
-            for (bucket_iterator it = buckets[i].data.begin();
-                 it != buckets[i].data.end();
-                 ++it) {
-                res.push_back(it->first);
-            }
-        }
-        return res;
     }
 };
 

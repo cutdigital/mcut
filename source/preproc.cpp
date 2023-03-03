@@ -110,7 +110,7 @@ bool client_input_arrays_to_hmesh(
 #if 0
     std::partial_sum(partial_sums.begin(), partial_sums.end(), partial_sums.data());
 #else
-    parallel_partial_sum(context_ptr->m_threadpool.get()[0], partial_sums.begin(), partial_sums.end());
+    parallel_partial_sum(context_ptr->get_shared_compute_threadpool() , partial_sums.begin(), partial_sums.end());
 #endif
     {
         typedef std::vector<uint32_t>::const_iterator InputStorageIteratorType;
@@ -180,7 +180,7 @@ bool client_input_arrays_to_hmesh(
         OutputStorageType partial_res;
 
         parallel_for(
-            context_ptr->m_threadpool.get()[0],
+            context_ptr->get_shared_compute_threadpool() ,
             partial_sums.cbegin(),
             partial_sums.cend(),
             fn_create_faces,
@@ -344,7 +344,7 @@ bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
     std::vector<int> cc_to_face_count;
     int n = find_connected_components(
 #if defined(MCUT_MULTI_THREADED)
-        context_ptr->m_threadpool.get()[0],
+        context_ptr->get_shared_compute_threadpool() ,
 #endif
         fccmap, m, cc_to_vertex_count, cc_to_face_count);
 
@@ -1265,7 +1265,7 @@ extern "C" void preproc(
     input_t kernel_input; // kernel/backend inpout
 
 #if defined(MCUT_MULTI_THREADED)
-    kernel_input.scheduler = &context_ptr->m_threadpool.get()[0];
+    kernel_input.scheduler = &context_ptr->get_shared_compute_threadpool() ;
 #endif
 
     kernel_input.src_mesh = source_hmesh;
@@ -1331,7 +1331,7 @@ extern "C" void preproc(
     std::vector<bounding_box_t<vec3>> source_hmesh_face_aabb_array;
     build_oibvh(
 #if defined(MCUT_MULTI_THREADED)
-        context_ptr->m_threadpool.get()[0],
+        context_ptr->get_shared_compute_threadpool() ,
 #endif
         *source_hmesh.get(), source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
 #else
@@ -1497,7 +1497,7 @@ extern "C" void preproc(
                 cut_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
 #if defined(MCUT_MULTI_THREADED)
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool() ,
 #endif
                     *cut_hmesh.get(), cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array, cut_hmesh_face_face_aabb_array, numerical_perturbation_constant);
 #else
@@ -1538,7 +1538,7 @@ extern "C" void preproc(
                 source_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
 #if defined(MCUT_MULTI_THREADED)
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool() ,
 #endif
                     *source_hmesh.get(),
                     source_hmesh_BVH_aabb_array,
@@ -1555,7 +1555,7 @@ extern "C" void preproc(
                 cut_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
 #if defined(MCUT_MULTI_THREADED)
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool() ,
 #endif
                     *cut_hmesh.get(),
                     cut_hmesh_BVH_aabb_array,
@@ -1604,7 +1604,7 @@ extern "C" void preproc(
 #else
             BoundingVolumeHierarchy::intersectBVHTrees(
 #if defined(MCUT_MULTI_THREADED)
-                context_ptr->m_threadpool.get()[0],
+                context_ptr->get_shared_compute_threadpool() ,
 #endif
                 ps_face_to_potentially_intersecting_others,
                 source_hmesh_BVH,
@@ -1990,7 +1990,7 @@ extern "C" void preproc(
             };
 
             parallel_for(
-                context_ptr->m_threadpool.get()[0],
+                context_ptr->get_shared_compute_threadpool() ,
                 cut_hmesh->vertices_begin(),
                 cut_hmesh->vertices_end(),
                 fn_fill_vertex_map);
@@ -2011,7 +2011,7 @@ extern "C" void preproc(
             };
 
             parallel_for(
-                context_ptr->m_threadpool.get()[0],
+                context_ptr->get_shared_compute_threadpool() ,
                 cut_hmesh->faces_begin(),
                 cut_hmesh->faces_end(),
                 fn_fill_face_map);
@@ -2069,7 +2069,7 @@ extern "C" void preproc(
             };
 
             parallel_for(
-                context_ptr->m_threadpool.get()[0],
+                context_ptr->get_shared_compute_threadpool() ,
                 source_hmesh->vertices_begin(),
                 source_hmesh->vertices_end(),
                 fn_fill_vertex_map);
@@ -2090,7 +2090,7 @@ extern "C" void preproc(
             };
 
             parallel_for(
-                context_ptr->m_threadpool.get()[0],
+                context_ptr->get_shared_compute_threadpool() ,
                 source_hmesh->faces_begin(),
                 source_hmesh->faces_end(),
                 fn_fill_face_map);

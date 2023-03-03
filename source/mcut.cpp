@@ -73,7 +73,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags c
         return_value = McResult::MC_INVALID_VALUE;
     } else {
         try {
-            create_context_impl(pOutContext, contextFlags);
+            // no helper threads
+            // only manager threads (2 managers if context is created with MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, otherwise 1 manager)
+            create_context_impl(pOutContext, contextFlags, 0);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -85,7 +87,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags c
     return return_value;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags, uint32_t nthreads)
+MCAPI_ATTR McResult MCAPI_CALL mcCreateContextWithHelpers(McContext* pOutContext, McFlags contextFlags, uint32_t helperThreadCount)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -95,7 +97,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags c
         return_value = McResult::MC_INVALID_VALUE;
     } else {
         try {
-            create_context_impl(pOutContext, contextFlags, nthreads);
+            create_context_impl(pOutContext, contextFlags, helperThreadCount);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -237,9 +239,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
             return_value = McResult::MC_INVALID_VALUE;
         }
     }
+
+    return return_value;
 }
 
-MCAPI_ATTR pfn_McEvent_CALLBACK MCAPI_CALL mcSetEventCallback(
+MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
     McEvent eventHandle,
     pfn_McEvent_CALLBACK eventCallback,
     void *data)
@@ -265,6 +269,8 @@ MCAPI_ATTR pfn_McEvent_CALLBACK MCAPI_CALL mcSetEventCallback(
             return_value = McResult::MC_INVALID_VALUE;
         }
     }
+
+    return return_value;
 }
 
 MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(

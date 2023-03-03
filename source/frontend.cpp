@@ -18,11 +18,6 @@
 
 #include "mcut/internal/cdt/cdt.h"
 
-#if defined(MCUT_MULTI_THREADED)
-#include "mcut/internal/tpool.h"
-std::atomic_bool thread_pool_terminate(false);
-#endif
-
 #if defined(PROFILING_BUILD)
 std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr<mini_timer>>();
 #endif
@@ -32,19 +27,18 @@ threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
 std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McContext handle that will be returned to the user
 std::once_flag g_objects_counter_init_flag; // flag used to initialise "g_objects_counter" with "std::call_once"
 
-void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t nthreads)
+void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperThreadCount)
 {
     MCUT_ASSERT(pOutContext != nullptr);
-    MCUT_ASSERT(nthreads >= 1);
 
     std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0); });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
 
     // allocate internal context object (including associated threadpool etc.)
-    // we pass the number of threads as "nthreads-1" because of the existance of 
-    // manager threads, which are like the "main" thread in each API task. 
-    g_contexts.add_or_update_mapping(handle, std::shared_ptr<context_t>(new context_t(flags, nthreads-1)));
+    // we pass the number of threads as "nthreads-1" because of the existance of
+    // manager threads, which are like the "main" thread in each API task.
+    g_contexts.add_or_update_mapping(handle, std::shared_ptr<context_t>(new context_t(flags, helperThreadCount)));
 
     std::shared_ptr<context_t> context_ptr = g_contexts.value_for(handle);
     MCUT_ASSERT(context_ptr != nullptr);
@@ -196,12 +190,18 @@ void get_info_impl(
 
     switch (info) {
     case MC_CONTEXT_FLAGS:
+    {
+        McFlags flags = context_ptr->get_flags();
         if (pMem == nullptr) {
-            *pNumBytes = sizeof(context_ptr->flags);
+            *pNumBytes = sizeof(McFlags);
         } else {
-            memcpy(pMem, reinterpret_cast<void*>(&context_ptr->flags), bytes);
+            if (bytes < sizeof(McFlags)) {
+                throw std::invalid_argument("invalid bytes");
+            }
+            memcpy(pMem, reinterpret_cast<void*>(&flags), bytes);
         }
         break;
+    }
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -266,28 +266,11 @@ void dispatch_impl(
         throw std::invalid_argument("invalid context");
     }
 
-    const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
-
-    g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
-
-    std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
-
-    MCUT_ASSERT(event_ptr != nullptr);
-
-    // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
-    std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
-
     // submit the dispatch call to be executed asynchronously and return the future
     // object that will be waited on as an event
-    event_ptr->m_future = context_ptr->enqueue(
+    const McEvent event_handle = context_ptr->enqueue(
+        numEventsInWaitlist, pEventWaitList,
         [=, &context_ptr]() {
-            // asynch task will have to wait for the events in the waitlist!
-            const bool have_events_to_wait_for = event_waitlist.empty() == false;
-
-            if (have_events_to_wait_for) {
-                wait_for_events_impl(event_waitlist.size(), event_waitlist.data()); // block unti events are done
-            }
-
             preproc(
                 context_ptr,
                 dispatchFlags,
@@ -301,8 +284,6 @@ void dispatch_impl(
                 pCutMeshFaceSizes,
                 numCutMeshVertices,
                 numCutMeshFaces);
-
-            event_ptr->notify_task_complete();
         });
 
     MCUT_ASSERT(pEvent != nullptr);
@@ -326,28 +307,9 @@ void get_connected_components_impl(
         throw std::invalid_argument("invalid context");
     }
 
-    const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
-
-    g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
-
-    std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
-
-    MCUT_ASSERT(event_ptr != nullptr);
-
-    // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
-    std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
-
-    event_ptr->m_future = context_ptr->enqueue(
+    const McEvent event_handle = context_ptr->enqueue(
+        numEventsInWaitlist, pEventWaitList,
         [=, &context_ptr]() {
-            // asynch task will have to wait for the events in the waitlist!
-            const bool have_events_to_wait_for = event_waitlist.empty() == false;
-
-            if (have_events_to_wait_for) {
-                wait_for_events_impl(event_waitlist.size(), event_waitlist.data()); // block until events are done
-            }
-
-            // After waiting for preceeding tasks, the device can now go on to do actual work
-
             if (numConnComps != nullptr) {
                 (*numConnComps) = 0; // reset
             }
@@ -1318,7 +1280,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->vertices_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
@@ -1395,7 +1357,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->vertices_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
@@ -1456,7 +1418,7 @@ void get_connected_component_data_impl_detail(
                 uint32_t partial_res;
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_count_indices,
@@ -1530,7 +1492,7 @@ void get_connected_component_data_impl_detail(
                 //
                 std::vector<uint32_t> partial_sum_vec = cc_uptr->face_sizes_cache; // copy
 
-                parallel_partial_sum(context_ptr->m_threadpool.get()[0], partial_sum_vec.begin(), partial_sum_vec.end());
+                parallel_partial_sum(context_ptr->get_shared_compute_threadpool(), partial_sum_vec.begin(), partial_sum_vec.end());
 
                 //
                 // step 3
@@ -1573,7 +1535,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_indices_copy,
@@ -1656,7 +1618,7 @@ void get_connected_component_data_impl_detail(
                     };
 
                     parallel_for(
-                        context_ptr->m_threadpool.get()[0],
+                        context_ptr->get_shared_compute_threadpool(),
                         cc_uptr->face_sizes_cache.begin(),
                         cc_uptr->face_sizes_cache.end(),
                         fn_face_size); // blocks until all work is done
@@ -1721,7 +1683,7 @@ void get_connected_component_data_impl_detail(
                 uint32_t partial_res;
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_count_faces_around_face,
@@ -1796,7 +1758,7 @@ void get_connected_component_data_impl_detail(
                 //
                 std::vector<uint32_t> partial_sum_vec = cc_uptr->face_adjacent_faces_size_cache; // copy
 
-                parallel_partial_sum(context_ptr->m_threadpool.get()[0], partial_sum_vec.begin(), partial_sum_vec.end());
+                parallel_partial_sum(context_ptr->get_shared_compute_threadpool(), partial_sum_vec.begin(), partial_sum_vec.end());
 
                 //
                 // step 3
@@ -1833,7 +1795,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_adjface_indices_copy); // blocks until all work is done
@@ -1906,7 +1868,7 @@ void get_connected_component_data_impl_detail(
                     };
 
                     parallel_for(
-                        context_ptr->m_threadpool.get()[0],
+                        context_ptr->get_shared_compute_threadpool(),
                         cc_uptr->face_adjacent_faces_size_cache.begin(),
                         cc_uptr->face_adjacent_faces_size_cache.end(),
                         fn_face_adj_face_size); // blocks until all work is done
@@ -1974,7 +1936,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->edges_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->edges_end(),
                     fn_copy_edges);
@@ -2148,7 +2110,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->seam_vertices.cbegin(),
                     cc_uptr->kernel_hmesh_data->seam_vertices.cend(),
                     fn_copy_seam_vertices);
@@ -2246,7 +2208,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cbegin(),
                     cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cend(),
                     fn_copy_vertex_map);
@@ -2369,7 +2331,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->data_maps.face_map.cbegin(),
                     cc_uptr->kernel_hmesh_data->data_maps.face_map.cend(),
                     fn_copy_face_map);
@@ -2430,7 +2392,7 @@ void get_connected_component_data_impl_detail(
                 const uint32_t min_per_thread = 1 << 10;
                 {
                     uint32_t max_threads = 0;
-                    const uint32_t available_threads = context_ptr->m_threadpool.get()[0].get_num_threads() + 1; // workers and master (+1)
+                    const uint32_t available_threads = context_ptr->get_shared_compute_threadpool().get_num_threads() + 1; // workers and master (+1)
                     uint32_t block_size_unused = 0;
                     const uint32_t length = cc_face_count;
 
@@ -2554,7 +2516,7 @@ void get_connected_component_data_impl_detail(
                 };
 
                 parallel_for(
-                    context_ptr->m_threadpool.get()[0],
+                    context_ptr->get_shared_compute_threadpool(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_begin(),
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_triangulate_faces,
@@ -2761,36 +2723,18 @@ void get_connected_component_data_impl(
         throw std::invalid_argument("invalid context");
     }
 
-    const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
-
-    g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
-
-    std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
-
-    MCUT_ASSERT(event_ptr != nullptr);
-
-    // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
-    std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
-
-    event_ptr->m_future = context_ptr->enqueue([=, &context_ptr]() {
-        // asynch task will have to wait for the events in the waitlist!
-        const bool have_events_to_wait_for = event_waitlist.empty() == false;
-
-        if (have_events_to_wait_for) {
-            wait_for_events_impl(event_waitlist.size(), event_waitlist.data()); // block unti events are done
-        }
-
-        // After waiting for preceeding tasks, the device can now go on to do actual work
-
-        // asynchronously get the data and write to user provided pointer
-        get_connected_component_data_impl_detail(
-            context_ptr,
-            connCompId,
-            flags,
-            bytes,
-            pMem,
-            pNumBytes);
-    });
+    const McEvent event_handle = context_ptr->enqueue(
+        numEventsInWaitlist, pEventWaitList,
+        [=, &context_ptr]() {
+            // asynchronously get the data and write to user provided pointer
+            get_connected_component_data_impl_detail(
+                context_ptr,
+                connCompId,
+                flags,
+                bytes,
+                pMem,
+                pNumBytes);
+        });
 
     *pEvent = event_handle;
 }
@@ -2807,6 +2751,8 @@ void release_event_impl(
     if (event_ptr.use_count() == 2) // here and in "g_events"
     {
         g_events.remove_mapping(eventHandle);
+
+        MCUT_ASSERT(event_ptr.use_count() == 1);
     }
 }
 

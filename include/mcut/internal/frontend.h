@@ -47,38 +47,84 @@
 #endif
 #include "mcut/internal/kernel.h"
 
-#if 0
-// internal frontend data structure which we use to store connected component
-// data that is computed by the kernel and requested by a client via the 
-// "mcGetConnectedComponentData" function. So the "mcGetConnectedComponentData"
-// function will read from this data structure (because halfedge meshes are only 
-// used by the backend kernel for resolving the intersections). 
-struct array_mesh_t {
-    array_mesh_t() { }
-    ~array_mesh_t()
-    {
-    }
 
-    std::unique_ptr<double[]> pVertices;
-    std::unique_ptr<uint32_t[]> pSeamVertexIndices;
-    std::unique_ptr<uint32_t[]> pVertexMapIndices; // descriptor/index in original mesh (source/cut-mesh), each vertex has an entry
-    std::unique_ptr<uint32_t[]> pFaceIndices;
-    std::unique_ptr<uint32_t[]> pFaceMapIndices; // descriptor/index in original mesh (source/cut-mesh), each face has an entry
-    std::unique_ptr<uint32_t[]> pFaceSizes;
-    std::unique_ptr<uint32_t[]> pEdges;
-    std::unique_ptr<uint32_t[]> pFaceAdjFaces;
-    std::unique_ptr<uint32_t[]> pFaceAdjFacesSizes;
-    std::unique_ptr<uint32_t[]> pTriangleIndices; // same as "pFaceIndices" but guaranteed to be only triangles
 
-    uint32_t numVertices = 0;
-    uint32_t numSeamVertexIndices = 0;
-    uint32_t numFaces = 0;
-    uint32_t numFaceIndices = 0;
-    uint32_t numEdgeIndices = 0;
-    uint32_t numFaceAdjFaceIndices = 0;
-    uint32_t numTriangleIndices = 0;
-};
-#endif
+
+extern "C" void create_context_impl(
+    McContext* pContext, McFlags flags, uint32_t num_helper_threads) noexcept(false);
+
+extern "C" void debug_message_callback_impl(
+    McContext context,
+    pfn_mcDebugOutput_CALLBACK cb,
+    const void* userParam) noexcept(false);
+
+extern "C" void debug_message_control_impl(
+    McContext context,
+    McDebugSource source,
+    McDebugType type,
+    McDebugSeverity severity,
+    bool enabled) noexcept(false);
+
+extern "C" void get_info_impl(
+    const McContext context,
+    McFlags info,
+    uint64_t bytes,
+    void* pMem,
+    uint64_t* pNumBytes) noexcept(false);
+
+extern "C" void set_event_callback_impl(
+    McEvent eventHandle,
+    pfn_McEvent_CALLBACK eventCallback,
+    void* data);
+
+extern "C" void wait_for_events_impl(
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList) noexcept(false);
+
+extern "C" void dispatch_impl(
+    McContext context,
+    McFlags flags,
+    const void* pSrcMeshVertices,
+    const uint32_t* pSrcMeshFaceIndices,
+    const uint32_t* pSrcMeshFaceSizes,
+    uint32_t numSrcMeshVertices,
+    uint32_t numSrcMeshFaces,
+    const void* pCutMeshVertices,
+    const uint32_t* pCutMeshFaceIndices,
+    const uint32_t* pCutMeshFaceSizes,
+    uint32_t numCutMeshVertices,
+    uint32_t numCutMeshFaces,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false);
+
+extern "C" void get_connected_components_impl(
+    const McContext context,
+    const McConnectedComponentType connectedComponentType,
+    const uint32_t numEntries,
+    McConnectedComponent* pConnComps,
+    uint32_t* numConnComps,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false);
+
+extern "C" void get_connected_component_data_impl(
+    const McContext context,
+    const McConnectedComponent connCompId,
+    McFlags flags,
+    uint64_t bytes,
+    void* pMem,
+    uint64_t* pNumBytes) noexcept(false);
+
+extern "C" void release_connected_components_impl(
+    const McContext context,
+    uint32_t numConnComps,
+    const McConnectedComponent* pConnComps) noexcept(false);
+
+extern "C" void release_context_impl(
+    McContext context) noexcept(false);
+
+extern "C" void release_events_impl(uint32_t numEvents, const McEvent* pEvents);
 
 // base struct from which other structs represent connected components inherit
 struct connected_component_t {
@@ -177,20 +223,23 @@ struct event_t {
         pfn_McEvent_CALLBACK m_fn_ptr;
         // pointer passed to user provided callback function
         void* m_data_ptr;
-        // atomic boolean flag indicating whether the task associated with event
-        // object has completed running
-        std::atomic<bool> m_finished;
         // atomic boolean flag indicating whether the callback associated with event
         // object has been called
         std::atomic<bool> m_invoked;
     } m_callback_info;
+    // atomic boolean flag indicating whether the task associated with event
+    // object has completed running
+    std::atomic<bool> m_finished;
     McEvent m_user_handle; // handle used by client app to reference this event object
+    // the Manager thread which was assigned the task of managing the task associated with this event object.
+    uint32_t m_responsible_thread_id;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
+        , m_responsible_thread_id(UINT32_MAX)
     {
         m_callback_info.m_fn_ptr = nullptr;
         m_callback_info.m_data_ptr = nullptr;
-        m_callback_info.m_finished.store(false);
+        m_finished.store(false);
         m_callback_info.m_invoked.store(true); // so that we do not call a null pointer/needless invoke the callback in the destructor
     }
 
@@ -212,7 +261,7 @@ struct event_t {
         m_callback_info.m_data_ptr = data_ptr;
         m_callback_info.m_invoked.store(false);
 
-        if (m_callback_info.m_finished.load() == true) { // see mutex documentation
+        if (m_finished.load() == true) { // see mutex documentation
             // immediately invoke the callback
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
             m_callback_info.m_invoked.store(true);
@@ -224,7 +273,7 @@ struct event_t {
     {
         std::lock_guard<std::mutex> lock(m_callback_mutex);
 
-        m_callback_info.m_finished = true;
+        m_finished = true;
 
         if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
@@ -235,7 +284,7 @@ struct event_t {
 };
 
 // init in frontened.cpp
-extern threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
+extern threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events;
 extern std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McObject handle that will be returned to the user
 extern std::once_flag g_objects_counter_init_flag;
 
@@ -267,32 +316,34 @@ void fn_delete_cc(connected_component_t* p)
 struct context_t {
 private:
     std::atomic<bool> m_done;
-    thread_safe_queue<function_wrapper> m_queue;
-    // Master/Manager thread(s) which are responsible for running the API calls 
+    std::vector<thread_safe_queue<function_wrapper>> m_queues;
+    // Master/Manager thread(s) which are responsible for running the API calls
     // When a user of MCUT calls one of the APIs (e.g. mcEnqueueDispatch) the task
     // of actually executing everything related to that task will be handled by
-    // one Manager thread. This manager thread itself will be involved in 
+    // one Manager thread. This manager thread itself will be involved in
     // computing some/all part of the respective task (think of it as the "main"
-    // thread insofar as the API task is concerned). Some API tasks contain code 
+    // thread insofar as the API task is concerned). Some API tasks contain code
     // sections that run in parallel, which is where the Manager thread will also
-    // submit tasks to the shared compute threadpool ("m_compute_threadpool"). 
+    // submit tasks to the shared compute threadpool ("m_compute_threadpool").
     // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
-    std::vector<std::thread> m_api_threadpool; 
+    std::vector<std::thread> m_api_threadpool;
     join_threads m_joiner;
 
     // A pool of threads that is shared by manager threads to execute e.g. parallel
-    // section of MCUT API tasks (see e.g. frontend.cpp and kernel.cpp) 
+    // section of MCUT API tasks (see e.g. frontend.cpp and kernel.cpp)
     std::unique_ptr<thread_pool> m_compute_threadpool;
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags m_flags = (McFlags)0;
 
-    void manager_thread_main()
+    void api_thread_main(uint32_t thread_id)
     {
+        std::cout << "[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")" << std::endl;
+
         do {
             function_wrapper task;
 
-            m_queue.wait_and_pop(task);
+            m_queues[thread_id].wait_and_pop(task);
 
             if (m_done) {
                 break;
@@ -305,15 +356,19 @@ private:
 
 public:
     context_t(McFlags flags, uint32_t num_compute_threads)
-        : m_joiner(m_api_threadpool)
-        , m_done(false),
-        m_flags(flags)
+        : m_done(false), m_joiner(m_api_threadpool)
+        , m_flags(flags)
     {
+        std::cout << "[MCUT] Create context " << this << std::endl;
+
         try {
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
 
+            m_queues = std::vector<thread_safe_queue<function_wrapper>>(manager_thread_count);
+            
             for (uint32_t i = 0; i < manager_thread_count; ++i) {
-                m_api_threadpool.push_back(std::thread(&context_t::manager_thread_main, this, i));
+                m_queues[i].set_done_ptr(&m_done);
+                m_api_threadpool.push_back(std::thread(&context_t::api_thread_main, this, i));
             }
 
             // create the pool of compute threads. These are the worker threads that
@@ -332,29 +387,109 @@ public:
         m_done = true;
     }
 
-    std::unique_ptr<thread_pool>& get_compute_threadpool()
+    // returns the flags which determine the runtime configuration of this context
+    const McFlags& get_flags() const
     {
-        return m_compute_threadpool;
+        return this->m_flags;
+    }
+
+    thread_pool& get_shared_compute_threadpool()
+    {
+        return m_compute_threadpool.get()[0];
     }
 
     template <typename FunctionType>
-    std::future<typename std::result_of<FunctionType()>::type> enqueue(FunctionType api_fn)
+    McEvent enqueue(uint32_t numEventsInWaitlist, const McEvent* pEventWaitList, FunctionType api_fn)
     {
-        typedef typename std::result_of<FunctionType()>::type result_type;
+        // List of events the enqueued task depends on
+        //
+        // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
+        const std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
 
-        std::packaged_task<result_type()> task(std::move(f));
-        std::future<result_type> res(task.get_future());
+        //
+        // Determine which manager thread to assign the task
+        //
 
-        m_queue.push(std::move(task));
+        // the id of manager thread that will be assigned the current task
+        uint32_t responsible_thread_id = UINT32_MAX;
 
-        return res;
+        for (std::vector<McEvent>::const_iterator waitlist_iter = event_waitlist.cbegin(); waitlist_iter != event_waitlist.cend(); ++waitlist_iter) {
+            const McEvent& parent_task_event_handle = *waitlist_iter;
+
+            const std::shared_ptr<event_t> parent_task_event_ptr = g_events.value_for(parent_task_event_handle);
+
+            MCUT_ASSERT(parent_task_event_ptr != nullptr);
+
+            const bool parent_task_is_not_finished = parent_task_event_ptr->m_finished == false;
+
+            if (parent_task_is_not_finished) {
+                // id of manager thread, which was assigned the parent task
+                const uint32_t responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id;
+
+                MCUT_ASSERT(responsible_thread_id != UINT32_MAX);
+                MCUT_ASSERT(responsible_thread_id < (uint32_t)m_api_threadpool.size());
+
+                break;
+            }
+        }
+
+        const bool have_responsible_thread = responsible_thread_id != UINT32_MAX;
+
+        if (!have_responsible_thread) {
+            uint32_t thread_with_empty_queue = UINT32_MAX;
+
+            for (uint32_t i = 0; i < (uint32_t)m_api_threadpool.size(); ++i) {
+                if (m_queues[i].empty() == true) {
+                    thread_with_empty_queue = i;
+                    break;
+                }
+            }
+
+            if (thread_with_empty_queue != UINT32_MAX) {
+                responsible_thread_id = thread_with_empty_queue;
+            } else { // all threads have work to do
+                responsible_thread_id = 0; // just pick thread 0
+            }
+        }
+
+        //
+        // create the event object associated with the enqueued task
+        //
+        const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
+
+        g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
+
+        std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
+
+        MCUT_ASSERT(event_ptr != nullptr);
+
+        //
+        // Package-up the task as a synchronised operation that will wait for
+        // other tasks in the event_waitlist, compute the operation, and finally update
+        // the respective event state with the completion status.
+        //
+
+        std::packaged_task<void()> task([=, &event_ptr]() {
+            if (!event_waitlist.empty()) {
+                wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
+            }
+
+            api_fn(); // execute the API function
+
+            event_ptr->notify_task_complete(); // updated event state to indicate task completion (lock-based)
+        });
+
+        event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents
+        event_ptr->m_responsible_thread_id = responsible_thread_id;
+
+        m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible thread is free
+
+        return event_handle;
     }
 
-    
     // the current set of connected components associated with context
     threadsafe_lookup_table<McConnectedComponent, std::shared_ptr<connected_component_t>> connected_components;
 
-    
     // McFlags dispatchFlags = (McFlags)0;
 
     // client/user debugging variable
@@ -388,81 +523,5 @@ public:
 
 // list of contexts created by client/user
 extern "C" threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts;
-
-extern "C" void create_context_impl(
-    McContext* pContext, McFlags flags, uint32_t nthreads) noexcept(false);
-
-extern "C" void debug_message_callback_impl(
-    McContext context,
-    pfn_mcDebugOutput_CALLBACK cb,
-    const void* userParam) noexcept(false);
-
-extern "C" void debug_message_control_impl(
-    McContext context,
-    McDebugSource source,
-    McDebugType type,
-    McDebugSeverity severity,
-    bool enabled) noexcept(false);
-
-extern "C" void get_info_impl(
-    const McContext context,
-    McFlags info,
-    uint64_t bytes,
-    void* pMem,
-    uint64_t* pNumBytes) noexcept(false);
-
-extern "C" void set_event_callback_impl(
-    McEvent eventHandle,
-    pfn_McEvent_CALLBACK eventCallback,
-    void* data);
-
-extern "C" void wait_for_events_impl(
-    uint32_t numEventsInWaitlist,
-    const McEvent* pEventWaitList) noexcept(false);
-
-extern "C" void dispatch_impl(
-    McContext context,
-    McFlags flags,
-    const void* pSrcMeshVertices,
-    const uint32_t* pSrcMeshFaceIndices,
-    const uint32_t* pSrcMeshFaceSizes,
-    uint32_t numSrcMeshVertices,
-    uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
-    const uint32_t* pCutMeshFaceIndices,
-    const uint32_t* pCutMeshFaceSizes,
-    uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces,
-    uint32_t numEventsInWaitlist,
-    const McEvent* pEventWaitList,
-    McEvent* pEvent) noexcept(false);
-
-extern "C" void get_connected_components_impl(
-    const McContext context,
-    const McConnectedComponentType connectedComponentType,
-    const uint32_t numEntries,
-    McConnectedComponent* pConnComps,
-    uint32_t* numConnComps,
-    uint32_t numEventsInWaitlist,
-    const McEvent* pEventWaitList,
-    McEvent* pEvent) noexcept(false);
-
-extern "C" void get_connected_component_data_impl(
-    const McContext context,
-    const McConnectedComponent connCompId,
-    McFlags flags,
-    uint64_t bytes,
-    void* pMem,
-    uint64_t* pNumBytes) noexcept(false);
-
-extern "C" void release_connected_components_impl(
-    const McContext context,
-    uint32_t numConnComps,
-    const McConnectedComponent* pConnComps) noexcept(false);
-
-extern "C" void release_context_impl(
-    McContext context) noexcept(false);
-
-extern "C" void release_events_impl(uint32_t numEvents, const McEvent* pEvents);
 
 #endif // #ifndef _FRONTEND_H_

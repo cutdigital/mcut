@@ -418,9 +418,6 @@ typedef void(MCAPI_PTR* pfn_McEvent_CALLBACK)(McEvent event, void* data);
 extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(
     McContext* pContext, McFlags flags);
 
-extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextAsync(
-    McContext* pContext, McFlags flags, uint32_t nthreads);
-
 /** @brief Specify a callback to receive debugging messages from the MCUT library.
  *
  * ::mcDebugMessageCallback sets the current debug output callback function to the function whose address is
@@ -566,7 +563,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
  *   -# \p event is not a valid object
  *   -# \p eventCallback is NULL
  */
-extern MCAPI_ATTR pfn_McEvent_CALLBACK MCAPI_CALL mcSetEventCallback(
+extern MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
     McEvent event,
     pfn_McEvent_CALLBACK pfn_notify,
     void* user_data);
