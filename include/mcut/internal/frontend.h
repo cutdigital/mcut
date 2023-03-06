@@ -114,7 +114,10 @@ extern "C" void get_connected_component_data_impl(
     McFlags flags,
     uint64_t bytes,
     void* pMem,
-    uint64_t* pNumBytes) noexcept(false);
+    uint64_t* pNumBytes,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false);
 
 extern "C" void release_connected_components_impl(
     const McContext context,
@@ -130,6 +133,7 @@ extern "C" void release_events_impl(uint32_t numEvents, const McEvent* pEvents);
 struct connected_component_t {
     virtual ~connected_component_t() {};
     McConnectedComponentType type = (McConnectedComponentType)0;
+    McConnectedComponent m_user_handle = MC_NULL_HANDLE;
     // array_mesh_t indexArrayMesh;
     // hmesh_t mesh;
     std::shared_ptr<output_mesh_info_t> kernel_hmesh_data;
@@ -284,26 +288,9 @@ struct event_t {
 };
 
 // init in frontened.cpp
-extern threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events;
+extern threadsafe_list< std::shared_ptr<event_t>> g_events;
 extern std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McObject handle that will be returned to the user
 extern std::once_flag g_objects_counter_init_flag;
-
-class device_t {
-private:
-    std::unique_ptr<thread_pool> m_compute_threadpool;
-
-public:
-    device_t(uint32_t nthreads)
-        : m_compute_threadpool(std::unique_ptr<thread_pool>(new thread_pool(nthreads)))
-    {
-    }
-
-    template <typename FunctionType>
-    std::future<typename std::result_of<FunctionType()>::type> enqueue(FunctionType api_fun)
-    {
-        return m_compute_threadpool->submit(api_fun);
-    }
-};
 
 // our custome deleter function for std::unique_ptr variable of an array type
 template <typename Derived>
@@ -335,6 +322,7 @@ private:
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags m_flags = (McFlags)0;
+    
 
     void api_thread_main(uint32_t thread_id)
     {
@@ -355,9 +343,9 @@ private:
     }
 
 public:
-    context_t(McFlags flags, uint32_t num_compute_threads)
+    context_t(McContext handle, McFlags flags, uint32_t num_compute_threads)
         : m_done(false), m_joiner(m_api_threadpool)
-        , m_flags(flags)
+        , m_flags(flags),m_user_handle(handle)
     {
         std::cout << "[MCUT] Create context " << this << std::endl;
 
@@ -386,6 +374,8 @@ public:
     {
         m_done = true;
     }
+
+    McContext m_user_handle;
 
     // returns the flags which determine the runtime configuration of this context
     const McFlags& get_flags() const
@@ -416,7 +406,7 @@ public:
         for (std::vector<McEvent>::const_iterator waitlist_iter = event_waitlist.cbegin(); waitlist_iter != event_waitlist.cend(); ++waitlist_iter) {
             const McEvent& parent_task_event_handle = *waitlist_iter;
 
-            const std::shared_ptr<event_t> parent_task_event_ptr = g_events.value_for(parent_task_event_handle);
+            const std::shared_ptr<event_t> parent_task_event_ptr = g_events.find_first_if([=](std::shared_ptr<event_t> e){ return e->m_user_handle == parent_task_event_handle;});
 
             MCUT_ASSERT(parent_task_event_ptr != nullptr);
 
@@ -455,13 +445,12 @@ public:
         //
         // create the event object associated with the enqueued task
         //
-        const McEvent event_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
-        g_events.add_or_update_mapping(event_handle, std::shared_ptr<event_t>(new event_t));
-
-        std::shared_ptr<event_t> event_ptr = g_events.value_for(event_handle);
-
+        std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t);
+        g_events.push_front(event_ptr);
         MCUT_ASSERT(event_ptr != nullptr);
+
+        event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
         //
         // Package-up the task as a synchronised operation that will wait for
@@ -484,12 +473,12 @@ public:
 
         m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible thread is free
 
-        return event_handle;
+        return event_ptr->m_user_handle;
     }
 
     // the current set of connected components associated with context
-    threadsafe_lookup_table<McConnectedComponent, std::shared_ptr<connected_component_t>> connected_components;
-
+    threadsafe_list<std::shared_ptr<connected_component_t>> connected_components;
+    
     // McFlags dispatchFlags = (McFlags)0;
 
     // client/user debugging variable
@@ -522,6 +511,6 @@ public:
 };
 
 // list of contexts created by client/user
-extern "C" threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts;
+extern "C" threadsafe_list<std::shared_ptr<context_t>> g_contexts;
 
 #endif // #ifndef _FRONTEND_H_

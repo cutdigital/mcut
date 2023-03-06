@@ -246,7 +246,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
 MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
     McEvent eventHandle,
     pfn_McEvent_CALLBACK eventCallback,
-    void *data)
+    void* data)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -516,7 +516,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
         per_thread_api_log_str = "invalid event parameters";
     } else {
         try {
-            get_connected_component_data_impl(context, connCompId, queryFlags, bytes, pMem, pNumBytes);
+            get_connected_component_data_impl(context, connCompId, queryFlags, bytes, pMem, pNumBytes, numEventsInWaitlist, pEventWaitList, pEvent);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }

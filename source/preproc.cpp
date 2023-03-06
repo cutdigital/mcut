@@ -1273,7 +1273,7 @@ extern "C" void preproc(
     kernel_input.verbose = false;
     kernel_input.require_looped_cutpaths = false;
 
-    kernel_input.verbose = static_cast<bool>((context_ptr->flags & MC_DEBUG) && (context_ptr->debugType & MC_DEBUG_SOURCE_KERNEL));
+    kernel_input.verbose = static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) && (context_ptr->debugType & MC_DEBUG_SOURCE_KERNEL));
     kernel_input.require_looped_cutpaths = static_cast<bool>(dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS);
     kernel_input.populate_vertex_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
     kernel_input.populate_face_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);
@@ -1726,23 +1726,16 @@ extern "C" void preproc(
             // const std::string cs_patch_loc_str = to_string(j->first);
 
             for (std::vector<std::shared_ptr<output_mesh_info_t>>::const_iterator k = j->second.cbegin(); k != j->second.cend(); ++k) {
-
-                // std::shared_ptr<connected_component_t> frag = std::unique_ptr<fragment_cc_t, void (*)(connected_component_t*)>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>);
-                // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(frag.get());
-                // context_ptr->connected_components.emplace(clientHandle, std::move(frag));
-                // fragment_cc_t* asFragPtr = dynamic_cast<fragment_cc_t*>(context_ptr->connected_components.at(clientHandle).get());
-
-                const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
-
-                // allocate internal context object (including associated threadpool etc.)
-                context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>));
-
-                std::shared_ptr<connected_component_t> cc_ptr = context_ptr->connected_components.value_for(handle);
-
+                
+                std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>);
+                
                 MCUT_ASSERT(cc_ptr != nullptr);
+                
+                std::shared_ptr<fragment_cc_t> asFragPtr = std::dynamic_pointer_cast<fragment_cc_t>(cc_ptr);
+                
+                MCUT_ASSERT(asFragPtr != nullptr);
 
-                fragment_cc_t* asFragPtr = dynamic_cast<fragment_cc_t*>(cc_ptr.get());
-
+                asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
                 asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
                 asFragPtr->fragmentLocation = convert(i->first);
                 asFragPtr->patchLocation = convert(j->first);
@@ -1762,6 +1755,8 @@ extern "C" void preproc(
                 asFragPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
                 asFragPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
                 asFragPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
+
+                context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
             }
         }
     }
@@ -1777,18 +1772,16 @@ extern "C" void preproc(
 
         for (std::vector<std::shared_ptr<output_mesh_info_t>>::const_iterator j = i->second.cbegin(); j != i->second.cend(); ++j) { // for each mesh
 
-            // std::shared_ptr<connected_component_t> unsealedFrag = std::unique_ptr<fragment_cc_t, void (*)(connected_component_t*)>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>);
-            // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(unsealedFrag.get());
-            // context_ptr->connected_components.emplace(clientHandle, std::move(unsealedFrag));
-            const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
-
-            // allocate internal context object (including associated threadpool etc.)
-            context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>));
-
-            std::shared_ptr<connected_component_t> cc_ptr = context_ptr->connected_components.value_for(handle);
-
+            std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new fragment_cc_t, fn_delete_cc<fragment_cc_t>);
+                
             MCUT_ASSERT(cc_ptr != nullptr);
-            fragment_cc_t* asFragPtr = dynamic_cast<fragment_cc_t*>(cc_ptr.get());
+            
+            std::shared_ptr<fragment_cc_t> asFragPtr = std::dynamic_pointer_cast<fragment_cc_t>(cc_ptr);
+            
+            MCUT_ASSERT(asFragPtr != nullptr);
+            
+            asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+                
             asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
             asFragPtr->fragmentLocation = convert(i->first);
             asFragPtr->patchLocation = McPatchLocation::MC_PATCH_LOCATION_UNDEFINED;
@@ -1805,6 +1798,8 @@ extern "C" void preproc(
             asFragPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
             asFragPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
             asFragPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
+
+            context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
         }
     }
     TIMESTACK_POP();
@@ -1817,6 +1812,16 @@ extern "C" void preproc(
          it != insidePatches.cend();
          ++it) {
 
+            std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
+                
+            MCUT_ASSERT(cc_ptr != nullptr);
+            
+            std::shared_ptr<patch_cc_t> asPatchPtr = std::dynamic_pointer_cast<patch_cc_t>(cc_ptr);
+            
+            MCUT_ASSERT(asPatchPtr != nullptr);
+            
+            asPatchPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+#if 0
         // std::shared_ptr<connected_component_t> patchConnComp = std::unique_ptr<patch_cc_t, void (*)(connected_component_t*)>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(patchConnComp.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(patchConnComp));
@@ -1829,6 +1834,7 @@ extern "C" void preproc(
 
         MCUT_ASSERT(cc_ptr != nullptr);
         patch_cc_t* asPatchPtr = dynamic_cast<patch_cc_t*>(cc_ptr.get());
+#endif
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_INSIDE;
 
@@ -1843,6 +1849,8 @@ extern "C" void preproc(
         asPatchPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
         asPatchPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asPatchPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
+
+        context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
     }
     TIMESTACK_POP();
 
@@ -1851,7 +1859,16 @@ extern "C" void preproc(
     const std::vector<std::shared_ptr<output_mesh_info_t>>& outsidePatches = kernel_output.outside_patches[cm_patch_winding_order_t::DEFAULT];
 
     for (std::vector<std::shared_ptr<output_mesh_info_t>>::const_iterator it = outsidePatches.cbegin(); it != outsidePatches.cend(); ++it) {
-
+            std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
+                
+            MCUT_ASSERT(cc_ptr != nullptr);
+            
+            std::shared_ptr<patch_cc_t> asPatchPtr = std::dynamic_pointer_cast<patch_cc_t>(cc_ptr);
+            
+            MCUT_ASSERT(asPatchPtr != nullptr);
+            
+            asPatchPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+#if 0
         /// std::shared_ptr<connected_component_t> patchConnComp = std::unique_ptr<patch_cc_t, void (*)(connected_component_t*)>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(patchConnComp.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(patchConnComp));
@@ -1864,6 +1881,7 @@ extern "C" void preproc(
 
         MCUT_ASSERT(cc_ptr != nullptr);
         patch_cc_t* asPatchPtr = dynamic_cast<patch_cc_t*>(cc_ptr.get());
+#endif
         asPatchPtr->type = MC_CONNECTED_COMPONENT_TYPE_PATCH;
         asPatchPtr->patchLocation = MC_PATCH_LOCATION_OUTSIDE;
         asPatchPtr->kernel_hmesh_data = (*it);
@@ -1877,6 +1895,8 @@ extern "C" void preproc(
         asPatchPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
         asPatchPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asPatchPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
+
+        context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
     }
     TIMESTACK_POP();
 
@@ -1889,6 +1909,17 @@ extern "C" void preproc(
 
     if (kernel_output.seamed_src_mesh != nullptr && kernel_output.seamed_src_mesh->mesh->number_of_faces() > 0) {
         TIMESTACK_PUSH("store source-mesh seam");
+        
+        std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
+            
+        MCUT_ASSERT(cc_ptr != nullptr);
+        
+        std::shared_ptr<seam_cc_t> asSrcMeshSeamPtr = std::dynamic_pointer_cast<seam_cc_t>(cc_ptr);
+        
+        MCUT_ASSERT(asSrcMeshSeamPtr != nullptr);
+        
+        asSrcMeshSeamPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+#if 0
         // std::shared_ptr<connected_component_t> srcMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(srcMeshSeam.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(srcMeshSeam));
@@ -1901,6 +1932,8 @@ extern "C" void preproc(
 
         MCUT_ASSERT(cc_ptr != nullptr);
         seam_cc_t* asSrcMeshSeamPtr = dynamic_cast<seam_cc_t*>(cc_ptr.get());
+#endif
+
         asSrcMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asSrcMeshSeamPtr->origin = MC_SEAM_ORIGIN_SRCMESH;
 
@@ -1916,6 +1949,8 @@ extern "C" void preproc(
         asSrcMeshSeamPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asSrcMeshSeamPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
+        context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
         TIMESTACK_POP();
     }
 
@@ -1923,7 +1958,17 @@ extern "C" void preproc(
 
     if (kernel_output.seamed_cut_mesh != nullptr && kernel_output.seamed_cut_mesh->mesh->number_of_faces() > 0) {
         TIMESTACK_PUSH("store cut-mesh seam");
-
+        
+        std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
+            
+        MCUT_ASSERT(cc_ptr != nullptr);
+        
+        std::shared_ptr<seam_cc_t> asCutMeshSeamPtr = std::dynamic_pointer_cast<seam_cc_t>(cc_ptr);
+        
+        MCUT_ASSERT(asCutMeshSeamPtr != nullptr);
+        
+        asCutMeshSeamPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+#if 0
         // std::shared_ptr<connected_component_t> cutMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(cutMeshSeam.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(cutMeshSeam));
@@ -1935,6 +1980,7 @@ extern "C" void preproc(
 
         MCUT_ASSERT(cc_ptr != nullptr);
         seam_cc_t* asCutMeshSeamPtr = dynamic_cast<seam_cc_t*>(cc_ptr.get());
+#endif
         asCutMeshSeamPtr->type = MC_CONNECTED_COMPONENT_TYPE_SEAM;
         asCutMeshSeamPtr->origin = MC_SEAM_ORIGIN_CUTMESH;
 
@@ -1950,6 +1996,8 @@ extern "C" void preproc(
         asCutMeshSeamPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asCutMeshSeamPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
+        context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
         TIMESTACK_POP();
     }
 
@@ -1959,6 +2007,17 @@ extern "C" void preproc(
     // internal cut-mesh (possibly with new faces and vertices)
     {
         TIMESTACK_PUSH("store original cut-mesh");
+
+        std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new input_cc_t, fn_delete_cc<input_cc_t>);
+            
+        MCUT_ASSERT(cc_ptr != nullptr);
+        
+        std::shared_ptr<input_cc_t> asCutMeshInputPtr = std::dynamic_pointer_cast<input_cc_t>(cc_ptr);
+        
+        MCUT_ASSERT(asCutMeshInputPtr != nullptr);
+        
+        asCutMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+#if 0
         // std::shared_ptr<connected_component_t> internalCutMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalCutMesh.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(internalCutMesh));
@@ -1970,6 +2029,7 @@ extern "C" void preproc(
 
         MCUT_ASSERT(cc_ptr != nullptr);
         input_cc_t* asCutMeshInputPtr = dynamic_cast<input_cc_t*>(cc_ptr.get());
+#endif
         asCutMeshInputPtr->type = MC_CONNECTED_COMPONENT_TYPE_INPUT;
         asCutMeshInputPtr->origin = MC_INPUT_ORIGIN_CUTMESH;
 
@@ -1999,6 +2059,7 @@ extern "C" void preproc(
                 omi->data_maps.vertex_map[*i] = vd_t((*i) + source_hmesh->number_of_vertices()); // apply offset like kernel does
             }
 #endif
+            
         }
 
         if (kernel_input.populate_face_maps) {
@@ -2036,12 +2097,25 @@ extern "C" void preproc(
         asCutMeshInputPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asCutMeshInputPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
 
+        context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
         TIMESTACK_POP();
     }
 
     // internal source-mesh (possibly with new faces and vertices)
     {
         TIMESTACK_PUSH("store original src-mesh");
+
+        std::shared_ptr<connected_component_t> cc_ptr = std::shared_ptr<connected_component_t>(new input_cc_t, fn_delete_cc<input_cc_t>);
+            
+        MCUT_ASSERT(cc_ptr != nullptr);
+        
+        std::shared_ptr<input_cc_t> asSrcMeshInputPtr = std::dynamic_pointer_cast<input_cc_t>(cc_ptr);
+        
+        MCUT_ASSERT(asSrcMeshInputPtr != nullptr);
+        
+        asSrcMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+#if 0
         // std::shared_ptr<connected_component_t> internalSrcMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalSrcMesh.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(internalSrcMesh));
@@ -2053,6 +2127,7 @@ extern "C" void preproc(
 
         MCUT_ASSERT(cc_ptr != nullptr);
         input_cc_t* asSrcMeshInputPtr = dynamic_cast<input_cc_t*>(cc_ptr.get());
+#endif
         asSrcMeshInputPtr->type = MC_CONNECTED_COMPONENT_TYPE_INPUT;
         asSrcMeshInputPtr->origin = MC_INPUT_ORIGIN_SRCMESH;
 
@@ -2114,6 +2189,8 @@ extern "C" void preproc(
         asSrcMeshInputPtr->client_sourcemesh_vertex_count = numSrcMeshVertices;
         asSrcMeshInputPtr->internal_sourcemesh_face_count = source_hmesh->number_of_faces();
         asSrcMeshInputPtr->client_sourcemesh_face_count = numSrcMeshFaces; // or source_hmesh_face_count
+
+        context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
         TIMESTACK_POP();
     }

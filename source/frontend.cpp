@@ -22,8 +22,8 @@
 std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr<mini_timer>>();
 #endif
 
-threadsafe_lookup_table<McContext, std::shared_ptr<context_t>> g_contexts = {};
-threadsafe_lookup_table<McEvent, std::shared_ptr<event_t>> g_events = {};
+threadsafe_list<std::shared_ptr<context_t>> g_contexts = {};
+threadsafe_list<std::shared_ptr<event_t>> g_events = {};
 std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McContext handle that will be returned to the user
 std::once_flag g_objects_counter_init_flag; // flag used to initialise "g_objects_counter" with "std::call_once"
 
@@ -34,14 +34,7 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
     std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0); });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
-
-    // allocate internal context object (including associated threadpool etc.)
-    // we pass the number of threads as "nthreads-1" because of the existance of
-    // manager threads, which are like the "main" thread in each API task.
-    g_contexts.add_or_update_mapping(handle, std::shared_ptr<context_t>(new context_t(flags, helperThreadCount)));
-
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(handle);
-    MCUT_ASSERT(context_ptr != nullptr);
+    g_contexts.push_front(std::shared_ptr<context_t>(new context_t(handle, flags, helperThreadCount)));
 
     *pOutContext = handle;
 }
@@ -54,7 +47,7 @@ void debug_message_callback_impl(
     MCUT_ASSERT(contextHandle != nullptr);
     MCUT_ASSERT(cb != nullptr);
 
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
 
@@ -125,7 +118,7 @@ void debug_message_control_impl(
 
     // const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
 
@@ -178,19 +171,14 @@ void get_info_impl(
     void* pMem,
     uint64_t* pNumBytes)
 {
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
-
-    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     if (context_ptr == nullptr) {
-        // "contextHandle" may not be NULL but that does not mean it maps to
-        // a valid object in "g_contexts"
         throw std::invalid_argument("invalid context");
     }
 
     switch (info) {
-    case MC_CONTEXT_FLAGS:
-    {
+    case MC_CONTEXT_FLAGS: {
         McFlags flags = context_ptr->get_flags();
         if (pMem == nullptr) {
             *pNumBytes = sizeof(McFlags);
@@ -215,7 +203,7 @@ void wait_for_events_impl(
     for (uint32_t i = 0; i < numEventsInWaitlist; ++i) {
         McEvent eventHandle = pEventWaitList[i];
 
-        std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+        std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
 
         if (event_ptr == nullptr) {
             // "contextHandle" may not be NULL but that does not mean it maps to
@@ -232,7 +220,7 @@ void set_event_callback_impl(
     pfn_McEvent_CALLBACK eventCallback,
     void* data)
 {
-    std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+    std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
 
     if (event_ptr == nullptr) {
         // "contextHandle" may not be NULL but that does not mean it maps to
@@ -260,7 +248,7 @@ void dispatch_impl(
     const McEvent* pEventWaitList,
     McEvent* pEvent)
 {
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
@@ -301,7 +289,7 @@ void get_connected_components_impl(
     const McEvent* pEventWaitList,
     McEvent* pEvent)
 {
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
@@ -317,14 +305,8 @@ void get_connected_components_impl(
             uint32_t valid_cc_counter = 0;
 
 #if 1
-            std::vector<McConnectedComponent> cc_vec = context_ptr->connected_components.get_lookup_keys();
-
-            for (std::vector<McConnectedComponent>::const_iterator it = cc_vec.cbegin(); it != cc_vec.cend(); ++it) {
-                const McConnectedComponent cc_handle = *it;
-                const std::shared_ptr<connected_component_t> cc_ptr = context_ptr->connected_components.value_for(cc_handle);
-
-                if (cc_ptr != nullptr) // i.e. the handle was not deleted somewhere in time between "get_lookup_keys()" and now
-                {
+            context_ptr->connected_components.for_each([&](const std::shared_ptr<connected_component_t>& cc_ptr) {
+                if (valid_cc_counter != numEntries) {
                     const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
 
                     if (is_valid) {
@@ -333,15 +315,12 @@ void get_connected_components_impl(
                             (*numConnComps)++;
                         } else // populate pConnComps
                         {
-                            pConnComps[valid_cc_counter] = cc_handle;
+                            pConnComps[valid_cc_counter] = cc_ptr->m_user_handle;
                             valid_cc_counter += 1;
-                            if (valid_cc_counter == numEntries) {
-                                break;
-                            }
                         }
                     }
                 }
-            }
+            });
 #else
             for (std::map<McConnectedComponent, std::shared_ptr<connected_component_t>>::const_iterator i = context_uptr->connected_components.cbegin();
                  i != context_uptr->connected_components.cend();
@@ -1224,7 +1203,7 @@ void get_connected_component_data_impl_detail(
     std::shared_ptr<connected_component_t>& cc_uptr = cc_entry_iter->second;
 #endif
 
-    std::shared_ptr<connected_component_t> cc_uptr = context_ptr->connected_components.value_for(connCompId);
+    std::shared_ptr<connected_component_t> cc_uptr = context_ptr->connected_components.find_first_if([=](const std::shared_ptr<connected_component_t> ccptr) { return ccptr->m_user_handle == connCompId; });
 
     switch (flags) {
 
@@ -2717,7 +2696,7 @@ void get_connected_component_data_impl(
     const McEvent* pEventWaitList,
     McEvent* pEvent)
 {
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
@@ -2742,7 +2721,7 @@ void get_connected_component_data_impl(
 void release_event_impl(
     McEvent eventHandle)
 {
-    std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
+    std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
 
     if (event_ptr == nullptr) {
         throw std::invalid_argument("invalid event handle");
@@ -2750,38 +2729,17 @@ void release_event_impl(
 
     if (event_ptr.use_count() == 2) // here and in "g_events"
     {
-        g_events.remove_mapping(eventHandle);
+        g_events.remove_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
 
-        MCUT_ASSERT(event_ptr.use_count() == 1);
+        MCUT_ASSERT(event_ptr.unique());
     }
 }
 
 void release_events_impl(uint32_t numEvents, const McEvent* pEvents)
 {
-    std::vector<McEvent> e_vec = g_events.get_lookup_keys();
-
-    if (numEvents > (uint32_t)e_vec.size()) {
-        throw std::invalid_argument("invalid event count");
-    }
-
     for (uint32_t i = 0; i < numEvents; ++i) {
         McEvent eventHandle = pEvents[i];
-        std::vector<McEvent>::const_iterator it = std::find_if(e_vec.cbegin(), e_vec.cend(), eventHandle);
-
-        if (it == e_vec.cend()) {
-            throw std::invalid_argument("invalid event handle");
-        }
-
-        std::shared_ptr<event_t> event_ptr = g_events.value_for(eventHandle);
-
-        if (event_ptr == nullptr) {
-            throw std::invalid_argument("invalid event handle");
-        }
-
-        if (event_ptr.use_count() == 2) // here and in "g_events"
-        {
-            g_events.remove_mapping(eventHandle);
-        }
+        g_events.remove_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
     }
 }
 
@@ -2790,43 +2748,28 @@ void release_connected_components_impl(
     uint32_t numConnComps,
     const McConnectedComponent* pConnComps)
 {
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context");
     }
 
-    std::vector<McConnectedComponent> cc_vec = context_ptr->connected_components.get_lookup_keys();
-
-    if (numConnComps > (uint32_t)cc_vec.size()) {
-        throw std::invalid_argument("invalid connected component count");
-    }
-
     bool freeAll = numConnComps == 0 && pConnComps == NULL;
 
-    if (!cc_vec.empty()) {
-        if (freeAll) {
-            std::vector<McConnectedComponent>::const_iterator it;
-            do {
-                it = cc_vec.cbegin();
-                McConnectedComponent cc_handle = *it;
-                context_ptr->connected_components.remove_mapping(cc_handle); // delete cc
-                it = cc_vec.erase(it);
-            } while (it != cc_vec.cend());
+    if (freeAll) {
+        context_ptr->connected_components.remove_if([](const std::shared_ptr<connected_component_t> ccptr) { ccptr;return true; });
+    } else {
+        for (int i = 0; i < (int)numConnComps; ++i) {
+            McConnectedComponent connCompId = pConnComps[i];
 
-        } else {
-            for (int i = 0; i < (int)numConnComps; ++i) {
-                McConnectedComponent connCompId = pConnComps[i];
+            // report error if cc is not valid
+            std::shared_ptr<connected_component_t> cc_ptr = context_ptr->connected_components.find_first_if([=](const std::shared_ptr<connected_component_t> ccptr) { return ccptr->m_user_handle == connCompId; });
 
-                std::vector<McConnectedComponent>::const_iterator it = std::find_if(cc_vec.cbegin(), cc_vec.cend(), connCompId);
-
-                if (it == cc_vec.cend()) {
-                    throw std::invalid_argument("invalid connected component handle");
-                }
-
-                // remove if "connCompId" still exists between "get_lookup_keys" and now
-                context_ptr->connected_components.remove_mapping(connCompId);
+            if (cc_ptr == nullptr) {
+                throw std::invalid_argument("invalid connected component handle");
             }
+
+            context_ptr->connected_components.remove_if([=](const std::shared_ptr<connected_component_t> ccptr) { return ccptr->m_user_handle == connCompId; });
         }
     }
 }
@@ -2834,11 +2777,11 @@ void release_connected_components_impl(
 void release_context_impl(
     McContext contextHandle)
 {
-    std::shared_ptr<context_t> context_ptr = g_contexts.value_for(contextHandle);
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
     if (context_ptr == nullptr) {
         throw std::invalid_argument("invalid context handle");
     }
 
-    g_contexts.remove_mapping(contextHandle);
+    g_contexts.remove_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 }
