@@ -1238,7 +1238,7 @@ void resolve_floating_polygons(
 }
 
 extern "C" void preproc(
-    std::shared_ptr<context_t>& context_ptr,
+    std::shared_ptr<context_t> context_ptr,
     McFlags dispatchFlags,
     const void* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,

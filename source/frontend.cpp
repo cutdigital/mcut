@@ -31,7 +31,7 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
 {
     MCUT_ASSERT(pOutContext != nullptr);
 
-    std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0); });
+    std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xdeadbeef); /*any non-ero value*/ });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
     g_contexts.push_front(std::shared_ptr<context_t>(new context_t(handle, flags, helperThreadCount)));
@@ -258,7 +258,7 @@ void dispatch_impl(
     // object that will be waited on as an event
     const McEvent event_handle = context_ptr->enqueue(
         numEventsInWaitlist, pEventWaitList,
-        [=, &context_ptr]() {
+        [=]() {
             preproc(
                 context_ptr,
                 dispatchFlags,
@@ -297,7 +297,7 @@ void get_connected_components_impl(
 
     const McEvent event_handle = context_ptr->enqueue(
         numEventsInWaitlist, pEventWaitList,
-        [=, &context_ptr]() {
+        [=]() {
             if (numConnComps != nullptr) {
                 (*numConnComps) = 0; // reset
             }
@@ -305,19 +305,21 @@ void get_connected_components_impl(
             uint32_t valid_cc_counter = 0;
 
 #if 1
-            context_ptr->connected_components.for_each([&](const std::shared_ptr<connected_component_t>& cc_ptr) {
-                if (valid_cc_counter != numEntries) {
-                    const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
+            context_ptr->connected_components.for_each([&](const std::shared_ptr<connected_component_t> cc_ptr) {
+                const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
 
-                    if (is_valid) {
-                        if (pConnComps == nullptr) // query number
+                if (is_valid) {
+                    if (pConnComps == nullptr) // query number
+                    {
+                        (*numConnComps)++;
+                    } else // populate pConnComps
+                    {
+                        if(valid_cc_counter == numEntries)
                         {
-                            (*numConnComps)++;
-                        } else // populate pConnComps
-                        {
-                            pConnComps[valid_cc_counter] = cc_ptr->m_user_handle;
-                            valid_cc_counter += 1;
+                            return;
                         }
+                        pConnComps[valid_cc_counter] = cc_ptr->m_user_handle;
+                        valid_cc_counter += 1;
                     }
                 }
             });
@@ -2704,7 +2706,7 @@ void get_connected_component_data_impl(
 
     const McEvent event_handle = context_ptr->enqueue(
         numEventsInWaitlist, pEventWaitList,
-        [=, &context_ptr]() {
+        [=]() {
             // asynchronously get the data and write to user provided pointer
             get_connected_component_data_impl_detail(
                 context_ptr,

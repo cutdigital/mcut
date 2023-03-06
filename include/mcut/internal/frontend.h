@@ -447,8 +447,10 @@ public:
         //
 
         std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t);
-        g_events.push_front(event_ptr);
         MCUT_ASSERT(event_ptr != nullptr);
+        
+        g_events.push_front(event_ptr);
+        
 
         event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
@@ -458,7 +460,7 @@ public:
         // the respective event state with the completion status.
         //
 
-        std::packaged_task<void()> task([=, &event_ptr]() {
+        std::packaged_task<void()> task([=]() {
             if (!event_waitlist.empty()) {
                 wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
             }
