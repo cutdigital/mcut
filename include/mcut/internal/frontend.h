@@ -241,6 +241,8 @@ struct event_t {
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
     {
+        std::cout << "[MCUT] Create event " << this << std::endl;
+
         m_callback_info.m_fn_ptr = nullptr;
         m_callback_info.m_data_ptr = nullptr;
         m_finished.store(false);
@@ -249,10 +251,13 @@ struct event_t {
 
     ~event_t()
     {
+        
+
         if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
+        std::cout << "[MCUT] Destroy event " << this << "(" << m_user_handle << ")" << std::endl;
     }
 
     // thread-safe function to set the callback function for an event object
@@ -296,7 +301,9 @@ extern std::once_flag g_objects_counter_init_flag;
 template <typename Derived>
 void fn_delete_cc(connected_component_t* p)
 {
+    
     delete static_cast<Derived*>(p);
+    std::cout << "[MCUT] Destroy connected component " << p->m_user_handle << std::endl;
 }
 
 // struct defining the state of a context object
@@ -313,7 +320,7 @@ private:
     // sections that run in parallel, which is where the Manager thread will also
     // submit tasks to the shared compute threadpool ("m_compute_threadpool").
     // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
-    std::vector<std::thread> m_api_threadpool;
+    std::vector<std::thread> m_api_threads;
     join_threads m_joiner;
 
     // A pool of threads that is shared by manager threads to execute e.g. parallel
@@ -340,14 +347,16 @@ private:
             task();
 
         } while (true);
+
+        std::cout << "[MCUT] Shutdown API thread " << std::this_thread::get_id() << " (" << thread_id << ")" << std::endl;
     }
 
 public:
     context_t(McContext handle, McFlags flags, uint32_t num_compute_threads)
-        : m_done(false), m_joiner(m_api_threadpool)
+        : m_done(false), m_joiner(m_api_threads)
         , m_flags(flags),m_user_handle(handle)
     {
-        std::cout << "[MCUT] Create context " << this << std::endl;
+        std::cout << "[MCUT] Create context " << m_user_handle << std::endl;
 
         try {
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
@@ -356,7 +365,7 @@ public:
             
             for (uint32_t i = 0; i < manager_thread_count; ++i) {
                 m_queues[i].set_done_ptr(&m_done);
-                m_api_threadpool.push_back(std::thread(&context_t::api_thread_main, this, i));
+                m_api_threads.push_back(std::thread(&context_t::api_thread_main, this, i));
             }
 
             // create the pool of compute threads. These are the worker threads that
@@ -372,7 +381,12 @@ public:
 
     ~context_t()
     {
+        
         m_done = true;
+        for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
+            m_queues[i].disrupt_wait_for_data();
+        }
+        std::cout << "[MCUT] Destory context " << m_user_handle << std::endl;
     }
 
     McContext m_user_handle;
@@ -417,7 +431,7 @@ public:
                 const uint32_t responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id;
 
                 MCUT_ASSERT(responsible_thread_id != UINT32_MAX);
-                MCUT_ASSERT(responsible_thread_id < (uint32_t)m_api_threadpool.size());
+                MCUT_ASSERT(responsible_thread_id < (uint32_t)m_api_threads.size());
 
                 break;
             }
@@ -428,7 +442,7 @@ public:
         if (!have_responsible_thread) {
             uint32_t thread_with_empty_queue = UINT32_MAX;
 
-            for (uint32_t i = 0; i < (uint32_t)m_api_threadpool.size(); ++i) {
+            for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
                 if (m_queues[i].empty() == true) {
                     thread_with_empty_queue = i;
                     break;
@@ -459,15 +473,25 @@ public:
         // other tasks in the event_waitlist, compute the operation, and finally update
         // the respective event state with the completion status.
         //
+        
+        std::weak_ptr<event_t> event_weak_ptr(event_ptr);
 
-        std::packaged_task<void()> task([=]() {
+        std::packaged_task<void()> task(
+            [=]() {
             if (!event_waitlist.empty()) {
                 wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
             }
 
             api_fn(); // execute the API function
 
-            event_ptr->notify_task_complete(); // updated event state to indicate task completion (lock-based)
+            MCUT_ASSERT(event_weak_ptr.expired() == false);
+
+            std::shared_ptr<event_t> event = event_weak_ptr.lock();
+
+            if(event) // not null
+            {
+                event->notify_task_complete(); // updated event state to indicate task completion (lock-based)
+            }
         });
 
         event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents

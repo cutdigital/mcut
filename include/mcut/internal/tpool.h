@@ -243,6 +243,8 @@ class thread_pool {
             task(); // run the task
 
         } while (true);
+
+        std::cout << "[MCUT] Shutdown helper thread " << std::this_thread::get_id() << " (" << thread_id << ")" << std::endl;
     }
 
     uint32_t machine_thread_count;
@@ -254,7 +256,7 @@ public:
         joiner(threads)
         , machine_thread_count(0)
     {
-        std::cout << "[MCUT] Helper threadpool " << this << std::endl;
+        std::cout << "[MCUT] Create threadpool " << this << std::endl;
         machine_thread_count = (uint32_t)std::thread::hardware_concurrency();
         uint32_t const pool_thread_count = std::min(nthreads, machine_thread_count - 1);
 
@@ -275,6 +277,7 @@ public:
 
     ~thread_pool()
     {
+        std::cout << "[MCUT] Destroy threadpool " << this << std::endl;
         m_done.store(true);
         wakeup_and_shutdown();
     }
@@ -871,7 +874,7 @@ public:
     threadsafe_list(threadsafe_list const& other)=delete;
     threadsafe_list& operator=(threadsafe_list const& other)=delete;
     
-    void push_front(T const& value)
+    void push_front(T /*const&*/ value)
     {
         std::unique_ptr<node> new_node(new node(value));
         std::lock_guard<std::mutex> lk(head.m);

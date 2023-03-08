@@ -31,11 +31,11 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
 {
     MCUT_ASSERT(pOutContext != nullptr);
 
-    std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xdeadbeef); /*any non-ero value*/ });
+    std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xDECAF); /*any non-ero value*/ });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
     g_contexts.push_front(std::shared_ptr<context_t>(new context_t(handle, flags, helperThreadCount)));
-
+    
     *pOutContext = handle;
 }
 
@@ -254,24 +254,29 @@ void dispatch_impl(
         throw std::invalid_argument("invalid context");
     }
 
+    std::weak_ptr<context_t> context_weak_ptr(context_ptr);
+
     // submit the dispatch call to be executed asynchronously and return the future
     // object that will be waited on as an event
     const McEvent event_handle = context_ptr->enqueue(
         numEventsInWaitlist, pEventWaitList,
         [=]() {
-            preproc(
-                context_ptr,
-                dispatchFlags,
-                pSrcMeshVertices,
-                pSrcMeshFaceIndices,
-                pSrcMeshFaceSizes,
-                numSrcMeshVertices,
-                numSrcMeshFaces,
-                pCutMeshVertices,
-                pCutMeshFaceIndices,
-                pCutMeshFaceSizes,
-                numCutMeshVertices,
-                numCutMeshFaces);
+            std::shared_ptr<context_t> context = context_weak_ptr.lock();
+            if (context) {
+                preproc(
+                    context,
+                    dispatchFlags,
+                    pSrcMeshVertices,
+                    pSrcMeshFaceIndices,
+                    pSrcMeshFaceSizes,
+                    numSrcMeshVertices,
+                    numSrcMeshFaces,
+                    pCutMeshVertices,
+                    pCutMeshFaceIndices,
+                    pCutMeshFaceSizes,
+                    numCutMeshVertices,
+                    numCutMeshFaces);
+            }
         });
 
     MCUT_ASSERT(pEvent != nullptr);
@@ -295,56 +300,38 @@ void get_connected_components_impl(
         throw std::invalid_argument("invalid context");
     }
 
+    std::weak_ptr<context_t> context_weak_ptr(context_ptr);
+
     const McEvent event_handle = context_ptr->enqueue(
         numEventsInWaitlist, pEventWaitList,
         [=]() {
-            if (numConnComps != nullptr) {
-                (*numConnComps) = 0; // reset
-            }
+            std::shared_ptr<context_t> context = context_weak_ptr.lock();
 
-            uint32_t valid_cc_counter = 0;
+            if (context) {
+                if (numConnComps != nullptr) {
+                    (*numConnComps) = 0; // reset
+                }
 
-#if 1
-            context_ptr->connected_components.for_each([&](const std::shared_ptr<connected_component_t> cc_ptr) {
-                const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
+                uint32_t valid_cc_counter = 0;
 
-                if (is_valid) {
-                    if (pConnComps == nullptr) // query number
-                    {
-                        (*numConnComps)++;
-                    } else // populate pConnComps
-                    {
-                        if(valid_cc_counter == numEntries)
+                context->connected_components.for_each([&](const std::shared_ptr<connected_component_t> cc_ptr) {
+                    const bool is_valid = (cc_ptr->type & connectedComponentType) != 0;
+
+                    if (is_valid) {
+                        if (pConnComps == nullptr) // query number
                         {
-                            return;
-                        }
-                        pConnComps[valid_cc_counter] = cc_ptr->m_user_handle;
-                        valid_cc_counter += 1;
-                    }
-                }
-            });
-#else
-            for (std::map<McConnectedComponent, std::shared_ptr<connected_component_t>>::const_iterator i = context_uptr->connected_components.cbegin();
-                 i != context_uptr->connected_components.cend();
-                 ++i) {
-
-                const bool is_valid = (i->second->type & connectedComponentType) != 0;
-
-                if (is_valid) {
-                    if (pConnComps == nullptr) // query number
-                    {
-                        (*numConnComps)++;
-                    } else // populate pConnComps
-                    {
-                        pConnComps[valid_cc_counter] = i->first;
-                        valid_cc_counter += 1;
-                        if (valid_cc_counter == numEntries) {
-                            break;
+                            (*numConnComps)++;
+                        } else // populate pConnComps
+                        {
+                            if (valid_cc_counter == numEntries) {
+                                return;
+                            }
+                            pConnComps[valid_cc_counter] = cc_ptr->m_user_handle;
+                            valid_cc_counter += 1;
                         }
                     }
-                }
+                });
             }
-#endif
         });
 
     *pEvent = event_handle;
@@ -1206,7 +1193,9 @@ void get_connected_component_data_impl_detail(
 #endif
 
     std::shared_ptr<connected_component_t> cc_uptr = context_ptr->connected_components.find_first_if([=](const std::shared_ptr<connected_component_t> ccptr) { return ccptr->m_user_handle == connCompId; });
-
+    if (!cc_uptr) {
+        throw std::invalid_argument("invalid connected component");
+    }
     switch (flags) {
 
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT: {
@@ -2704,17 +2693,22 @@ void get_connected_component_data_impl(
         throw std::invalid_argument("invalid context");
     }
 
+    std::weak_ptr<context_t> context_weak_ptr(context_ptr);
+
     const McEvent event_handle = context_ptr->enqueue(
         numEventsInWaitlist, pEventWaitList,
         [=]() {
-            // asynchronously get the data and write to user provided pointer
-            get_connected_component_data_impl_detail(
-                context_ptr,
-                connCompId,
-                flags,
-                bytes,
-                pMem,
-                pNumBytes);
+            std::shared_ptr<context_t> context = context_weak_ptr.lock();
+            if (context) {
+                // asynchronously get the data and write to user provided pointer
+                get_connected_component_data_impl_detail(
+                    context_ptr,
+                    connCompId,
+                    flags,
+                    bytes,
+                    pMem,
+                    pNumBytes);
+            }
         });
 
     *pEvent = event_handle;
@@ -2729,11 +2723,8 @@ void release_event_impl(
         throw std::invalid_argument("invalid event handle");
     }
 
-    if (event_ptr.use_count() == 2) // here and in "g_events"
     {
         g_events.remove_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
-
-        MCUT_ASSERT(event_ptr.unique());
     }
 }
 
@@ -2741,7 +2732,7 @@ void release_events_impl(uint32_t numEvents, const McEvent* pEvents)
 {
     for (uint32_t i = 0; i < numEvents; ++i) {
         McEvent eventHandle = pEvents[i];
-        g_events.remove_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
+        release_event_impl(eventHandle);
     }
 }
 
@@ -2759,7 +2750,7 @@ void release_connected_components_impl(
     bool freeAll = numConnComps == 0 && pConnComps == NULL;
 
     if (freeAll) {
-        context_ptr->connected_components.remove_if([](const std::shared_ptr<connected_component_t> ccptr) { ccptr;return true; });
+        context_ptr->connected_components.remove_if([](const std::shared_ptr<connected_component_t>) { return true; });
     } else {
         for (int i = 0; i < (int)numConnComps; ++i) {
             McConnectedComponent connCompId = pConnComps[i];
