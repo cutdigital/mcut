@@ -362,7 +362,8 @@ typedef enum McDispatchFlags {
  */
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
-    MC_DONT_CARE = 1 << 1 /**< wildcard.*/
+    MC_DONT_CARE = 1 << 1, /**< wildcard.*/
+    MC_EVENT_STATUS = 1<<2
 } McQueryFlags;
 
 /**

@@ -22,6 +22,8 @@
 std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr<mini_timer>>();
 #endif
 
+thread_local std::string per_thread_api_log_str;
+
 threadsafe_list<std::shared_ptr<context_t>> g_contexts = {};
 threadsafe_list<std::shared_ptr<event_t>> g_events = {};
 std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McContext handle that will be returned to the user
@@ -195,6 +197,38 @@ void get_info_impl(
         break;
     }
 }
+
+void get_event_info_impl(
+    const McEvent event,
+    McFlags info,
+    uint64_t bytes,
+    void* pMem,
+    uint64_t* pNumBytes) 
+    {
+        std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> ptr) { return ptr->m_user_handle == event; });
+
+    if (event_ptr == nullptr) {
+        throw std::invalid_argument("invalid event");
+    }
+
+    switch (info) {
+    case MC_EVENT_STATUS: {
+        McResult status = event_ptr->m_execution_status;
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McResult);
+        } else {
+            if (bytes < sizeof(McResult)) {
+                throw std::invalid_argument("invalid bytes");
+            }
+            memcpy(pMem, reinterpret_cast<void*>(&status), bytes);
+        }
+        break;
+    }
+    default:
+        throw std::invalid_argument("unknown info parameter");
+        break;
+    }
+    }
 
 void wait_for_events_impl(
     uint32_t numEventsInWaitlist,

@@ -47,8 +47,35 @@
 #endif
 #include "mcut/internal/kernel.h"
 
+/*
+std::invalid_argument: related to the input parameters
+std::runtime_error: system runtime error e.g. out of memory
+std::logic_error: a bug caught through an assertion failure
+std::exception: unknown error source e.g. probably another bug
+*/
+#define CATCH_POSSIBLE_EXCEPTIONS(logstr)              \
+    catch (std::invalid_argument & e0)                 \
+    {                                                  \
+        logstr = e0.what();                            \
+        return_value = McResult::MC_INVALID_VALUE;     \
+    }                                                  \
+    catch (std::runtime_error & e1)                    \
+    {                                                  \
+        logstr = e1.what();                            \
+        return_value = McResult::MC_INVALID_OPERATION; \
+    }                                                  \
+    catch (std::logic_error & e2)                      \
+    {                                                  \
+        logstr = e2.what();                            \
+        return_value = McResult::MC_RESULT_MAX_ENUM;   \
+    }                                                  \
+    catch (std::exception & e3)                        \
+    {                                                  \
+        logstr = e3.what();                            \
+        return_value = McResult::MC_RESULT_MAX_ENUM;   \
+    }
 
-
+extern thread_local std::string per_thread_api_log_str; // frontend.cpp
 
 extern "C" void create_context_impl(
     McContext* pContext, McFlags flags, uint32_t num_helper_threads) noexcept(false);
@@ -67,6 +94,13 @@ extern "C" void debug_message_control_impl(
 
 extern "C" void get_info_impl(
     const McContext context,
+    McFlags info,
+    uint64_t bytes,
+    void* pMem,
+    uint64_t* pNumBytes) noexcept(false);
+
+extern "C" void get_event_info_impl(
+    const McEvent event,
     McFlags info,
     uint64_t bytes,
     void* pMem,
@@ -237,9 +271,10 @@ struct event_t {
     McEvent m_user_handle; // handle used by client app to reference this event object
     // the Manager thread which was assigned the task of managing the task associated with this event object.
     uint32_t m_responsible_thread_id;
+    McResult m_execution_status; // API return code associated with respective task (for user to query)
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
-        , m_responsible_thread_id(UINT32_MAX)
+        , m_responsible_thread_id(UINT32_MAX),m_execution_status(MC_NO_ERROR)
     {
         std::cout << "[MCUT] Create event " << this << std::endl;
 
@@ -251,7 +286,6 @@ struct event_t {
 
     ~event_t()
     {
-        
 
         if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
@@ -278,12 +312,12 @@ struct event_t {
     }
 
     // update the status of the event object to "finished"
-    void notify_task_complete()
+    void notify_task_complete(McResult exec_status)
     {
-        std::lock_guard<std::mutex> lock(m_callback_mutex);
-
         m_finished = true;
+        m_execution_status = exec_status;
 
+        std::lock_guard<std::mutex> lock(m_callback_mutex);
         if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
@@ -293,7 +327,7 @@ struct event_t {
 };
 
 // init in frontened.cpp
-extern threadsafe_list< std::shared_ptr<event_t>> g_events;
+extern threadsafe_list<std::shared_ptr<event_t>> g_events;
 extern std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McObject handle that will be returned to the user
 extern std::once_flag g_objects_counter_init_flag;
 
@@ -301,7 +335,7 @@ extern std::once_flag g_objects_counter_init_flag;
 template <typename Derived>
 void fn_delete_cc(connected_component_t* p)
 {
-    
+
     delete static_cast<Derived*>(p);
     std::cout << "[MCUT] Destroy connected component " << p->m_user_handle << std::endl;
 }
@@ -329,7 +363,6 @@ private:
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags m_flags = (McFlags)0;
-    
 
     void api_thread_main(uint32_t thread_id)
     {
@@ -353,8 +386,10 @@ private:
 
 public:
     context_t(McContext handle, McFlags flags, uint32_t num_compute_threads)
-        : m_done(false), m_joiner(m_api_threads)
-        , m_flags(flags),m_user_handle(handle)
+        : m_done(false)
+        , m_joiner(m_api_threads)
+        , m_flags(flags)
+        , m_user_handle(handle)
     {
         std::cout << "[MCUT] Create context " << m_user_handle << std::endl;
 
@@ -362,7 +397,7 @@ public:
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
 
             m_queues = std::vector<thread_safe_queue<function_wrapper>>(manager_thread_count);
-            
+
             for (uint32_t i = 0; i < manager_thread_count; ++i) {
                 m_queues[i].set_done_ptr(&m_done);
                 m_api_threads.push_back(std::thread(&context_t::api_thread_main, this, i));
@@ -381,7 +416,7 @@ public:
 
     ~context_t()
     {
-        
+
         m_done = true;
         for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
             m_queues[i].disrupt_wait_for_data();
@@ -420,7 +455,7 @@ public:
         for (std::vector<McEvent>::const_iterator waitlist_iter = event_waitlist.cbegin(); waitlist_iter != event_waitlist.cend(); ++waitlist_iter) {
             const McEvent& parent_task_event_handle = *waitlist_iter;
 
-            const std::shared_ptr<event_t> parent_task_event_ptr = g_events.find_first_if([=](std::shared_ptr<event_t> e){ return e->m_user_handle == parent_task_event_handle;});
+            const std::shared_ptr<event_t> parent_task_event_ptr = g_events.find_first_if([=](std::shared_ptr<event_t> e) { return e->m_user_handle == parent_task_event_handle; });
 
             MCUT_ASSERT(parent_task_event_ptr != nullptr);
 
@@ -462,9 +497,8 @@ public:
 
         std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t);
         MCUT_ASSERT(event_ptr != nullptr);
-        
+
         g_events.push_front(event_ptr);
-        
 
         event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
 
@@ -473,26 +507,42 @@ public:
         // other tasks in the event_waitlist, compute the operation, and finally update
         // the respective event state with the completion status.
         //
-        
+
         std::weak_ptr<event_t> event_weak_ptr(event_ptr);
 
         std::packaged_task<void()> task(
             [=]() {
-            if (!event_waitlist.empty()) {
-                wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
-            }
+                if (!event_waitlist.empty()) {
+                    wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
+                }
 
-            api_fn(); // execute the API function
+                 MCUT_ASSERT(event_weak_ptr.expired() == false);
 
-            MCUT_ASSERT(event_weak_ptr.expired() == false);
+                std::shared_ptr<event_t> event = event_weak_ptr.lock();
 
-            std::shared_ptr<event_t> event = event_weak_ptr.lock();
+                McResult return_value = McResult::MC_NO_ERROR;
+                per_thread_api_log_str.clear();
 
-            if(event) // not null
-            {
-                event->notify_task_complete(); // updated event state to indicate task completion (lock-based)
-            }
-        });
+                try {
+                    api_fn(); // execute the API function. 
+                }
+                CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str); // exceptions may be thrown due to runtime errors, which must be reported back to user
+
+                if (!per_thread_api_log_str.empty()) {
+
+                    std::fprintf(stderr, "%s(...) -> %s (EventID=%p)\n", __FUNCTION__, per_thread_api_log_str.c_str(), event == nullptr ? 0xFFFFFFFF ? event->m_user_handle);
+
+                    if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+                    {
+                        return_value = McResult::MC_INVALID_VALUE;
+                    }
+                }
+
+                if (event) // not null
+                {
+                    event->notify_task_complete(return_value); // updated event state to indicate task completion (lock-based)
+                }
+            });
 
         event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents
         event_ptr->m_responsible_thread_id = responsible_thread_id;
@@ -504,7 +554,7 @@ public:
 
     // the current set of connected components associated with context
     threadsafe_list<std::shared_ptr<connected_component_t>> connected_components;
-    
+
     // McFlags dispatchFlags = (McFlags)0;
 
     // client/user debugging variable

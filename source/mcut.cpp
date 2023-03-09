@@ -33,35 +33,7 @@
 #pragma warning(disable : 26812)
 #endif
 
-/*
-std::invalid_argument: related to the input parameters
-std::runtime_error: system runtime error e.g. out of memory
-std::logic_error: a bug caught through an assertion failure
-std::exception: unknown error source e.g. probably another bug
-*/
-#define CATCH_POSSIBLE_EXCEPTIONS(logstr)              \
-    catch (std::invalid_argument & e0)                 \
-    {                                                  \
-        logstr = e0.what();                            \
-        return_value = McResult::MC_INVALID_VALUE;     \
-    }                                                  \
-    catch (std::runtime_error & e1)                    \
-    {                                                  \
-        logstr = e1.what();                            \
-        return_value = McResult::MC_INVALID_OPERATION; \
-    }                                                  \
-    catch (std::logic_error & e2)                      \
-    {                                                  \
-        logstr = e2.what();                            \
-        return_value = McResult::MC_RESULT_MAX_ENUM;   \
-    }                                                  \
-    catch (std::exception & e3)                        \
-    {                                                  \
-        logstr = e3.what();                            \
-        return_value = McResult::MC_RESULT_MAX_ENUM;   \
-    }
 
-thread_local std::string per_thread_api_log_str;
 
 MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags)
 {
@@ -211,6 +183,41 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
 
     return return_value;
 }
+
+
+MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (event == nullptr) {
+        per_thread_api_log_str = "context ptr (param0) undef (NULL)";
+    } else if (bytes != 0 && pMem == nullptr) {
+        per_thread_api_log_str = "invalid specification (param2 & param3)";
+    } else if (false == (info == MC_EVENT_STATUS)) // check all possible values
+    {
+        per_thread_api_log_str = "invalid info flag val (param1)";
+    } else if ((info == MC_EVENT_STATUS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
+        per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
+    } else {
+        try {
+            get_event_info_impl(event, info, bytes, pMem, pNumBytes);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+
+    return return_value;
+}
+
+
 
 MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
     uint32_t numEventsInWaitlist,
@@ -390,6 +397,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     uint32_t numCutMeshFaces)
 {
     McEvent event = MC_NULL_HANDLE;
+    
     McResult return_value = mcEnqueueDispatch(
         context,
         dispatchFlags,
@@ -407,11 +415,15 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         nullptr,
         &event);
 
-    if (return_value == MC_NO_ERROR) {
-        return_value = mcWaitForEvents(1, &event); // block until event of mcEnqueueDispatch is completed!
-        MCUT_ASSERT(return_value == MC_NO_ERROR);
-        return_value = mcReleaseEvents(1, &event);
-        MCUT_ASSERT(return_value == MC_NO_ERROR);
+    if (return_value == MC_NO_ERROR) { // API parameter checks are fine
+        if(event != MC_NULL_HANDLE) // event must exist to wait on and query
+        {
+            wait_for_events_impl(1, &event); // block until event of mcEnqueueDispatch is completed!
+            
+            get_event_info_impl(event, MC_EVENT_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+
+            release_events_impl(1, &event); // destroy
+        }
     }
 
     return return_value;
