@@ -530,7 +530,7 @@ public:
 
                 if (!per_thread_api_log_str.empty()) {
 
-                    std::fprintf(stderr, "%s(...) -> %s (EventID=%p)\n", __FUNCTION__, per_thread_api_log_str.c_str(), event == nullptr ? 0xFFFFFFFF ? event->m_user_handle);
+                    std::fprintf(stderr, "%s(...) -> %s (EventID=%p)\n", __FUNCTION__, per_thread_api_log_str.c_str(), event == nullptr ? (McEvent)0 : event->m_user_handle);
 
                     if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
                     {
