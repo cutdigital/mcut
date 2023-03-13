@@ -274,7 +274,8 @@ struct event_t {
     McResult m_execution_status; // API return code associated with respective task (for user to query)
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
-        , m_responsible_thread_id(UINT32_MAX),m_execution_status(MC_NO_ERROR)
+        , m_responsible_thread_id(UINT32_MAX)
+        , m_execution_status(MC_NO_ERROR)
     {
         std::cout << "[MCUT] Create event " << this << std::endl;
 
@@ -409,7 +410,9 @@ public:
             m_compute_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_compute_threads));
 
         } catch (...) {
-            m_done = true;
+            shutdown();
+
+            std::cout << "[MCUT] Destroy context due to exception" << m_user_handle << std::endl;
             throw;
         }
     }
@@ -417,11 +420,16 @@ public:
     ~context_t()
     {
 
+        shutdown();
+        std::cout << "[MCUT] Destroy context " << m_user_handle << std::endl;
+    }
+
+    void shutdown()
+    {
         m_done = true;
         for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
             m_queues[i].disrupt_wait_for_data();
         }
-        std::cout << "[MCUT] Destory context " << m_user_handle << std::endl;
     }
 
     McContext m_user_handle;
@@ -516,7 +524,7 @@ public:
                     wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
                 }
 
-                 MCUT_ASSERT(event_weak_ptr.expired() == false);
+                MCUT_ASSERT(event_weak_ptr.expired() == false);
 
                 std::shared_ptr<event_t> event = event_weak_ptr.lock();
 
@@ -524,7 +532,7 @@ public:
                 per_thread_api_log_str.clear();
 
                 try {
-                    api_fn(); // execute the API function. 
+                    api_fn(); // execute the API function.
                 }
                 CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str); // exceptions may be thrown due to runtime errors, which must be reported back to user
 

@@ -397,7 +397,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     uint32_t numCutMeshFaces)
 {
     McEvent event = MC_NULL_HANDLE;
-    
+
     McResult return_value = mcEnqueueDispatch(
         context,
         dispatchFlags,
@@ -486,12 +486,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 {
     McEvent event = MC_NULL_HANDLE;
     McResult return_value = mcEnqueueGetConnectedComponents(context, connectedComponentType, numEntries, pConnComps, numConnComps, 0, nullptr, &event);
-    if (return_value == MC_NO_ERROR) {
-        return_value = mcWaitForEvents(1, &event); // block until event of mcEnqueueGetConnectedComponents is completed!
-        MCUT_ASSERT(return_value == MC_NO_ERROR);
-        return_value = mcReleaseEvents(1, &event);
-        MCUT_ASSERT(return_value == MC_NO_ERROR);
-    }
+    if(event != MC_NULL_HANDLE) // event must exist to wait on and query
+        {
+            wait_for_events_impl(1, &event); // block until event of task is completed!
+            
+            get_event_info_impl(event, MC_EVENT_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+
+            release_events_impl(1, &event); // destroy
+        }
     return return_value;
 }
 
@@ -556,12 +558,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
 {
     McEvent event = MC_NULL_HANDLE;
     McResult return_value = mcEnqueueGetConnectedComponentData(context, connCompId, queryFlags, bytes, pMem, pNumBytes, 0, nullptr, &event);
-    if (return_value == MC_NO_ERROR) {
-        return_value = mcWaitForEvents(1, &event); // block until event of mcEnqueueGetConnectedComponents is completed!
-        MCUT_ASSERT(return_value == MC_NO_ERROR);
-        return_value = mcReleaseEvents(1, &event);
-        MCUT_ASSERT(return_value == MC_NO_ERROR);
-    }
+    if(event != MC_NULL_HANDLE) // event must exist to wait on and query
+        {
+            wait_for_events_impl(1, &event); // block until event of task is completed!
+            
+            get_event_info_impl(event, MC_EVENT_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+
+            release_events_impl(1, &event); // destroy
+        }
     return return_value;
 }
 
