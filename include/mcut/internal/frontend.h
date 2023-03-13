@@ -272,10 +272,18 @@ struct event_t {
     // the Manager thread which was assigned the task of managing the task associated with this event object.
     uint32_t m_responsible_thread_id;
     McResult m_execution_status; // API return code associated with respective task (for user to query)
+    std::atomic<size_t> m_timestamp_queued;
+    std::atomic<size_t> m_timestamp_submit;
+    std::atomic<size_t> m_timestamp_start;
+    std::atomic<size_t> m_timestamp_end;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
         , m_execution_status(MC_NO_ERROR)
+        , m_timestamp_queued(0)
+        , m_timestamp_submit(0)
+        , m_timestamp_start(0)
+        , m_timestamp_end(0)
     {
         std::cout << "[MCUT] Create event " << this << std::endl;
 
@@ -293,6 +301,31 @@ struct event_t {
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
         std::cout << "[MCUT] Destroy event " << this << "(" << m_user_handle << ")" << std::endl;
+    }
+
+    std::size_t get_time_since_epoch()
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    }
+
+    void log_queued_time()
+    {
+        this->m_timestamp_queued.store(get_time_since_epoch());
+    }
+
+    void log_submit_time()
+    {
+        this->m_timestamp_submit.store(get_time_since_epoch());
+    }
+
+    void log_start_time()
+    {
+        this->m_timestamp_start.store(get_time_since_epoch());
+    }
+
+    void log_end_time()
+    {
+        this->m_timestamp_end.store(get_time_since_epoch());
     }
 
     // thread-safe function to set the callback function for an event object
@@ -448,6 +481,20 @@ public:
     template <typename FunctionType>
     McEvent enqueue(uint32_t numEventsInWaitlist, const McEvent* pEventWaitList, FunctionType api_fn)
     {
+        //
+        // create the event object associated with the enqueued task
+        //
+
+        std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t);
+
+        MCUT_ASSERT(event_ptr != nullptr);
+
+        g_events.push_front(event_ptr);
+
+        event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
+
+        event_ptr->log_submit_time();
+
         // List of events the enqueued task depends on
         //
         // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
@@ -500,17 +547,6 @@ public:
         }
 
         //
-        // create the event object associated with the enqueued task
-        //
-
-        std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t);
-        MCUT_ASSERT(event_ptr != nullptr);
-
-        g_events.push_front(event_ptr);
-
-        event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
-
-        //
         // Package-up the task as a synchronised operation that will wait for
         // other tasks in the event_waitlist, compute the operation, and finally update
         // the respective event state with the completion status.
@@ -524,31 +560,34 @@ public:
                     wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
                 }
 
-                MCUT_ASSERT(event_weak_ptr.expired() == false);
+                if (!event_weak_ptr.expired()) {
 
-                std::shared_ptr<event_t> event = event_weak_ptr.lock();
+                    std::shared_ptr<event_t> event = event_weak_ptr.lock();
 
-                McResult return_value = McResult::MC_NO_ERROR;
-                per_thread_api_log_str.clear();
+                    if (event) {
+                        McResult return_value = McResult::MC_NO_ERROR;
+                        per_thread_api_log_str.clear();
 
-                try {
-                    api_fn(); // execute the API function.
-                }
-                CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str); // exceptions may be thrown due to runtime errors, which must be reported back to user
+                        event->log_start_time();
 
-                if (!per_thread_api_log_str.empty()) {
+                        try {
+                            api_fn(); // execute the API function.
+                        }
+                        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str); // exceptions may be thrown due to runtime errors, which must be reported back to user
 
-                    std::fprintf(stderr, "%s(...) -> %s (EventID=%p)\n", __FUNCTION__, per_thread_api_log_str.c_str(), event == nullptr ? (McEvent)0 : event->m_user_handle);
+                        if (!per_thread_api_log_str.empty()) {
 
-                    if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
-                    {
-                        return_value = McResult::MC_INVALID_VALUE;
+                            std::fprintf(stderr, "%s(...) -> %s (EventID=%p)\n", __FUNCTION__, per_thread_api_log_str.c_str(), event == nullptr ? (McEvent)0 : event->m_user_handle);
+
+                            if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+                            {
+                                return_value = McResult::MC_INVALID_VALUE;
+                            }
+                        }
+
+                        event->notify_task_complete(return_value); // updated event state to indicate task completion (lock-based)
+                        event->log_end_time();
                     }
-                }
-
-                if (event) // not null
-                {
-                    event->notify_task_complete(return_value); // updated event state to indicate task completion (lock-based)
                 }
             });
 
@@ -556,6 +595,7 @@ public:
         event_ptr->m_responsible_thread_id = responsible_thread_id;
 
         m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible thread is free
+        event_ptr->log_queued_time();
 
         return event_ptr->m_user_handle;
     }

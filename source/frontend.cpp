@@ -213,14 +213,40 @@ void get_event_info_impl(
 
     switch (info) {
     case MC_EVENT_STATUS: {
-        McResult status = event_ptr->m_execution_status;
+
         if (pMem == nullptr) {
             *pNumBytes = sizeof(McResult);
         } else {
             if (bytes < sizeof(McResult)) {
                 throw std::invalid_argument("invalid bytes");
             }
+            McResult status = event_ptr->m_execution_status;
             memcpy(pMem, reinterpret_cast<void*>(&status), bytes);
+        }
+        break;
+    }
+    case MC_EVENT_TIMESTAMP_QUEUED:
+    case MC_EVENT_TIMESTAMP_SUBMIT:
+    case MC_EVENT_TIMESTAMP_START:
+    case MC_EVENT_TIMESTAMP_END: {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McSize);
+        } else {
+            if (bytes < sizeof(McSize)) {
+                throw std::invalid_argument("invalid bytes");
+            }
+            McSize nanoseconds_since_epoch = 0;
+            if (info == MC_EVENT_TIMESTAMP_QUEUED) {
+                nanoseconds_since_epoch = event_ptr->m_timestamp_queued.load();
+            } else if (info == MC_EVENT_TIMESTAMP_SUBMIT) {
+                nanoseconds_since_epoch = event_ptr->m_timestamp_submit.load();
+            } else if (info == MC_EVENT_TIMESTAMP_START) {
+                nanoseconds_since_epoch = event_ptr->m_timestamp_start.load();
+            } else if (info == MC_EVENT_TIMESTAMP_END) {
+                nanoseconds_since_epoch = event_ptr->m_timestamp_end.load();
+            }
+            MCUT_ASSERT(nanoseconds_since_epoch != 0);
+            memcpy(pMem, reinterpret_cast<void*>(&nanoseconds_since_epoch), bytes);
         }
         break;
     }

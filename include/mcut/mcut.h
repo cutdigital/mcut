@@ -103,7 +103,14 @@ typedef struct McEvent_T* McEvent;
 typedef uint32_t McFlags;
 
 /**
- * @brief Boolean type.
+ * @brief Byte size type.
+ *
+ *  Unsigned integer type of the result of the sizeof operator as well as the sizeof... operator and the alignof operator.
+ */
+typedef size_t McSize;
+
+/**
+ * @brief 64-bit type.
  *
  * Integral type representing a boolean value (MC_TRUE or MC_FALSE).
  */
@@ -363,7 +370,11 @@ typedef enum McDispatchFlags {
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
     MC_DONT_CARE = 1 << 1, /**< wildcard.*/
-    MC_EVENT_STATUS = 1<<2
+    MC_EVENT_STATUS = 1<<2, /**< Error/status code associated with asynchronous task.*/
+    MC_EVENT_TIMESTAMP_QUEUED = 1<<3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event is enqueued in an internal queue by the internal scheduler. */
+    MC_EVENT_TIMESTAMP_SUBMIT = 1<<4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
+    MC_EVENT_TIMESTAMP_START = 1<<5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
+    MC_EVENT_TIMESTAMP_END = 1<<6 /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
 } McQueryFlags;
 
 /**
