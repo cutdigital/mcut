@@ -212,7 +212,7 @@ void get_event_info_impl(
     }
 
     switch (info) {
-    case MC_EVENT_STATUS: {
+    case MC_EVENT_RUNTIME_EXECUTION_STATUS: {
 
         if (pMem == nullptr) {
             *pNumBytes = sizeof(McResult);

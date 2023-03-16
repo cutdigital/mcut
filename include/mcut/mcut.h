@@ -110,7 +110,14 @@ typedef uint32_t McFlags;
 typedef size_t McSize;
 
 /**
- * @brief 64-bit type.
+ * @brief 32-bit type.
+ *
+ * Integral type representing an value.
+ */
+typedef uint32_t McIndex;
+
+/**
+ * @brief 32-bit type.
  *
  * Integral type representing a boolean value (MC_TRUE or MC_FALSE).
  */
@@ -362,6 +369,20 @@ typedef enum McDispatchFlags {
 } McDispatchFlags;
 
 /**
+ * \enum McEventOperationExevStatus
+ * @brief Flags for querying the operation status.
+ *
+ * This enum structure defines the flags which are used for querying the execution status of an operation associated with an event.
+ */
+typedef enum McEventOperationExecStatus
+{
+    MC_QUEUED, /**< Operation has been enqueued in the internal-queue. */
+    MC_SUBMITTED, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
+    MC_RUNNING, /**< Operation is currently running. */
+    MC_COMPLETE /**< The operation has completed. */
+}McEventOperationExecStatus;
+
+/**
  * \enum McQueryFlags
  * @brief Flags for querying fixed API state.
  *
@@ -370,11 +391,12 @@ typedef enum McDispatchFlags {
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
     MC_DONT_CARE = 1 << 1, /**< wildcard.*/
-    MC_EVENT_STATUS = 1<<2, /**< Error/status code associated with asynchronous task.*/
+    MC_EVENT_RUNTIME_EXECUTION_STATUS = 1<<2, /**< Error/status code associated with the runtime of the asynchronous/non-blocking part of the associated task.*/
     MC_EVENT_TIMESTAMP_QUEUED = 1<<3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event is enqueued in an internal queue by the internal scheduler. */
     MC_EVENT_TIMESTAMP_SUBMIT = 1<<4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
     MC_EVENT_TIMESTAMP_START = 1<<5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
-    MC_EVENT_TIMESTAMP_END = 1<<6 /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
+    MC_EVENT_TIMESTAMP_END = 1<<6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
+    MC_EVENT_OPERATION_EXECUTION_STATUS = 1<<7 /**< the execution status of the command identified by event. See also :: */
 } McQueryFlags;
 
 /**
@@ -540,6 +562,32 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
     McDebugSeverity severity,
     bool enabled);
 
+/**
+ * @brief Returns information about the event object..
+ *
+ * @param[in] event Specifies the event object being queried..
+ * @param[in] info Specifies the information to query. See:: 
+ * @param[in] bytes Specifies the size in bytes of memory pointed to by `pMem`. This size must be >= size of the return type as described in the table below..
+ * @param[in] pMem A pointer to memory where the appropriate result being queried is returned. If param_value is NULL, it is ignored.
+ * @param[in] pNumBytes Returns the actual size in bytes of data copied to `pMem`. If `pNumBytes` is NULL, it is ignored. 
+ * 
+ * Using clGetInfo to determine if a operation identified by event has finished 
+ * execution (i.e. MC_EVENT_COMMAND_EXECUTION_STATUS returns MC_COMPLETE) is not 
+ * a synchronization point. There are no guarantees that the memory objects being 
+ * modified by the operation associated with event will be visible to other 
+ * enqueued commands.
+ *
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - ::MC_NO_ERROR
+ *   -# proper exit
+ * - ::MC_INVALID_VALUE
+ *   -# \p event is not a valid object
+ *   -# \p ...
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes);
 /**
  * @brief Registers a user callback function.
  *

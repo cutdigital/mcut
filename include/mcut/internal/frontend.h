@@ -279,7 +279,7 @@ struct event_t {
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
-        , m_execution_status(MC_NO_ERROR)
+        , m_execution_status(MC_RESULT_MAX_ENUM)
         , m_timestamp_queued(0)
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
