@@ -1021,7 +1021,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
  *   -# \p numEventsInWaitlist is greater than 0 and \p pEventWaitList is NULL (and vice versa).
  *   -# If an event object in \p pEventWaitList is not a valid event object.
  */
-extern Floyd ChitalumcEnquemcEnqueueGetConnectedComponentsueGetConnectedComponentsMCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
+extern MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList);
 
