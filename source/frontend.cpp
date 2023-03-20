@@ -250,6 +250,17 @@ void get_event_info_impl(
         }
         break;
     }
+    case MC_EVENT_COMMAND_EXECUTION_STATUS:
+    {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McFlags);
+        } else {
+            if (bytes < sizeof(McFlags)) {
+                throw std::invalid_argument("invalid bytes");
+            }
+            memcpy(pMem, reinterpret_cast<void*>(&event_ptr->m_command_exec_status), bytes);
+        }
+    }break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;

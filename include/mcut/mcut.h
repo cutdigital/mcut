@@ -374,13 +374,13 @@ typedef enum McDispatchFlags {
  *
  * This enum structure defines the flags which are used for querying the execution status of an operation associated with an event.
  */
-typedef enum McEventOperationExecStatus
+typedef enum McEventCommandExecStatus
 {
-    MC_QUEUED, /**< Operation has been enqueued in the internal-queue. */
-    MC_SUBMITTED, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
-    MC_RUNNING, /**< Operation is currently running. */
-    MC_COMPLETE /**< The operation has completed. */
-}McEventOperationExecStatus;
+    MC_QUEUED=1<<0, /**< Operation has been enqueued in the internal-queue. */
+    MC_SUBMITTED=1<<1, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
+    MC_RUNNING=1<<2, /**< Operation is currently running. */
+    MC_COMPLETE=1<<3 /**< The operation has completed. */
+}McEventCommandExecStatus;
 
 /**
  * \enum McQueryFlags
@@ -396,7 +396,7 @@ typedef enum McQueryFlags {
     MC_EVENT_TIMESTAMP_SUBMIT = 1<<4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
     MC_EVENT_TIMESTAMP_START = 1<<5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
     MC_EVENT_TIMESTAMP_END = 1<<6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
-    MC_EVENT_OPERATION_EXECUTION_STATUS = 1<<7 /**< the execution status of the command identified by event. See also :: */
+    MC_EVENT_COMMAND_EXECUTION_STATUS = 1<<7 /**< the execution status of the command identified by event. See also :: */
 } McQueryFlags;
 
 /**
@@ -576,7 +576,6 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
  * a synchronization point. There are no guarantees that the memory objects being 
  * modified by the operation associated with event will be visible to other 
  * enqueued commands.
- *
  *
  * @return Error code.
  *
@@ -1022,7 +1021,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
  *   -# \p numEventsInWaitlist is greater than 0 and \p pEventWaitList is NULL (and vice versa).
  *   -# If an event object in \p pEventWaitList is not a valid event object.
  */
-MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
+extern Floyd ChitalumcEnquemcEnqueueGetConnectedComponentsueGetConnectedComponentsMCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList);
 

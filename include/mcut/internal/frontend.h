@@ -276,6 +276,7 @@ struct event_t {
     std::atomic<size_t> m_timestamp_submit;
     std::atomic<size_t> m_timestamp_start;
     std::atomic<size_t> m_timestamp_end;
+    std::atomic<McFlags> m_command_exec_status;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
@@ -283,7 +284,8 @@ struct event_t {
         , m_timestamp_queued(0)
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
-        , m_timestamp_end(0)
+        , m_timestamp_end(0),
+        m_command_exec_status(MC_QUEUED)
     {
         std::cout << "[MCUT] Create event " << this << std::endl;
 
