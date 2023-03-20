@@ -277,6 +277,7 @@ struct event_t {
     std::atomic<size_t> m_timestamp_start;
     std::atomic<size_t> m_timestamp_end;
     std::atomic<McFlags> m_command_exec_status;
+    bool m_profiling_enabled;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
@@ -285,7 +286,7 @@ struct event_t {
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
         , m_timestamp_end(0),
-        m_command_exec_status(MC_QUEUED)
+        m_command_exec_status(McEventCommandExecStatus::MC_QUEUED),m_profiling_enabled(true)
     {
         std::cout << "[MCUT] Create event " << this << std::endl;
 
@@ -305,29 +306,45 @@ struct event_t {
         std::cout << "[MCUT] Destroy event " << this << "(" << m_user_handle << ")" << std::endl;
     }
 
-    std::size_t get_time_since_epoch()
+    inline std::size_t get_time_since_epoch()
     {
         return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     }
 
-    void log_queued_time()
+    inline void log_queued_time()
     {
-        this->m_timestamp_queued.store(get_time_since_epoch());
+        if(m_profiling_enabled)
+        {
+            this->m_timestamp_queued.store(get_time_since_epoch());
+        }
+        m_command_exec_status = McEventCommandExecStatus::MC_QUEUED;
     }
 
-    void log_submit_time()
+    inline void log_submit_time()
     {
-        this->m_timestamp_submit.store(get_time_since_epoch());
+        if(m_profiling_enabled)
+        {
+            this->m_timestamp_submit.store(get_time_since_epoch());
+        }
+        m_command_exec_status = McEventCommandExecStatus::MC_SUBMITTED;
     }
 
-    void log_start_time()
+    inline void log_start_time()
     {
-        this->m_timestamp_start.store(get_time_since_epoch());
+        if(m_profiling_enabled)
+        {
+            this->m_timestamp_start.store(get_time_since_epoch());
+        }
+        m_command_exec_status = McEventCommandExecStatus::MC_RUNNING;
     }
 
-    void log_end_time()
+    inline void log_end_time()
     {
-        this->m_timestamp_end.store(get_time_since_epoch());
+        if(m_profiling_enabled)
+        {
+            this->m_timestamp_end.store(get_time_since_epoch());
+        }
+        m_command_exec_status = McEventCommandExecStatus::MC_COMPLETE;
     }
 
     // thread-safe function to set the callback function for an event object
