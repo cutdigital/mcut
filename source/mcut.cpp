@@ -34,7 +34,6 @@
 #endif
 
 
-
 MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags)
 {
     McResult return_value = McResult::MC_NO_ERROR;

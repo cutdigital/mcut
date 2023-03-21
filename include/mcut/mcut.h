@@ -374,13 +374,12 @@ typedef enum McDispatchFlags {
  *
  * This enum structure defines the flags which are used for querying the execution status of an operation associated with an event.
  */
-typedef enum McEventCommandExecStatus
-{
-    MC_QUEUED=1<<0, /**< Operation has been enqueued in the internal-queue. */
-    MC_SUBMITTED=1<<1, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
-    MC_RUNNING=1<<2, /**< Operation is currently running. */
-    MC_COMPLETE=1<<3 /**< The operation has completed. */
-}McEventCommandExecStatus;
+typedef enum McEventCommandExecStatus {
+    MC_QUEUED = 1 << 0, /**< Operation has been enqueued in the internal-queue. */
+    MC_SUBMITTED = 1 << 1, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
+    MC_RUNNING = 1 << 2, /**< Operation is currently running. */
+    MC_COMPLETE = 1 << 3 /**< The operation has completed. */
+} McEventCommandExecStatus;
 
 /**
  * \enum McQueryFlags
@@ -391,12 +390,12 @@ typedef enum McEventCommandExecStatus
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
     MC_DONT_CARE = 1 << 1, /**< wildcard.*/
-    MC_EVENT_RUNTIME_EXECUTION_STATUS = 1<<2, /**< Error/status code associated with the runtime of the asynchronous/non-blocking part of the associated task.*/
-    MC_EVENT_TIMESTAMP_QUEUED = 1<<3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event is enqueued in an internal queue by the internal scheduler. */
-    MC_EVENT_TIMESTAMP_SUBMIT = 1<<4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
-    MC_EVENT_TIMESTAMP_START = 1<<5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
-    MC_EVENT_TIMESTAMP_END = 1<<6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
-    MC_EVENT_COMMAND_EXECUTION_STATUS = 1<<7 /**< the execution status of the command identified by event. See also :: */
+    MC_EVENT_RUNTIME_EXECUTION_STATUS = 1 << 2, /**< Error/status code associated with the runtime of the asynchronous/non-blocking part of the associated task.*/
+    MC_EVENT_TIMESTAMP_QUEUED = 1 << 3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event is enqueued in an internal queue by the internal scheduler. */
+    MC_EVENT_TIMESTAMP_SUBMIT = 1 << 4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
+    MC_EVENT_TIMESTAMP_START = 1 << 5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
+    MC_EVENT_TIMESTAMP_END = 1 << 6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
+    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 7 /**< the execution status of the command identified by event. See also :: */
 } McQueryFlags;
 
 /**
@@ -566,15 +565,15 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
  * @brief Returns information about the event object..
  *
  * @param[in] event Specifies the event object being queried..
- * @param[in] info Specifies the information to query. See:: 
+ * @param[in] info Specifies the information to query. See::
  * @param[in] bytes Specifies the size in bytes of memory pointed to by `pMem`. This size must be >= size of the return type as described in the table below..
  * @param[in] pMem A pointer to memory where the appropriate result being queried is returned. If param_value is NULL, it is ignored.
- * @param[in] pNumBytes Returns the actual size in bytes of data copied to `pMem`. If `pNumBytes` is NULL, it is ignored. 
- * 
- * Using clGetInfo to determine if a operation identified by event has finished 
- * execution (i.e. MC_EVENT_COMMAND_EXECUTION_STATUS returns MC_COMPLETE) is not 
- * a synchronization point. There are no guarantees that the memory objects being 
- * modified by the operation associated with event will be visible to other 
+ * @param[in] pNumBytes Returns the actual size in bytes of data copied to `pMem`. If `pNumBytes` is NULL, it is ignored.
+ *
+ * Using clGetInfo to determine if a operation identified by event has finished
+ * execution (i.e. MC_EVENT_COMMAND_EXECUTION_STATUS returns MC_COMPLETE) is not
+ * a synchronization point. There are no guarantees that the memory objects being
+ * modified by the operation associated with event will be visible to other
  * enqueued commands.
  *
  * @return Error code.

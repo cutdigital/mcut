@@ -30,13 +30,41 @@ UTEST(CreateContext, noFlags)
     McResult err = mcCreateContext(&context, 0);
     EXPECT_TRUE(context != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
 }
 
-UTEST(ContextCreationTest, debugFlag)
+UTEST(CreateContext, debugFlag)
 {
     McContext context;
     McResult err = mcCreateContext(&context, MC_DEBUG);
     EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
+}
+
+UTEST(CreateContext, outOfOrderExec)
+{
+    McContext context;
+    McResult err = mcCreateContext(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE);
+    EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
+}
+
+UTEST(CreateContext, outOfOrderExec_debug)
+{
+    McContext context;
+    McResult err = mcCreateContext(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE | MC_DEBUG);
+    EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
     EXPECT_EQ(err, MC_NO_ERROR);
 }
 

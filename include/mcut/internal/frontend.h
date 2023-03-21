@@ -285,10 +285,11 @@ struct event_t {
         , m_timestamp_queued(0)
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
-        , m_timestamp_end(0),
-        m_command_exec_status(McEventCommandExecStatus::MC_QUEUED),m_profiling_enabled(true)
+        , m_timestamp_end(0)
+        , m_command_exec_status(McEventCommandExecStatus::MC_QUEUED)
+        , m_profiling_enabled(true)
     {
-        std::cout << "[MCUT] Create event " << this << std::endl;
+        log_msg("[MCUT] Create event " << this);
 
         m_callback_info.m_fn_ptr = nullptr;
         m_callback_info.m_data_ptr = nullptr;
@@ -303,7 +304,8 @@ struct event_t {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
-        std::cout << "[MCUT] Destroy event " << this << "(" << m_user_handle << ")" << std::endl;
+
+        log_msg("[MCUT] Destroy event " << this << "(" << m_user_handle << ")");
     }
 
     inline std::size_t get_time_since_epoch()
@@ -313,8 +315,7 @@ struct event_t {
 
     inline void log_queued_time()
     {
-        if(m_profiling_enabled)
-        {
+        if (m_profiling_enabled) {
             this->m_timestamp_queued.store(get_time_since_epoch());
         }
         m_command_exec_status = McEventCommandExecStatus::MC_QUEUED;
@@ -322,8 +323,7 @@ struct event_t {
 
     inline void log_submit_time()
     {
-        if(m_profiling_enabled)
-        {
+        if (m_profiling_enabled) {
             this->m_timestamp_submit.store(get_time_since_epoch());
         }
         m_command_exec_status = McEventCommandExecStatus::MC_SUBMITTED;
@@ -331,8 +331,7 @@ struct event_t {
 
     inline void log_start_time()
     {
-        if(m_profiling_enabled)
-        {
+        if (m_profiling_enabled) {
             this->m_timestamp_start.store(get_time_since_epoch());
         }
         m_command_exec_status = McEventCommandExecStatus::MC_RUNNING;
@@ -340,8 +339,7 @@ struct event_t {
 
     inline void log_end_time()
     {
-        if(m_profiling_enabled)
-        {
+        if (m_profiling_enabled) {
             this->m_timestamp_end.store(get_time_since_epoch());
         }
         m_command_exec_status = McEventCommandExecStatus::MC_COMPLETE;
@@ -390,7 +388,7 @@ void fn_delete_cc(connected_component_t* p)
 {
 
     delete static_cast<Derived*>(p);
-    std::cout << "[MCUT] Destroy connected component " << p->m_user_handle << std::endl;
+    log_msg("[MCUT] Destroy connected component " << p->m_user_handle);
 }
 
 // struct defining the state of a context object
@@ -419,7 +417,7 @@ private:
 
     void api_thread_main(uint32_t thread_id)
     {
-        std::cout << "[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")" << std::endl;
+        log_msg("[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
 
         do {
             function_wrapper task;
@@ -434,7 +432,7 @@ private:
 
         } while (true);
 
-        std::cout << "[MCUT] Shutdown API thread " << std::this_thread::get_id() << " (" << thread_id << ")" << std::endl;
+        log_msg("[MCUT] Shutdown API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
     }
 
 public:
@@ -444,7 +442,7 @@ public:
         , m_flags(flags)
         , m_user_handle(handle)
     {
-        std::cout << "[MCUT] Create context " << m_user_handle << std::endl;
+        log_msg("[MCUT] Create context " << m_user_handle);
 
         try {
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
@@ -464,7 +462,7 @@ public:
         } catch (...) {
             shutdown();
 
-            std::cout << "[MCUT] Destroy context due to exception" << m_user_handle << std::endl;
+            log_msg("[MCUT] Destroy context due to exception" << m_user_handle);
             throw;
         }
     }
@@ -473,14 +471,17 @@ public:
     {
 
         shutdown();
-        std::cout << "[MCUT] Destroy context " << m_user_handle << std::endl;
+        log_msg("[MCUT] Destroy context " << m_user_handle);
     }
 
     void shutdown()
     {
         m_done = true;
-        for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
+        for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
             m_queues[i].disrupt_wait_for_data();
+            if (m_api_threads[i].joinable()) {
+                m_api_threads[i].join();
+            }
         }
     }
 
