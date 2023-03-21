@@ -68,6 +68,49 @@ UTEST(CreateContext, outOfOrderExec_debug)
     EXPECT_EQ(err, MC_NO_ERROR);
 }
 
+UTEST(CreateContext, withOneHelper)
+{
+    McContext context;
+    McResult err = mcCreateContextWithHelpers(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, 1);
+    EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
+}
+
+UTEST(CreateContext, withTwoHelpers)
+{
+    McContext context;
+    McResult err = mcCreateContextWithHelpers(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, 2);
+    EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
+}
+
+UTEST(CreateContext, withFourHelpers)
+{
+    McContext context;
+    McResult err = mcCreateContextWithHelpers(&context, MC_NULL_HANDLE, 4);
+    EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
+}
+
+UTEST(CreateContext, withOneHundredHelpers)
+{
+    McContext context;
+    McResult err = mcCreateContextWithHelpers(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, 100); // capped to system thread count
+    EXPECT_TRUE(context != nullptr);
+    EXPECT_EQ(err, MC_NO_ERROR);
+
+    err = mcReleaseContext(context);
+    EXPECT_EQ(err, MC_NO_ERROR);
+}
 // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 struct DebugContextConfig {
     McContext context_;

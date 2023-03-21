@@ -457,7 +457,7 @@ public:
             // create the pool of compute threads. These are the worker threads that
             // can be tasked with work from any manager-thread. Thus, manager threads
             // share the available/user-specified compute threads.
-            m_compute_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_compute_threads));
+            m_compute_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_compute_threads, manager_thread_count));
 
         } catch (...) {
             shutdown();
@@ -469,7 +469,6 @@ public:
 
     ~context_t()
     {
-
         shutdown();
         log_msg("[MCUT] Destroy context " << m_user_handle);
     }
@@ -477,6 +476,7 @@ public:
     void shutdown()
     {
         m_done = true;
+        m_compute_threadpool.reset();
         for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
             m_queues[i].disrupt_wait_for_data();
             if (m_api_threads[i].joinable()) {

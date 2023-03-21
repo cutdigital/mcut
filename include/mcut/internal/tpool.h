@@ -250,7 +250,7 @@ class thread_pool {
     uint32_t machine_thread_count;
 
 public:
-    thread_pool(uint32_t nthreads)
+    thread_pool(uint32_t nthreads, uint32_t used_cores)
         :  m_done(false),
 
         joiner(threads)
@@ -258,7 +258,10 @@ public:
     {
         log_msg("[MCUT] Create threadpool " << this);
         machine_thread_count = (uint32_t)std::thread::hardware_concurrency();
-        uint32_t const pool_thread_count = std::min(nthreads, machine_thread_count - 1);
+        uint32_t const pool_thread_count = std::min(
+            nthreads, 
+            // prevents over-subscription given that "N=used_cores" API threads are already in use
+            machine_thread_count - used_cores);
 
         try {
 
@@ -278,6 +281,7 @@ public:
     ~thread_pool()
     {
         log_msg("[MCUT] Destroy threadpool " << this);
+        
         m_done.store(true);
         wakeup_and_shutdown();
     }

@@ -451,6 +451,53 @@ typedef void(MCAPI_PTR* pfn_McEvent_CALLBACK)(McEvent event, void* data);
 extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(
     McContext* pContext, McFlags flags);
 
+/** @brief Create an MCUT context object with N helper threads.
+ *
+ * This method creates a context object with an additonal number of threads that
+ * assist the internal scheduler with compute workloads. The returned a handle 
+ * shall be used by a client applications to control the API state and access data. 
+ * 
+ * Unless otherwise stated, MCUT runs asynchronously with the user application.
+ * Non-blocking commands issued with a given context run on a conceptual "device",
+ * which executes independently of the client application. This device is  
+ * associated with one logical thread by default. Two logical threads will be 
+ * associated with the device if MC_OUT_OF_ORDER_EXEC_MODE_ENABLE is provided as
+ * a flag. 
+ * 
+ * Having one logical device thread means that MCUT commands shall execute in 
+ * the order that they are provided by a client application. And if two logical 
+ * threads are associated with the device then multiple API commands may also run
+ * concurrently subject to their dependency list.  
+ * 
+ * Concurrent commands share the pool of N helper threads.
+ *
+ * @param [out] pContext a pointer to the allocated context handle
+ * @param [in] flags bitfield containing the context creation flags
+ * @param [in] helperThreadCount Number of helper-threads to assist device-threads with parallel work.
+ *
+ * An example of usage:
+ * @code
+ * McContext myContext = MC_NULL_HANDLE;
+ * McResult err = mcCreateContextWithHelpers(&myContext, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, 2);
+ * if(err != MC_NO_ERROR)
+ * {
+ *  // deal with error
+ * }
+ * @endcode
+ *
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL
+ *   -# Failure to allocate resources
+ *   -# \p flags defines an invalid bitfield.
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextWithHelpers(
+    McContext* pOutContext, McFlags contextFlags, uint32_t helperThreadCount);
+
 /** @brief Specify a callback to receive debugging messages from the MCUT library.
  *
  * ::mcDebugMessageCallback sets the current debug output callback function to the function whose address is
