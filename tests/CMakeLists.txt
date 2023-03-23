@@ -66,10 +66,11 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/source/polygonWithHoles.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/triangulation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/off.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/getEventInfo.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/getEventInfo.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/concurrentSynchronizedContexts.cpp)
 
 target_include_directories(mcut_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
-target_link_libraries(mcut_tests PRIVATE mcut)
+target_link_libraries(mcut_tests PRIVATE mcut Threads::Threads)
 target_compile_definitions(mcut_tests PRIVATE -DMESHES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/meshes" )
 target_compile_options(mcut_tests PRIVATE ${compilation_flags})
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

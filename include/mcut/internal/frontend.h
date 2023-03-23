@@ -386,9 +386,8 @@ extern std::once_flag g_objects_counter_init_flag;
 template <typename Derived>
 void fn_delete_cc(connected_component_t* p)
 {
-
-    delete static_cast<Derived*>(p);
     log_msg("[MCUT] Destroy connected component " << p->m_user_handle);
+    delete dynamic_cast<Derived*>(p);
 }
 
 // struct defining the state of a context object
@@ -442,7 +441,7 @@ public:
         , m_flags(flags)
         , m_user_handle(handle)
     {
-        log_msg("[MCUT] Create context " << m_user_handle);
+        log_msg("\n[MCUT] Create context " << m_user_handle);
 
         try {
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;

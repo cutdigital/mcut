@@ -189,8 +189,6 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
         ASSERT_TRUE(queued != 0);
     }
 
-    
-
     McSize start = 0;
     {
         bytes = 0;
@@ -213,9 +211,9 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
         ASSERT_TRUE(end != 0);
     }
 
-    ASSERT_LT(submit, queued );
+    ASSERT_LT(submit, queued);
 
-    ASSERT_GT( queued -submit, (McSize)0);
+    ASSERT_GT(queued - submit, (McSize)0);
 
     ASSERT_LT(queued, start);
 
@@ -224,4 +222,6 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
     ASSERT_LT(start, end);
 
     ASSERT_GT(end - start, (McSize)0);
+
+    ASSERT_EQ(mcReleaseEvents(1, &dispatchEvent), MC_NO_ERROR);
 }
