@@ -767,7 +767,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
     McEvent* pEvent);
 
 /**
- * @brief Non-asychronous version of ::mcEnqueueDispatch. This
+ * @brief Blocking version of ::mcEnqueueDispatch. This
  * function blocks until the operation is completed
  *
  * @param context
@@ -922,8 +922,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
  *   -# \p numConnComps and \p pConnComps are both NULL.
  *   -# \p numConnComps is zero and \p pConnComps is not NULL.
- *   -# \p numEventsInWaitlist Number of events in the waitlist.
- *   -# \p pEventWaitList events that need to complete before this particular command can be executed
+ *   -# \p 
  */
 MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
     const McContext context,
@@ -936,7 +935,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
     McEvent* pEvent);
 
 /**
- * @brief Non-asychronous version of ::mcEnqueueGetConnectedComponents. This
+ * @brief Blocking version of ::mcEnqueueGetConnectedComponents. This
  * function blocks until the operation is completed
  *
  * @param context
@@ -1016,7 +1015,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
     McEvent* pEvent);
 
 /**
- * @brief Non-asychronous version of ::mcEnqueueGetConnectedComponents. This
+ * @brief Blocking version of ::mcEnqueueGetConnectedComponents. This
  * function blocks until the operation is completed.
  *
  * @param context
