@@ -512,6 +512,7 @@ public:
         g_events.push_front(event_ptr);
 
         event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
+        event_ptr->m_profiling_enabled = (this->m_flags & MC_PROFILING_ENABLE) != 0;
 
         event_ptr->log_submit_time();
 

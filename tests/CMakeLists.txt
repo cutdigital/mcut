@@ -65,7 +65,8 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/source/getDataMaps.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/polygonWithHoles.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/triangulation.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/off.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/off.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/getEventInfo.cpp)
 
 target_include_directories(mcut_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
 target_link_libraries(mcut_tests PRIVATE mcut)

@@ -390,12 +390,12 @@ typedef enum McEventCommandExecStatus {
 typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
     MC_DONT_CARE = 1 << 1, /**< wildcard.*/
-    MC_EVENT_RUNTIME_EXECUTION_STATUS = 1 << 2, /**< Error/status code associated with the runtime of the asynchronous/non-blocking part of the associated task.*/
+    MC_EVENT_RUNTIME_EXECUTION_STATUS = 1 << 2, /**< Error/status code associated with the runtime of the asynchronous/non-blocking part of the associated task. See also ::McResult */
     MC_EVENT_TIMESTAMP_QUEUED = 1 << 3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event is enqueued in an internal queue by the internal scheduler. */
     MC_EVENT_TIMESTAMP_SUBMIT = 1 << 4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
     MC_EVENT_TIMESTAMP_START = 1 << 5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
     MC_EVENT_TIMESTAMP_END = 1 << 6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
-    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 7 /**< the execution status of the command identified by event. See also :: */
+    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 7 /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
 } McQueryFlags;
 
 /**
@@ -617,7 +617,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
  * @param[in] pMem A pointer to memory where the appropriate result being queried is returned. If param_value is NULL, it is ignored.
  * @param[in] pNumBytes Returns the actual size in bytes of data copied to `pMem`. If `pNumBytes` is NULL, it is ignored.
  *
- * Using clGetInfo to determine if a operation identified by event has finished
+ * Using mcGetEventInfo to determine if a operation identified by event has finished
  * execution (i.e. MC_EVENT_COMMAND_EXECUTION_STATUS returns MC_COMPLETE) is not
  * a synchronization point. There are no guarantees that the memory objects being
  * modified by the operation associated with event will be visible to other
@@ -630,7 +630,10 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
  *   -# proper exit
  * - ::MC_INVALID_VALUE
  *   -# \p event is not a valid object
- *   -# \p ...
+ *   -# \p bytes is greater than zero but \p pMem is null.
+ *   -# \p bytes is zero but \p pMem is not null.
+ *   -# \p bytes is zero \p pMem is null and \p pNumBytes is null.
+ *   -# \p bytes is incompatible with \p info.
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes);
 /**

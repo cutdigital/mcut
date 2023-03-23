@@ -193,12 +193,16 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info,
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     } else if (bytes != 0 && pMem == nullptr) {
         per_thread_api_log_str = "invalid specification (param2 & param3)";
-    } else if (false == (info == MC_EVENT_RUNTIME_EXECUTION_STATUS)) // check all possible values
-    {
-        per_thread_api_log_str = "invalid info flag val (param1)";
-    } else if ((info == MC_EVENT_RUNTIME_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
+    } else if ((info == MC_EVENT_RUNTIME_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McResult))) {
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
-    } else {
+    }
+    else if ((info == MC_EVENT_COMMAND_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
+        per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
+    }
+    else if ((info == MC_EVENT_TIMESTAMP_QUEUED || info == MC_EVENT_TIMESTAMP_SUBMIT|| info ==  MC_EVENT_TIMESTAMP_START || info == MC_EVENT_TIMESTAMP_END ) && (pMem != nullptr && bytes != sizeof(McSize))) {
+        per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
+    }
+     else {
         try {
             get_event_info_impl(event, info, bytes, pMem, pNumBytes);
         }
