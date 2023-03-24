@@ -230,7 +230,7 @@ void get_event_info_impl(
             if (bytes < sizeof(McResult)) {
                 throw std::invalid_argument("invalid bytes");
             }
-            McResult status = event_ptr->m_execution_status;
+            McResult status = (McResult)event_ptr->m_runtime_exec_status.load();
             memcpy(pMem, reinterpret_cast<void*>(&status), bytes);
         }
         break;
@@ -302,7 +302,10 @@ void wait_for_events_impl(
             // a valid object in "g_contexts"
             throw std::invalid_argument("null event object");
         } else {
-            event_ptr->m_future.wait(); // block until contect-device is done
+            if(event_ptr->m_future.valid())
+            {
+                event_ptr->m_future.get(); // block until context-device is done
+            }
         }
     }
 }

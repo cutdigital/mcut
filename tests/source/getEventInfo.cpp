@@ -211,11 +211,11 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
         ASSERT_TRUE(end != 0);
     }
 
-    ASSERT_LT(submit, queued);
+    ASSERT_LT(queued, submit);
 
-    ASSERT_GT(queued - submit, (McSize)0);
+    ASSERT_GT(submit - queued, (McSize)0);
 
-    ASSERT_LT(queued, start);
+    ASSERT_LT(submit, start);
 
     ASSERT_GT(start - queued, (McSize)0);
 

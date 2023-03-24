@@ -375,7 +375,7 @@ typedef enum McDispatchFlags {
  */
 typedef enum McEventCommandExecStatus {
     MC_QUEUED = 1 << 0, /**< Operation has been enqueued in the internal-queue. */
-    MC_SUBMITTED = 1 << 1, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
+    MC_SUBMITTED = 1 << 1, /**< enqueued operation has been submitted by the client thread to the internal "device". */
     MC_RUNNING = 1 << 2, /**< Operation is currently running. */
     MC_COMPLETE = 1 << 3 /**< The operation has completed. */
     

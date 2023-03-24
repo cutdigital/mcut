@@ -203,7 +203,13 @@ UTEST_F(ConcurrentSynchronizedContexts, parallelButUnsynchronisedDispatchCalls)
         McEventCommandExecStatus dispatchEventStatus = (McEventCommandExecStatus)MC_UNDEFINED_VALUE;
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
 
-        ASSERT_TRUE(dispatchEventStatus == McEventCommandExecStatus::MC_COMPLETE);
+        {
+            if (dispatchEventStatus != McEventCommandExecStatus::MC_COMPLETE)
+            {
+                ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
+            }
+        }
+        ASSERT_EQ(dispatchEventStatus, McEventCommandExecStatus::MC_COMPLETE);
 
         ASSERT_EQ(mcReleaseEvents(1, &dispatchEvent), MC_NO_ERROR);
     };

@@ -271,18 +271,18 @@ struct event_t {
     McEvent m_user_handle; // handle used by client app to reference this event object
     // the Manager thread which was assigned the task of managing the task associated with this event object.
     uint32_t m_responsible_thread_id;
-    McResult m_execution_status; // API return code associated with respective task (for user to query)
+    std::atomic<int32_t> m_runtime_exec_status; // API return code associated with respective task (for user to query)
     std::atomic<size_t> m_timestamp_queued;
     std::atomic<size_t> m_timestamp_submit;
     std::atomic<size_t> m_timestamp_start;
     std::atomic<size_t> m_timestamp_end;
-    std::atomic<McFlags> m_command_exec_status;
+    std::atomic<uint32_t> m_command_exec_status;
     bool m_profiling_enabled;
     McCommandType m_command_type;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
-        , m_execution_status(MC_RESULT_MAX_ENUM)
+        , m_runtime_exec_status(MC_RESULT_MAX_ENUM)
         , m_timestamp_queued(0)
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
@@ -368,7 +368,7 @@ struct event_t {
     void notify_task_complete(McResult exec_status)
     {
         m_finished = true;
-        m_execution_status = exec_status;
+        m_runtime_exec_status = exec_status;
 
         std::lock_guard<std::mutex> lock(m_callback_mutex);
         if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
@@ -527,7 +527,7 @@ public:
         event_ptr->m_profiling_enabled = (this->m_flags & MC_PROFILING_ENABLE) != 0;
         event_ptr->m_command_type = cmdType;
 
-        event_ptr->log_submit_time();
+        event_ptr->log_queued_time();
 
         // List of events the enqueued task depends on
         //
@@ -552,7 +552,7 @@ public:
 
             if (parent_task_is_not_finished) {
                 // id of manager thread, which was assigned the parent task
-                const uint32_t responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id;
+                responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id;
 
                 MCUT_ASSERT(responsible_thread_id != UINT32_MAX);
                 MCUT_ASSERT(responsible_thread_id < (uint32_t)m_api_threads.size());
@@ -621,6 +621,7 @@ public:
 
                         event->notify_task_complete(return_value); // updated event state to indicate task completion (lock-based)
                         event->log_end_time();
+
                     }
                 }
             });
@@ -629,7 +630,7 @@ public:
         event_ptr->m_responsible_thread_id = responsible_thread_id;
 
         m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible thread is free
-        event_ptr->log_queued_time();
+        event_ptr->log_submit_time();
 
         return event_ptr->m_user_handle;
     }

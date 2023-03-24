@@ -33,7 +33,6 @@
 #pragma warning(disable : 26812)
 #endif
 
-
 MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags)
 {
     McResult return_value = McResult::MC_NO_ERROR;
@@ -183,7 +182,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
     return return_value;
 }
 
-
 MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes)
 {
     McResult return_value = McResult::MC_NO_ERROR;
@@ -195,14 +193,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info,
         per_thread_api_log_str = "invalid specification (param2 & param3)";
     } else if ((info == MC_EVENT_RUNTIME_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McResult))) {
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
-    }
-    else if ((info == MC_EVENT_COMMAND_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
+    } else if ((info == MC_EVENT_COMMAND_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
-    }
-    else if ((info == MC_EVENT_TIMESTAMP_QUEUED || info == MC_EVENT_TIMESTAMP_SUBMIT|| info ==  MC_EVENT_TIMESTAMP_START || info == MC_EVENT_TIMESTAMP_END ) && (pMem != nullptr && bytes != sizeof(McSize))) {
+    } else if ((info == MC_EVENT_TIMESTAMP_QUEUED || info == MC_EVENT_TIMESTAMP_SUBMIT || info == MC_EVENT_TIMESTAMP_START || info == MC_EVENT_TIMESTAMP_END) && (pMem != nullptr && bytes != sizeof(McSize))) {
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
-    }
-     else {
+    } else {
         try {
             get_event_info_impl(event, info, bytes, pMem, pNumBytes);
         }
@@ -219,8 +214,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info,
 
     return return_value;
 }
-
-
 
 MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
     uint32_t numEventsInWaitlist,
@@ -419,7 +412,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         &event);
 
     if (return_value == MC_NO_ERROR) { // API parameter checks are fine
-        if(event != MC_NULL_HANDLE) // event must exist to wait on and query
+        if (event != MC_NULL_HANDLE) // event must exist to wait on and query
         {
             wait_for_events_impl(1, &event); // block until event of mcEnqueueDispatch is completed!
             
@@ -489,14 +482,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
 {
     McEvent event = MC_NULL_HANDLE;
     McResult return_value = mcEnqueueGetConnectedComponents(context, connectedComponentType, numEntries, pConnComps, numConnComps, 0, nullptr, &event);
-    if(event != MC_NULL_HANDLE) // event must exist to wait on and query
-        {
-            wait_for_events_impl(1, &event); // block until event of task is completed!
-            
-            get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+    if (event != MC_NULL_HANDLE) // event must exist to wait on and query
+    {
+        wait_for_events_impl(1, &event); // block until event of task is completed!
+        
+        get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
 
-            release_events_impl(1, &event); // destroy
-        }
+        release_events_impl(1, &event); // destroy
+    }
     return return_value;
 }
 
@@ -561,14 +554,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
 {
     McEvent event = MC_NULL_HANDLE;
     McResult return_value = mcEnqueueGetConnectedComponentData(context, connCompId, queryFlags, bytes, pMem, pNumBytes, 0, nullptr, &event);
-    if(event != MC_NULL_HANDLE) // event must exist to wait on and query
-        {
-            wait_for_events_impl(1, &event); // block until event of task is completed!
-            
-            get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+    if (event != MC_NULL_HANDLE) // event must exist to wait on and query
+    {
+        wait_for_events_impl(1, &event); // block until event of task is completed!
 
-            release_events_impl(1, &event); // destroy
-        }
+        get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+
+        release_events_impl(1, &event); // destroy
+    }
     return return_value;
 }
 
