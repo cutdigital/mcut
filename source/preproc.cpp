@@ -96,7 +96,7 @@ bool client_input_arrays_to_hmesh(
 
     const bool assume_triangle_mesh = (pFaceSizes == nullptr);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // init partial sums vec
     std::vector<uint32_t> partial_sums(numFaces, 3); // assume that "pFaceSizes" is filled with 3's (which is the implication if pFaceSizes is null)
 
@@ -235,7 +235,7 @@ bool client_input_arrays_to_hmesh(
             return false;
         }
     }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     int faceSizeOffset = 0;
     std::vector<vd_t> faceVertices;
 
@@ -343,7 +343,7 @@ bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
     std::vector<int> cc_to_vertex_count;
     std::vector<int> cc_to_face_count;
     int n = find_connected_components(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         context_ptr->get_shared_compute_threadpool() ,
 #endif
         fccmap, m, cc_to_vertex_count, cc_to_face_count);
@@ -1264,7 +1264,7 @@ extern "C" void preproc(
 
     input_t kernel_input; // kernel/backend inpout
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     kernel_input.scheduler = &context_ptr->get_shared_compute_threadpool() ;
 #endif
 
@@ -1330,7 +1330,7 @@ extern "C" void preproc(
     std::vector<fd_t> source_hmesh_BVH_leafdata_array;
     std::vector<bounding_box_t<vec3>> source_hmesh_face_aabb_array;
     build_oibvh(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         context_ptr->get_shared_compute_threadpool() ,
 #endif
         *source_hmesh.get(), source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, source_hmesh_face_aabb_array);
@@ -1395,7 +1395,7 @@ extern "C" void preproc(
 
     std::map<fd_t, std::vector<fd_t>> ps_face_to_potentially_intersecting_others; // result of BVH traversal
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     kernel_output.status.store(status_t::SUCCESS);
 #else
     kernel_output.status = status_t::SUCCESS;
@@ -1424,7 +1424,7 @@ extern "C" void preproc(
         // here we check the reason (if any) for entering the loop body.
         // NOTE: the aforementioned 2 reasons could both be false, which will
         // be the case during the first iteration (i.e. when "kernel_invocation_counter == 0")
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         bool general_position_assumption_was_violated = ((kernel_output.status.load() == status_t::GENERAL_POSITION_VIOLATION));
         bool floating_polygon_was_detected = kernel_output.status.load() == status_t::DETECTED_FLOATING_POLYGON;
 #else
@@ -1433,7 +1433,7 @@ extern "C" void preproc(
 #endif
 
         // Here we reset the kernel execution status
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         kernel_output.status.store(status_t::SUCCESS);
 #else
         kernel_output.status = status_t::SUCCESS;
@@ -1496,7 +1496,7 @@ extern "C" void preproc(
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
                     context_ptr->get_shared_compute_threadpool() ,
 #endif
                     *cut_hmesh.get(), cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array, cut_hmesh_face_face_aabb_array, numerical_perturbation_constant);
@@ -1537,7 +1537,7 @@ extern "C" void preproc(
                 source_hmesh_BVH_aabb_array.clear();
                 source_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
                     context_ptr->get_shared_compute_threadpool() ,
 #endif
                     *source_hmesh.get(),
@@ -1554,7 +1554,7 @@ extern "C" void preproc(
                 cut_hmesh_BVH_aabb_array.clear();
                 cut_hmesh_BVH_leafdata_array.clear();
                 build_oibvh(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
                     context_ptr->get_shared_compute_threadpool() ,
 #endif
                     *cut_hmesh.get(),
@@ -1603,7 +1603,7 @@ extern "C" void preproc(
             intersectOIBVHs(ps_face_to_potentially_intersecting_others, source_hmesh_BVH_aabb_array, source_hmesh_BVH_leafdata_array, cut_hmesh_BVH_aabb_array, cut_hmesh_BVH_leafdata_array);
 #else
             BoundingVolumeHierarchy::intersectBVHTrees(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
                 context_ptr->get_shared_compute_threadpool() ,
 #endif
                 ps_face_to_potentially_intersecting_others,
@@ -1625,7 +1625,7 @@ extern "C" void preproc(
                 if (general_position_assumption_was_violated && cut_mesh_perturbation_count > 0) {
                     // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
                     // We need to perturb again. (The whole cut mesh)
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
                     kernel_output.status.store(status_t::GENERAL_POSITION_VIOLATION);
 #else
                     kernel_output.status = status_t::GENERAL_POSITION_VIOLATION;
@@ -1660,7 +1660,7 @@ extern "C" void preproc(
             throw e;
         }
     } while (
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         (kernel_output.status.load() == status_t::GENERAL_POSITION_VIOLATION && kernel_input.enforce_general_position) || //
         kernel_output.status.load() == status_t::DETECTED_FLOATING_POLYGON
 #else
@@ -2042,7 +2042,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_vertex_maps) {
             omi->data_maps.vertex_map.resize(cut_hmesh->number_of_vertices());
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             auto fn_fill_vertex_map = [&](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                 for (vertex_array_iterator_t i = block_start_; i != block_end_; ++i) {
                     omi->data_maps.vertex_map[*i] = vd_t((*i) + source_hmesh->number_of_vertices()); // apply offset like kernel does
@@ -2064,7 +2064,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_face_maps) {
             omi->data_maps.face_map.resize(cut_hmesh->number_of_faces());
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             auto fn_fill_face_map = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
                 for (face_array_iterator_t i = block_start_; i != block_end_; ++i) {
                     omi->data_maps.face_map[*i] = fd_t((*i) + source_hmesh->number_of_faces()); // apply offset like kernel does
@@ -2136,7 +2136,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_vertex_maps) {
             omi->data_maps.vertex_map.resize(source_hmesh->number_of_vertices());
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             auto fn_fill_vertex_map = [&](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                 for (vertex_array_iterator_t i = block_start_; i != block_end_; ++i) {
                     omi->data_maps.vertex_map[*i] = *i; // one to one mapping
@@ -2157,7 +2157,7 @@ extern "C" void preproc(
 
         if (kernel_input.populate_face_maps) {
             omi->data_maps.face_map.resize(source_hmesh->number_of_faces());
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             auto fn_fill_face_map = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
                 for (face_array_iterator_t i = block_start_; i != block_end_; ++i) {
                     omi->data_maps.face_map[*i] = *i; // one to one mapping

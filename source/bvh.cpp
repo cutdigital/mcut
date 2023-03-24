@@ -200,7 +200,7 @@ unsigned int morton3D(float x, float y, float z)
 };
 
 void build_oibvh(
-    #if defined(MCUT_MULTI_THREADED)
+    #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& pool,
     #endif
     const hmesh_t& mesh,
@@ -219,7 +219,7 @@ void build_oibvh(
 
     face_bboxes.resize(meshFaceCount); //, bounding_box_t<vec3>());
     std::vector<vec3> face_bbox_centers(meshFaceCount, vec3());
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
         auto fn_compute_face_bbox_data = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
             for (face_array_iterator_t f = block_start_; f != block_end_; ++f) {
@@ -278,7 +278,7 @@ void build_oibvh(
     bvhAABBs.resize(bvhNodeCount);
     bounding_box_t<vec3>& meshBbox = bvhAABBs.front(); // root bounding box
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
         std::mutex bbox_expansion_mtx;
         auto fn_compute_mesh_bbox = [&](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
@@ -311,7 +311,7 @@ void build_oibvh(
 
     std::vector<std::pair<fd_t, uint32_t>> bvhLeafNodeDescriptors(meshFaceCount, std::pair<fd_t, uint32_t>());
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
         auto fn_compute_morton_codes = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
             for (face_array_iterator_t f = block_start_; f != block_end_; ++f) {
@@ -372,7 +372,7 @@ void build_oibvh(
     const int leftmost_real_node_on_leaf_level = get_level_leftmost_node(leaf_level_index);
     const int rightmost_real_leaf = get_rightmost_real_leaf(leaf_level_index, meshFaceCount);
     const int rightmost_real_node_on_leaf_level = get_level_rightmost_real_node(rightmost_real_leaf, leaf_level_index, leaf_level_index);
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
         auto fn_save_leaf_node_info = [&](std::vector<std::pair<fd_t, uint32_t>>::const_iterator block_start_, std::vector<std::pair<fd_t, uint32_t>>::const_iterator block_end_) {
             for (std::vector<std::pair<fd_t, uint32_t>>::const_iterator it = block_start_; it != block_end_; ++it) {
@@ -426,7 +426,7 @@ void build_oibvh(
         const int leftmost_real_node_on_level = get_level_leftmost_node(level_index);
         const int number_of_real_nodes_on_level = (rightmost_real_node_on_level - leftmost_real_node_on_level) + 1;
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         {
             // allows us to pretend that we can use an iterator over the nodes
             std::vector<uint8_t> level_nodes_placeholder(number_of_real_nodes_on_level);
@@ -1003,7 +1003,7 @@ const fd_t& BoundingVolumeHierarchy::GetPrimitive(int index) const
 }
 
 void BoundingVolumeHierarchy::intersectBVHTrees(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& scheduler,
 #endif
     std::map<fd_t, std::vector<fd_t>>& symmetric_intersecting_pairs,
@@ -1087,7 +1087,7 @@ void BoundingVolumeHierarchy::intersectBVHTrees(
     // start with pair of root nodes
     std::vector<std::pair<int, int>> todo(1, std::make_pair(0, 0));
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
         // master thread intersects the BVHs until the number of node pairs
         // reaches a threshold (or workload was small enough that traversal
@@ -1141,7 +1141,7 @@ void BoundingVolumeHierarchy::intersectBVHTrees(
     }
 #else
     fn_intersectBVHTrees(todo, symmetric_intersecting_pairs, std::numeric_limits<uint32_t>::max());
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 }
 
 #endif

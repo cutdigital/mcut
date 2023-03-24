@@ -27,7 +27,7 @@
 #	MCUT_BUILD_DOCUMENTATION [default=OFF] - Build documentation (explicit dependancy on Doxygen) 
 #	MCUT_BUILD_TESTS [default=OFF] - Build the tests (implicit dependancy on GoogleTest)
 #	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
-#	MCUT_BUILD_WITH_MULTITHREADING [default=ON] - Build as configurable multi-threaded library
+#	MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL [default=ON] - Build as configurable multi-threaded library
 #
 # This script will define the following CMake cache variables:
 #
@@ -113,7 +113,7 @@ if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TESTS)
 	option(MCUT_BUILD_TESTS "Configure to build tests" ON)
 endif()
 option(MCUT_BUILD_AS_SHARED_LIB "Configure to build MCUT as a shared/dynamic library" ON)
-option(MCUT_BUILD_WITH_MULTITHREADING "Configure to build MCUT as a multi-threaded library" ON)
+option(MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL "Configure to build MCUT as a multi-threaded library" ON)
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS) 
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
@@ -139,8 +139,8 @@ find_package(Threads REQUIRED)
 
 list(APPEND extra_libs Threads::Threads) 
 
-if (MCUT_BUILD_WITH_MULTITHREADING)
-	list(APPEND preprocessor_defs -DMCUT_MULTI_THREADED=1)
+if (MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL)
+	list(APPEND preprocessor_defs -DMCUT_WITH_COMPUTE_HELPER_THREADPOOL=1)
 endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

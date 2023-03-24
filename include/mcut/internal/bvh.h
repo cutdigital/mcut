@@ -25,7 +25,7 @@
 #include "mcut/internal/hmesh.h"
 #include "mcut/internal/math.h"
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 #include "mcut/internal/tpool.h"
 #endif
 
@@ -101,7 +101,7 @@ extern int get_node_mem_index(
     const int rightmostRealNodeImplicitIndexOnNodeLevel);
 
 extern void build_oibvh(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& pool,
 #endif
     const hmesh_t& mesh,
@@ -303,7 +303,7 @@ public:
     const fd_t& GetPrimitive(int index) const;
 
     static void intersectBVHTrees(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         thread_pool& scheduler,
 #endif
         std::map<fd_t, std::vector<fd_t>>& symmetric_intersecting_pairs,

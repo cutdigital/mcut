@@ -24,7 +24,7 @@
 #define MCUT_KERNEL_H
 #include <mcut/internal/bvh.h>
 #include <mcut/internal/hmesh.h>
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 #include <mcut/internal/tpool.h>
 #endif
 
@@ -110,7 +110,7 @@ struct floating_polygon_info_t {
 // settings for how to execute the function "dispatch(...)"
 //
 struct input_t {
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool* scheduler = nullptr;
 #endif
     /*const*/ std::shared_ptr<hmesh_t> src_mesh = nullptr;
@@ -179,7 +179,7 @@ struct output_mesh_info_t {
 //
 struct output_t {
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     std::atomic<status_t> status;
 #else
     status_t status = status_t::SUCCESS;
@@ -213,7 +213,7 @@ struct output_t {
 void dispatch(output_t& out, const input_t& in);
 
 int find_connected_components(
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& scheduler,
 #endif
     std::vector<int>& fccmap, const hmesh_t& mesh, std::vector<int>& cc_to_vertex_count,

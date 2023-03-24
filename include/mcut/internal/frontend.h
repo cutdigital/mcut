@@ -43,10 +43,8 @@
 #include <string>
 #include <future>
 
-
-#if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
-#endif
+
 #include "mcut/internal/kernel.h"
 
 /*
@@ -207,7 +205,7 @@ struct connected_component_t {
     // the original "birth-face" in an input mesh (source mesh or cut mesh)
     std::vector<uint32_t> cdt_face_map_cache;
     bool cdt_face_map_cache_initialized = false;
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // Stores the number of vertices per face of CC. This is an optimization
     // because there is a possibility that face-sizes may (at-minimum) be queried
     // twice by user. The first case is during the populating (i.e. second) call to the API
@@ -224,7 +222,7 @@ struct connected_component_t {
     // Similar concepts but applied to MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE
     std::vector<uint32_t> face_adjacent_faces_size_cache;
     bool face_adjacent_faces_size_cache_initialized = false;
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 };
 
 // struct representing a fragment
@@ -407,11 +405,13 @@ private:
     // submit tasks to the shared compute threadpool ("m_compute_threadpool").
     // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
     std::vector<std::thread> m_api_threads;
-    join_threads m_joiner;
+    //join_threads m_joiner;
 
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // A pool of threads that is shared by manager threads to execute e.g. parallel
     // section of MCUT API tasks (see e.g. frontend.cpp and kernel.cpp)
     std::unique_ptr<thread_pool> m_compute_threadpool;
+#endif
 
     // The state and flag variable current used to configure the next dispatch call
     McFlags m_flags = (McFlags)0;
@@ -437,9 +437,13 @@ private:
     }
 
 public:
-    context_t(McContext handle, McFlags flags, uint32_t num_compute_threads)
+    context_t(McContext handle, McFlags flags
+    #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    , uint32_t num_compute_threads
+    #endif
+    )
         : m_done(false)
-        , m_joiner(m_api_threads)
+       // , m_joiner(m_api_threads)
         , m_flags(flags)
         , m_user_handle(handle)
     {
@@ -454,12 +458,12 @@ public:
                 m_queues[i].set_done_ptr(&m_done);
                 m_api_threads.push_back(std::thread(&context_t::api_thread_main, this, i));
             }
-
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             // create the pool of compute threads. These are the worker threads that
             // can be tasked with work from any manager-thread. Thus, manager threads
             // share the available/user-specified compute threads.
             m_compute_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_compute_threads, manager_thread_count));
-
+#endif
         } catch (...) {
             shutdown();
 
@@ -477,7 +481,9 @@ public:
     void shutdown()
     {
         m_done = true;
+        #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         m_compute_threadpool.reset();
+        #endif
         for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
             m_queues[i].disrupt_wait_for_data();
             if (m_api_threads[i].joinable()) {
@@ -494,10 +500,12 @@ public:
         return this->m_flags;
     }
 
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& get_shared_compute_threadpool()
     {
         return m_compute_threadpool.get()[0];
     }
+#endif
 
     template <typename FunctionType>
     McEvent enqueue(uint32_t numEventsInWaitlist, const McEvent* pEventWaitList, FunctionType api_fn)

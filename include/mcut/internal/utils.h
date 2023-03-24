@@ -308,4 +308,9 @@ extern std::stack<std::unique_ptr<mini_timer>> g_timestack;
         std::cerr << ss.str();      \
     }
 
+
+// used to marked/label unused function parameters to prevent warnings
+#define UNUSED(x) [&x]{}()
+
+
 #endif // MCUT_UTILS_H_

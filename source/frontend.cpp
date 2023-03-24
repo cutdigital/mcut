@@ -31,12 +31,22 @@ std::once_flag g_objects_counter_init_flag; // flag used to initialise "g_object
 
 void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperThreadCount)
 {
+#if !defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    UNUSED(helperThreadCount);
+#endif
+
     MCUT_ASSERT(pOutContext != nullptr);
 
     std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xDECAF); /*any non-ero value*/ });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
-    g_contexts.push_front(std::shared_ptr<context_t>(new context_t(handle, flags, helperThreadCount)));
+    g_contexts.push_front(std::shared_ptr<context_t>(
+        new context_t(handle, flags
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+            ,
+            helperThreadCount
+#endif
+            )));
 
     *pOutContext = handle;
 }
@@ -250,8 +260,7 @@ void get_event_info_impl(
         }
         break;
     }
-    case MC_EVENT_COMMAND_EXECUTION_STATUS:
-    {
+    case MC_EVENT_COMMAND_EXECUTION_STATUS: {
         if (pMem == nullptr) {
             *pNumBytes = sizeof(McFlags);
         } else {
@@ -260,7 +269,7 @@ void get_event_info_impl(
             }
             memcpy(pMem, reinterpret_cast<void*>(&event_ptr->m_command_exec_status), bytes);
         }
-    }break;
+    } break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -1297,7 +1306,7 @@ void get_connected_component_data_impl_detail(
 
             float* casted_ptr = reinterpret_cast<float*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
 
                 auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
@@ -1330,7 +1339,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint64_t elem_offset = 0;
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data->mesh->vertices_begin(); viter != cc_uptr->kernel_hmesh_data->mesh->vertices_end(); ++viter) {
                 const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(*viter);
@@ -1347,7 +1356,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(float)) <= allocated_bytes);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE: {
@@ -1373,7 +1382,7 @@ void get_connected_component_data_impl_detail(
 
             double* casted_ptr = reinterpret_cast<double*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 typedef vertex_array_iterator_t InputStorageIteratorType;
 
@@ -1407,7 +1416,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->mesh->vertices_end(),
                     fn_copy_vertex_coords);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint64_t elem_offset = 0;
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data->mesh->vertices_begin(); viter != cc_uptr->kernel_hmesh_data->mesh->vertices_end(); ++viter) {
 
@@ -1424,7 +1433,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(float)) <= allocated_bytes);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
@@ -1432,7 +1441,7 @@ void get_connected_component_data_impl_detail(
         if (pMem == nullptr) { // querying for number of bytes
             uint32_t num_indices = 0;
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 // each worker-thread will count the number of indices according
                 // to the number of faces in its range/block. The master thread
@@ -1479,7 +1488,7 @@ void get_connected_component_data_impl_detail(
                     num_indices += num_indices_THREAD_LOCAL;
                 }
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
                 const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_vertices_around_face(*fiter);
 
@@ -1488,7 +1497,7 @@ void get_connected_component_data_impl_detail(
                 num_indices += num_vertices_around_face;
             }
 
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             MCUT_ASSERT(num_indices >= 3); // min is a triangle
 
             *pNumBytes = num_indices * sizeof(uint32_t);
@@ -1500,7 +1509,7 @@ void get_connected_component_data_impl_detail(
             const uint32_t num_indices_to_copy = bytes / sizeof(uint32_t);
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 // step 1: compute array storing face sizes (recursive API call)
                 // - for computing exclusive sum
@@ -1586,7 +1595,7 @@ void get_connected_component_data_impl_detail(
                     fn_face_indices_copy,
                     (1 << 14)); // blocks until all work is done
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 
             std::vector<vd_t> cc_face_vertices;
             uint32_t elem_offset = 0;
@@ -1611,7 +1620,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT(elem_offset == num_indices_to_copy);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 
         } // if (pMem == nullptr) { // querying for number of bytes
     } break;
@@ -1630,7 +1639,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 const uint32_t face_count = cc_uptr->kernel_hmesh_data->mesh->number_of_faces();
 
@@ -1706,7 +1715,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t num_face_adjacent_face_indices = 0;
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 // each worker-thread will count the number of indices according
                 // to the number of faces in its range/block. The master thread
@@ -1744,7 +1753,7 @@ void get_connected_component_data_impl_detail(
                     num_face_adjacent_face_indices += num_face_adjacent_face_indices_THREAD_LOCAL;
                 }
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
                 const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(*fiter, nullptr);
                 num_face_adjacent_face_indices += num_faces_around_face;
@@ -1760,7 +1769,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 // step 1: compute array storing face-adjacent-face sizes (recursive API call)
                 // - for computing exclusive sum
@@ -1845,7 +1854,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->mesh->faces_end(),
                     fn_face_adjface_indices_copy); // blocks until all work is done
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint64_t elem_offset = 0;
             std::vector<fd_t> faces_around_face;
 
@@ -1863,7 +1872,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE: {
@@ -1882,7 +1891,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 const uint32_t face_count = cc_uptr->kernel_hmesh_data->mesh->number_of_faces();
 
@@ -1933,7 +1942,7 @@ void get_connected_component_data_impl_detail(
                     memcpy(casted_ptr, &(cc_uptr->face_adjacent_faces_size_cache[0]), sizeof(uint32_t) * face_count);
                 }
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint64_t elem_offset = 0;
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
                 const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(*fiter, nullptr);
@@ -1942,7 +1951,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
 
@@ -1960,7 +1969,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 auto fn_copy_edges = [&casted_ptr, &cc_uptr](edge_array_iterator_t block_start_, edge_array_iterator_t block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
@@ -1986,7 +1995,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->mesh->edges_end(),
                     fn_copy_edges);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint64_t elem_offset = 0;
             for (edge_array_iterator_t eiter = cc_uptr->kernel_hmesh_data->mesh->edges_begin(); eiter != cc_uptr->kernel_hmesh_data->mesh->edges_end(); ++eiter) {
                 const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data->mesh->vertex(*eiter, 0);
@@ -1999,7 +2008,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT((elem_offset * sizeof(uint32_t)) <= bytes);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_TYPE: {
@@ -2135,7 +2144,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 auto fn_copy_seam_vertices = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<vd_t>::const_iterator block_start_, std::vector<vd_t>::const_iterator block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
@@ -2160,7 +2169,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->seam_vertices.cend(),
                     fn_copy_seam_vertices);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint32_t elem_offset = 0;
             for (uint32_t i = 0; i < elems_to_copy; ++i) {
                 const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data->seam_vertices[i];
@@ -2200,7 +2209,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 auto fn_copy_vertex_map = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<vd_t>::const_iterator block_start_, std::vector<vd_t>::const_iterator block_end_) {
                     // thread starting offset
@@ -2258,7 +2267,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->data_maps.vertex_map.cend(),
                     fn_copy_vertex_map);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint32_t elem_offset = 0;
             for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each vertex in CC
             {
@@ -2317,7 +2326,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT(elem_offset <= vertex_map_size);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
@@ -2346,7 +2355,7 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
                 auto fn_copy_face_map = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<fd_t>::const_iterator block_start_, std::vector<fd_t>::const_iterator block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
@@ -2381,7 +2390,7 @@ void get_connected_component_data_impl_detail(
                     cc_uptr->kernel_hmesh_data->data_maps.face_map.cend(),
                     fn_copy_face_map);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint32_t elem_offset = 0;
             for (uint32_t i = 0; i < elems_to_copy; ++i) // ... for each FACE (to copy) in CC
             {
@@ -2395,7 +2404,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT(elem_offset <= face_map_size);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION: {
@@ -2417,7 +2426,7 @@ void get_connected_component_data_impl_detail(
                 cc_uptr->cdt_face_map_cache.reserve(cc_face_count * 1.2);
             }
 
-#if defined(MCUT_MULTI_THREADED)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             {
 
                 // the offset from which each thread will write its CDT indices
@@ -2567,7 +2576,7 @@ void get_connected_component_data_impl_detail(
                     fn_triangulate_faces,
                     min_per_thread);
             }
-#else // #if defined(MCUT_MULTI_THREADED)
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             uint32_t face_indices_offset = 0;
             cc_uptr->cdt_index_cache.reserve(cc_face_count * 1.2);
 
@@ -2612,7 +2621,7 @@ void get_connected_component_data_impl_detail(
                     // triangulated!
                     std::vector<uint32_t> cc_face_triangulation;
 
-                    triangulate_face(cc_face_triangulation, context_uptr, cc_face_vcount, cc_face_vertices, cc.get()[0], *cc_face_iter);
+                    triangulate_face(cc_face_triangulation, context_ptr, cc_face_vcount, cc_face_vertices, cc.get()[0], *cc_face_iter);
 
                     //
                     // Change local triangle indices to global index values (in CC) and save
@@ -2645,7 +2654,7 @@ void get_connected_component_data_impl_detail(
             }
 
             MCUT_ASSERT(cc_uptr->cdt_index_cache.size() >= 3);
-#endif // #if defined(MCUT_MULTI_THREADED)
+#endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             cc_uptr->cdt_index_cache_initialized = true;
 
             if (user_requested_cdt_face_maps) {
