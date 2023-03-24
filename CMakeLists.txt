@@ -135,12 +135,12 @@ if(MCUT_BUILD_AS_SHARED_LIB)
 	list(APPEND preprocessor_defs -DMCUT_SHARED_LIB=1)
 endif()
 
-if (MCUT_BUILD_WITH_MULTITHREADING)
-	find_package(Threads REQUIRED)
+find_package(Threads REQUIRED)
 
-	list(APPEND extra_libs Threads::Threads) 
+list(APPEND extra_libs Threads::Threads) 
+
+if (MCUT_BUILD_WITH_MULTITHREADING)
 	list(APPEND preprocessor_defs -DMCUT_MULTI_THREADED=1)
-	
 endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

@@ -42,7 +42,7 @@
 #include <memory>
 #include <string>
 #include <future>
-#include <atomic>
+
 
 #if defined(MCUT_MULTI_THREADED)
 #include "mcut/internal/tpool.h"
