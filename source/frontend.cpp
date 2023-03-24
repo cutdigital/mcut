@@ -262,12 +262,24 @@ void get_event_info_impl(
     }
     case MC_EVENT_COMMAND_EXECUTION_STATUS: {
         if (pMem == nullptr) {
-            *pNumBytes = sizeof(McFlags);
+            *pNumBytes = sizeof(McEventCommandExecStatus);
         } else {
-            if (bytes < sizeof(McFlags)) {
+            if (bytes < sizeof(McEventCommandExecStatus)) {
                 throw std::invalid_argument("invalid bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(&event_ptr->m_command_exec_status), bytes);
+            McEventCommandExecStatus status = (McEventCommandExecStatus)event_ptr->m_command_exec_status.load();
+            memcpy(pMem, reinterpret_cast<void*>(&status), bytes);
+        }
+    } break;
+    case MC_EVENT_COMMAND_TYPE: {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McCommandType);
+        } else {
+            if (bytes < sizeof(McCommandType)) {
+                throw std::invalid_argument("invalid bytes");
+            }
+            McCommandType cmdType = (McCommandType)event_ptr->m_command_type;
+            memcpy(pMem, reinterpret_cast<void*>(&cmdType), bytes);
         }
     } break;
     default:
@@ -338,8 +350,8 @@ void dispatch_impl(
 
     // submit the dispatch call to be executed asynchronously and return the future
     // object that will be waited on as an event
-    const McEvent event_handle = context_ptr->enqueue(
-        numEventsInWaitlist, pEventWaitList,
+    const McEvent event_handle = context_ptr->prepare_and_submit_API_task(
+        MC_COMMAND_DISPATCH, numEventsInWaitlist, pEventWaitList,
         [=]() {
             if (!context_weak_ptr.expired()) {
                 std::shared_ptr<context_t> context = context_weak_ptr.lock();
@@ -384,8 +396,8 @@ void get_connected_components_impl(
 
     std::weak_ptr<context_t> context_weak_ptr(context_ptr);
 
-    const McEvent event_handle = context_ptr->enqueue(
-        numEventsInWaitlist, pEventWaitList,
+    const McEvent event_handle = context_ptr->prepare_and_submit_API_task(
+        MC_COMMAND_GET_CONNECTED_COMPONENTS, numEventsInWaitlist, pEventWaitList,
         [=]() {
             if (!context_weak_ptr.expired()) {
                 std::shared_ptr<context_t> context = context_weak_ptr.lock();
@@ -2779,8 +2791,8 @@ void get_connected_component_data_impl(
 
     std::weak_ptr<context_t> context_weak_ptr(context_ptr);
 
-    const McEvent event_handle = context_ptr->enqueue(
-        numEventsInWaitlist, pEventWaitList,
+    const McEvent event_handle = context_ptr->prepare_and_submit_API_task(
+        MC_COMMAND_GET_CONNECTED_COMPONENT_DATA, numEventsInWaitlist, pEventWaitList,
         [=]() {
             if (!context_weak_ptr.expired()) {
                 std::shared_ptr<context_t> context = context_weak_ptr.lock();

@@ -155,12 +155,12 @@ UTEST_F(ConcurrentSynchronizedContexts, sequentialDispatchCalls)
         size_t bytes = 0;
 
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), MC_NO_ERROR);
-        ASSERT_EQ(bytes, sizeof(McFlags));
+        ASSERT_EQ(bytes, sizeof(McEventCommandExecStatus));
 
-        McFlags dispatchEventStatus = MC_UNDEFINED_VALUE;
+        McEventCommandExecStatus dispatchEventStatus = (McEventCommandExecStatus)MC_UNDEFINED_VALUE;
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
 
-        ASSERT_TRUE(dispatchEventStatus == MC_COMPLETE);
+        ASSERT_TRUE(dispatchEventStatus == McEventCommandExecStatus::MC_COMPLETE);
 
         ASSERT_EQ(mcReleaseEvents(1, &dispatchEvent), MC_NO_ERROR);
     }
@@ -197,12 +197,12 @@ UTEST_F(ConcurrentSynchronizedContexts, parallelButUnsynchronisedDispatchCalls)
         size_t bytes = 0;
 
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), MC_NO_ERROR);
-        ASSERT_EQ(bytes, sizeof(McFlags));
+        ASSERT_EQ(bytes, sizeof(McEventCommandExecStatus));
 
-        McFlags dispatchEventStatus = MC_UNDEFINED_VALUE;
+        McEventCommandExecStatus dispatchEventStatus = (McEventCommandExecStatus)MC_UNDEFINED_VALUE;
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
 
-        ASSERT_TRUE(dispatchEventStatus == MC_COMPLETE);
+        ASSERT_TRUE(dispatchEventStatus == McEventCommandExecStatus::MC_COMPLETE);
 
         ASSERT_EQ(mcReleaseEvents(1, &dispatchEvent), MC_NO_ERROR);
     };

@@ -277,6 +277,7 @@ struct event_t {
     std::atomic<size_t> m_timestamp_start;
     std::atomic<size_t> m_timestamp_end;
     std::atomic<McFlags> m_command_exec_status;
+    McCommandType m_command_type;
     bool m_profiling_enabled;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
@@ -287,7 +288,8 @@ struct event_t {
         , m_timestamp_start(0)
         , m_timestamp_end(0)
         , m_command_exec_status(McEventCommandExecStatus::MC_QUEUED)
-        , m_profiling_enabled(true)
+        , m_profiling_enabled(true),
+        m_command_type(MC_COMMAND_UKNOWN)
     {
         log_msg("[MCUT] Create event " << this);
 
@@ -508,7 +510,7 @@ public:
 #endif
 
     template <typename FunctionType>
-    McEvent enqueue(uint32_t numEventsInWaitlist, const McEvent* pEventWaitList, FunctionType api_fn)
+    McEvent prepare_and_submit_API_task(McCommandType cmdType, uint32_t numEventsInWaitlist, const McEvent* pEventWaitList, FunctionType api_fn)
     {
         //
         // create the event object associated with the enqueued task
@@ -522,6 +524,7 @@ public:
 
         event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
         event_ptr->m_profiling_enabled = (this->m_flags & MC_PROFILING_ENABLE) != 0;
+        event_ptr->m_command_type = cmdType;
 
         event_ptr->log_submit_time();
 

@@ -110,9 +110,9 @@ typedef uint32_t McFlags;
 typedef size_t McSize;
 
 /**
- * @brief 32-bit type.
+ * @brief 32-bit unsigned type.
  *
- * Integral type representing an value.
+ * Integral type representing an index value.
  */
 typedef uint32_t McIndex;
 
@@ -257,7 +257,6 @@ typedef enum McConnectedComponentData {
     MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION = (1 << 19), /**< List of 3*N triangulated face indices, where N is the number of triangles that are produced using a [Constrained] Delaunay triangulation. Such a triangulation is similar to a Delaunay triangulation, but each (non-triangulated) face segment is present as a single edge in the triangulation. A constrained Delaunay triangulation is not truly a Delaunay triangulation. Some of its triangles might not be Delaunay, but they are all constrained Delaunay. */
     MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP = (1 << 20), /**< List of a subset of face indices from one of the input meshes (source-mesh or the cut-mesh). Each value will be the index of an input mesh face. This index-value corresponds to the connected-component face at the accessed index. Example: the value at index 0 of the queried array is the index of the face in the original input mesh. Note that all triangulated-faces are mapped to a defined value. In order to clearly distinguish indices of the cut mesh from those of the source mesh, an input-mesh face index value corresponds to a cut-mesh vertex-index if it is great-than-or-equal-to the number of source-mesh faces. The input connected component (source-mesh or cut-mesh) that is referred to must be one stored internally by MCUT (i.e. a connected component queried from the API via ::McInputOrigin), to ensure consistency with any modification done internally by MCUT. */
     // TODO MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_CDT = (1<<20) /**< List of 3*N triangulated face indices, where N is the number of triangles that are produced using a [Conforming] Delaunay triangulation. A conforming Delaunay triangulation (CDT) of a PSLG (i.e. a face of in the given connected component) is a true Delaunay triangulation in which each PSLG segment/edge may have been subdivided into several edges by the insertion of additional vertices, called Steiner points. Steiner points are necessary to allow the segments to exist in the mesh while maintaining the Delaunay property. This Delaunay property follows from the definition of a "Delaunay triangulation": the Delaunay triangulation is the triangulation such that, if you circumscribe a circle around every triangle, none of those circles will contain any other points. Alternatively, the Delaunay triangulation is the triangulation that “maximizes the minimum angle in all of the triangles.”. Steiner points are not inserted to meet constraints on the minimum angle and maximum triangle area. MCUT computes a CDT of a given connected component starting only from the faces that have more than three vertices. Neighbouring (triangle) faces will also be processed (i.e. refined) if their incident edges are split as a result of performing CDT on the current face. */
-
 } McConnectedComponentData;
 
 /**
@@ -379,7 +378,21 @@ typedef enum McEventCommandExecStatus {
     MC_SUBMITTED = 1 << 1, /**< enqueued operation has been submitted by the client thread to the internal task queue. */
     MC_RUNNING = 1 << 2, /**< Operation is currently running. */
     MC_COMPLETE = 1 << 3 /**< The operation has completed. */
+    
 } McEventCommandExecStatus;
+
+/**
+ * \enum McCommandType
+ * @brief Flags for identifying event commands.
+ *
+ * This enum structure defines the flags which are used for identifying the MCUT command associated with an event.
+ */
+typedef enum McCommandType {
+    MC_COMMAND_DISPATCH = 1 << 0, /**< From McEnqueueDispatch. */
+    MC_COMMAND_GET_CONNECTED_COMPONENTS = 1 << 1, /**< From McEnqueueGetConnectedComponents. */
+    MC_COMMAND_GET_CONNECTED_COMPONENT_DATA = 1 << 2, /**< From McEnqueueGetConnectedComponentData. */
+    MC_COMMAND_UKNOWN
+} McCommandType;
 
 /**
  * \enum McQueryFlags
@@ -395,7 +408,9 @@ typedef enum McQueryFlags {
     MC_EVENT_TIMESTAMP_SUBMIT = 1 << 4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
     MC_EVENT_TIMESTAMP_START = 1 << 5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
     MC_EVENT_TIMESTAMP_END = 1 << 6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
-    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 7 /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
+    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 7, /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
+    MC_EVENT_CONTEXT = 1 << 8, /**< The context associated with event. */
+    MC_EVENT_COMMAND_TYPE = 1 << 9 /**< The command associated with event. Can be one of the values in :: */
 } McQueryFlags;
 
 /**
@@ -454,21 +469,21 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(
 /** @brief Create an MCUT context object with N helper threads.
  *
  * This method creates a context object with an additonal number of threads that
- * assist the internal scheduler with compute workloads. The returned a handle 
- * shall be used by a client applications to control the API state and access data. 
- * 
+ * assist the internal scheduler with compute workloads. The returned a handle
+ * shall be used by a client applications to control the API state and access data.
+ *
  * Unless otherwise stated, MCUT runs asynchronously with the user application.
  * Non-blocking commands issued with a given context run on a conceptual "device",
- * which executes independently of the client application. This device is  
- * associated with one logical thread by default. Two logical threads will be 
+ * which executes independently of the client application. This device is
+ * associated with one logical thread by default. Two logical threads will be
  * associated with the device if MC_OUT_OF_ORDER_EXEC_MODE_ENABLE is provided as
- * a flag. 
- * 
- * Having one logical device thread means that MCUT commands shall execute in 
- * the order that they are provided by a client application. And if two logical 
+ * a flag.
+ *
+ * Having one logical device thread means that MCUT commands shall execute in
+ * the order that they are provided by a client application. And if two logical
  * threads are associated with the device then multiple API commands may also run
- * concurrently subject to their dependency list.  
- * 
+ * concurrently subject to their dependency list.
+ *
  * Concurrent commands share the pool of N helper threads.
  *
  * @param [out] pContext a pointer to the allocated context handle
@@ -647,9 +662,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlag
  * command associated with event is complete.
  * Each call to clSetEventCallback registers the specified user callback function
  * and replaces any previously specified callback.
- * An enqueued callbacks shall be called before the event object is destroyed.
+ * An enqueued callback shall be called before the event object is destroyed.
  * The callback must return promptly. The behavior of calling expensive system
- * routines, or blocking MCUT operations etc. in a callback is undefined.
+ * routines, or calling blocking MCUT operations etc. in a callback is undefined.
  * It is the application's responsibility to ensure that the callback function is
  * thread-safe.
  *
@@ -767,46 +782,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
     McEvent* pEvent);
 
 /**
- * @brief Blocking version of ::mcEnqueueDispatch. This
- * function blocks until the operation is completed
- *
- * @param context
- * @param flags
- * @param pSrcMeshVertices
- * @param pSrcMeshFaceIndices
- * @param pSrcMeshFaceSizes
- * @param numSrcMeshVertices
- * @param numSrcMeshFaces
- * @param pCutMeshVertices
- * @param pCutMeshFaceIndices
- * @param pCutMeshFaceSizes
- * @param numCutMeshVertices
- * @param numCutMeshFaces
- * @return MCAPI_ATTR
- *
- * An example of usage:
- * @code
- *  McResult err = mcDispatch(
- *        myContext,
- *        // parse vertex arrays as 32 bit vertex coordinates (float*)
- *        MC_DISPATCH_VERTEX_ARRAY_FLOAT,
- *        // source mesh data
- *        pSrcMeshVertices,
- *        pSrcMeshFaceIndices,
- *        pSrcMeshFaceSizes,
- *        numSrcMeshVertices,
- *       numSrcMeshFaces,
- *        // cut mesh data
- *        pCutMeshVertices,
- *        pCutMeshFaceIndices,
- *        pCutMeshFaceSizes,
- *        numCutMeshVertices,
- *        numCutMeshFaces);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- * @endcode
+ * @brief Blocking version of ::mcEnqueueDispatch.
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     McContext context,
@@ -893,7 +869,8 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  * @code
  * uint32_t numConnComps = 0;
  * McConnectedComponent* pConnComps;
- * McResult err =  err = mcGetConnectedComponents(myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
+ * McEvent ev = MC_NULL_HANDLE;
+ * McResult err =  err = mcGetConnectedComponents(myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps, 0, NULL, &ev);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -905,11 +882,12 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  *
  * pConnComps = (McConnectedComponent*)malloc(sizeof(McConnectedComponent) * numConnComps);
  *
- * err = mcGetConnectedComponents(myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, numConnComps, pConnComps, NULL);
+ * err = mcGetConnectedComponents(myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, numConnComps, pConnComps, NULL, 1, &ev, NULL);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
  * }
+ * ...
  * @endcode
  *
  * @return Error code.
@@ -922,7 +900,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
  *   -# \p connectedComponentType is not a value in ::McConnectedComponentType.
  *   -# \p numConnComps and \p pConnComps are both NULL.
  *   -# \p numConnComps is zero and \p pConnComps is not NULL.
- *   -# \p 
+ *   -# \p
  */
 MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
     const McContext context,
@@ -935,15 +913,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
     McEvent* pEvent);
 
 /**
- * @brief Blocking version of ::mcEnqueueGetConnectedComponents. This
- * function blocks until the operation is completed
- *
- * @param context
- * @param connectedComponentType
- * @param numEntries
- * @param pConnComps
- * @param numConnComps
- * @return MCAPI_ATTR
+ * @brief Blocking version of ::mcEnqueueGetConnectedComponents.
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     const McContext context,
@@ -973,7 +943,8 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  * @code
  * uint64_t numBytes = 0;
  * McEvent bytesQueryEvent=MC_NULL_HANDLE;
- * McResult err = mcEnqueueGetConnectedComponentData(myContext,  connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes, 0, NULL, &bytesQueryEvent);
+ * McEvent ev = MC_NULL_HANDLE;
+ * McResult err = mcEnqueueGetConnectedComponentData(myContext,  connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes, 0, NULL, &bytesQueryEvent, 0, NULL, &ev);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -981,7 +952,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  *
  * double* pVertices = (double*)malloc(numBytes);
  * // this operation shall happen AFTER the preceding operation associated with "bytesQueryEvent".
- * err = mcEnqueueGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL, 1, &bytesQueryEvent, NULL);
+ * err = mcEnqueueGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL, 1, &bytesQueryEvent, NULL, 1, &ev, NULL);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -1015,36 +986,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
     McEvent* pEvent);
 
 /**
- * @brief Blocking version of ::mcEnqueueGetConnectedComponents. This
- * function blocks until the operation is completed.
- *
- * @param context
- * @param connCompId
- * @param flags
- * @param bytes
- * @param pMem
- * @param pNumBytes
- *
- * An example of usage:
- * @code
- * uint64_t numBytes = 0;
- * McResult err = mcGetConnectedComponentData(myContext,  connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- *
- * double* pVertices = (double*)malloc(numBytes);
- *
- * err = mcGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL);
- * if(err != MC_NO_ERROR)
- * {
- *  // deal with error
- * }
- * @endcode
- *
- *
- * @return MCAPI_ATTR
+ * @brief Blocking version of ::mcEnqueueGetConnectedComponents.
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
@@ -1081,7 +1023,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
  *
  * The event object is deleted once the reference count becomes zero, the specific
  * command identified by this event has completed (or terminated) and there are
- * no commands in the command-queue of a context that require a wait for this
+ * no commands in the internal-queue of a context that require a wait for this
  * event to complete.
  *
  * @return Error code.
