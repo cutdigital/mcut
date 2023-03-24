@@ -23,7 +23,7 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         cmake -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.shared}} \
-              -DMCUT_BUILD_WITH_MULTITHREADING=${{matrix.multithreading}} \
+              -DMCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL=${{matrix.multithreading}} \
               $GITHUB_WORKSPACE
 
     - name: Build

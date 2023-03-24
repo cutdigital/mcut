@@ -38,10 +38,10 @@
 
 #include "mcut/mcut.h"
 
+#include <future>
 #include <map>
 #include <memory>
 #include <string>
-#include <future>
 
 #include "mcut/internal/tpool.h"
 
@@ -277,8 +277,8 @@ struct event_t {
     std::atomic<size_t> m_timestamp_start;
     std::atomic<size_t> m_timestamp_end;
     std::atomic<McFlags> m_command_exec_status;
-    McCommandType m_command_type;
     bool m_profiling_enabled;
+    McCommandType m_command_type;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
@@ -288,8 +288,8 @@ struct event_t {
         , m_timestamp_start(0)
         , m_timestamp_end(0)
         , m_command_exec_status(McEventCommandExecStatus::MC_QUEUED)
-        , m_profiling_enabled(true),
-        m_command_type(MC_COMMAND_UKNOWN)
+        , m_profiling_enabled(true)
+        , m_command_type(MC_COMMAND_UKNOWN)
     {
         log_msg("[MCUT] Create event " << this);
 
@@ -407,7 +407,7 @@ private:
     // submit tasks to the shared compute threadpool ("m_compute_threadpool").
     // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
     std::vector<std::thread> m_api_threads;
-    //join_threads m_joiner;
+    // join_threads m_joiner;
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // A pool of threads that is shared by manager threads to execute e.g. parallel
@@ -440,12 +440,13 @@ private:
 
 public:
     context_t(McContext handle, McFlags flags
-    #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-    , uint32_t num_compute_threads
-    #endif
-    )
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+        ,
+        uint32_t num_compute_threads
+#endif
+        )
         : m_done(false)
-       // , m_joiner(m_api_threads)
+        // , m_joiner(m_api_threads)
         , m_flags(flags)
         , m_user_handle(handle)
     {
@@ -483,9 +484,9 @@ public:
     void shutdown()
     {
         m_done = true;
-        #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         m_compute_threadpool.reset();
-        #endif
+#endif
         for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
             m_queues[i].disrupt_wait_for_data();
             if (m_api_threads[i].joinable()) {

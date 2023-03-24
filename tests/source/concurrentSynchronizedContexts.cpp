@@ -64,7 +64,8 @@ UTEST_F_SETUP(ConcurrentSynchronizedContexts)
     // create the context objects
     for (int i = 0; i < (int)utest_fixture->contexts.size(); ++i) {
         utest_fixture->contexts[i] = MC_NULL_HANDLE;
-        ASSERT_EQ(mcCreateContext(&utest_fixture->contexts[i], MC_OUT_OF_ORDER_EXEC_MODE_ENABLE), MC_NO_ERROR);
+        uint32_t helpers = ((i % 2 == 0) ? 1 : 0);
+        ASSERT_EQ(mcCreateContextWithHelpers(&utest_fixture->contexts[i], MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, helpers), MC_NO_ERROR);
         ASSERT_TRUE(utest_fixture->contexts[i] != nullptr);
     }
 

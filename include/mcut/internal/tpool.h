@@ -166,7 +166,13 @@ public:
 
     void disrupt_wait_for_data()
     {
-        data_cond.notify_all();
+        // https://stackoverflow.com/questions/60658842/condition-variable-doesnt-get-notified-to-wake-up-even-with-a-predicate
+        //
+        // Need to this to prevent data race, which can happen when user-app thread
+        // is too slow to reach this function i.e. that an API/context/device thread
+        // waits on the condition variable AFTER the client thread calls notify_one()
+        std::unique_lock<std::mutex> lock(head_mutex);
+        data_cond.notify_one();
     }
 
     void push(T new_value)
