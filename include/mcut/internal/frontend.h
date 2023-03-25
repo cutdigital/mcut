@@ -601,7 +601,7 @@ public:
                     wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
                 }
 
-                MCUT_ASSERT(!event_weak_ptr.expired())
+                MCUT_ASSERT(!event_weak_ptr.expired());
 
                 {
                     std::shared_ptr<event_t> event = event_weak_ptr.lock();
