@@ -95,16 +95,16 @@ extern "C" void debug_message_control_impl(
 extern "C" void get_info_impl(
     const McContext context,
     McFlags info,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes) noexcept(false);
+    McSize* pNumBytes) noexcept(false);
 
 extern "C" void get_event_info_impl(
     const McEvent event,
     McFlags info,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes) noexcept(false);
+    McSize* pNumBytes) noexcept(false);
 
 extern "C" void set_event_callback_impl(
     McEvent eventHandle,
@@ -146,9 +146,9 @@ extern "C" void get_connected_component_data_impl(
     const McContext context,
     const McConnectedComponent connCompId,
     McFlags flags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes,
+    McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
     McEvent* pEvent) noexcept(false);
@@ -272,7 +272,6 @@ struct event_t {
     // the Manager thread which was assigned the task of managing the task associated with this event object.
     uint32_t m_responsible_thread_id;
     std::atomic<int32_t> m_runtime_exec_status; // API return code associated with respective task (for user to query)
-    std::atomic<size_t> m_timestamp_queued;
     std::atomic<size_t> m_timestamp_submit;
     std::atomic<size_t> m_timestamp_start;
     std::atomic<size_t> m_timestamp_end;
@@ -283,11 +282,10 @@ struct event_t {
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
         , m_runtime_exec_status(MC_RESULT_MAX_ENUM)
-        , m_timestamp_queued(0)
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
         , m_timestamp_end(0)
-        , m_command_exec_status(McEventCommandExecStatus::MC_QUEUED)
+        , m_command_exec_status(MC_RESULT_MAX_ENUM)
         , m_profiling_enabled(true)
         , m_command_type(MC_COMMAND_UKNOWN)
     {
@@ -313,14 +311,6 @@ struct event_t {
     inline std::size_t get_time_since_epoch()
     {
         return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    }
-
-    inline void log_queued_time()
-    {
-        if (m_profiling_enabled) {
-            this->m_timestamp_queued.store(get_time_since_epoch());
-        }
-        m_command_exec_status = McEventCommandExecStatus::MC_QUEUED;
     }
 
     inline void log_submit_time()
@@ -534,7 +524,7 @@ public:
         event_ptr->m_profiling_enabled = (this->m_flags & MC_PROFILING_ENABLE) != 0;
         event_ptr->m_command_type = cmdType;
 
-        event_ptr->log_queued_time();
+        event_ptr->log_submit_time();
 
         // List of events the enqueued task depends on
         //
@@ -640,14 +630,7 @@ public:
         event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents
         event_ptr->m_responsible_thread_id = responsible_thread_id;
 
-        // we log the submit (i.e. call log_submit_time()) BEFORE actually submitting incase the current 
-        // (user) thread stalls as "push(std::move(task))" is exeuting such that
-        // the API thread run and logs the "running" and "complete" states BEFORE
-        // the current (user) threads has actually logged the "submit" state. 
-        event_ptr->log_submit_time();
-
         m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible API thread is free
-        
 
         return event_ptr->m_user_handle;
     }

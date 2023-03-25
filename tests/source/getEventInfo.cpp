@@ -140,7 +140,7 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
 
         // can be any because task runs asynchronously
-        ASSERT_TRUE(dispatchEventStatus == MC_QUEUED || //
+        ASSERT_TRUE(
             dispatchEventStatus == MC_SUBMITTED || //
             dispatchEventStatus == MC_RUNNING || //
             dispatchEventStatus == MC_COMPLETE);
@@ -177,18 +177,6 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
         ASSERT_TRUE(submit != 0);
     }
 
-    McSize queued = 0;
-
-    {
-        bytes = 0;
-        ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_TIMESTAMP_QUEUED, 0, NULL, &bytes), MC_NO_ERROR);
-        ASSERT_EQ(bytes, sizeof(McSize));
-
-        ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_TIMESTAMP_QUEUED, bytes, &queued, NULL), MC_NO_ERROR);
-
-        ASSERT_TRUE(queued != 0);
-    }
-
     McSize start = 0;
     {
         bytes = 0;
@@ -211,13 +199,9 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
         ASSERT_TRUE(end != 0);
     }
 
-    ASSERT_LT(queued, submit);
-
-    ASSERT_GT(submit - queued, (McSize)0);
-
     ASSERT_LT(submit, start);
 
-    ASSERT_GT(start - queued, (McSize)0);
+    ASSERT_GT(start - submit, (McSize)0);
 
     ASSERT_LT(start, end);
 

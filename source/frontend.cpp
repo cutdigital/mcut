@@ -179,9 +179,9 @@ void debug_message_control_impl(
 void get_info_impl(
     const McContext contextHandle,
     McFlags info,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes)
+    McSize* pNumBytes)
 {
     std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
@@ -211,9 +211,9 @@ void get_info_impl(
 void get_event_info_impl(
     const McEvent event,
     McFlags info,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes)
+    McSize* pNumBytes)
 {
     std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> ptr) { return ptr->m_user_handle == event; });
 
@@ -235,7 +235,6 @@ void get_event_info_impl(
         }
         break;
     }
-    case MC_EVENT_TIMESTAMP_QUEUED:
     case MC_EVENT_TIMESTAMP_SUBMIT:
     case MC_EVENT_TIMESTAMP_START:
     case MC_EVENT_TIMESTAMP_END: {
@@ -246,9 +245,7 @@ void get_event_info_impl(
                 throw std::invalid_argument("invalid bytes");
             }
             McSize nanoseconds_since_epoch = 0;
-            if (info == MC_EVENT_TIMESTAMP_QUEUED) {
-                nanoseconds_since_epoch = event_ptr->m_timestamp_queued.load();
-            } else if (info == MC_EVENT_TIMESTAMP_SUBMIT) {
+            if (info == MC_EVENT_TIMESTAMP_SUBMIT) {
                 nanoseconds_since_epoch = event_ptr->m_timestamp_submit.load();
             } else if (info == MC_EVENT_TIMESTAMP_START) {
                 nanoseconds_since_epoch = event_ptr->m_timestamp_start.load();
@@ -1269,9 +1266,9 @@ void get_connected_component_data_impl_detail(
     std::shared_ptr<context_t> context_ptr,
     const McConnectedComponent connCompId,
     McFlags flags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes)
+    McSize* pNumBytes)
 {
 #if 0
     std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(context);
@@ -1300,7 +1297,7 @@ void get_connected_component_data_impl_detail(
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT");
 
-        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data->mesh->number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const McSize allocated_bytes = cc_uptr->kernel_hmesh_data->mesh->number_of_vertices() * sizeof(float) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
 
         if (pMem == nullptr) {
             *pNumBytes = allocated_bytes;
@@ -1311,13 +1308,13 @@ void get_connected_component_data_impl_detail(
             } // if
 
             // an element is a component
-            const uint64_t nelems = (uint64_t)(bytes / sizeof(float));
+            const McSize nelems = (McSize)(bytes / sizeof(float));
 
             if (nelems % 3 != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint64_t num_vertices_to_copy = (nelems / 3);
+            const McSize num_vertices_to_copy = (nelems / 3);
 
             float* casted_ptr = reinterpret_cast<float*>(pMem);
 
@@ -1326,9 +1323,9 @@ void get_connected_component_data_impl_detail(
 
                 auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data->mesh->vertices_begin(), block_start_);
+                    const McSize base_offset = std ::distance(cc_uptr->kernel_hmesh_data->mesh->vertices_begin(), block_start_);
 
-                    uint64_t elem_offset = base_offset * 3;
+                    McSize elem_offset = base_offset * 3;
 
                     for (vertex_array_iterator_t vertex_iter = block_start_; vertex_iter != block_end_; ++vertex_iter) {
 
@@ -1355,7 +1352,7 @@ void get_connected_component_data_impl_detail(
                     fn_copy_vertex_coords);
             }
 #else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-            uint64_t elem_offset = 0;
+            McSize elem_offset = 0;
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data->mesh->vertices_begin(); viter != cc_uptr->kernel_hmesh_data->mesh->vertices_end(); ++viter) {
                 const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(*viter);
 
@@ -1376,7 +1373,7 @@ void get_connected_component_data_impl_detail(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE");
-        const uint64_t allocated_bytes = cc_uptr->kernel_hmesh_data->mesh->number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
+        const McSize allocated_bytes = cc_uptr->kernel_hmesh_data->mesh->number_of_vertices() * sizeof(double) * 3ul; // cc_uptr->indexArrayMesh.numVertices * sizeof(float) * 3;
 
         if (pMem == nullptr) {
             *pNumBytes = allocated_bytes;
@@ -1387,13 +1384,13 @@ void get_connected_component_data_impl_detail(
             } // if
 
             // an element is a component
-            const int64_t nelems = (uint64_t)(bytes / sizeof(double));
+            const int64_t nelems = (McSize)(bytes / sizeof(double));
 
             if (nelems % 3 != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint64_t num_vertices_to_copy = (nelems / 3);
+            const McSize num_vertices_to_copy = (nelems / 3);
 
             double* casted_ptr = reinterpret_cast<double*>(pMem);
 
@@ -1403,9 +1400,9 @@ void get_connected_component_data_impl_detail(
 
                 auto fn_copy_vertex_coords = [&casted_ptr, &cc_uptr, &num_vertices_to_copy](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    const uint64_t base_offset = std ::distance(cc_uptr->kernel_hmesh_data->mesh->vertices_begin(), block_start_);
+                    const McSize base_offset = std ::distance(cc_uptr->kernel_hmesh_data->mesh->vertices_begin(), block_start_);
 
-                    uint64_t elem_offset = base_offset * 3;
+                    McSize elem_offset = base_offset * 3;
 
                     for (InputStorageIteratorType vertex_iter = block_start_; vertex_iter != block_end_; ++vertex_iter) {
 
@@ -1432,7 +1429,7 @@ void get_connected_component_data_impl_detail(
                     fn_copy_vertex_coords);
             }
 #else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-            uint64_t elem_offset = 0;
+            McSize elem_offset = 0;
             for (vertex_array_iterator_t viter = cc_uptr->kernel_hmesh_data->mesh->vertices_begin(); viter != cc_uptr->kernel_hmesh_data->mesh->vertices_end(); ++viter) {
 
                 const vec3& coords = cc_uptr->kernel_hmesh_data->mesh->vertex(*viter);
@@ -1469,7 +1466,7 @@ void get_connected_component_data_impl_detail(
                     uint32_t num_indices_LOCAL = 0;
 
                     // thread starting offset (in vertex count) in the "array of vertices"
-                    // const uint64_t face_base_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
+                    // const McSize face_base_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     for (InputStorageIteratorType fiter = block_start_; fiter != block_end_; ++fiter) {
 
@@ -1709,7 +1706,7 @@ void get_connected_component_data_impl_detail(
             }
 #else
             //
-            uint64_t elem_offset = 0;
+            McSize elem_offset = 0;
 
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
                 const uint32_t num_vertices_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_vertices_around_face(*fiter);
@@ -1870,7 +1867,7 @@ void get_connected_component_data_impl_detail(
                     fn_face_adjface_indices_copy); // blocks until all work is done
             }
 #else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-            uint64_t elem_offset = 0;
+            McSize elem_offset = 0;
             std::vector<fd_t> faces_around_face;
 
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
@@ -1958,7 +1955,7 @@ void get_connected_component_data_impl_detail(
                 }
             }
 #else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-            uint64_t elem_offset = 0;
+            McSize elem_offset = 0;
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
                 const uint32_t num_faces_around_face = cc_uptr->kernel_hmesh_data->mesh->get_num_faces_around_face(*fiter, nullptr);
                 *(casted_ptr + elem_offset) = num_faces_around_face;
@@ -1988,9 +1985,9 @@ void get_connected_component_data_impl_detail(
             {
                 auto fn_copy_edges = [&casted_ptr, &cc_uptr](edge_array_iterator_t block_start_, edge_array_iterator_t block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
-                    const uint64_t base_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->edges_begin(), block_start_);
+                    const McSize base_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->edges_begin(), block_start_);
 
-                    uint64_t elem_offset = base_offset * 2; // two (vertex) indices per edge
+                    McSize elem_offset = base_offset * 2; // two (vertex) indices per edge
 
                     for (edge_array_iterator_t edge_iter = block_start_; edge_iter != block_end_; ++edge_iter) {
 
@@ -2011,7 +2008,7 @@ void get_connected_component_data_impl_detail(
                     fn_copy_edges);
             }
 #else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-            uint64_t elem_offset = 0;
+            McSize elem_offset = 0;
             for (edge_array_iterator_t eiter = cc_uptr->kernel_hmesh_data->mesh->edges_begin(); eiter != cc_uptr->kernel_hmesh_data->mesh->edges_end(); ++eiter) {
                 const vertex_descriptor_t v0 = cc_uptr->kernel_hmesh_data->mesh->vertex(*eiter, 0);
                 *(casted_ptr + elem_offset) = (uint32_t)v0;
@@ -2163,9 +2160,9 @@ void get_connected_component_data_impl_detail(
             {
                 auto fn_copy_seam_vertices = [&casted_ptr, &cc_uptr, &elems_to_copy](std::vector<vd_t>::const_iterator block_start_, std::vector<vd_t>::const_iterator block_end_) {
                     // thread starting offset (in edge count) in the "array of edges"
-                    const uint64_t base_offset = std::distance(cc_uptr->kernel_hmesh_data->seam_vertices.cbegin(), block_start_);
+                    const McSize base_offset = std::distance(cc_uptr->kernel_hmesh_data->seam_vertices.cbegin(), block_start_);
 
-                    uint64_t elem_offset = base_offset;
+                    McSize elem_offset = base_offset;
 
                     for (std::vector<vd_t>::const_iterator sv_iter = block_start_; sv_iter != block_end_; ++sv_iter) {
 
@@ -2779,9 +2776,9 @@ void get_connected_component_data_impl(
     const McContext contextHandle,
     const McConnectedComponent connCompId,
     McFlags flags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes,
+    McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
     McEvent* pEvent)

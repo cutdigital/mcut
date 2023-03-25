@@ -150,7 +150,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
     return return_value;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes)
+MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -182,7 +182,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
     return return_value;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes)
+MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -195,7 +195,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info,
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
     } else if ((info == MC_EVENT_COMMAND_EXECUTION_STATUS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
-    } else if ((info == MC_EVENT_TIMESTAMP_QUEUED || info == MC_EVENT_TIMESTAMP_SUBMIT || info == MC_EVENT_TIMESTAMP_START || info == MC_EVENT_TIMESTAMP_END) && (pMem != nullptr && bytes != sizeof(McSize))) {
+    } else if ((info == MC_EVENT_TIMESTAMP_SUBMIT || info == MC_EVENT_TIMESTAMP_START || info == MC_EVENT_TIMESTAMP_END) && (pMem != nullptr && bytes != sizeof(McSize))) {
         per_thread_api_log_str = "invalid byte size (param2)"; // leads to e.g. "out of bounds" memory access during memcpy
     } else {
         try {
@@ -497,9 +497,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
     const McContext context,
     const McConnectedComponent connCompId,
     McFlags queryFlags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes,
+    McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
     McEvent* pEvent)
@@ -548,9 +548,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
     const McConnectedComponent connCompId,
     McFlags queryFlags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes)
+    McSize* pNumBytes)
 {
     McEvent event = MC_NULL_HANDLE;
     McResult return_value = mcEnqueueGetConnectedComponentData(context, connCompId, queryFlags, bytes, pMem, pNumBytes, 0, nullptr, &event);

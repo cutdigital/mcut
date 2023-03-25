@@ -374,10 +374,9 @@ typedef enum McDispatchFlags {
  * This enum structure defines the flags which are used for querying the execution status of an operation associated with an event.
  */
 typedef enum McEventCommandExecStatus {
-    MC_QUEUED = 1 << 0, /**< Operation has been enqueued in the internal-queue. */
-    MC_SUBMITTED = 1 << 1, /**< enqueued operation has been submitted by the client thread to the internal "device". */
-    MC_RUNNING = 1 << 2, /**< Operation is currently running. */
-    MC_COMPLETE = 1 << 3 /**< The operation has completed. */
+    MC_SUBMITTED = 1 << 0, /**< enqueued operation has been submitted by the client thread to the internal "device". */
+    MC_RUNNING = 1 << 1, /**< Operation is currently running. */
+    MC_COMPLETE = 1 << 2 /**< The operation has completed. */
 } McEventCommandExecStatus;
 
 /**
@@ -403,13 +402,12 @@ typedef enum McQueryFlags {
     MC_CONTEXT_FLAGS = 1 << 0, /**< Flags used to create a context.*/
     MC_DONT_CARE = 1 << 1, /**< wildcard.*/
     MC_EVENT_RUNTIME_EXECUTION_STATUS = 1 << 2, /**< Error/status code associated with the runtime of the asynchronous/non-blocking part of the associated task. See also ::McResult */
-    MC_EVENT_TIMESTAMP_QUEUED = 1 << 3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event is enqueued in an internal queue by the internal scheduler. */
-    MC_EVENT_TIMESTAMP_SUBMIT = 1 << 4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
-    MC_EVENT_TIMESTAMP_START = 1 << 5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
-    MC_EVENT_TIMESTAMP_END = 1 << 6, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
-    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 7, /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
-    MC_EVENT_CONTEXT = 1 << 8, /**< The context associated with event. */
-    MC_EVENT_COMMAND_TYPE = 1 << 9 /**< The command associated with event. Can be one of the values in :: */
+    MC_EVENT_TIMESTAMP_SUBMIT = 1 << 3, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event that has been enqueued is submitted by the internal scheduler for execution.*/
+    MC_EVENT_TIMESTAMP_START = 1 << 4, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event starts execution.*/
+    MC_EVENT_TIMESTAMP_END = 1 << 5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
+    MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 6, /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
+    MC_EVENT_CONTEXT = 1 << 7, /**< The context associated with event. */
+    MC_EVENT_COMMAND_TYPE = 1 << 8 /**< The command associated with event. Can be one of the values in :: */
 } McQueryFlags;
 
 /**
@@ -649,7 +647,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
  *   -# \p bytes is zero \p pMem is null and \p pNumBytes is null.
  *   -# \p bytes is incompatible with \p info.
  */
-extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, uint64_t bytes, void* pMem, uint64_t* pNumBytes);
+extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes);
 /**
  * @brief Registers a user callback function.
  *
@@ -809,7 +807,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
  *
  * An example of usage:
  * @code
- * uint64_t numBytes = 0;
+ * McSize numBytes = 0;
  * McFlags contextFlags;
  * McResult err =  mcGetInfo(context, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes);
  * if(err != MC_NO_ERROR)
@@ -837,9 +835,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
     const McContext context,
     McFlags info,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes);
+    McSize* pNumBytes);
 
 /**
  * @brief Query the connected components available in a context.
@@ -940,7 +938,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  *
  * An example of usage:
  * @code
- * uint64_t numBytes = 0;
+ * McSize numBytes = 0;
  * McEvent bytesQueryEvent=MC_NULL_HANDLE;
  * McEvent ev = MC_NULL_HANDLE;
  * McResult err = mcEnqueueGetConnectedComponentData(myContext,  connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes, 0, NULL, &bytesQueryEvent, 0, NULL, &ev);
@@ -977,9 +975,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
     const McContext context,
     const McConnectedComponent connCompId,
     McFlags queryFlags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes,
+    McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
     McEvent* pEvent);
@@ -991,9 +989,9 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McContext context,
     const McConnectedComponent connCompId,
     McFlags flags,
-    uint64_t bytes,
+    McSize bytes,
     void* pMem,
-    uint64_t* pNumBytes);
+    McSize* pNumBytes);
 
 /**
  * @brief Waits on the user thread for commands identified by event objects to complete.
