@@ -175,6 +175,11 @@ public:
         data_cond.notify_one();
     }
 
+    void notify_one()
+    {
+        data_cond.notify_one();
+    }
+
     void push(T new_value)
     {
         std::shared_ptr<T> new_data(std::make_shared<T>(std::move(new_value)));

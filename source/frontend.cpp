@@ -304,7 +304,7 @@ void wait_for_events_impl(
         } else {
             if(event_ptr->m_future.valid())
             {
-                event_ptr->m_future.get(); // block until context-device is done
+               event_ptr->m_future.wait(); 
             }
         }
     }

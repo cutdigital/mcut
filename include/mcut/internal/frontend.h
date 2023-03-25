@@ -345,6 +345,7 @@ struct event_t {
             this->m_timestamp_end.store(get_time_since_epoch());
         }
         m_command_exec_status = McEventCommandExecStatus::MC_COMPLETE;
+        printf("%p has finished (%u)\n", this, m_command_exec_status.load());
     }
 
     // thread-safe function to set the callback function for an event object
@@ -425,7 +426,13 @@ private:
         do {
             function_wrapper task;
 
-            m_queues[thread_id].wait_and_pop(task);
+            // We must try_pop() first in case the task "producer" (API) thread
+            // already invoked cond_var.notify_one() of "m_queues[thread_id]""
+            // BEFORE current thread first-entered this function.
+            // Basically prevents deadlock
+            if (!m_queues[thread_id].try_pop(task)) {
+                m_queues[thread_id].wait_and_pop(task);
+            }
 
             if (m_done) {
                 break;
@@ -594,11 +601,14 @@ public:
                     wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
                 }
 
-                if (!event_weak_ptr.expired()) {
+                MCUT_ASSERT(!event_weak_ptr.expired())
 
+                {
                     std::shared_ptr<event_t> event = event_weak_ptr.lock();
 
-                    if (event) {
+                    MCUT_ASSERT(event != nullptr);
+
+                    {
                         McResult return_value = McResult::MC_NO_ERROR;
                         per_thread_api_log_str.clear();
 
@@ -622,6 +632,7 @@ public:
                         event->notify_task_complete(return_value); // updated event state to indicate task completion (lock-based)
                         event->log_end_time();
 
+                        printf("Finish\n");
                     }
                 }
             });
@@ -629,8 +640,14 @@ public:
         event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents
         event_ptr->m_responsible_thread_id = responsible_thread_id;
 
-        m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible thread is free
+        // we log the submit (i.e. call log_submit_time()) BEFORE actually submitting incase the current 
+        // (user) thread stalls as "push(std::move(task))" is exeuting such that
+        // the API thread run and logs the "running" and "complete" states BEFORE
+        // the current (user) threads has actually logged the "submit" state. 
         event_ptr->log_submit_time();
+
+        m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible API thread is free
+        
 
         return event_ptr->m_user_handle;
     }
