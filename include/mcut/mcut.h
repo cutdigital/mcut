@@ -96,6 +96,13 @@ typedef struct McContext_T* McContext;
 typedef struct McEvent_T* McEvent;
 
 /**
+ * @brief 32 bit integer.
+ *
+ * Integral type representing a 32-bit signed integer.
+ */
+typedef int32_t McInt32;
+
+/**
  * @brief Bitfield type.
  *
  * Integral type representing a 32-bit bitfield for storing parameter values.
@@ -389,6 +396,7 @@ typedef enum McCommandType {
     MC_COMMAND_DISPATCH = 1 << 0, /**< From McEnqueueDispatch. */
     MC_COMMAND_GET_CONNECTED_COMPONENTS = 1 << 1, /**< From McEnqueueGetConnectedComponents. */
     MC_COMMAND_GET_CONNECTED_COMPONENT_DATA = 1 << 2, /**< From McEnqueueGetConnectedComponentData. */
+    MC_COMMAND_USER = 1 << 3, /**< From user application. */
     MC_COMMAND_UKNOWN
 } McCommandType;
 
@@ -619,6 +627,46 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(
     McDebugType type,
     McDebugSeverity severity,
     bool enabled);
+
+/**
+ * @brief To create a user event object, call the function
+ *
+ * @param event Event handle
+ * @param context must be a valid MCUT context.
+ *
+ * User events allow applications to enqueue commands that wait on a user event
+ * to finish before the command is executed by the MCUT engine
+ *
+ * mcCreateUserEvent returns a valid non-zero event object and return code is
+ * set to MC_NO_ERROR if the user event object is created successfully.
+ * Otherwise, it returns a NULL value with an error values.
+ *
+ * @return MCAPI_ATTR
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcCreateUserEvent(
+    McEvent* event,
+    McContext context);
+
+/**
+ * @brief To set the execution status of a user event object, call the function
+ *
+ * @param event is a user event object created using mcCreateUserEvent.
+ * @param execution_status specifies the new execution status to be set and can
+ * be MC_​COMPLETE or an ::McResult value to indicate an error. Thus a negative
+ * integer value causes all enqueued commands that wait on this user event to
+ * be terminated. mcSetUserEventStatus can only be called once to change the
+ * execution status of event.
+ * 
+ * If there are enqueued commands with user events in the event_wait_list 
+ * argument of mcEnqueue* commands, the user must ensure that the status of 
+ * these user events being waited on are set using mcSetUserEventStatus before 
+ * any MCUT APIs that release MCUT objects except for event objects are called; 
+ * otherwise the behavior is undefined.
+ *
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcSetUserEventStatus(
+    McEvent event,
+    McInt32 execution_status);
 
 /**
  * @brief Returns information about the event object..

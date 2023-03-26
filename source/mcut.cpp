@@ -182,6 +182,62 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
     return return_value;
 }
 
+MCAPI_ATTR McResult MCAPI_CALL mcCreateUserEvent(
+    McEvent* event,
+    McContext context)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (event == nullptr) {
+        per_thread_api_log_str = "event ptr (param0) undef (NULL)";
+    } else if (context == nullptr) {
+        per_thread_api_log_str = "context handle undefined (NULL)";
+    } else {
+        try {
+            create_user_event_impl(event, context);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+
+    return return_value;
+}
+
+MCAPI_ATTR McResult MCAPI_CALL mcSetUserEventStatus(
+    McEvent event,
+    McInt32 execution_status)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (event == nullptr) {
+        per_thread_api_log_str = "event ptr (param0) undef (NULL)";
+    } else {
+        try {
+            set_user_event_status_impl(event, execution_status);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+
+    return return_value;
+}
+
 MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes)
 {
     McResult return_value = McResult::MC_NO_ERROR;
@@ -415,7 +471,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
         if (event != MC_NULL_HANDLE) // event must exist to wait on and query
         {
             wait_for_events_impl(1, &event); // block until event of mcEnqueueDispatch is completed!
-            
+
             get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
 
             release_events_impl(1, &event); // destroy
@@ -485,7 +541,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     if (event != MC_NULL_HANDLE) // event must exist to wait on and query
     {
         wait_for_events_impl(1, &event); // block until event of task is completed!
-        
+
         get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
 
         release_events_impl(1, &event); // destroy

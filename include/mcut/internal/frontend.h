@@ -99,6 +99,10 @@ extern "C" void get_info_impl(
     void* pMem,
     McSize* pNumBytes) noexcept(false);
 
+extern "C" void create_user_event_impl(McEvent* event, McContext context);
+
+extern "C" void set_user_event_status_impl(McEvent event, McInt32 execution_status);
+
 extern "C" void get_event_info_impl(
     const McEvent event,
     McFlags info,
@@ -278,6 +282,8 @@ struct event_t {
     std::atomic<uint32_t> m_command_exec_status;
     bool m_profiling_enabled;
     McCommandType m_command_type;
+    std::unique_ptr<std::packaged_task<void()>> m_user_API_command_task_emulator;
+    McContext m_context;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
@@ -288,6 +294,8 @@ struct event_t {
         , m_command_exec_status(MC_RESULT_MAX_ENUM)
         , m_profiling_enabled(true)
         , m_command_type(MC_COMMAND_UKNOWN)
+        , m_user_API_command_task_emulator(nullptr)
+        , m_context(nullptr)
     {
         log_msg("[MCUT] Create event " << this);
 
@@ -621,8 +629,6 @@ public:
 
                         event->notify_task_complete(return_value); // updated event state to indicate task completion (lock-based)
                         event->log_end_time();
-
-                        printf("Finish\n");
                     }
                 }
             });

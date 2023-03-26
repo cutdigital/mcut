@@ -208,6 +208,99 @@ void get_info_impl(
     }
 }
 
+void create_user_event_impl(McEvent* eventHandle, McContext context)
+{
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == context; });
+
+    if (context_ptr == nullptr) {
+        throw std::invalid_argument("invalid context");
+    }
+
+    //
+    // create the event object associated with the enqueued task
+    //
+
+    std::shared_ptr<event_t> user_event_ptr = std::shared_ptr<event_t>(new event_t);
+
+    MCUT_ASSERT(user_event_ptr != nullptr);
+
+    g_events.push_front(user_event_ptr);
+
+    user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
+    user_event_ptr->m_profiling_enabled = (context_ptr->get_flags() & MC_PROFILING_ENABLE) != 0;
+    user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
+    user_event_ptr->m_context = context;
+
+    user_event_ptr->log_submit_time();
+
+    std::weak_ptr<event_t> user_event_weak_ptr(user_event_ptr);
+
+    user_event_ptr->m_user_API_command_task_emulator = std::unique_ptr<std::packaged_task<void()>>(new std::packaged_task<void()>(
+        [user_event_weak_ptr]() {
+            if (user_event_weak_ptr.expired()) {
+                throw std::runtime_error("event expired");
+            }
+
+            std::shared_ptr<event_t> event_ptr = user_event_weak_ptr.lock();
+
+            if (event_ptr == nullptr) {
+                throw std::runtime_error("event null");
+            }
+
+            event_ptr->log_start_time();
+        }));
+
+    user_event_ptr->m_future = user_event_ptr->m_user_API_command_task_emulator->get_future(); // the future we can later wait on via mcWaitForEVents
+    user_event_ptr->m_responsible_thread_id = MC_UNDEFINED_VALUE; // some user thread
+
+    *eventHandle = user_event_ptr->m_user_handle;
+}
+
+/**
+ * execution_status specifies the new execution status to be set and can be CL_​COMPLETE or a negative integer value to indicate an error.
+ * A negative integer value causes all enqueued commands that wait on this user
+ * event to be terminated.
+ */
+void set_user_event_status_impl(McEvent event, McInt32 execution_status)
+{
+    std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> ptr) { return ptr->m_user_handle == event; });
+
+    if (event_ptr == nullptr) {
+        throw std::invalid_argument("invalid event");
+    }
+
+    McResult userEventErrorCode = McResult::MC_NO_ERROR;
+
+    switch (execution_status) {
+    case McEventCommandExecStatus::MC_COMPLETE: {
+        std::unique_ptr<std::packaged_task<void()>>& associated_task_emulator = event_ptr->m_user_API_command_task_emulator;
+
+        MCUT_ASSERT(associated_task_emulator != nullptr);
+
+        // simply logs the start time and makes the std::packaged_task future object ready
+        associated_task_emulator->operator()(); // call the internal "task" function to update event status
+
+        event_ptr->log_end_time();
+    } break;
+    default: {
+        MCUT_ASSERT(execution_status < 0); // an error
+        switch (execution_status) {
+        case McResult::MC_INVALID_OPERATION:
+        case McResult::MC_INVALID_VALUE:
+        case McResult::MC_OUT_OF_MEMORY: {
+            userEventErrorCode = (McResult)execution_status;
+        } break;
+        default: {
+            throw std::invalid_argument("invalid command status");
+        }
+        }
+    }
+    }
+
+    // invoke call back
+    event_ptr->notify_task_complete(userEventErrorCode); // updated event state to indicate task completion (lock-based)
+}
+
 void get_event_info_impl(
     const McEvent event,
     McFlags info,
@@ -279,6 +372,17 @@ void get_event_info_impl(
             memcpy(pMem, reinterpret_cast<void*>(&cmdType), bytes);
         }
     } break;
+    case MC_EVENT_CONTEXT: {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McCommandType);
+        } else {
+            if (bytes < sizeof(McCommandType)) {
+                throw std::invalid_argument("invalid bytes");
+            }
+            McContext ctxt = (McContext)event_ptr->m_context;
+            memcpy(pMem, reinterpret_cast<void*>(&ctxt), bytes);
+        }
+    } break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -299,9 +403,8 @@ void wait_for_events_impl(
             // a valid object in "g_contexts"
             throw std::invalid_argument("null event object");
         } else {
-            if(event_ptr->m_future.valid())
-            {
-               event_ptr->m_future.wait(); 
+            if (event_ptr->m_future.valid()) {
+                event_ptr->m_future.wait();
             }
         }
     }
