@@ -284,7 +284,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
         per_thread_api_log_str = "invalid event waitlist size (zero)";
     } else {
         try {
-            wait_for_events_impl(numEventsInWaitlist, pEventWaitList);
+            McResult waitliststatus = MC_NO_ERROR;
+            wait_for_events_impl(numEventsInWaitlist, pEventWaitList, waitliststatus);
+
+            if (waitliststatus != McResult::MC_NO_ERROR) {
+                per_thread_api_log_str = "event in waitlist has an error";
+            }
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -470,9 +475,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     if (return_value == MC_NO_ERROR) { // API parameter checks are fine
         if (event != MC_NULL_HANDLE) // event must exist to wait on and query
         {
-            wait_for_events_impl(1, &event); // block until event of mcEnqueueDispatch is completed!
+            McResult waitliststatus = MC_NO_ERROR;
 
-            get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+            wait_for_events_impl(1, &event, waitliststatus); // block until event of mcEnqueueDispatch is completed!
+
+            if (waitliststatus != McResult::MC_NO_ERROR) {
+                return_value = waitliststatus;
+            }
 
             release_events_impl(1, &event); // destroy
         }
@@ -540,10 +549,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
     McResult return_value = mcEnqueueGetConnectedComponents(context, connectedComponentType, numEntries, pConnComps, numConnComps, 0, nullptr, &event);
     if (event != MC_NULL_HANDLE) // event must exist to wait on and query
     {
-        wait_for_events_impl(1, &event); // block until event of task is completed!
+        McResult waitliststatus = MC_NO_ERROR;
 
-        get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+        wait_for_events_impl(1, &event, waitliststatus); // block until event of mcEnqueueDispatch is completed!
 
+        if (waitliststatus != McResult::MC_NO_ERROR) {
+            return_value = waitliststatus;
+        }
         release_events_impl(1, &event); // destroy
     }
     return return_value;
@@ -612,9 +624,13 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     McResult return_value = mcEnqueueGetConnectedComponentData(context, connCompId, queryFlags, bytes, pMem, pNumBytes, 0, nullptr, &event);
     if (event != MC_NULL_HANDLE) // event must exist to wait on and query
     {
-        wait_for_events_impl(1, &event); // block until event of task is completed!
+        McResult waitliststatus = MC_NO_ERROR;
 
-        get_event_info_impl(event, MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &return_value, NULL); // get the status (for user)
+        wait_for_events_impl(1, &event, waitliststatus); // block until event of mcEnqueueDispatch is completed!
+
+        if (waitliststatus != McResult::MC_NO_ERROR) {
+            return_value = waitliststatus;
+        }
 
         release_events_impl(1, &event); // destroy
     }

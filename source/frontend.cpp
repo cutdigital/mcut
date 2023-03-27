@@ -236,15 +236,16 @@ void create_user_event_impl(McEvent* eventHandle, McContext context)
     std::weak_ptr<event_t> user_event_weak_ptr(user_event_ptr);
 
     user_event_ptr->m_user_API_command_task_emulator = std::unique_ptr<std::packaged_task<void()>>(new std::packaged_task<void()>(
+        // will be "called" when user updates the command status to MC_COMPLETE
         [user_event_weak_ptr]() {
             if (user_event_weak_ptr.expired()) {
-                throw std::runtime_error("event expired");
+                throw std::runtime_error("user event expired");
             }
 
             std::shared_ptr<event_t> event_ptr = user_event_weak_ptr.lock();
 
             if (event_ptr == nullptr) {
-                throw std::runtime_error("event null");
+                throw std::runtime_error("user event null");
             }
 
             event_ptr->log_start_time();
@@ -391,7 +392,7 @@ void get_event_info_impl(
 
 void wait_for_events_impl(
     uint32_t numEventsInWaitlist,
-    const McEvent* pEventWaitList)
+    const McEvent* pEventWaitList, McResult& runtimeStatusFromAllPrecedingEvents)
 {
     for (uint32_t i = 0; i < numEventsInWaitlist; ++i) {
         McEvent eventHandle = pEventWaitList[i];
@@ -404,7 +405,16 @@ void wait_for_events_impl(
             throw std::invalid_argument("null event object");
         } else {
             if (event_ptr->m_future.valid()) {
-                event_ptr->m_future.wait();
+                
+                event_ptr->m_future.wait(); // block until event task is finished
+
+                runtimeStatusFromAllPrecedingEvents = (McResult)event_ptr->m_runtime_exec_status.load();
+                if(runtimeStatusFromAllPrecedingEvents != McResult::MC_NO_ERROR)
+                {
+                    // indicate that a task waiting on any one of the event in pEventWaitList
+                    // must not proceed because a runtime error occurred
+                    break;
+                }
             }
         }
     }

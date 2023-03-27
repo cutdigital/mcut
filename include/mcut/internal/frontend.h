@@ -117,7 +117,8 @@ extern "C" void set_event_callback_impl(
 
 extern "C" void wait_for_events_impl(
     uint32_t numEventsInWaitlist,
-    const McEvent* pEventWaitList) noexcept(false);
+    const McEvent* pEventWaitList,
+    McResult& runtimeStatusFromAllPrecedingEvents) noexcept(false);
 
 extern "C" void dispatch_impl(
     McContext context,
@@ -282,12 +283,18 @@ struct event_t {
     std::atomic<uint32_t> m_command_exec_status;
     bool m_profiling_enabled;
     McCommandType m_command_type;
+    // A callable object that also holds an std::future. Its purpose is to emulate
+    // the internal representation of an API task, where this time the task is actually
+    // a user command since this pointer is define ONLY for user events.
+    // The std::future object of the packaged task is used to initialize m_future
+    // when this event is a user event. This our internal mechanism allowing for
+    // API command to be able to effectively wait on user events.
     std::unique_ptr<std::packaged_task<void()>> m_user_API_command_task_emulator;
     McContext m_context;
     event_t()
         : m_user_handle(MC_NULL_HANDLE)
         , m_responsible_thread_id(UINT32_MAX)
-        , m_runtime_exec_status(MC_RESULT_MAX_ENUM)
+        , m_runtime_exec_status(MC_NO_ERROR)
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
         , m_timestamp_end(0)
@@ -424,10 +431,9 @@ private:
         do {
             function_wrapper task;
 
-            // We must try_pop() first in case the task "producer" (API) thread
+            // We try_pop() first in case the task "producer" (API) thread
             // already invoked cond_var.notify_one() of "m_queues[thread_id]""
             // BEFORE current thread first-entered this function.
-            // Basically prevents deadlock
             if (!m_queues[thread_id].try_pop(task)) {
                 m_queues[thread_id].wait_and_pop(task);
             }
@@ -553,7 +559,7 @@ public:
 
             MCUT_ASSERT(parent_task_event_ptr != nullptr);
 
-            const bool parent_task_is_not_finished = parent_task_event_ptr->m_finished == false;
+            const bool parent_task_is_not_finished = parent_task_event_ptr->m_finished.load() == false;
 
             if (parent_task_is_not_finished) {
                 // id of manager thread, which was assigned the parent task
@@ -595,8 +601,16 @@ public:
 
         std::packaged_task<void()> task(
             [=]() {
+                McResult runtime_status_from_all_preceding_events = McResult::MC_NO_ERROR;
+
                 if (!event_waitlist.empty()) {
-                    wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0]); // block until events are done
+                    wait_for_events_impl((uint32_t)event_waitlist.size(), &event_waitlist[0], runtime_status_from_all_preceding_events); // block until events are done
+                }
+
+                // if any previous event failed then we cannot proceed with this task.
+                // i.e. no-Op
+                if (runtime_status_from_all_preceding_events != McResult::MC_NO_ERROR) {
+                    return;
                 }
 
                 MCUT_ASSERT(!event_weak_ptr.expired());
