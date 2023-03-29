@@ -230,6 +230,7 @@ void create_user_event_impl(McEvent* eventHandle, McContext context)
     user_event_ptr->m_profiling_enabled = (context_ptr->get_flags() & MC_PROFILING_ENABLE) != 0;
     user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
     user_event_ptr->m_context = context;
+    user_event_ptr->m_responsible_thread_id = 0; // initialized but unused for user event
 
     user_event_ptr->log_submit_time();
 
@@ -272,15 +273,13 @@ void set_user_event_status_impl(McEvent event, McInt32 execution_status)
 
     McResult userEventErrorCode = McResult::MC_NO_ERROR;
 
+    std::unique_ptr<std::packaged_task<void()>>& associated_task_emulator = event_ptr->m_user_API_command_task_emulator;
+    MCUT_ASSERT(associated_task_emulator != nullptr);
+    // simply logs the start time and makes the std::packaged_task future object ready
+    associated_task_emulator->operator()(); // call the internal "task" function to update event status
+
     switch (execution_status) {
     case McEventCommandExecStatus::MC_COMPLETE: {
-        std::unique_ptr<std::packaged_task<void()>>& associated_task_emulator = event_ptr->m_user_API_command_task_emulator;
-
-        MCUT_ASSERT(associated_task_emulator != nullptr);
-
-        // simply logs the start time and makes the std::packaged_task future object ready
-        associated_task_emulator->operator()(); // call the internal "task" function to update event status
-
         event_ptr->log_end_time();
     } break;
     default: {
@@ -375,9 +374,9 @@ void get_event_info_impl(
     } break;
     case MC_EVENT_CONTEXT: {
         if (pMem == nullptr) {
-            *pNumBytes = sizeof(McCommandType);
+            *pNumBytes = sizeof(McContext);
         } else {
-            if (bytes < sizeof(McCommandType)) {
+            if (bytes < sizeof(McContext)) {
                 throw std::invalid_argument("invalid bytes");
             }
             McContext ctxt = (McContext)event_ptr->m_context;
@@ -405,12 +404,11 @@ void wait_for_events_impl(
             throw std::invalid_argument("null event object");
         } else {
             if (event_ptr->m_future.valid()) {
-                
+
                 event_ptr->m_future.wait(); // block until event task is finished
 
                 runtimeStatusFromAllPrecedingEvents = (McResult)event_ptr->m_runtime_exec_status.load();
-                if(runtimeStatusFromAllPrecedingEvents != McResult::MC_NO_ERROR)
-                {
+                if (runtimeStatusFromAllPrecedingEvents != McResult::MC_NO_ERROR) {
                     // indicate that a task waiting on any one of the event in pEventWaitList
                     // must not proceed because a runtime error occurred
                     break;

@@ -315,6 +315,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
 
+    if (eventHandle == nullptr) {
+        per_thread_api_log_str = "invalid event ptr (NULL)";
+    }
     if (eventCallback == nullptr) {
         per_thread_api_log_str = "invalid event callback function ptr (NULL)";
     } else {
@@ -400,8 +403,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
         per_thread_api_log_str = "invalid event waitlist size (zero)";
     } else if (pEventWaitList == nullptr && numEventsInWaitlist == 0 && pEvent == nullptr) {
         per_thread_api_log_str = "invalid event ptr (zero)";
-    } else if (pEventWaitList != nullptr && numEventsInWaitlist > 0 && pEvent != nullptr) {
-        per_thread_api_log_str = "invalid event parameters";
     } else {
         try {
             dispatch_impl(
@@ -515,8 +516,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponents(
         per_thread_api_log_str = "invalid event waitlist size (zero)";
     } else if (pEventWaitList == nullptr && numEventsInWaitlist == 0 && pEvent == nullptr) {
         per_thread_api_log_str = "invalid event ptr (zero)";
-    } else if (pEventWaitList != nullptr && numEventsInWaitlist > 0 && pEvent != nullptr) {
-        per_thread_api_log_str = "invalid event parameters";
     } else {
         try {
 
@@ -590,8 +589,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
         per_thread_api_log_str = "invalid event waitlist size (zero)";
     } else if (pEventWaitList == nullptr && numEventsInWaitlist == 0 && pEvent == nullptr) {
         per_thread_api_log_str = "invalid event ptr (zero)";
-    } else if (pEventWaitList != nullptr && numEventsInWaitlist > 0 && pEvent != nullptr) {
-        per_thread_api_log_str = "invalid event parameters";
     } else {
         try {
             get_connected_component_data_impl(context, connCompId, queryFlags, bytes, pMem, pNumBytes, numEventsInWaitlist, pEventWaitList, pEvent);

@@ -275,7 +275,7 @@ struct event_t {
     std::atomic<bool> m_finished;
     McEvent m_user_handle; // handle used by client app to reference this event object
     // the Manager thread which was assigned the task of managing the task associated with this event object.
-    uint32_t m_responsible_thread_id;
+    std::atomic<uint32_t> m_responsible_thread_id;
     std::atomic<int32_t> m_runtime_exec_status; // API return code associated with respective task (for user to query)
     std::atomic<size_t> m_timestamp_submit;
     std::atomic<size_t> m_timestamp_start;
@@ -315,7 +315,7 @@ struct event_t {
     ~event_t()
     {
 
-        if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr) {
+        if (m_callback_info.m_invoked.load() == false && m_callback_info.m_fn_ptr != nullptr && m_runtime_exec_status.load() == MC_NO_ERROR) {
             MCUT_ASSERT(m_user_handle != MC_NULL_HANDLE);
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
@@ -344,13 +344,13 @@ struct event_t {
         m_command_exec_status = McEventCommandExecStatus::MC_RUNNING;
     }
 
+    // logs time and sets m_command_exec_status to MC_COMPLETE
     inline void log_end_time()
     {
         if (m_profiling_enabled) {
             this->m_timestamp_end.store(get_time_since_epoch());
         }
-        m_command_exec_status = McEventCommandExecStatus::MC_COMPLETE;
-        printf("%p has finished (%u)\n", this, m_command_exec_status.load());
+        m_command_exec_status.store(McEventCommandExecStatus::MC_COMPLETE);
     }
 
     // thread-safe function to set the callback function for an event object
@@ -561,9 +561,9 @@ public:
 
             const bool parent_task_is_not_finished = parent_task_event_ptr->m_finished.load() == false;
 
-            if (parent_task_is_not_finished) {
+            if (parent_task_is_not_finished && parent_task_event_ptr->m_command_type != McCommandType::MC_COMMAND_USER) {
                 // id of manager thread, which was assigned the parent task
-                responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id;
+                responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id.load();
 
                 MCUT_ASSERT(responsible_thread_id != UINT32_MAX);
                 MCUT_ASSERT(responsible_thread_id < (uint32_t)m_api_threads.size());
