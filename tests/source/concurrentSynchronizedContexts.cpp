@@ -153,7 +153,7 @@ UTEST_F(ConcurrentSynchronizedContexts, sequentialDispatchCalls)
         //
         ASSERT_EQ(mcWaitForEvents(1, &dispatchEvent), MC_NO_ERROR);
 
-        size_t bytes = 0;
+        McSize bytes = 0;
 
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), MC_NO_ERROR);
         ASSERT_EQ(bytes, sizeof(McEventCommandExecStatus));
@@ -195,7 +195,7 @@ UTEST_F(ConcurrentSynchronizedContexts, parallelButUnsynchronisedDispatchCalls)
         //
         ASSERT_EQ(mcWaitForEvents(1, &dispatchEvent), MC_NO_ERROR);
 
-        size_t bytes = 0;
+        McSize bytes = 0;
 
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), MC_NO_ERROR);
         ASSERT_EQ(bytes, sizeof(McEventCommandExecStatus));

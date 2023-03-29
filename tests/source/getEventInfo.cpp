@@ -131,7 +131,7 @@ UTEST_F(GetEventInfo, mcEnqueueDispatchAPI)
 
     ASSERT_TRUE(dispatchEvent != MC_NULL_HANDLE);
 
-    size_t bytes = 0;
+    McSize bytes = 0;
     {
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), MC_NO_ERROR);
         ASSERT_EQ(bytes, sizeof(McFlags));

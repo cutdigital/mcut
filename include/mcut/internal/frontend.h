@@ -333,7 +333,9 @@ struct event_t {
         if (m_profiling_enabled) {
             this->m_timestamp_submit.store(get_time_since_epoch());
         }
-        m_command_exec_status = McEventCommandExecStatus::MC_SUBMITTED;
+        // TODO: use specific acquire-release semantics
+        // see e.g.: https://stackoverflow.com/questions/13632344/understanding-c11-memory-fences
+        m_command_exec_status.store(McEventCommandExecStatus::MC_SUBMITTED);
     }
 
     inline void log_start_time()
