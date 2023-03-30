@@ -83,7 +83,7 @@ extern "C" void create_context_impl(
 extern "C" void debug_message_callback_impl(
     McContext context,
     pfn_mcDebugOutput_CALLBACK cb,
-    const void* userParam) noexcept(false);
+    const McVoid* userParam) noexcept(false);
 
 extern "C" void debug_message_control_impl(
     McContext context,
@@ -96,7 +96,7 @@ extern "C" void get_info_impl(
     const McContext context,
     McFlags info,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes) noexcept(false);
 
 extern "C" void create_user_event_impl(McEvent* event, McContext context);
@@ -107,13 +107,13 @@ extern "C" void get_event_info_impl(
     const McEvent event,
     McFlags info,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes) noexcept(false);
 
 extern "C" void set_event_callback_impl(
     McEvent eventHandle,
     pfn_McEvent_CALLBACK eventCallback,
-    void* data);
+    McVoid* data);
 
 extern "C" void wait_for_events_impl(
     uint32_t numEventsInWaitlist,
@@ -123,12 +123,12 @@ extern "C" void wait_for_events_impl(
 extern "C" void dispatch_impl(
     McContext context,
     McFlags flags,
-    const void* pSrcMeshVertices,
+    const McVoid* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
+    const McVoid* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
@@ -152,7 +152,7 @@ extern "C" void get_connected_component_data_impl(
     const McConnectedComponent connCompId,
     McFlags flags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
@@ -265,7 +265,7 @@ struct event_t {
         // optional user callback, which is invoked when associated task is finished
         pfn_McEvent_CALLBACK m_fn_ptr;
         // pointer passed to user provided callback function
-        void* m_data_ptr;
+        McVoid* m_data_ptr;
         // atomic boolean flag indicating whether the callback associated with event
         // object has been called
         std::atomic<bool> m_invoked;
@@ -356,7 +356,7 @@ struct event_t {
     }
 
     // thread-safe function to set the callback function for an event object
-    void set_callback_data(McEvent handle, pfn_McEvent_CALLBACK fn_ptr, void* data_ptr)
+    void set_callback_data(McEvent handle, pfn_McEvent_CALLBACK fn_ptr, McVoid* data_ptr)
     {
         std::lock_guard<std::mutex> lock(m_callback_mutex); // exclusive access
 
@@ -668,7 +668,7 @@ public:
     // function pointer to user-define callback function for status/erro reporting
     pfn_mcDebugOutput_CALLBACK debugCallback = nullptr;
     // user provided data for callback
-    const void* debugCallbackUserParam = nullptr;
+    const McVoid* debugCallbackUserParam = nullptr;
 
     // TODO: make use of the following three filter inside the log function
 

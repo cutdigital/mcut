@@ -54,7 +54,7 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
 void debug_message_callback_impl(
     McContext contextHandle,
     pfn_mcDebugOutput_CALLBACK cb,
-    const void* userParam)
+    const McVoid* userParam)
 {
     MCUT_ASSERT(contextHandle != nullptr);
     MCUT_ASSERT(cb != nullptr);
@@ -180,7 +180,7 @@ void get_info_impl(
     const McContext contextHandle,
     McFlags info,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes)
 {
     std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
@@ -198,7 +198,7 @@ void get_info_impl(
             if (bytes < sizeof(McFlags)) {
                 throw std::invalid_argument("invalid bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(&flags), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&flags), bytes);
         }
         break;
     }
@@ -305,7 +305,7 @@ void get_event_info_impl(
     const McEvent event,
     McFlags info,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes)
 {
     std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> ptr) { return ptr->m_user_handle == event; });
@@ -324,7 +324,7 @@ void get_event_info_impl(
                 throw std::invalid_argument("invalid bytes");
             }
             McResult status = (McResult)event_ptr->m_runtime_exec_status.load();
-            memcpy(pMem, reinterpret_cast<void*>(&status), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&status), bytes);
         }
         break;
     }
@@ -346,7 +346,7 @@ void get_event_info_impl(
                 nanoseconds_since_epoch = event_ptr->m_timestamp_end.load();
             }
             MCUT_ASSERT(nanoseconds_since_epoch != 0);
-            memcpy(pMem, reinterpret_cast<void*>(&nanoseconds_since_epoch), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&nanoseconds_since_epoch), bytes);
         }
         break;
     }
@@ -358,7 +358,7 @@ void get_event_info_impl(
                 throw std::invalid_argument("invalid bytes");
             }
             McEventCommandExecStatus status = (McEventCommandExecStatus)event_ptr->m_command_exec_status.load();
-            memcpy(pMem, reinterpret_cast<void*>(&status), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&status), bytes);
         }
     } break;
     case MC_EVENT_COMMAND_TYPE: {
@@ -369,7 +369,7 @@ void get_event_info_impl(
                 throw std::invalid_argument("invalid bytes");
             }
             McCommandType cmdType = (McCommandType)event_ptr->m_command_type;
-            memcpy(pMem, reinterpret_cast<void*>(&cmdType), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&cmdType), bytes);
         }
     } break;
     case MC_EVENT_CONTEXT: {
@@ -380,7 +380,7 @@ void get_event_info_impl(
                 throw std::invalid_argument("invalid bytes");
             }
             McContext ctxt = (McContext)event_ptr->m_context;
-            memcpy(pMem, reinterpret_cast<void*>(&ctxt), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&ctxt), bytes);
         }
     } break;
     default:
@@ -421,7 +421,7 @@ void wait_for_events_impl(
 void set_event_callback_impl(
     McEvent eventHandle,
     pfn_McEvent_CALLBACK eventCallback,
-    void* data)
+    McVoid* data)
 {
     std::shared_ptr<event_t> event_ptr = g_events.find_first_if([=](const std::shared_ptr<event_t> eptr) { return eptr->m_user_handle == eventHandle; });
 
@@ -437,12 +437,12 @@ void set_event_callback_impl(
 void dispatch_impl(
     McContext contextHandle,
     McFlags dispatchFlags,
-    const void* pSrcMeshVertices,
+    const McVoid* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
+    const McVoid* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
@@ -1378,7 +1378,7 @@ void get_connected_component_data_impl_detail(
     const McConnectedComponent connCompId,
     McFlags flags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes)
 {
 #if 0
@@ -1805,8 +1805,8 @@ void get_connected_component_data_impl_detail(
 
                 // the pointers are different if "cc_uptr->face_sizes_cache" is not
                 // being populated in the current call
-                const void* src_ptr = reinterpret_cast<void*>(&(cc_uptr->face_sizes_cache[0]));
-                const void* dst_ptr = pMem;
+                const McVoid* src_ptr = reinterpret_cast<McVoid*>(&(cc_uptr->face_sizes_cache[0]));
+                const McVoid* dst_ptr = pMem;
                 const bool writing_to_client_pointer = (src_ptr != dst_ptr);
 
                 if (writing_to_client_pointer) // copy only if "casted_ptr" is client pointer
@@ -2055,8 +2055,8 @@ void get_connected_component_data_impl_detail(
 
                 // the pointers are different if "cc_uptr->face_adjacent_faces_size_cache" is not
                 // being populated in the current call
-                const void* src_ptr = reinterpret_cast<void*>(&(cc_uptr->face_adjacent_faces_size_cache[0]));
-                const void* dst_ptr = pMem;
+                const McVoid* src_ptr = reinterpret_cast<McVoid*>(&(cc_uptr->face_adjacent_faces_size_cache[0]));
+                const McVoid* dst_ptr = pMem;
                 const bool writing_to_client_pointer = (src_ptr != dst_ptr);
 
                 if (writing_to_client_pointer) // copy only if "casted_ptr" is client pointer
@@ -2144,7 +2144,7 @@ void get_connected_component_data_impl_detail(
             if (bytes % sizeof(McConnectedComponentType) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            memcpy(pMem, reinterpret_cast<void*>(&cc_uptr->type), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&cc_uptr->type), bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FRAGMENT_LOCATION: {
@@ -2166,7 +2166,7 @@ void get_connected_component_data_impl_detail(
             }
 
             fragment_cc_t* fragPtr = dynamic_cast<fragment_cc_t*>(cc_uptr.get());
-            memcpy(pMem, reinterpret_cast<void*>(&fragPtr->fragmentLocation), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&fragPtr->fragmentLocation), bytes);
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_PATCH_LOCATION: {
@@ -2186,12 +2186,12 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const void* src = nullptr;
+            const McVoid* src = nullptr;
             if (cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT) {
-                src = reinterpret_cast<const void*>(&dynamic_cast<fragment_cc_t*>(cc_uptr.get())->patchLocation);
+                src = reinterpret_cast<const McVoid*>(&dynamic_cast<fragment_cc_t*>(cc_uptr.get())->patchLocation);
             } else {
                 MCUT_ASSERT(cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_PATCH);
-                src = reinterpret_cast<const void*>(&dynamic_cast<patch_cc_t*>(cc_uptr.get())->patchLocation);
+                src = reinterpret_cast<const McVoid*>(&dynamic_cast<patch_cc_t*>(cc_uptr.get())->patchLocation);
             }
             memcpy(pMem, src, bytes);
         }
@@ -2213,7 +2213,7 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
             fragment_cc_t* fragPtr = dynamic_cast<fragment_cc_t*>(cc_uptr.get());
-            memcpy(pMem, reinterpret_cast<void*>(&fragPtr->srcMeshSealType), bytes);
+            memcpy(pMem, reinterpret_cast<McVoid*>(&fragPtr->srcMeshSealType), bytes);
         }
     } break;
         //
@@ -2238,10 +2238,10 @@ void get_connected_component_data_impl_detail(
 
             if (cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_SEAM) {
                 seam_cc_t* ptr = dynamic_cast<seam_cc_t*>(cc_uptr.get());
-                memcpy(pMem, reinterpret_cast<void*>(&ptr->origin), bytes);
+                memcpy(pMem, reinterpret_cast<McVoid*>(&ptr->origin), bytes);
             } else {
                 input_cc_t* ptr = dynamic_cast<input_cc_t*>(cc_uptr.get());
-                memcpy(pMem, reinterpret_cast<void*>(&ptr->origin), bytes);
+                memcpy(pMem, reinterpret_cast<McVoid*>(&ptr->origin), bytes);
             }
         }
     } break;
@@ -2817,7 +2817,7 @@ void get_connected_component_data_impl_detail(
                     throw std::invalid_argument("invalid number of bytes");
                 }
 
-                memcpy(pMem, reinterpret_cast<void*>(cc_uptr->cdt_index_cache.data()), bytes);
+                memcpy(pMem, reinterpret_cast<McVoid*>(cc_uptr->cdt_index_cache.data()), bytes);
             }
         }
     } break;
@@ -2888,7 +2888,7 @@ void get_connected_component_data_impl(
     const McConnectedComponent connCompId,
     McFlags flags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,

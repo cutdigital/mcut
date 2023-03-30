@@ -126,6 +126,20 @@ typedef size_t McSize;
 typedef uint32_t McIndex;
 
 /**
+ * @brief 32-bit floating point type.
+ *
+ * Floating point type type representing a 32-bit real number value.
+ */
+typedef float McFloat;
+
+/**
+ * @brief 64-bit floating point type.
+ *
+ * Floating point type type representing a 64-bit real number value.
+ */
+typedef double McDouble;
+
+/**
  * @brief 32-bit type.
  *
  * Integral type representing a boolean value (MC_TRUE or MC_FALSE).
@@ -433,7 +447,7 @@ typedef void(MCAPI_PTR* pfn_mcDebugOutput_CALLBACK)(
     McDebugSeverity severity,
     size_t length,
     const char* message,
-    const void* userParam);
+    const McVoid* userParam);
 
 /**
  *
@@ -441,7 +455,7 @@ typedef void(MCAPI_PTR* pfn_mcDebugOutput_CALLBACK)(
  *
  * The callback function should have this prototype (in C), or be otherwise compatible with such a prototype.
  */
-typedef void(MCAPI_PTR* pfn_McEvent_CALLBACK)(McEvent event, void* data);
+typedef void(MCAPI_PTR* pfn_McEvent_CALLBACK)(McEvent event, McVoid* data);
 
 /** @brief Create an MCUT context.
  *
@@ -540,14 +554,14 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextWithHelpers(
  * An example of usage:
  * @code
  * // define my callback (with type pfn_mcDebugOutput_CALLBACK)
- * void mcDebugOutput(McDebugSource source,   McDebugType type, unsigned int id, McDebugSeverity severity,size_t length, const char* message,const void* userParam)
+ * void mcDebugOutput(McDebugSource source,   McDebugType type, unsigned int id, McDebugSeverity severity,size_t length, const char* message,const McVoid* userParam)
  * {
  *  // do stuff
  * }
  *
  * // ...
  *
- * void* someData = NULL;
+ * McVoid* someData = NULL;
  * McResult err = mcDebugMessageCallback(myContext, mcDebugOutput, someData);
  * if(err != MC_NO_ERROR)
  * {
@@ -568,7 +582,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcCreateContextWithHelpers(
 extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
     McContext context,
     pfn_mcDebugOutput_CALLBACK cb,
-    const void* userParam);
+    const McVoid* userParam);
 
 /**
  * Control the reporting of debug messages in a debug context.
@@ -697,7 +711,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcSetUserEventStatus(
  *   -# \p bytes is zero \p pMem is null and \p pNumBytes is null.
  *   -# \p bytes is incompatible with \p info.
  */
-extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes);
+extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, McVoid* pMem, McSize* pNumBytes);
 /**
  * @brief Registers a user callback function.
  *
@@ -736,7 +750,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlag
 extern MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
     McEvent event,
     pfn_McEvent_CALLBACK pfn_notify,
-    void* user_data);
+    McVoid* user_data);
 
 /**
  * @brief Execute a cutting operation with two meshes - the source mesh, and the cut mesh.
@@ -814,12 +828,12 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
 extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
     const McContext context,
     McFlags dispatchFlags,
-    const void* pSrcMeshVertices,
+    const McVoid* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
+    const McVoid* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
@@ -834,12 +848,12 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
 extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     McContext context,
     McFlags flags,
-    const void* pSrcMeshVertices,
+    const McVoid* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
+    const McVoid* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
@@ -886,7 +900,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
     const McContext context,
     McFlags info,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes);
 
 /**
@@ -999,7 +1013,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponents(
  *
  * double* pVertices = (double*)malloc(numBytes);
  * // this operation shall happen AFTER the preceding operation associated with "bytesQueryEvent".
- * err = mcEnqueueGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)pVertices, NULL, 1, &bytesQueryEvent, NULL, 1, &ev, NULL);
+ * err = mcEnqueueGetConnectedComponentData(context, connCompHandle, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (McVoid*)pVertices, NULL, 1, &bytesQueryEvent, NULL, 1, &ev, NULL);
  * if(err != MC_NO_ERROR)
  * {
  *  // deal with error
@@ -1026,7 +1040,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
     const McConnectedComponent connCompId,
     McFlags queryFlags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
@@ -1040,7 +1054,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McConnectedComponent connCompId,
     McFlags flags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes);
 
 /**

@@ -79,7 +79,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContextWithHelpers(McContext* pOutContext
     return return_value;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mcDebugOutput_CALLBACK cb, const void* userParam)
+MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mcDebugOutput_CALLBACK cb, const McVoid* userParam)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -150,7 +150,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebug
     return return_value;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes)
+MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, McSize bytes, McVoid* pMem, McSize* pNumBytes)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -238,7 +238,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcSetUserEventStatus(
     return return_value;
 }
 
-MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, void* pMem, McSize* pNumBytes)
+MCAPI_ATTR McResult MCAPI_CALL mcGetEventInfo(const McEvent event, McFlags info, McSize bytes, McVoid* pMem, McSize* pNumBytes)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -310,7 +310,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcWaitForEvents(
 MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
     McEvent eventHandle,
     pfn_McEvent_CALLBACK eventCallback,
-    void* data)
+    McVoid* data)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -343,12 +343,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
 MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
     const McContext context,
     McFlags dispatchFlags,
-    const void* pSrcMeshVertices,
+    const McVoid* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
+    const McVoid* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
@@ -443,12 +443,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
 MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     const McContext context,
     McFlags dispatchFlags,
-    const void* pSrcMeshVertices,
+    const McVoid* pSrcMeshVertices,
     const uint32_t* pSrcMeshFaceIndices,
     const uint32_t* pSrcMeshFaceSizes,
     uint32_t numSrcMeshVertices,
     uint32_t numSrcMeshFaces,
-    const void* pCutMeshVertices,
+    const McVoid* pCutMeshVertices,
     const uint32_t* pCutMeshFaceIndices,
     const uint32_t* pCutMeshFaceSizes,
     uint32_t numCutMeshVertices,
@@ -565,7 +565,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueGetConnectedComponentData(
     const McConnectedComponent connCompId,
     McFlags queryFlags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes,
     uint32_t numEventsInWaitlist,
     const McEvent* pEventWaitList,
@@ -614,7 +614,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetConnectedComponentData(
     const McConnectedComponent connCompId,
     McFlags queryFlags,
     McSize bytes,
-    void* pMem,
+    McVoid* pMem,
     McSize* pNumBytes)
 {
     McEvent event = MC_NULL_HANDLE;
