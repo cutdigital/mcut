@@ -43,7 +43,7 @@ UTEST_F_SETUP(Triangulation)
 
         // config debug output
     // -----------------------
-    uint64_t numBytes = 0;
+    McSize numBytes = 0;
     McFlags contextFlags;
     EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes), MC_NO_ERROR);
     
@@ -113,20 +113,20 @@ UTEST_F(Triangulation, oneEdgePartialCut)
         McConnectedComponent cc = connComps[c]; // connected compoenent id
 
         // vertex array
-        uint64_t connCompVerticesBytes = 0;
+        McSize connCompVerticesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompVerticesBytes, uint64_t(0));
-        ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
+        ASSERT_GT(connCompVerticesBytes, McSize(0));
+        ASSERT_GE(connCompVerticesBytes, McSize(sizeof(float) * 9)); // triangle
         const uint32_t numberOfVertices = (uint32_t)(connCompVerticesBytes / (sizeof(float) * 3));
 
         std::vector<float> vertices(numberOfVertices * 3);
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
         // triangle indices
-        uint64_t connCompTriIndicesBytes = 0;
+        McSize connCompTriIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &connCompTriIndicesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompTriIndicesBytes, uint64_t(0));
-        ASSERT_GE(connCompTriIndicesBytes, uint64_t(sizeof(uint32_t) * 3)); // triangle
+        ASSERT_GT(connCompTriIndicesBytes, McSize(0));
+        ASSERT_GE(connCompTriIndicesBytes, McSize(sizeof(uint32_t) * 3)); // triangle
         std::vector<uint32_t> triangleIndices;
         triangleIndices.resize(connCompTriIndicesBytes / sizeof(uint32_t));
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, connCompTriIndicesBytes, triangleIndices.data(), NULL), MC_NO_ERROR);
@@ -192,20 +192,20 @@ UTEST_F(Triangulation, twoEdgePartialCut)
         McConnectedComponent cc = connComps[c]; // connected compoenent id
 
         // vertex array
-        uint64_t connCompVerticesBytes = 0;
+        McSize connCompVerticesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompVerticesBytes, uint64_t(0));
-        ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
+        ASSERT_GT(connCompVerticesBytes, McSize(0));
+        ASSERT_GE(connCompVerticesBytes, McSize(sizeof(float) * 9)); // triangle
         const uint32_t numberOfVertices = (uint32_t)(connCompVerticesBytes / (sizeof(float) * 3));
 
         std::vector<float> vertices(numberOfVertices * 3);
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
         // triangle indices
-        uint64_t connCompTriIndicesBytes = 0;
+        McSize connCompTriIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &connCompTriIndicesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompTriIndicesBytes, uint64_t(0));
-        ASSERT_GE(connCompTriIndicesBytes, uint64_t(sizeof(uint32_t) * 3)); // triangle
+        ASSERT_GT(connCompTriIndicesBytes, McSize(0));
+        ASSERT_GE(connCompTriIndicesBytes, McSize(sizeof(uint32_t) * 3)); // triangle
         std::vector<uint32_t> triangleIndices;
         triangleIndices.resize(connCompTriIndicesBytes / sizeof(uint32_t));
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, connCompTriIndicesBytes, triangleIndices.data(), NULL), MC_NO_ERROR);
@@ -278,20 +278,20 @@ UTEST_F(Triangulation, threeEdgePartialCut)
         McConnectedComponent cc = connComps[c]; // connected compoenent id
 
         // vertex array
-        uint64_t connCompVerticesBytes = 0;
+        McSize connCompVerticesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompVerticesBytes, uint64_t(0));
-        ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
+        ASSERT_GT(connCompVerticesBytes, McSize(0));
+        ASSERT_GE(connCompVerticesBytes, McSize(sizeof(float) * 9)); // triangle
         const uint32_t numberOfVertices = (uint32_t)(connCompVerticesBytes / (sizeof(float) * 3));
 
         std::vector<float> vertices(numberOfVertices * 3);
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
         // triangle indices
-        uint64_t connCompTriIndicesBytes = 0;
+        McSize connCompTriIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &connCompTriIndicesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompTriIndicesBytes, uint64_t(0));
-        ASSERT_GE(connCompTriIndicesBytes, uint64_t(sizeof(uint32_t) * 3)); // triangle
+        ASSERT_GT(connCompTriIndicesBytes, McSize(0));
+        ASSERT_GE(connCompTriIndicesBytes, McSize(sizeof(uint32_t) * 3)); // triangle
         std::vector<uint32_t> triangleIndices;
         triangleIndices.resize(connCompTriIndicesBytes / sizeof(uint32_t));
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, connCompTriIndicesBytes, triangleIndices.data(), NULL), MC_NO_ERROR);
@@ -364,20 +364,20 @@ UTEST_F(Triangulation, threeEdgeVerticalPartialCut)
         McConnectedComponent cc = connComps[c]; // connected compoenent id
 
         // vertex array
-        uint64_t connCompVerticesBytes = 0;
+        McSize connCompVerticesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompVerticesBytes, uint64_t(0));
-        ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
+        ASSERT_GT(connCompVerticesBytes, McSize(0));
+        ASSERT_GE(connCompVerticesBytes, McSize(sizeof(float) * 9)); // triangle
         const uint32_t numberOfVertices = (uint32_t)(connCompVerticesBytes / (sizeof(float) * 3));
 
         std::vector<float> vertices(numberOfVertices * 3);
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
         // triangle indices
-        uint64_t connCompTriIndicesBytes = 0;
+        McSize connCompTriIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &connCompTriIndicesBytes), MC_NO_ERROR);
-        ASSERT_GT(connCompTriIndicesBytes, uint64_t(0));
-        ASSERT_GE(connCompTriIndicesBytes, uint64_t(sizeof(uint32_t) * 3)); // triangle
+        ASSERT_GT(connCompTriIndicesBytes, McSize(0));
+        ASSERT_GE(connCompTriIndicesBytes, McSize(sizeof(uint32_t) * 3)); // triangle
         std::vector<uint32_t> triangleIndices;
         triangleIndices.resize(connCompTriIndicesBytes / sizeof(uint32_t));
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, connCompTriIndicesBytes, triangleIndices.data(), NULL), MC_NO_ERROR);

@@ -194,7 +194,7 @@ int main()
     {
         McConnectedComponent connComp = connectedComponents[i]; // connected compoenent id
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
 
         //  query the ccVertices
         // ------------------------
@@ -354,7 +354,7 @@ int main()
             for (int v = 0; v < (int)faceSize; ++v)
             {
 
-                const int ccVertexIdx = ccFaceIndices.at((uint64_t)faceVertexOffsetBase + v);
+                const int ccVertexIdx = ccFaceIndices.at((McSize)faceVertexOffsetBase + v);
                 // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
                 const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
                 bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMesh.V.rows());
@@ -385,9 +385,9 @@ int main()
 
                     // 1. get the origin face of the current cc face
 
-                    double x(ccVertices[((uint64_t)ccVertexIdx * 3) + 0]);
-                    double y(ccVertices[((uint64_t)ccVertexIdx * 3) + 1]);
-                    double z(ccVertices[((uint64_t)ccVertexIdx * 3) + 2]);
+                    double x(ccVertices[((McSize)ccVertexIdx * 3) + 0]);
+                    double y(ccVertices[((McSize)ccVertexIdx * 3) + 1]);
+                    double z(ccVertices[((McSize)ccVertexIdx * 3) + 2]);
 
                     // vertices of the origin face
                     const Eigen::Vector3d &a = inputMeshPtr->V.row(imFace.x());
@@ -476,9 +476,9 @@ int main()
         // write vertices
         for (int k = 0; k < (int)ccVertexCount; ++k)
         {
-            double x = ccVertices[(uint64_t)k * 3 + 0];
-            double y = ccVertices[(uint64_t)k * 3 + 1];
-            double z = ccVertices[(uint64_t)k * 3 + 2];
+            double x = ccVertices[(McSize)k * 3 + 0];
+            double y = ccVertices[(McSize)k * 3 + 1];
+            double z = ccVertices[(McSize)k * 3 + 2];
             file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
         }
 

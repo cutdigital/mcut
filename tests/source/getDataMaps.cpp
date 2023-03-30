@@ -271,7 +271,7 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL), MC_NO_ERROR);
 
         if (utest_fixture->dispatchflags & MC_DISPATCH_INCLUDE_VERTEX_MAP) {
-            uint64_t numBytes = 0;
+            McSize numBytes = 0;
 
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes), MC_NO_ERROR);
             ASSERT_GT((int)numBytes, 0);
@@ -358,7 +358,7 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
         }
 
         if (utest_fixture->dispatchflags & MC_DISPATCH_INCLUDE_FACE_MAP) {
-            uint64_t numBytes = 0;
+            McSize numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes), MC_NO_ERROR);
             uint32_t ccFaceCount = (uint32_t)(numBytes / sizeof(uint32_t));
             ASSERT_GT((int)ccFaceCount, (int)0);
@@ -459,7 +459,7 @@ UTEST_F(FaceAndVertexDataMapsQueryMissingFlagTest, vertexMapFlag)
     for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_INVALID_VALUE);
     }
 }
@@ -492,7 +492,7 @@ UTEST_F(FaceAndVertexDataMapsQueryMissingFlagTest, faceMapFlag)
     for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_INVALID_VALUE);
     }
 }

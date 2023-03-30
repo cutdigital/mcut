@@ -187,7 +187,7 @@ int main()
         //  query the ccVertices
         // ----------------------
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
         uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
@@ -337,7 +337,7 @@ int main()
             for (int v = 0; v < faceSize; ++v)
             {
 
-                const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
+                const int ccVertexIdx = ccFaceIndices[(McSize)faceVertexOffsetBase + v];
                 // input mesh (source mesh or cut mesh) vertex index (which may be offsetted)
                 const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
                 bool vertexIsFromSrcMesh = (imVertexIdxRaw < (std::uint32_t)srcMesh.V.size());
@@ -366,9 +366,9 @@ int main()
 
                     // 1. get the origin face of the current cc face
 
-                    double x(ccVertices[((uint64_t)ccVertexIdx * 3u) + 0u]);
-                    double y(ccVertices[((uint64_t)ccVertexIdx * 3u) + 1u]);
-                    double z(ccVertices[((uint64_t)ccVertexIdx * 3u) + 2u]);
+                    double x(ccVertices[((McSize)ccVertexIdx * 3u) + 0u]);
+                    double y(ccVertices[((McSize)ccVertexIdx * 3u) + 1u]);
+                    double z(ccVertices[((McSize)ccVertexIdx * 3u) + 2u]);
 
                     // vertices of the origin face
                     const std::vector<double> &a = inputMeshPtr->V[imFace[0]];
@@ -477,9 +477,9 @@ int main()
 
         for (int i = 0; i < (int)ccVertexCount; ++i)
         {
-            double x = ccVertices[(uint64_t)i * 3 + 0];
-            double y = ccVertices[(uint64_t)i * 3 + 1];
-            double z = ccVertices[(uint64_t)i * 3 + 2];
+            double x = ccVertices[(McSize)i * 3 + 0];
+            double y = ccVertices[(McSize)i * 3 + 1];
+            double z = ccVertices[(McSize)i * 3 + 2];
             file << "v " << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << x << " " << y << " " << z << std::endl;
 
             Eigen::Vector3d n = ccVertexNormals[i];

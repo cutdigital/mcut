@@ -158,20 +158,20 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             McConnectedComponent cc = connComps[c]; // connected compoenent id
 
             // vertex array
-            uint64_t connCompVerticesBytes = 0;
+            McSize connCompVerticesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &connCompVerticesBytes), MC_NO_ERROR);
-            ASSERT_GT(connCompVerticesBytes, uint64_t(0));
-            ASSERT_GE(connCompVerticesBytes, uint64_t(sizeof(float) * 9)); // triangle
+            ASSERT_GT(connCompVerticesBytes, McSize(0));
+            ASSERT_GE(connCompVerticesBytes, McSize(sizeof(float) * 9)); // triangle
             const uint32_t numberOfVertices = (uint32_t)(connCompVerticesBytes / (sizeof(float) * 3));
 
             std::vector<float> vertices(numberOfVertices*3);
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, connCompVerticesBytes, (void*)vertices.data(), NULL), MC_NO_ERROR);
 
             // face indices
-            uint64_t connCompFaceIndicesBytes = 0;
+            McSize connCompFaceIndicesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &connCompFaceIndicesBytes), MC_NO_ERROR);
-            ASSERT_GT(connCompFaceIndicesBytes, uint64_t(0));
-            ASSERT_GE(connCompFaceIndicesBytes, uint64_t(sizeof(uint32_t) * 3)); // triangle
+            ASSERT_GT(connCompFaceIndicesBytes, McSize(0));
+            ASSERT_GE(connCompFaceIndicesBytes, McSize(sizeof(uint32_t) * 3)); // triangle
             std::vector<uint32_t> faceIndices;
             faceIndices.resize(connCompFaceIndicesBytes / sizeof(uint32_t));
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE, connCompFaceIndicesBytes, faceIndices.data(), NULL), MC_NO_ERROR);
@@ -182,7 +182,7 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             }
 
             // face sizes
-            uint64_t connCompFaceSizesBytes = 0;
+            McSize connCompFaceSizesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &connCompFaceSizesBytes), MC_NO_ERROR);
             ASSERT_GE(connCompFaceIndicesBytes, sizeof(uint32_t));
             std::vector<uint32_t> faceSizes;
@@ -196,9 +196,9 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
             }
 
             // edge indices
-            uint64_t connCompEdgesBytes = 0;
+            McSize connCompEdgesBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_EDGE, 0, NULL, &connCompEdgesBytes), MC_NO_ERROR);
-            ASSERT_GE(connCompEdgesBytes, uint64_t(sizeof(uint32_t) * 6)); // triangle
+            ASSERT_GE(connCompEdgesBytes, McSize(sizeof(uint32_t) * 6)); // triangle
 
             std::vector<uint32_t> edgeIndices;
             edgeIndices.resize(connCompEdgesBytes / sizeof(uint32_t));

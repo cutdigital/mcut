@@ -131,7 +131,7 @@ UTEST_F_TEARDOWN(DebugContextConfig)
 
 UTEST_F(DebugContextConfig, queryContextDebugFlag)
 {
-    uint64_t bytes;
+    McSize bytes;
     McFlags flags;
     EXPECT_EQ(mcGetInfo(utest_fixture->context_, MC_CONTEXT_FLAGS, 0, nullptr, &bytes), MC_NO_ERROR);
     EXPECT_EQ(bytes, sizeof(McFlags));

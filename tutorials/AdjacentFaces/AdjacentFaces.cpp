@@ -207,11 +207,11 @@ int main()
         // query the vertices
         // ----------------------
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
         uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
-        std::vector<double> ccVertices((uint64_t)ccVertexCount * 3u, 0);
+        std::vector<double> ccVertices((McSize)ccVertexCount * 3u, 0);
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         my_assert(err == MC_NO_ERROR);
 
@@ -340,9 +340,9 @@ void writeOBJ(
 
     // write vertices and normals
     for (uint32_t i = 0; i < (uint32_t)ccVertexCount; ++i) {
-        double x = ccVertices[(uint64_t)i * 3 + 0];
-        double y = ccVertices[(uint64_t)i * 3 + 1];
-        double z = ccVertices[(uint64_t)i * 3 + 2];
+        double x = ccVertices[(McSize)i * 3 + 0];
+        double y = ccVertices[(McSize)i * 3 + 1];
+        double z = ccVertices[(McSize)i * 3 + 2];
         file << "v " << x << " " << y << " " << z << std::endl;
     }
 
@@ -355,7 +355,7 @@ void writeOBJ(
         file << "f ";
         // for each vertex in face
         for (int v = 0; (v < faceSize); v++) {
-            const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
+            const int ccVertexIdx = ccFaceIndices[(McSize)faceVertexOffsetBase + v];
             file << (ccVertexIdx + 1) << " ";
         } // for (int v = 0; v < faceSize; ++v) {
         file << std::endl;

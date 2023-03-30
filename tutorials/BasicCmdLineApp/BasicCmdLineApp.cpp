@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
 
     // config debug output
     // -----------------------
-    uint64_t numBytes = 0;
+    McSize numBytes = 0;
     McFlags contextFlags;
     err = mcGetInfo(context, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes);
     mcCheckError(err);
@@ -363,9 +363,9 @@ void writeOBJ(
 
     // write vertices and normals
     for (uint32_t i = 0; i < (uint32_t)ccVertexCount; ++i) {
-        double x = ccVertices[(uint64_t)i * 3 + 0];
-        double y = ccVertices[(uint64_t)i * 3 + 1];
-        double z = ccVertices[(uint64_t)i * 3 + 2];
+        double x = ccVertices[(McSize)i * 3 + 0];
+        double y = ccVertices[(McSize)i * 3 + 1];
+        double z = ccVertices[(McSize)i * 3 + 2];
         file << "v " << x << " " << y << " " << z << std::endl;
     }
 
@@ -378,7 +378,7 @@ void writeOBJ(
         file << "f ";
         // for each vertex in face
         for (int v = 0; (v < faceSize); v++) {
-            const int ccVertexIdx = ccFaceIndices[(uint64_t)faceVertexOffsetBase + v];
+            const int ccVertexIdx = ccFaceIndices[(McSize)faceVertexOffsetBase + v];
             file << (ccVertexIdx + 1) << " ";
         } // for (int v = 0; v < faceSize; ++v) {
         file << std::endl;

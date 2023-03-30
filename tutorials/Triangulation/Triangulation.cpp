@@ -163,7 +163,7 @@ int main()
     {
         McConnectedComponent connComp = connComps[i]; // connected compoenent id
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
 
         // query the vertices
         // ----------------------

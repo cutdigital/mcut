@@ -153,7 +153,7 @@ UTEST_F(SeamConnectedComponent, queryVertices)
         McConnectedComponent cc = utest_fixture->connComps_[c]; // connected compoenent id
 
         // indices of the vertices which define the seam
-        uint64_t connCompSeamVertexIndicesBytes = 0;
+        McSize connCompSeamVertexIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, 0, NULL, &connCompSeamVertexIndicesBytes), MC_NO_ERROR);
 
         std::vector<uint32_t> seamVertexIndices;

@@ -25,7 +25,7 @@
 
 struct GetContextInfo {
     McContext context_;
-    uint64_t bytes;
+    McSize bytes;
 };
 
 UTEST_F_SETUP(GetContextInfo)

@@ -184,7 +184,7 @@ int main()
         //  query the vertices
         // ----------------------
 
-        uint64_t numBytes = 0;
+        McSize numBytes = 0;
         err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(err == MC_NO_ERROR);
 
@@ -316,7 +316,7 @@ int main()
             // for each vertex in face
             for (int v = 0; v < faceSize; ++v) {
 
-                const int ccVertexIdx = ccTriangulatedFaceIndices.at((uint64_t)faceVertexOffsetBase + v);
+                const int ccVertexIdx = ccTriangulatedFaceIndices.at((McSize)faceVertexOffsetBase + v);
                 const uint32_t imVertexIdxRaw = ccVertexMap.at(ccVertexIdx);
                 // NOTE: it is generally advisable to use the number of vertices of the internal source-mesh since MCUT might modify
                 // the user-provided source mesh. Keeping things simple for now 
@@ -341,9 +341,9 @@ int main()
                     // --------------------------------------------------
 
                     // coordinates of current point
-                    double x(ccVertices[((uint64_t)ccVertexIdx * 3u) + 0u]);
-                    double y(ccVertices[((uint64_t)ccVertexIdx * 3u) + 1u]);
-                    double z(ccVertices[((uint64_t)ccVertexIdx * 3u) + 2u]);
+                    double x(ccVertices[((McSize)ccVertexIdx * 3u) + 0u]);
+                    double y(ccVertices[((McSize)ccVertexIdx * 3u) + 1u]);
+                    double z(ccVertices[((McSize)ccVertexIdx * 3u) + 2u]);
 
                     // vertices of the origin face (i.e. the face from which the current face came from).
                     // NOTE: we have assumed triangulated input meshes for simplicity. Otherwise, interpolation
@@ -461,9 +461,9 @@ int main()
         // write vertices
 
         for (int p = 0; p < (int)ccVertexCount; ++p) {
-            double x = ccVertices[(uint64_t)p * 3 + 0];
-            double y = ccVertices[(uint64_t)p * 3 + 1];
-            double z = ccVertices[(uint64_t)p * 3 + 2];
+            double x = ccVertices[(McSize)p * 3 + 0];
+            double y = ccVertices[(McSize)p * 3 + 1];
+            double z = ccVertices[(McSize)p * 3 + 2];
             file << std::setprecision(std::numeric_limits<long double>::digits10 + 1) << "v " << x << " " << y << " " << z << std::endl;
         }
 

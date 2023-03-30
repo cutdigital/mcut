@@ -95,6 +95,8 @@ typedef struct McContext_T* McContext;
  */
 typedef struct McEvent_T* McEvent;
 
+typedef void McVoid;
+
 /**
  * @brief 32 bit integer.
  *
