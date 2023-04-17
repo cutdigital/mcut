@@ -672,6 +672,7 @@ public:
 
     // TODO: make use of the following three filter inside the log function
 
+    std::mutex debugCallbackMutex;
     // controller for permmited messages based on the source of message
     McFlags debugSource = 0;
     // controller for permmited messages based on the type of message
@@ -686,6 +687,8 @@ public:
         McDebugSeverity severity,
         const std::string& message)
     {
+        std::lock_guard<std::mutex> lock(debugCallbackMutex);
+        
         if (debugCallback != nullptr) {
             (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
         }
