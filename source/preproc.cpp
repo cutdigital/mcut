@@ -1273,7 +1273,7 @@ extern "C" void preproc(
     kernel_input.verbose = false;
     kernel_input.require_looped_cutpaths = false;
 
-    kernel_input.verbose = static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) && (context_ptr->debugType & MC_DEBUG_SOURCE_KERNEL));
+    kernel_input.verbose = static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) && (context_ptr->dbgCallbackBitfieldType & MC_DEBUG_SOURCE_KERNEL));
     kernel_input.require_looped_cutpaths = static_cast<bool>(dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS);
     kernel_input.populate_vertex_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
     kernel_input.populate_face_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);

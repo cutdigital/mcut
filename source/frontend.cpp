@@ -117,61 +117,65 @@ int clear_bit(unsigned int v, unsigned int pos)
 
 void debug_message_control_impl(
     McContext contextHandle,
-    McDebugSource source,
-    McDebugType type,
-    McDebugSeverity severity,
+    McDebugSource sourceBitfieldParam,
+    McDebugType typeBitfieldParam,
+    McDebugSeverity severityBitfieldParam,
     bool enabled)
 {
-    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
-
-    // if (context_entry_iter == g_contexts.end()) {
-    //     throw std::invalid_argument("invalid context");
-    // }
-
-    // const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
-
     std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == contextHandle; });
 
-    // std::map<McContext, std::unique_ptr<context_t>>::iterator context_entry_iter = g_contexts.find(contextHandle);
-
     if (context_ptr == nullptr) {
-        // "contextHandle" may not be NULL but that does not mean it maps to
-        // a valid object in "g_contexts"
         throw std::invalid_argument("invalid context");
     }
-    // reset
-    context_ptr->debugSource = 0;
+
+    //
+    // Debug source flag
+    //
 
     for (auto i : { MC_DEBUG_SOURCE_API, MC_DEBUG_SOURCE_KERNEL }) {
-        if ((source & i) && enabled) {
-
+        if (sourceBitfieldParam & i) {
             int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i);
+            if (enabled) {
+                context_ptr->dbgCallbackBitfieldSource = set_bit(context_ptr->dbgCallbackBitfieldSource, n);
+            } else {
 
-            context_ptr->debugSource = set_bit(context_ptr->debugSource, n);
+                context_ptr->dbgCallbackBitfieldSource = clear_bit(context_ptr->dbgCallbackBitfieldSource, n);
+            }
         }
     }
 
-    // reset
-    context_ptr->debugType = 0;
+    //
+    // Debug type flag
+    //
 
     for (auto i : { MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, MC_DEBUG_TYPE_ERROR, MC_DEBUG_TYPE_OTHER }) {
-        if ((type & i) && enabled) {
+        if (typeBitfieldParam & i) {
 
-            int n = trailing_zeroes(MC_DEBUG_TYPE_ALL & i);
+            const int n = trailing_zeroes(MC_DEBUG_TYPE_ALL & i);
 
-            context_ptr->debugType = set_bit(context_ptr->debugType, n);
+            if (enabled) {
+                context_ptr->dbgCallbackBitfieldType = set_bit(context_ptr->dbgCallbackBitfieldType, n);
+            } else {
+
+                context_ptr->dbgCallbackBitfieldType = clear_bit(context_ptr->dbgCallbackBitfieldType, n);
+            }
         }
     }
 
-    // reset
-    context_ptr->debugSeverity = 0;
+    //
+    // Debug severity flag
+    //
 
     for (auto i : { MC_DEBUG_SEVERITY_HIGH, MC_DEBUG_SEVERITY_LOW, MC_DEBUG_SEVERITY_MEDIUM, MC_DEBUG_SEVERITY_NOTIFICATION }) {
-        if ((severity & i) && enabled) {
+        if (severityBitfieldParam & i) {
 
-            int n = trailing_zeroes(MC_DEBUG_SEVERITY_ALL & i);
+            const int n = trailing_zeroes(MC_DEBUG_SEVERITY_ALL & i);
 
-            context_ptr->debugSeverity = set_bit(context_ptr->debugSeverity, n);
+            if (enabled) {
+                context_ptr->dbgCallbackBitfieldSeverity = set_bit(context_ptr->dbgCallbackBitfieldSeverity, n);
+            } else {
+                context_ptr->dbgCallbackBitfieldSeverity = clear_bit(context_ptr->dbgCallbackBitfieldSeverity, n);
+            }
         }
     }
 }

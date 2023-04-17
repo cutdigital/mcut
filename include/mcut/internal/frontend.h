@@ -462,6 +462,9 @@ public:
         // , m_joiner(m_api_threads)
         , m_flags(flags)
         , m_user_handle(handle)
+        , dbgCallbackBitfieldSource(0)
+        , dbgCallbackBitfieldType(0)
+        , dbgCallbackBitfieldSeverity(0)
     {
         log_msg("\n[MCUT] Create context " << m_user_handle);
 
@@ -674,23 +677,35 @@ public:
 
     std::mutex debugCallbackMutex;
     // controller for permmited messages based on the source of message
-    McFlags debugSource = 0;
+    std::atomic<McFlags> dbgCallbackBitfieldSource;
     // controller for permmited messages based on the type of message
-    McFlags debugType = 0;
+    std::atomic<McFlags> dbgCallbackBitfieldType;
     // controller for permmited messages based on the severity of message
-    McFlags debugSeverity = 0;
+    std::atomic<McFlags> dbgCallbackBitfieldSeverity;
+    bool dbgCallbackAllowAsyncCalls = true;
 
     // function to invoke the user-provided debug call back
     void dbg_cb(McDebugSource source,
         McDebugType type,
-        unsigned int id,
+        unsigned int id, // unused
         McDebugSeverity severity,
         const std::string& message)
     {
-        std::lock_guard<std::mutex> lock(debugCallbackMutex);
-        
+        std::unique_lock<std::mutex> ulock(debugCallbackMutex, std::defer_lock); 
+
+        if (!dbgCallbackAllowAsyncCalls) {
+            ulock.lock();
+        } // otherwise the callback will be invoked asynchronously
+
         if (debugCallback != nullptr) {
-            (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
+            
+            // can we log this type of message?
+
+            if (((uint32_t)source & dbgCallbackBitfieldSource.load()) && //
+                    ((uint32_t)type & dbgCallbackBitfieldType.load()) && //
+                    ((uint32_t)severity & dbgCallbackBitfieldSeverity.load()) ) {
+                (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
+            }
         }
     }
 };
