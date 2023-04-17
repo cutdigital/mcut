@@ -31,7 +31,7 @@ bool client_input_arrays_to_hmesh(
 {
     SCOPED_TIMER(__FUNCTION__);
 
-    context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
+    context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "construct halfedge mesh");
 
     // minor optimization
     halfedgeMesh.reserve_for_additional_elements(numVertices);
@@ -133,7 +133,7 @@ bool client_input_arrays_to_hmesh(
                     bool exchanged = atm_result.compare_exchange_strong(zero, 1);
                     if (exchanged) // first thread to detect error
                     {
-                        context_ptr->log( //
+                        context_ptr->dbg_cb( //
                             MC_DEBUG_SOURCE_API, //
                             MC_DEBUG_TYPE_ERROR, //
                             0, //
@@ -160,7 +160,7 @@ bool client_input_arrays_to_hmesh(
 
                         if (exchanged) // first thread to detect error
                         {
-                            context_ptr->log(
+                            context_ptr->dbg_cb(
                                 MC_DEBUG_SOURCE_API,
                                 MC_DEBUG_TYPE_ERROR,
                                 0,
@@ -197,7 +197,7 @@ bool client_input_arrays_to_hmesh(
 
                 if (fd == hmesh_t::null_face()) {
 
-                    context_ptr->log( //
+                    context_ptr->dbg_cb( //
                         MC_DEBUG_SOURCE_API, //
                         MC_DEBUG_TYPE_ERROR, //
                         0, //
@@ -245,7 +245,7 @@ bool client_input_arrays_to_hmesh(
 
         if (face_vertex_count < 3) {
 
-            context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid face-size for face - " + std::to_string(i) + " (size = " + std::to_string(face_vertex_count) + ")");
+            context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "invalid face-size for face - " + std::to_string(i) + " (size = " + std::to_string(face_vertex_count) + ")");
 
             return false;
         }
@@ -258,7 +258,7 @@ bool client_input_arrays_to_hmesh(
 
             if (isDuplicate) {
 
-                context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "found duplicate vertex in face - " + std::to_string(i));
+                context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "found duplicate vertex in face - " + std::to_string(i));
 
                 return false;
             }
@@ -271,7 +271,7 @@ bool client_input_arrays_to_hmesh(
         if (fd == hmesh_t::null_face()) {
             // Hint: this can happen when the mesh does not have a consistent
             // winding order i.e. some faces are CCW and others are CW
-            context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
+            context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_ERROR, 0, MC_DEBUG_SEVERITY_HIGH, "non-manifold edge on face " + std::to_string(i));
 
             return false;
         }
@@ -320,7 +320,7 @@ bool is_coplanar(const hmesh_t& m, const fd_t& f, int& fv_count)
 bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
 {
     if (m.number_of_vertices() < 3) {
-        context_ptr->log(
+        context_ptr->dbg_cb(
             MC_DEBUG_SOURCE_API,
             MC_DEBUG_TYPE_ERROR,
             0,
@@ -330,7 +330,7 @@ bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
     }
 
     if (m.number_of_faces() < 1) {
-        context_ptr->log(
+        context_ptr->dbg_cb(
             MC_DEBUG_SOURCE_API,
             MC_DEBUG_TYPE_ERROR,
             0,
@@ -349,7 +349,7 @@ bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
         fccmap, m, cc_to_vertex_count, cc_to_face_count);
 
     if (n != 1) {
-        context_ptr->log(
+        context_ptr->dbg_cb(
             MC_DEBUG_SOURCE_API,
             MC_DEBUG_TYPE_ERROR,
             0,
@@ -363,7 +363,7 @@ bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
         int fv_count = 0;
         const bool face_is_coplanar = is_coplanar(m, *f, fv_count);
         if (!face_is_coplanar) {
-            context_ptr->log(
+            context_ptr->dbg_cb(
                 MC_DEBUG_SOURCE_API,
                 MC_DEBUG_TYPE_OTHER,
                 0,
@@ -1323,7 +1323,7 @@ extern "C" void preproc(
     // Construct BVHs
     // ::::::::::::::
 
-    context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
+    context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build source-mesh BVH");
 
 #if defined(USE_OIBVH)
     std::vector<bounding_box_t<vec3>> source_hmesh_BVH_aabb_array;
@@ -1338,7 +1338,7 @@ extern "C" void preproc(
     BoundingVolumeHierarchy source_hmesh_BVH;
     source_hmesh_BVH.buildTree(source_hmesh);
 #endif
-    context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
+    context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Build cut-mesh BVH");
 
     /*
         NOTE: All variables declared as shared pointers here represent variables that live (on the heap)
@@ -1449,7 +1449,7 @@ extern "C" void preproc(
 
             if (cut_mesh_perturbation_count == MAX_PERTUBATION_ATTEMPTS) {
 
-                context_ptr->log(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_MEDIUM, kernel_output.logger.get_reason_for_failure());
+                context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_MEDIUM, kernel_output.logger.get_reason_for_failure());
 
                 throw std::runtime_error("max perturbation iteratons reached");
             }
@@ -1580,13 +1580,13 @@ extern "C" void preproc(
 
         // NOTE: we check for defects here since both input meshes may be modified by the polygon partitioning process above.
         // Partitiining is involked after atleast one dispatch call.
-        context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Check source-mesh for defects");
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Check source-mesh for defects");
 
         if (false == check_input_mesh(context_ptr, *source_hmesh.get())) {
             throw std::invalid_argument("invalid source-mesh connectivity");
         }
 
-        context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Check cut-mesh for defects");
 
         if (false == check_input_mesh(context_ptr, *cut_hmesh.get())) {
             throw std::invalid_argument("invalid cut-mesh connectivity");
@@ -1596,7 +1596,7 @@ extern "C" void preproc(
             // Evaluate BVHs to find polygon pairs that will be tested for intersection
             // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
             source_or_cut_hmesh_BVH_rebuilt = false;
-            context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
+            context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Find potentially-intersecting polygons");
 
             ps_face_to_potentially_intersecting_others.clear();
 #if defined(USE_OIBVH)
@@ -1614,7 +1614,7 @@ extern "C" void preproc(
 
 #endif
 
-            context_ptr->log(
+            context_ptr->dbg_cb(
                 MC_DEBUG_SOURCE_API,
                 MC_DEBUG_TYPE_OTHER,
                 0,
@@ -1632,7 +1632,7 @@ extern "C" void preproc(
 #endif
                     continue;
                 } else {
-                    context_ptr->log(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+                    context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
                     return; // we are done
                 }
             }
@@ -1653,7 +1653,7 @@ extern "C" void preproc(
         source_hmesh_face_count_prev = source_hmesh->number_of_faces();
 
         try {
-            context_ptr->log(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch kernel");
+            context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "dispatch kernel");
             dispatch(kernel_output, kernel_input);
         } catch (const std::exception& e) {
             fprintf(stderr, "fatal kernel exception caught : %s\n", e.what());
@@ -1673,7 +1673,7 @@ extern "C" void preproc(
 
     if (convert(kernel_output.status) != McResult::MC_NO_ERROR) {
 
-        context_ptr->log(
+        context_ptr->dbg_cb(
             MC_DEBUG_SOURCE_KERNEL,
             MC_DEBUG_TYPE_ERROR,
             0,

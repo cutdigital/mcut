@@ -679,7 +679,8 @@ public:
     // controller for permmited messages based on the severity of message
     McFlags debugSeverity = 0;
 
-    void log(McDebugSource source,
+    // function to invoke the user-provided debug call back
+    void dbg_cb(McDebugSource source,
         McDebugType type,
         unsigned int id,
         McDebugSeverity severity,

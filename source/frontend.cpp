@@ -1064,7 +1064,7 @@ void triangulate_face(
 
     if (!duplicates_info_post.duplicates.empty()) {
         // This should not happen! Probably a good idea to email the author
-        context_uptr->log(
+        context_uptr->dbg_cb(
             MC_DEBUG_SOURCE_KERNEL,
             MC_DEBUG_TYPE_ERROR, 0,
             MC_DEBUG_SEVERITY_HIGH, "face f" + std::to_string(cc_face_iter) + " has duplicate vertices that could not be resolved (bug)");
@@ -1082,7 +1082,7 @@ void triangulate_face(
 
     if (!cdt::check_topology(cdt)) {
 
-        context_uptr->log(
+        context_uptr->dbg_cb(
             MC_DEBUG_SOURCE_KERNEL,
             MC_DEBUG_TYPE_OTHER, 0,
             MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face f" + std::to_string(cc_face_iter) + " has invalid topology");
@@ -1091,7 +1091,7 @@ void triangulate_face(
     }
 
     if (cdt.triangles.empty()) {
-        context_uptr->log(
+        context_uptr->dbg_cb(
             MC_DEBUG_SOURCE_KERNEL,
             MC_DEBUG_TYPE_OTHER, 0,
             MC_DEBUG_SEVERITY_NOTIFICATION, "triangulation on face f" + std::to_string(cc_face_iter) + " produced zero faces");
@@ -1284,7 +1284,7 @@ void triangulate_face(
 
             const std::string msg = "triangulation on face f" + std::to_string(cc_face_iter) + " produced invalid triangles that could not be stored";
 
-            context_uptr->log(
+            context_uptr->dbg_cb(
                 MC_DEBUG_SOURCE_KERNEL,
                 MC_DEBUG_TYPE_OTHER, 0,
                 MC_DEBUG_SEVERITY_HIGH, msg);
@@ -1322,7 +1322,7 @@ void triangulate_face(
 
     for (std::uint32_t i = 0; i < (std::uint32_t)cc_face_vcount; ++i) {
         if (SAFE_ACCESS(cc_face_vtx_to_is_used_flag, i) != true) {
-            context_uptr->log(
+            context_uptr->dbg_cb(
                 MC_DEBUG_SOURCE_KERNEL,
                 MC_DEBUG_TYPE_OTHER, 0,
                 MC_DEBUG_SEVERITY_HIGH, "triangulation on face f" + std::to_string(cc_face_iter) + " did not use vertex v" + std::to_string(i));
