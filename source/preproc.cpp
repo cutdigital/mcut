@@ -5,6 +5,7 @@
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
 #include "mcut/internal/utils.h"
+#include "mcut/internal/timer.h"
 
 #include <numeric> // std::partial_sum
 #include <queue>

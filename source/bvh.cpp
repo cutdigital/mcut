@@ -22,6 +22,7 @@
 
 #include <mcut/internal/bvh.h>
 #include <mcut/internal/utils.h>
+#include "mcut/internal/timer.h"
 
 #include <cmath> // see: if it is possible to remove thsi header
 #include <queue>

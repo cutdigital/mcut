@@ -99,31 +99,7 @@ typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
 #define SAFE_ACCESS(var, i) var[i]
 #endif
 
-// #define PROFILING_BUILD
 
-#if defined(PROFILING_BUILD)
-#include <chrono>
-#include <memory>
-#include <stack>
-
-#define TIMESTACK_PUSH(name) \
-    g_timestack.push(std::unique_ptr<mini_timer>(new mini_timer(name)))
-#define TIMESTACK_POP() \
-    g_timestack.pop()
-#define TIMESTACK_RESET()                 \
-    while (!g_timestack.empty()) {        \
-        g_timestack.top()->set_invalid(); \
-        g_timestack.pop();                \
-    }
-#define SCOPED_TIMER(name) \
-    mini_timer _1mt(name)
-
-#else
-#define SCOPED_TIMER(name)
-#define TIMESTACK_PUSH(name)
-#define TIMESTACK_POP()
-#define TIMESTACK_RESET()
-#endif
 
 static inline int wrap_integer(int x, const int lo, const int hi)
 {
@@ -136,34 +112,6 @@ static inline int wrap_integer(int x, const int lo, const int hi)
     return lo + (x - lo) % range_size;
 }
 
-#if defined(PROFILING_BUILD)
-class mini_timer {
-    std::chrono::time_point<std::chrono::steady_clock> m_start;
-    const std::string m_name;
-    bool m_valid = true;
-
-public:
-    mini_timer(const std::string& name)
-        : m_start(std::chrono::steady_clock::now())
-        , m_name(name)
-    {
-    }
-
-    ~mini_timer()
-    {
-        if (m_valid) {
-            const std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-            const std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_start);
-            unsigned long long elapsed_ = elapsed.count();
-            printf("[PROF]: %s (%llums)\n", m_name.c_str(), elapsed_);
-        }
-    }
-    void set_invalid()
-    {
-        m_valid = false;
-    }
-};
-#endif
 class logger_t {
 
     std::stringstream m_buffer;
@@ -294,9 +242,7 @@ pair<T> make_pair(const T a, const T b)
     return pair<T>(a, b);
 }
 
-#if defined(PROFILING_BUILD)
-extern std::stack<std::unique_ptr<mini_timer>> g_timestack;
-#endif // #if defined(PROFILING_BUILD)
+
 
 // Threadsafe logging to console which prevents std::cerr from mixing strings when
 // concatenating with the operator<< multiple time per string, across multiple
@@ -308,9 +254,7 @@ extern std::stack<std::unique_ptr<mini_timer>> g_timestack;
         std::cerr << ss.str();      \
     }
 
-
 // used to marked/label unused function parameters to prevent warnings
-#define UNUSED(x) [&x]{}()
-
+#define UNUSED(x) [&x] {}()
 
 #endif // MCUT_UTILS_H_

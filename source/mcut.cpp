@@ -23,7 +23,7 @@
 #include "mcut/mcut.h"
 
 #include "mcut/internal/utils.h"
-
+#include "mcut/internal/timer.h"
 #include "mcut/internal/frontend.h"
 
 #include <exception>
@@ -434,8 +434,6 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
             return_value = McResult::MC_INVALID_VALUE;
         }
     }
-
-    TIMESTACK_POP();
 
     return return_value;
 }

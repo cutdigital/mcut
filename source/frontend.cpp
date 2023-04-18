@@ -17,16 +17,17 @@
 #include <unordered_map>
 
 #include "mcut/internal/cdt/cdt.h"
+#include "mcut/internal/timer.h"
 
 #if defined(PROFILING_BUILD)
-std::stack<std::unique_ptr<mini_timer>> g_timestack = std::stack<std::unique_ptr<mini_timer>>();
+thread_local std::stack<std::unique_ptr<mini_timer>> g_thrd_loc_timerstack;
 #endif
 
 thread_local std::string per_thread_api_log_str;
 
 threadsafe_list<std::shared_ptr<context_t>> g_contexts = {};
 threadsafe_list<std::shared_ptr<event_t>> g_events = {};
-std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to a McContext handle that will be returned to the user
+std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to e.g. a McContext handle that will be returned to the user
 std::once_flag g_objects_counter_init_flag; // flag used to initialise "g_objects_counter" with "std::call_once"
 
 void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperThreadCount)
