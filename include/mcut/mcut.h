@@ -98,11 +98,25 @@ typedef struct McEvent_T* McEvent;
 typedef void McVoid;
 
 /**
- * @brief 32 bit integer.
+ * @brief 8 bit signed char.
+ *
+ * Integral type representing a 8-bit signed char.
+ */
+typedef int8_t McChar;
+
+/**
+ * @brief 32 bit signed integer.
  *
  * Integral type representing a 32-bit signed integer.
  */
 typedef int32_t McInt32;
+
+/**
+ * @brief 32 bit unsigned integer.
+ *
+ * Integral type representing a 32-bit usigned integer.
+ */
+typedef uint32_t McUint32;
 
 /**
  * @brief Bitfield type.
@@ -586,6 +600,90 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
     McContext context,
     pfn_mcDebugOutput_CALLBACK cb,
     const McVoid* userParam);
+
+/**
+ * @brief Returns messages stored in an internal log.
+ * 
+ * @param context The context handle that was created by a previous call to @see ::mcCreateContext.
+ * @param count The number of messages that you want to _try_ to fetch. The return value is the number of messages actually fetched. Any messages successfully fetched will be removed from the message log.
+ * @param bufSize 
+ * @param sources array that must be at least \p count in size. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
+ * @param types array that must be at least \p count in size. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
+ * @param severities array that must be at least \p count in size. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
+ * @param lengths array that must be at least \p count in size. These are the lengths of the string for that index's corresponding messages. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
+ * @param messageLog a single array of characters, of at least \p bufSize​ in size. 
+ * 
+  * If no callback is registered, then messages are stored in a log. This log has 
+ * a fixed, implementation defined length of ::MC_MAX_DEBUG_LOGGED_MESSAGES message 
+ * entries. If the log is full and more messages are generated, then the new 
+ * messages will be discarded.
+ * 
+ * NOTE: ::MC_MAX_DEBUG_LOGGED_MESSAGES is allowed to be as few as one, so it 
+ * would be unwise to rely on logging without at least verifying that the message 
+ * log is of reasonable length. So it's more reliable to build your own log.
+ * 
+ * Each context maintains its own message log queue for commands executed in that 
+ * context. Logging follows the same synchronization rules as for the callback. 
+ * So if you need immediate results in the log, or if the order of messages needs 
+ * to be guaranteed, you must use synchronous behavior. Messages from the context's 
+ * log can be fetched with this function.
+ * 
+ * The behavior of the character data is more difficult to deal with. \p messageLoG 
+ * is a single array of characters, of at least \p bufSize in size. The function 
+ * will copy into this string the message strings for each message extracted, 
+ * separated by null characters (and terminated by one). However, if it is unable 
+ * to copy a string due to lack of space remaining in \p bufSize then this message, 
+ * and all subsequent messages, will remain in the log. 
+ * 
+ * Therefore, if you do not provide enough space in \p messageLog you cannot get 
+ * any messages from the log. You can query the length of the string in the first 
+ * message of the log with ::MC_DEBUG_NEXT_LOGGED_MESSAGE_LENGTH. This includes 
+ * the null-terminator, so you can use that directly to get at least the first 
+ * message. If you want to be able to query any number of messages, you can use 
+ * the implementation-defined ::MC_MAX_DEBUG_MESSAGE_LENGTH value, which is the 
+ * maximum length (including null-terminator) of message strings.
+ * 
+ * Here is an example of code that can get the first N messages:
+ * 
+ * @code {.c++}
+ * void GetFirstNMessages(McUint32 numMsgs)
+ * {
+ *      McInt32 maxMsgLen = 0;
+ *      mcGet(MC_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
+ * 	    std::vector<McChar> msgData(numMsgs * maxMsgLen);
+ *      std::vector<McDebugSource> sources(numMsgs);
+ *      std::vector<McDebugType> types(numMsgs);
+ *      std::vector<McDebugSeverity> severities(numMsgs);
+ *      std::vector<McUint32> ids(numMsgs);0
+ *      std::vector<McSize> lengths(numMsgs);
+ *      
+ *      McUint32 numFound = mcGetDebugMessageLog(numMsgs, msgs.size(), &sources[0], &types[0], &ids[0], &severities[0], &lengths[0], &msgData[0]);
+ * 
+ *      sources.resize(numFound);
+ *      types.resize(numFound);
+ *      severities.resize(numFound);
+ *      ids.resize(numFound);
+ *      lengths.resize(numFound);
+ *      std::vector<std::string> messages;
+ *      messages.reserve(numFound);
+ * 
+ *      std::vector<McChar>::iterator currPos = msgData.begin();
+ *      
+ *      for(size_t msg = 0; msg < lengths.size(); ++msg)
+ *      {
+ *          messages.push_back(std::string(currPos, currPos + lengths[msg] - 1));
+ *          currPos = currPos + lengths[msg];
+ *      }
+ *  }
+ * @endcode
+ * 
+ * @return MCAPI_ATTR 
+ */
+extern MCAPI_ATTR McUint32 mcGetDebugMessageLog(
+    McContext context,  
+    McUint32 count, McSize bufSize,
+    McDebugSource *sources, McDebugType *types, McDebugSeverity *severities,
+    McSize *lengths, McChar *messageLog);
 
 /**
  * Control the reporting of debug messages in a debug context.
