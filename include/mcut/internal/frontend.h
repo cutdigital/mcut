@@ -673,8 +673,6 @@ public:
     // user provided data for callback
     const McVoid* debugCallbackUserParam = nullptr;
 
-    // TODO: make use of the following three filter inside the log function
-
     std::mutex debugCallbackMutex;
     // controller for permmited messages based on the source of message
     std::atomic<McFlags> dbgCallbackBitfieldSource;
@@ -683,6 +681,13 @@ public:
     // controller for permmited messages based on the severity of message
     std::atomic<McFlags> dbgCallbackBitfieldSeverity;
     bool dbgCallbackAllowAsyncCalls = true;
+
+    void set_debug_callback_data(pfn_mcDebugOutput_CALLBACK cb, const McVoid* data_ptr)
+    {
+        std::lock_guard<std::mutex> lguard(debugCallbackMutex);
+        debugCallback = cb;
+        debugCallbackUserParam = data_ptr;
+    }
 
     // function to invoke the user-provided debug call back
     void dbg_cb(McDebugSource source,

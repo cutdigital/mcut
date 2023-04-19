@@ -72,8 +72,7 @@ void debug_message_callback_impl(
     // const std::unique_ptr<context_t>& context_uptr = context_entry_iter->second;
 
     // set callback function ptr, and user pointer
-    context_ptr->debugCallback = cb;
-    context_ptr->debugCallbackUserParam = userParam;
+    context_ptr->set_debug_callback_data(cb, userParam);
 }
 
 // find the number of trailing zeros in v
