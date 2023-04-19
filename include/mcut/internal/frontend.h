@@ -705,10 +705,11 @@ public:
         if (debugCallback != nullptr) {
             
             // can we log this type of message?
+            const bool canLog = ((uint32_t)source & dbgCallbackBitfieldSource.load(std::memory_order_acquire)) && //
+                    ((uint32_t)type & dbgCallbackBitfieldType.load(std::memory_order_acquire)) && //
+                    ((uint32_t)severity & dbgCallbackBitfieldSeverity.load(std::memory_order_acquire)) ;
 
-            if (((uint32_t)source & dbgCallbackBitfieldSource.load()) && //
-                    ((uint32_t)type & dbgCallbackBitfieldType.load()) && //
-                    ((uint32_t)severity & dbgCallbackBitfieldSeverity.load()) ) {
+            if (canLog) {
                 (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
             }
         }

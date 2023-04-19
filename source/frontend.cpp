@@ -77,7 +77,7 @@ void debug_message_callback_impl(
 
 // find the number of trailing zeros in v
 // http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightLinear
-int trailing_zeroes(unsigned int v)
+inline int trailing_zeroes(uint32_t v)
 {
     int r; // the result goes here
 #ifdef _WIN32
@@ -103,13 +103,13 @@ int trailing_zeroes(unsigned int v)
 }
 
 // https://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit
-int set_bit(unsigned int v, unsigned int pos)
+inline int set_bit(uint32_t v, uint32_t pos)
 {
     v |= 1U << pos;
     return v;
 }
 
-int clear_bit(unsigned int v, unsigned int pos)
+inline int clear_bit(uint32_t v, uint32_t pos)
 {
     v &= ~(1UL << pos);
     return v;
@@ -129,23 +129,23 @@ void debug_message_control_impl(
     }
 
     //
-    // Debug source flag
+    // Debug "source" flag
     //
 
+    // for each possible "source" flag
     for (auto i : { MC_DEBUG_SOURCE_API, MC_DEBUG_SOURCE_KERNEL }) {
-        if (sourceBitfieldParam & i) {
-            int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i);
-            if (enabled) {
+        if (sourceBitfieldParam & i) { // was it set/included by the user (to be enabled/disabled)?
+            int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i); // get position of bit representing current "source" flag
+            if (enabled) { // does the user want to enabled this information (from being logged in the debug callback function)
                 context_ptr->dbgCallbackBitfieldSource = set_bit(context_ptr->dbgCallbackBitfieldSource, n);
-            } else {
-
+            } else { // ... user wants to disable this information 
                 context_ptr->dbgCallbackBitfieldSource = clear_bit(context_ptr->dbgCallbackBitfieldSource, n);
             }
         }
     }
 
     //
-    // Debug type flag
+    // Debug "type" flag
     //
 
     for (auto i : { MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR, MC_DEBUG_TYPE_ERROR, MC_DEBUG_TYPE_OTHER }) {
@@ -163,7 +163,7 @@ void debug_message_control_impl(
     }
 
     //
-    // Debug severity flag
+    // Debug "severity" flag
     //
 
     for (auto i : { MC_DEBUG_SEVERITY_HIGH, MC_DEBUG_SEVERITY_LOW, MC_DEBUG_SEVERITY_MEDIUM, MC_DEBUG_SEVERITY_NOTIFICATION }) {
