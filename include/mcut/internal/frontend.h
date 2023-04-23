@@ -85,6 +85,11 @@ extern "C" void debug_message_callback_impl(
     pfn_mcDebugOutput_CALLBACK cb,
     const McVoid* userParam) noexcept(false);
 
+extern "C" void get_debug_message_log_impl(McContext context,
+    McUint32 count, McSize bufSize,
+    McDebugSource* sources, McDebugType* types, McDebugSeverity* severities,
+    McSize* lengths, McChar* messageLog, McUint32& numFetched);
+
 extern "C" void debug_message_control_impl(
     McContext context,
     McDebugSource source,
@@ -689,6 +694,15 @@ public:
         debugCallbackUserParam = data_ptr;
     }
 
+    struct debug_log_msg_t {
+        McDebugSource source;
+        McDebugType type;
+        McDebugSeverity severity;
+        std::string str;
+    };
+
+    std::vector<debug_log_msg_t> m_debug_logs;
+
     // function to invoke the user-provided debug call back
     void dbg_cb(McDebugSource source,
         McDebugType type,
@@ -696,21 +710,36 @@ public:
         McDebugSeverity severity,
         const std::string& message)
     {
-        std::unique_lock<std::mutex> ulock(debugCallbackMutex, std::defer_lock); 
+        if (this->m_flags & McContextCreationFlags::MC_DEBUG) // information logged only during debug mode
+        {
+            std::unique_lock<std::mutex> ulock(debugCallbackMutex, std::defer_lock);
 
-        if (!dbgCallbackAllowAsyncCalls) {
-            ulock.lock();
-        } // otherwise the callback will be invoked asynchronously
+            if (!dbgCallbackAllowAsyncCalls) {
+                ulock.lock();
+            } // otherwise the callback will be invoked asynchronously
 
-        if (debugCallback != nullptr) {
-            
-            // can we log this type of message?
+            // can we log this type of message? (based on user preferences via mcDebugMessageControl)
             const bool canLog = ((uint32_t)source & dbgCallbackBitfieldSource.load(std::memory_order_acquire)) && //
-                    ((uint32_t)type & dbgCallbackBitfieldType.load(std::memory_order_acquire)) && //
-                    ((uint32_t)severity & dbgCallbackBitfieldSeverity.load(std::memory_order_acquire)) ;
+                ((uint32_t)type & dbgCallbackBitfieldType.load(std::memory_order_acquire)) && //
+                ((uint32_t)severity & dbgCallbackBitfieldSeverity.load(std::memory_order_acquire));
 
             if (canLog) {
-                (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
+
+                if (debugCallback != nullptr) { // user gave us a callback function pointer
+
+                    (*debugCallback)(source, type, id, severity, message.length(), message.c_str(), debugCallbackUserParam);
+
+                } else // write to the internal log
+                {
+                    m_debug_logs.emplace_back(debug_log_msg_t());
+
+                    debug_log_msg_t& dbg_log = m_debug_logs.back();
+
+                    dbg_log.source = source;
+                    dbg_log.type = type;
+                    dbg_log.severity = severity;
+                    dbg_log.str = message;
+                }
             }
         }
     }

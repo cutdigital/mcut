@@ -107,6 +107,45 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mc
     return return_value;
 }
 
+MCAPI_ATTR McResult MCAPI_CALL mcGetDebugMessageLog(
+    McContext context,  
+    McUint32 count, McSize bufSize,
+    McDebugSource *sources, McDebugType *types, McDebugSeverity *severities,
+    McSize *lengths, McChar *messageLog, McUint32* numFetched)
+    {
+         McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (context == nullptr) {
+        per_thread_api_log_str = "context ptr (param0) undef (NULL)";
+    } else if (
+        count == 0) {
+        per_thread_api_log_str = "count must be > 0";
+    } else if (bufSize == 0) {
+        per_thread_api_log_str = "bufSize must be > 0";
+    } else if (messageLog == nullptr) {
+        per_thread_api_log_str = "messageLog undefined";
+    } else {
+        try {
+            get_debug_message_log_impl(context,  
+            count, bufSize,
+            sources, types, severities,
+            lengths, messageLog, *numFetched);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+
+    return return_value;
+    }
+
 MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebugSource source, McDebugType type, McDebugSeverity severity, bool enabled)
 {
     McResult return_value = McResult::MC_NO_ERROR;

@@ -448,7 +448,8 @@ typedef enum McQueryFlags {
     MC_EVENT_TIMESTAMP_END = 1 << 5, /**< An unsigned 64-bit value that describes the current internal time counter in nanoseconds when the MCUT API function identified by event has finished execution. */
     MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 6, /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
     MC_EVENT_CONTEXT = 1 << 7, /**< The context associated with event. */
-    MC_EVENT_COMMAND_TYPE = 1 << 8 /**< The command associated with event. Can be one of the values in :: */
+    MC_EVENT_COMMAND_TYPE = 1 << 8, /**< The command associated with event. Can be one of the values in :: */
+    MC_MAX_DEBUG_MESSAGE_LENGTH = 1 << 9
 } McQueryFlags;
 
 /**
@@ -605,59 +606,55 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
  * @brief Returns messages stored in an internal log.
  * 
  * @param context The context handle that was created by a previous call to @see ::mcCreateContext.
- * @param count The number of messages that you want to _try_ to fetch. The return value is the number of messages actually fetched. Any messages successfully fetched will be removed from the message log.
- * @param bufSize 
- * @param sources array that must be at least \p count in size. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
- * @param types array that must be at least \p count in size. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
- * @param severities array that must be at least \p count in size. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
- * @param lengths array that must be at least \p count in size. These are the lengths of the string for that index's corresponding messages. For each successfully extracted message, an entry in this arrays will be filled in with the appropriate message data.
- * @param messageLog a single array of characters, of at least \p bufSize​ in size. 
+ * @param count The number of debug messages to retrieve from the log.
+ * @param bufSize The size of the buffer whose address is given by \p messageLog.
+ * @param sources The address of an array of variables to receive the sources of the retrieved messages.
+ * @param types The address of an array of variables to receive the types of the retrieved messages.
+ * @param severities The address of an array of variables to receive the severites of the retrieved messages.
+ * @param lengths The address of an array of variables to receive the lengths of the received messages.
+ * @param messageLog The address of an array of variables to receive the lengths of the received messages.. 
  * 
-  * If no callback is registered, then messages are stored in a log. This log has 
- * a fixed, implementation defined length of ::MC_MAX_DEBUG_LOGGED_MESSAGES message 
- * entries. If the log is full and more messages are generated, then the new 
- * messages will be discarded.
+ * mcGetDebugMessageLog retrieves messages from the debug message log. A maximum 
+ * of \p count messages are retrieved from the log. If \p sources is not NULL then 
+ * the source of each message is written into up to count elements of the array. 
+ * If \p types is not NULL then the type of each message is written into up to 
+ * count elements of the array. If \p severities is not NULL then the severity 
+ * of each message is written into up to count elements of the array. If \p lengths 
+ * is not NULL then the length of each message is written into up to count 
+ * elements of the array.
  * 
- * NOTE: ::MC_MAX_DEBUG_LOGGED_MESSAGES is allowed to be as few as one, so it 
- * would be unwise to rely on logging without at least verifying that the message 
- * log is of reasonable length. So it's more reliable to build your own log.
+ * \p messageLog specifies the address of a character array into which the debug 
+ * messages will be written. Each message will be concatenated onto the array 
+ * starting at the first element of \p messageLog. \p bufSize specifies the size 
+ * of the array \p messageLog. If a message will not fit into the remaining space 
+ * in \p messageLog then the function terminates and returns the number of messages 
+ * written so far, which may be zero.
  * 
- * Each context maintains its own message log queue for commands executed in that 
- * context. Logging follows the same synchronization rules as for the callback. 
- * So if you need immediate results in the log, or if the order of messages needs 
- * to be guaranteed, you must use synchronous behavior. Messages from the context's 
- * log can be fetched with this function.
- * 
- * The behavior of the character data is more difficult to deal with. \p messageLoG 
- * is a single array of characters, of at least \p bufSize in size. The function 
- * will copy into this string the message strings for each message extracted, 
- * separated by null characters (and terminated by one). However, if it is unable 
- * to copy a string due to lack of space remaining in \p bufSize then this message, 
- * and all subsequent messages, will remain in the log. 
- * 
- * Therefore, if you do not provide enough space in \p messageLog you cannot get 
- * any messages from the log. You can query the length of the string in the first 
- * message of the log with ::MC_DEBUG_NEXT_LOGGED_MESSAGE_LENGTH. This includes 
- * the null-terminator, so you can use that directly to get at least the first 
- * message. If you want to be able to query any number of messages, you can use 
- * the implementation-defined ::MC_MAX_DEBUG_MESSAGE_LENGTH value, which is the 
- * maximum length (including null-terminator) of message strings.
+ * If ::mcGetDebugMessageLog returns zero then no messages are present in the 
+ * debug log, or there was not enough space in \p messageLog to retrieve the 
+ * first message in the queue. If \p messageLog is NULL then no messages are 
+ * written and the value of \p bufSize is ignored..
  * 
  * Here is an example of code that can get the first N messages:
  * 
  * @code {.c++}
- * void GetFirstNMessages(McUint32 numMsgs)
+ * McResult GetFirstNMessages(McContext context, McUint32 numMsgs)
  * {
- *      McInt32 maxMsgLen = 0;
+ *      McSize maxMsgLen = 0;
  *      mcGet(MC_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
  * 	    std::vector<McChar> msgData(numMsgs * maxMsgLen);
  *      std::vector<McDebugSource> sources(numMsgs);
  *      std::vector<McDebugType> types(numMsgs);
  *      std::vector<McDebugSeverity> severities(numMsgs);
- *      std::vector<McUint32> ids(numMsgs);0
  *      std::vector<McSize> lengths(numMsgs);
+ *      McUint32 numFound;
+ * 
+ *      McResult err = mcGetDebugMessageLog(context, numMsgs, msgs.size(), &sources[0], &types[0], &ids[0], &severities[0], &lengths[0], &msgData[0], &numFound);
  *      
- *      McUint32 numFound = mcGetDebugMessageLog(numMsgs, msgs.size(), &sources[0], &types[0], &ids[0], &severities[0], &lengths[0], &msgData[0]);
+ *      if(err != MC_NO_ERROR)
+ *      {
+ *          // deal with error ...
+ *      }
  * 
  *      sources.resize(numFound);
  *      types.resize(numFound);
@@ -677,13 +674,13 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
  *  }
  * @endcode
  * 
- * @return MCAPI_ATTR 
+ * @return error code
  */
-extern MCAPI_ATTR McUint32 mcGetDebugMessageLog(
+extern MCAPI_ATTR McResult MCAPI_CALL mcGetDebugMessageLog(
     McContext context,  
     McUint32 count, McSize bufSize,
     McDebugSource *sources, McDebugType *types, McDebugSeverity *severities,
-    McSize *lengths, McChar *messageLog);
+    McSize *lengths, McChar *messageLog, McUint32* numFetched);
 
 /**
  * Control the reporting of debug messages in a debug context.

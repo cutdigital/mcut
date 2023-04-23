@@ -75,6 +75,50 @@ void debug_message_callback_impl(
     context_ptr->set_debug_callback_data(cb, userParam);
 }
 
+void get_debug_message_log_impl(McContext context,
+    McUint32 count, McSize bufSize,
+    McDebugSource* sources, McDebugType* types, McDebugSeverity* severities,
+    McSize* lengths, McChar* messageLog, McUint32& numFetched)
+{
+    MCUT_ASSERT(context != nullptr);
+
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == context; });
+
+    if (context_ptr == nullptr) {
+        throw std::invalid_argument("invalid context");
+    }
+
+    if(count > context_ptr->m_debug_logs.size())
+    {
+        throw std::invalid_argument("invalid count parameter");
+    }
+
+    numFetched = 0;
+    McSize messageLogOffset = 0;
+
+    // for internal message
+    for (numFetched = 0; numFetched < count; ++numFetched) {
+
+        const context_t::debug_log_msg_t& cur_dbg_msg = context_ptr->m_debug_logs[numFetched];
+        const McSize msg_length = (McSize)cur_dbg_msg.str.size();
+        const McSize newLengthOfActualMessageLog = (messageLogOffset + msg_length);
+
+        if (newLengthOfActualMessageLog > bufSize) {
+            break; // stop
+        }
+
+        sources[numFetched] = cur_dbg_msg.source;
+        types[numFetched] = cur_dbg_msg.type;
+        severities[numFetched] = cur_dbg_msg.severity;
+        lengths[numFetched] = msg_length;
+
+        // copy into output array
+        memcpy(messageLog + messageLogOffset, cur_dbg_msg.str.data(), msg_length);
+
+        messageLogOffset = newLengthOfActualMessageLog;
+    }
+}
+
 // find the number of trailing zeros in v
 // http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightLinear
 inline int trailing_zeroes(uint32_t v)
@@ -138,7 +182,7 @@ void debug_message_control_impl(
             int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i); // get position of bit representing current "source" flag
             if (enabled) { // does the user want to enabled this information (from being logged in the debug callback function)
                 context_ptr->dbgCallbackBitfieldSource = set_bit(context_ptr->dbgCallbackBitfieldSource, n);
-            } else { // ... user wants to disable this information 
+            } else { // ... user wants to disable this information
                 context_ptr->dbgCallbackBitfieldSource = clear_bit(context_ptr->dbgCallbackBitfieldSource, n);
             }
         }
@@ -206,6 +250,15 @@ void get_info_impl(
         }
         break;
     }
+    case MC_MAX_DEBUG_MESSAGE_LENGTH:
+    {
+        McSize sizeMax = 0;
+        for(McUint32 i =0; i < (McUint32)context_ptr->m_debug_logs.size(); ++i)
+        {
+            sizeMax = std::max((McSize)sizeMax, (McSize)context_ptr->m_debug_logs[i].str.size());
+        }
+        memcpy(pMem, reinterpret_cast<McVoid*>(&sizeMax), sizeof(McSize));
+    }break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
