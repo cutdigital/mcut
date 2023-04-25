@@ -649,7 +649,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
  *      std::vector<McSize> lengths(numMsgs);
  *      McUint32 numFound;
  * 
- *      McResult err = mcGetDebugMessageLog(context, numMsgs, msgs.size(), &sources[0], &types[0], &ids[0], &severities[0], &lengths[0], &msgData[0], &numFound);
+ *      McResult err = mcGetDebugMessageLog(context, numMsgs, numMsgs, &sources[0], &types[0], &severities[0], &lengths[0], &msgData[0], &numFound);
  *      
  *      if(err != MC_NO_ERROR)
  *      {

@@ -6298,7 +6298,7 @@ void dispatch(output_t& output, const input_t& input)
                 output.seamed_cut_mesh->data_maps = std::move(separated_cut_mesh_fragments.begin()->second.front().second.data_maps);
 
                 if (input.verbose) {
-                    dump_mesh(output.seamed_src_mesh->mesh.get()[0], "cut-mesh-traced-poly");
+                    dump_mesh(output.seamed_cut_mesh->mesh.get()[0], "cut-mesh-traced-poly");
                 }
             }
         }

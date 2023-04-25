@@ -22,9 +22,9 @@
 
 #include "mcut/mcut.h"
 
-#include "mcut/internal/utils.h"
-#include "mcut/internal/timer.h"
 #include "mcut/internal/frontend.h"
+#include "mcut/internal/timer.h"
+#include "mcut/internal/utils.h"
 
 #include <exception>
 #include <stdexcept>
@@ -108,12 +108,12 @@ MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(McContext pContext, pfn_mc
 }
 
 MCAPI_ATTR McResult MCAPI_CALL mcGetDebugMessageLog(
-    McContext context,  
+    McContext context,
     McUint32 count, McSize bufSize,
-    McDebugSource *sources, McDebugType *types, McDebugSeverity *severities,
-    McSize *lengths, McChar *messageLog, McUint32* numFetched)
-    {
-         McResult return_value = McResult::MC_NO_ERROR;
+    McDebugSource* sources, McDebugType* types, McDebugSeverity* severities,
+    McSize* lengths, McChar* messageLog, McUint32* numFetched)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
 
     if (context == nullptr) {
@@ -123,14 +123,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetDebugMessageLog(
         per_thread_api_log_str = "count must be > 0";
     } else if (bufSize == 0) {
         per_thread_api_log_str = "bufSize must be > 0";
-    } else if (messageLog == nullptr) {
-        per_thread_api_log_str = "messageLog undefined";
+    }  else if (numFetched == nullptr) {
+        per_thread_api_log_str = "numFetched  undef (NULL)";
     } else {
         try {
-            get_debug_message_log_impl(context,  
-            count, bufSize,
-            sources, types, severities,
-            lengths, messageLog, *numFetched);
+            get_debug_message_log_impl(context,
+                count, bufSize,
+                sources, types, severities,
+                lengths, messageLog, *numFetched);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
@@ -144,7 +144,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetDebugMessageLog(
     }
 
     return return_value;
-    }
+}
 
 MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageControl(McContext pContext, McDebugSource source, McDebugType type, McDebugSeverity severity, bool enabled)
 {
@@ -198,7 +198,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     } else if (bytes != 0 && pMem == nullptr) {
         per_thread_api_log_str = "invalid specification (param2 & param3)";
-    } else if (false == (info == MC_CONTEXT_FLAGS)) // check all possible values
+    } else if (false == (info == MC_CONTEXT_FLAGS || info == MC_MAX_DEBUG_MESSAGE_LENGTH)) // check all possible values
     {
         per_thread_api_log_str = "invalid info flag val (param1)";
     } else if ((info == MC_CONTEXT_FLAGS) && (pMem != nullptr && bytes != sizeof(McFlags))) {

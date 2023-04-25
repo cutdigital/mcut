@@ -88,16 +88,20 @@ void get_debug_message_log_impl(McContext context,
         throw std::invalid_argument("invalid context");
     }
 
-    if(count > context_ptr->m_debug_logs.size())
-    {
-        throw std::invalid_argument("invalid count parameter");
-    }
-
     numFetched = 0;
+
+    if(messageLog == nullptr)
+    {
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "output messageLog is NULL. Return.");
+        return;
+    }
+    
     McSize messageLogOffset = 0;
 
+    const uint32_t N = std::min((uint32_t)count, (uint32_t)context_ptr->m_debug_logs.size());
+
     // for internal message
-    for (numFetched = 0; numFetched < count; ++numFetched) {
+    for (numFetched = 0; numFetched < N; ++numFetched) {
 
         const context_t::debug_log_msg_t& cur_dbg_msg = context_ptr->m_debug_logs[numFetched];
         const McSize msg_length = (McSize)cur_dbg_msg.str.size();
