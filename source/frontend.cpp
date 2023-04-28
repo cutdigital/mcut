@@ -90,12 +90,11 @@ void get_debug_message_log_impl(McContext context,
 
     numFetched = 0;
 
-    if(messageLog == nullptr)
-    {
+    if (messageLog == nullptr) {
         context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "output messageLog is NULL. Return.");
         return;
     }
-    
+
     McSize messageLogOffset = 0;
 
     const uint32_t N = std::min((uint32_t)count, (uint32_t)context_ptr->m_debug_logs.size());
@@ -111,10 +110,21 @@ void get_debug_message_log_impl(McContext context,
             break; // stop
         }
 
-        sources[numFetched] = cur_dbg_msg.source;
-        types[numFetched] = cur_dbg_msg.type;
-        severities[numFetched] = cur_dbg_msg.severity;
-        lengths[numFetched] = msg_length;
+        if (sources != nullptr) {
+            sources[numFetched] = cur_dbg_msg.source;
+        }
+
+        if (types != nullptr) {
+            types[numFetched] = cur_dbg_msg.type;
+        }
+
+        if (severities != nullptr) {
+            severities[numFetched] = cur_dbg_msg.severity;
+        }
+
+        if (lengths != nullptr) {
+            lengths[numFetched] = msg_length;
+        }
 
         // copy into output array
         memcpy(messageLog + messageLogOffset, cur_dbg_msg.str.data(), msg_length);
@@ -254,15 +264,13 @@ void get_info_impl(
         }
         break;
     }
-    case MC_MAX_DEBUG_MESSAGE_LENGTH:
-    {
+    case MC_MAX_DEBUG_MESSAGE_LENGTH: {
         McSize sizeMax = 0;
-        for(McUint32 i =0; i < (McUint32)context_ptr->m_debug_logs.size(); ++i)
-        {
+        for (McUint32 i = 0; i < (McUint32)context_ptr->m_debug_logs.size(); ++i) {
             sizeMax = std::max((McSize)sizeMax, (McSize)context_ptr->m_debug_logs[i].str.size());
         }
         memcpy(pMem, reinterpret_cast<McVoid*>(&sizeMax), sizeof(McSize));
-    }break;
+    } break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
