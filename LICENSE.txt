@@ -12,5 +12,8 @@ Permission to use this software is governed by two licensing options which are m
     For more information, email "floyd.m.chitalu@gmail.com".
 
 These options protect the project's commercial value and thus make it possible for the 
-author(s) to guarantee long term support, maintenance and further development of the 
+author to guarantee long term support, maintenance and further development of the 
 code for the benefit of the project and its users.
+
+This software is also partly based on "CDT" (C++ library for constrained Delaunay triangulation): https://github.com/artem-ogre/CDT
+CDT files that were originally under the MPL-2.0 are dual licensed under the MPL-2.0 and the GNU General Public License (GPL) licenses.
