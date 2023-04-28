@@ -23,6 +23,7 @@
 #include "utest.h"
 #include <mcut/mcut.h>
 #include <vector>
+#include <string>
 
 void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
