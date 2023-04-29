@@ -233,6 +233,8 @@ struct connected_component_t {
     std::vector<uint32_t> face_adjacent_faces_size_cache;
     bool face_adjacent_faces_size_cache_initialized = false;
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    // non-zero if origin source and cut-mesh where perturbed
+    vec3 perturbation_vector = vec3(0.0);
 };
 
 // struct representing a fragment
@@ -527,6 +529,8 @@ public:
         return this->m_flags;
     }
 
+    // returns (user controllable) epsilon representing the maximum by which the cut-mesh 
+    // can be perturbed on any axis 
     const McDouble get_general_position_enforcement_constant()
     {
         return this->m_general_position_enforcement_constant.load(std::memory_order_acquire);

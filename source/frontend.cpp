@@ -1633,6 +1633,21 @@ void get_connected_component_data_impl_detail(
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
+    case MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR:
+    {
+        SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR");
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(vec3);
+        } else {
+            if (bytes > sizeof(vec3)) {
+                throw std::invalid_argument("out of bounds memory access");
+            }
+            if (bytes % sizeof(vec3) != 0) {
+                throw std::invalid_argument("invalid number of bytes");
+            }
+            memcpy(pMem, reinterpret_cast<vec3*>(&cc_uptr->perturbation_vector), bytes);
+        }
+    }break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE");
         if (pMem == nullptr) { // querying for number of bytes
