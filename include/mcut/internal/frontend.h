@@ -431,6 +431,8 @@ private:
     // The state and flag variable current used to configure the next dispatch call
     McFlags m_flags = (McFlags)0;
 
+    std::atomic<McDouble> m_general_position_enforcement_constant;
+
     void api_thread_main(uint32_t thread_id)
     {
         log_msg("[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
@@ -469,7 +471,8 @@ public:
         , m_user_handle(handle)
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
-        , dbgCallbackBitfieldSeverity(0)
+        , dbgCallbackBitfieldSeverity(0),
+        m_general_position_enforcement_constant(1.5e-5)
     {
         log_msg("\n[MCUT] Create context " << m_user_handle);
 
@@ -522,6 +525,16 @@ public:
     const McFlags& get_flags() const
     {
         return this->m_flags;
+    }
+
+    const McDouble get_general_position_enforcement_constant()
+    {
+        return this->m_general_position_enforcement_constant.load(std::memory_order_acquire);
+    }
+
+    const void set_general_position_enforcement_constant(McDouble new_value)
+    {
+        this->m_general_position_enforcement_constant.store(new_value, std::memory_order_release);
     }
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)

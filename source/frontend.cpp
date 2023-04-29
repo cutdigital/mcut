@@ -272,6 +272,10 @@ void get_info_impl(
         }
         memcpy(pMem, reinterpret_cast<McVoid*>(&sizeMax), sizeof(McSize));
     } break;
+    case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT:{
+        const McDouble gpec = context_ptr->get_general_position_enforcement_constant();
+        memcpy(pMem, reinterpret_cast<const McDouble*>(&gpec), sizeof(McDouble));
+    }break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
