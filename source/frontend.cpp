@@ -264,7 +264,7 @@ void get_info_impl(
         }
         break;
     }
-    case MC_MAX_DEBUG_MESSAGE_LENGTH: {
+    case MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH: {
         std::lock_guard<std::mutex> lock(context_ptr->debugCallbackMutex);
         McSize sizeMax = 0;
         for (McUint32 i = 0; i < (McUint32)context_ptr->m_debug_logs.size(); ++i) {

@@ -198,7 +198,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     } else if (bytes != 0 && pMem == nullptr) {
         per_thread_api_log_str = "invalid specification (param2 & param3)";
-    } else if (false == (info == MC_CONTEXT_FLAGS || info == MC_MAX_DEBUG_MESSAGE_LENGTH)) // check all possible values
+    } else if (false == (info == MC_CONTEXT_FLAGS || info == MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH)) // check all possible values
     {
         per_thread_api_log_str = "invalid info flag val (param1)";
     } else if ((info == MC_CONTEXT_FLAGS) && (pMem != nullptr && bytes != sizeof(McFlags))) {

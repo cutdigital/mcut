@@ -200,7 +200,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
     McUint32 numMsgs = 10; // retrieve up to 10
 
     McSize maxMsgLen = 0;
-    ASSERT_EQ(MC_NO_ERROR, mcGetInfo(utest_fixture->context_, MC_MAX_DEBUG_MESSAGE_LENGTH, sizeof(McSize), &maxMsgLen, NULL));
+    ASSERT_EQ(MC_NO_ERROR, mcGetInfo(utest_fixture->context_, MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH, sizeof(McSize), &maxMsgLen, NULL));
 
     std::vector<McChar> msgData(numMsgs * maxMsgLen);
     std::vector<McDebugSource> sources(numMsgs);

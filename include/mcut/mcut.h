@@ -449,7 +449,7 @@ typedef enum McQueryFlags {
     MC_EVENT_COMMAND_EXECUTION_STATUS = 1 << 6, /**< the execution status of the command identified by event. See also ::McEventCommandExecStatus */
     MC_EVENT_CONTEXT = 1 << 7, /**< The context associated with event. */
     MC_EVENT_COMMAND_TYPE = 1 << 8, /**< The command associated with event. Can be one of the values in :: */
-    MC_MAX_DEBUG_MESSAGE_LENGTH = 1 << 9, /**< The maximum length of a single message return from ::mcGetDebugMessageLog */
+    MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH = 1 << 9, /**< The maximum length of a single message return from ::mcGetDebugMessageLog */
     MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT = 1 << 10 /**< A constant small real number representing the amount by which to perturb the cut-mesh when two intersecting polygon are found to not be in general position. */
 } McQueryFlags;
 
@@ -642,7 +642,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
  * McResult GetFirstNMessages(McContext context, McUint32 numMsgs)
  * {
  *      McSize maxMsgLen = 0;
- *      mcGet(MC_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
+ *      mcGet(MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
  * 	    std::vector<McChar> msgData(numMsgs * maxMsgLen);
  *      std::vector<McDebugSource> sources(numMsgs);
  *      std::vector<McDebugType> types(numMsgs);
