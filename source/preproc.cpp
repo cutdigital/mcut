@@ -1319,7 +1319,7 @@ extern "C" void preproc(
         kernel_input.keep_cutmesh_seam = true;
     }
 
-    kernel_input.enforce_general_position = (0 != (dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION));
+    kernel_input.enforce_general_position = (0 != (dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION)) || (0 != (dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE));
 
     // Construct BVHs
     // ::::::::::::::
@@ -1447,9 +1447,11 @@ extern "C" void preproc(
 
             MCUT_ASSERT(floating_polygon_was_detected == false); // cannot occur at same time! (see kernel)
 
+            context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, "general position assumption violated!");
+
             if (cut_mesh_perturbation_count == MAX_PERTUBATION_ATTEMPTS) {
 
-                context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_MEDIUM, kernel_output.logger.get_reason_for_failure());
+                context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, kernel_output.logger.get_reason_for_failure());
 
                 throw std::runtime_error("max perturbation iteratons reached");
             }
@@ -1487,7 +1489,13 @@ extern "C" void preproc(
                 throw std::invalid_argument("invalid cut-mesh arrays");
             }
 
-            relative_perturbation_constant = cut_hmesh_aabb_diag * context_ptr->get_general_position_enforcement_constant();
+            /*const*/ double perturbation_scalar = cut_hmesh_aabb_diag;
+            if(dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE)
+            {
+                perturbation_scalar = 1.0;
+            }
+
+            relative_perturbation_constant = perturbation_scalar * context_ptr->get_general_position_enforcement_constant();
 
             kernel_input.cut_mesh = cut_hmesh;
 

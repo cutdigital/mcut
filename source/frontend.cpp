@@ -272,10 +272,39 @@ void get_info_impl(
         }
         memcpy(pMem, reinterpret_cast<McVoid*>(&sizeMax), sizeof(McSize));
     } break;
-    case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT:{
+    case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT: {
         const McDouble gpec = context_ptr->get_general_position_enforcement_constant();
         memcpy(pMem, reinterpret_cast<const McDouble*>(&gpec), sizeof(McDouble));
-    }break;
+    } break;
+    default:
+        throw std::invalid_argument("unknown info parameter");
+        break;
+    }
+}
+
+void bind_impl(
+    const McContext context,
+    McFlags stateInfo,
+    McSize bytes,
+    McVoid* pMem)
+{
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == context; });
+
+    if (context_ptr == nullptr) {
+        throw std::invalid_argument("invalid context");
+    }
+
+    switch (stateInfo) {
+    case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT: {
+        McDouble value;
+        memcpy(&value, pMem, bytes);
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general position enforcement constant set to " + std::to_string(value));
+        if (value <= 0) {
+            throw std::invalid_argument("invalid general position enforcement constant");
+        }
+        context_ptr->set_general_position_enforcement_constant(value);
+
+    } break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -1633,8 +1662,7 @@ void get_connected_component_data_impl_detail(
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
-    case MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR:
-    {
+    case MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR");
         if (pMem == nullptr) {
             *pNumBytes = sizeof(vec3);
@@ -1647,7 +1675,7 @@ void get_connected_component_data_impl_detail(
             }
             memcpy(pMem, reinterpret_cast<vec3*>(&cc_uptr->perturbation_vector), bytes);
         }
-    }break;
+    } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE");
         if (pMem == nullptr) { // querying for number of bytes

@@ -104,6 +104,12 @@ extern "C" void get_info_impl(
     McVoid* pMem,
     McSize* pNumBytes) noexcept(false);
 
+extern "C" void bind_impl(
+    const McContext context,
+    McFlags stateInfo,
+    McSize bytes,
+    McVoid* pMem);
+
 extern "C" void create_user_event_impl(McEvent* event, McContext context);
 
 extern "C" void set_user_event_status_impl(McEvent event, McInt32 execution_status);
@@ -470,11 +476,11 @@ public:
         : m_done(false)
         // , m_joiner(m_api_threads)
         , m_flags(flags)
-        , m_user_handle(handle)
-        , dbgCallbackBitfieldSource(0)
+        , m_general_position_enforcement_constant(1.5e-5), m_user_handle(handle),
+        dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
-        , dbgCallbackBitfieldSeverity(0),
-        m_general_position_enforcement_constant(1.5e-5)
+        , dbgCallbackBitfieldSeverity(0)
+        
     {
         log_msg("\n[MCUT] Create context " << m_user_handle);
 
@@ -529,14 +535,14 @@ public:
         return this->m_flags;
     }
 
-    // returns (user controllable) epsilon representing the maximum by which the cut-mesh 
-    // can be perturbed on any axis 
-    const McDouble get_general_position_enforcement_constant()
+    // returns (user controllable) epsilon representing the maximum by which the cut-mesh
+    // can be perturbed on any axis
+    McDouble get_general_position_enforcement_constant()
     {
         return this->m_general_position_enforcement_constant.load(std::memory_order_acquire);
     }
 
-    const void set_general_position_enforcement_constant(McDouble new_value)
+    void set_general_position_enforcement_constant(McDouble new_value)
     {
         this->m_general_position_enforcement_constant.store(new_value, std::memory_order_release);
     }
@@ -687,7 +693,7 @@ public:
 
     // McFlags dispatchFlags = (McFlags)0;
 
-    // client/user debugging variable
+    // client/user debugging variables
     // ------------------------------
 
     // function pointer to user-define callback function for status/erro reporting

@@ -391,20 +391,33 @@ typedef enum McDispatchFlags {
         MC_DISPATCH_FILTER_SEAM_SRCMESH | //
         MC_DISPATCH_FILTER_SEAM_CUTMESH), /**< Keep all connected components resulting from the dispatched cut. */
     /**
-     * Allow MCUT to perturb the cut-mesh if the inputs are not in general position.
+     * The following two flags allow MCUT to perturb the cut-mesh if the inputs are found not to be in general position.
      *
-     * MCUT is formulated for inputs in general position. Here the notion of general position is defined with
-    respect to the orientation predicate (as evaluated on the intersecting polygons). Thus, a set of points
-    is in general position if no three points are collinear and also no four points are coplanar.
+     * MCUT is formulated for inputs in general position. Here the notion of general position is defined with respect 
+     * to the orientation predicate (as evaluated on the intersecting polygons). Thus, a set of points is in general 
+     * position if no three points are collinear and also no four points are coplanar.
+     * 
+     * MCUT uses the "MC_DISPATCH_ENFORCE_GENERAL_POSITION.." flags to inform of when to use perturbation (of the
+     * cut-mesh) so as to bring the input into general position. In such cases, the idea is to solve the cutting
+     * problem not on the given input, but on a nearby input. The nearby input is obtained by perturbing the given
+     * input. The perturbed input will then be in general position and, since it is near the original input, 
+     * the result for the perturbed input will hopefully still be useful.  This is justified by the fact that 
+     * the task of MCUT is not to decide whether the input is in general position but rather to make perturbation
+     * on the input (if) necessary within the available precision of the computing device. 
+     * 
+     * HOW GENERAL POSITION IS ENFORCED
+     * 
+     * When the inputs are found _not_ to be in GP, MCUT will generate a pseudo-random 
+     * 3d vector "p" representing a translation that will be applied to the cut-mesh. 
+     * 
+     * A component "i" of "p" is computed as "p[i] = r() * c", where "r()" is a 
+     * function returning a random variable from a uniform distribution on the 
+     * interval [-1.0, 1.0), and "c" is a scalar computed from the general position 
+     * enforcement constant (see ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT).
+     * */
 
-    MCUT uses the "GENERAL_POSITION_VIOLATION" flag to inform of when to use perturbation (of the
-    cut-mesh) so as to bring the input into general position. In such cases, the idea is to solve the cutting
-    problem not on the given input, but on a nearby input. The nearby input is obtained by perturbing the given
-    input. The perturbed input will then be in general position and, since it is near the original input,
-    the result for the perturbed input will hopefully still be useful.  This is justified by the fact that
-    the task of MCUT is not to decide whether the input is in general position but rather to make perturbation
-    on the input (if) necessary within the available precision of the computing device. */
-    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15)
+    MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15), /**< Enforce general position such that the variable "c" (see detailed note above) is computed as the multiplication of the current general position enforcement constant (of current MCUT context) and the diagonal length of the bounding box of the cut-mesh. So this uses a relative perturbation of the cut-mesh based on its scale (see also ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT). */
+    MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE= (1 << 16), /**< Enforce general position such that the variable "c" (see detailed note above) is the current general position enforcement constant (of current MCUT context). So this uses an absolute perturbation of the cut-mesh based on the stored constant (see also ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT). */
 } McDispatchFlags;
 
 /**
@@ -642,7 +655,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDebugMessageCallback(
  * McResult GetFirstNMessages(McContext context, McUint32 numMsgs)
  * {
  *      McSize maxMsgLen = 0;
- *      mcGet(MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
+ *      mcGetInfo(MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH, &maxMsgLen);
  * 	    std::vector<McChar> msgData(numMsgs * maxMsgLen);
  *      std::vector<McDebugSource> sources(numMsgs);
  *      std::vector<McDebugType> types(numMsgs);
@@ -920,7 +933,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcSetEventCallback(
  *   -# \p numCutMeshFaces is less than one.
  *   -# \p numEventsInWaitlist Number of events in the waitlist.
  *   -# \p pEventWaitList events that need to complete before this particular command can be executed
- *   -# ::MC_DISPATCH_ENFORCE_GENERAL_POSITION is not set and: 1) Found two intersecting edges between the source-mesh and the cut-mesh and/or 2) An intersection test between a face and an edge failed because an edge vertex only touches (but does not penetrate) the face, and/or 3) One or more source-mesh vertices are colocated with one or more cut-mesh vertices.
+ *   -# ::MC_DISPATCH_ENFORCE_GENERAL_POSITION or ::MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE is not set and: 1) Found two intersecting edges between the source-mesh and the cut-mesh and/or 2) An intersection test between a face and an edge failed because an edge vertex only touches (but does not penetrate) the face, and/or 3) One or more source-mesh vertices are colocated with one or more cut-mesh vertices.
  * - ::MC_OUT_OF_MEMORY
  *   -# Insufficient memory to perform operation.
  */
@@ -992,8 +1005,6 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
  * - MC_INVALID_VALUE
  *   -# \p pContext is NULL or \p pContext is not an existing context.
  *   -# \p bytes is greater than the returned size of data type queried
- *
- * @note Event synchronisation is not implemented.
  */
 extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
     const McContext context,
@@ -1001,6 +1012,42 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(
     McSize bytes,
     McVoid* pMem,
     McSize* pNumBytes);
+
+/**
+ * @brief Set the value of a selected parameter of a context.
+ *
+ * @param[in] context The context handle that was created by a previous call to ::mcCreateContext.
+ * @param[in] info Information being set. ::McQueryFlags
+ * @param[in] bytes Size in bytes of memory pointed to by \p pMem.
+ * @param[out] pMem Pointer to memory from where the appropriate result being copied.
+ * 
+ * This function effectively sets state variables of a context. All API functions using the respective context shall be effected by this state.
+ *
+ * An example of usage:
+ * @code
+ * McDouble epsilon = 1e-4;
+ * McResult err =  mcBindState(context, MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT, sizeof(McDouble), &epsilon);
+ * if(err != MC_NO_ERROR)
+ * {
+ *  // deal with error
+ * }
+ * @endcode
+ * @return Error code.
+ *
+ * <b>Error codes</b>
+ * - MC_NO_ERROR
+ *   -# proper exit
+ * - MC_INVALID_VALUE
+ *   -# \p pContext is NULL or \p pContext is not an existing context.
+ *   -# \p stateInfo is not an accepted flag.
+ *   -# \p bytes is 0
+ *   -# \p pMem is NULL  
+ */
+extern MCAPI_ATTR McResult MCAPI_CALL mcBindState(
+    const McContext context,
+    McFlags stateInfo,
+    McSize bytes,
+    McVoid* pMem);
 
 /**
  * @brief Query the connected components available in a context.

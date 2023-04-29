@@ -123,7 +123,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetDebugMessageLog(
         per_thread_api_log_str = "count must be > 0";
     } else if (bufSize == 0) {
         per_thread_api_log_str = "bufSize must be > 0";
-    }  else if (numFetched == nullptr) {
+    } else if (numFetched == nullptr) {
         per_thread_api_log_str = "numFetched  undef (NULL)";
     } else {
         try {
@@ -206,6 +206,44 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
     } else {
         try {
             get_info_impl(context, info, bytes, pMem, pNumBytes);
+        }
+        CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
+    }
+
+    if (!per_thread_api_log_str.empty()) {
+        std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
+        if (return_value == McResult::MC_NO_ERROR) // i.e. problem with basic local parameter checks
+        {
+            return_value = McResult::MC_INVALID_VALUE;
+        }
+    }
+
+    return return_value;
+}
+
+MCAPI_ATTR McResult MCAPI_CALL mcBindState(
+    const McContext context,
+    McFlags stateInfo,
+    McSize bytes,
+    McVoid* pMem)
+{
+    McResult return_value = McResult::MC_NO_ERROR;
+    per_thread_api_log_str.clear();
+
+    if (context == nullptr) {
+        per_thread_api_log_str = "context ptr (param0) undef (NULL)";
+    } else if (bytes == 0) {
+        per_thread_api_log_str = "invalid bytes ";
+    } else if (pMem == nullptr) {
+        per_thread_api_log_str = "invalid ptr (pMem)";
+    } else if (false == (stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT)) // check all possible values
+    {
+        per_thread_api_log_str = "invalid stateInfo ";
+    } else if ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT) && bytes != sizeof(McDouble)) {
+        per_thread_api_log_str = "invalid num bytes"; // leads to e.g. "out of bounds" memory access during memcpy
+    } else {
+        try {
+            bind_impl(context, stateInfo, bytes, pMem);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
