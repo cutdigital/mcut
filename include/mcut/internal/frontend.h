@@ -104,11 +104,11 @@ extern "C" void get_info_impl(
     McVoid* pMem,
     McSize* pNumBytes) noexcept(false);
 
-extern "C" void bind_impl(
+extern "C" void bind_state_impl(
     const McContext context,
     McFlags stateInfo,
     McSize bytes,
-    McVoid* pMem);
+    const McVoid* pMem);
 
 extern "C" void create_user_event_impl(McEvent* event, McContext context);
 

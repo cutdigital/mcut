@@ -265,16 +265,34 @@ void get_info_impl(
         break;
     }
     case MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH: {
-        std::lock_guard<std::mutex> lock(context_ptr->debugCallbackMutex);
-        McSize sizeMax = 0;
-        for (McUint32 i = 0; i < (McUint32)context_ptr->m_debug_logs.size(); ++i) {
-            sizeMax = std::max((McSize)sizeMax, (McSize)context_ptr->m_debug_logs[i].str.size());
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McSize);
+        } else {
+            std::lock_guard<std::mutex> lock(context_ptr->debugCallbackMutex);
+            McSize sizeMax = 0;
+            for (McUint32 i = 0; i < (McUint32)context_ptr->m_debug_logs.size(); ++i) {
+                sizeMax = std::max((McSize)sizeMax, (McSize)context_ptr->m_debug_logs[i].str.size());
+            }
+            memcpy(pMem, reinterpret_cast<McVoid*>(&sizeMax), sizeof(McSize));
         }
-        memcpy(pMem, reinterpret_cast<McVoid*>(&sizeMax), sizeof(McSize));
+
     } break;
     case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT: {
-        const McDouble gpec = context_ptr->get_general_position_enforcement_constant();
-        memcpy(pMem, reinterpret_cast<const McDouble*>(&gpec), sizeof(McDouble));
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McDouble);
+        } else {
+            const McDouble gpec = context_ptr->get_general_position_enforcement_constant();
+            memcpy(pMem, reinterpret_cast<const McDouble*>(&gpec), sizeof(McDouble));
+        }
+    } break;
+
+    case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS: {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McUint32);
+        } else {
+            const McUint32 attempts = context_ptr->get_general_position_enforcement_attempts();
+            memcpy(pMem, reinterpret_cast<const McDouble*>(&attempts), sizeof(McUint32));
+        }
     } break;
     default:
         throw std::invalid_argument("unknown info parameter");
@@ -282,11 +300,11 @@ void get_info_impl(
     }
 }
 
-void bind_impl(
+void bind_state_impl(
     const McContext context,
     McFlags stateInfo,
     McSize bytes,
-    McVoid* pMem)
+    const McVoid* pMem)
 {
     std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == context; });
 
@@ -310,7 +328,7 @@ void bind_impl(
         memcpy(&value, pMem, bytes);
         context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general position enforcement attempts set to " + std::to_string(value));
         if (value < 1) {
-            throw std::invalid_argument("invalid general position enforcement constant");
+            throw std::invalid_argument("invalid general position enforcement attempts");
         }
         context_ptr->set_general_position_enforcement_attempts(value);
 
@@ -1672,8 +1690,8 @@ void get_connected_component_data_impl_detail(
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         }
     } break;
-    case MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR: {
-        SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR");
+    case MC_CONNECTED_COMPONENT_DATA_DISPATCH_PERTURBATION_VECTOR: {
+        SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_DISPATCH_PERTURBATION_VECTOR");
         if (pMem == nullptr) {
             *pNumBytes = sizeof(vec3);
         } else {
@@ -1683,7 +1701,10 @@ void get_connected_component_data_impl_detail(
             if (bytes % sizeof(vec3) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-            memcpy(pMem, reinterpret_cast<vec3*>(&cc_uptr->perturbation_vector), bytes);
+
+            ((McDouble*)pMem)[0] = cc_uptr->perturbation_vector[0];
+            ((McDouble*)pMem)[1] = cc_uptr->perturbation_vector[1];
+            ((McDouble*)pMem)[2] = cc_uptr->perturbation_vector[2];
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {

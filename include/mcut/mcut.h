@@ -275,7 +275,7 @@ typedef enum McConnectedComponentData {
     // MC_CONNECTED_COMPONENT_DATA_VERTEX_COUNT = (1 << 0), /**< Number of vertices. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT = (1 << 1), /**< List of vertex coordinates as an array of 32 bit floating-point numbers. */
     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE = (1 << 2), /**< List of vertex coordinates as an array of 64 bit floating-point numbers. */
-    MC_CONNECTED_COMPONENT_DATA_VERTEX_PERTURBATION_VECTOR = (1 << 4), /**< Tuple of three real numbers represneting the vector that was used to nudge/perturb the source- and cut-mesh into general position to produce the respective connected component. This vector will represent the zero-vector if no perturbation was applied prior to the cutting operation that produced this connected component. */
+    MC_CONNECTED_COMPONENT_DATA_DISPATCH_PERTURBATION_VECTOR = (1 << 4), /**< Tuple of three real numbers represneting the vector that was used to nudge/perturb the source- and cut-mesh into general position to produce the respective connected component. This vector will represent the zero-vector if no perturbation was applied prior to the cutting operation that produced this connected component. */
     MC_CONNECTED_COMPONENT_DATA_FACE = (1 << 5), /**< List of faces as an array of indices. Each face can also be understood as a "planar straight line graph" (PSLG), which is a collection of vertices and segments that lie on the same plane. Segments are edges whose endpoints are vertices in the PSLG.*/
     MC_CONNECTED_COMPONENT_DATA_FACE_SIZE = (1 << 6), /**< List of face sizes (vertices per face) as an array. */
     // MC_CONNECTED_COMPONENT_DATA_EDGE_COUNT = (1 << 7), /**< Number of edges. */
@@ -1048,7 +1048,7 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcBindState(
     const McContext context,
     McFlags stateInfo,
     McSize bytes,
-    McVoid* pMem);
+    const McVoid* pMem);
 
 /**
  * @brief Query the connected components available in a context.

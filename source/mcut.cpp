@@ -198,7 +198,11 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         per_thread_api_log_str = "context ptr (param0) undef (NULL)";
     } else if (bytes != 0 && pMem == nullptr) {
         per_thread_api_log_str = "invalid specification (param2 & param3)";
-    } else if (false == (info == MC_CONTEXT_FLAGS || info == MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH)) // check all possible values
+    } else if (false == //
+        (info == MC_CONTEXT_FLAGS || //
+            info == MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH || //
+            info == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT || //
+            info == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS)) // check all possible values
     {
         per_thread_api_log_str = "invalid info flag val (param1)";
     } else if ((info == MC_CONTEXT_FLAGS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
@@ -225,7 +229,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcBindState(
     const McContext context,
     McFlags stateInfo,
     McSize bytes,
-    McVoid* pMem)
+    const McVoid* pMem)
 {
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
@@ -236,14 +240,18 @@ MCAPI_ATTR McResult MCAPI_CALL mcBindState(
         per_thread_api_log_str = "invalid bytes ";
     } else if (pMem == nullptr) {
         per_thread_api_log_str = "invalid ptr (pMem)";
-    } else if (false == (stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT)) // check all possible values
+    } else if (false == //
+        (stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT || //
+            stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS)) // check all possible values
     {
         per_thread_api_log_str = "invalid stateInfo ";
-    } else if ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT) && bytes != sizeof(McDouble)) {
+    } else if (
+        ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT) && bytes != sizeof(McDouble)) || //
+        ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS) && bytes != sizeof(McUint32))) {
         per_thread_api_log_str = "invalid num bytes"; // leads to e.g. "out of bounds" memory access during memcpy
     } else {
         try {
-            bind_impl(context, stateInfo, bytes, pMem);
+            bind_state_impl(context, stateInfo, bytes, pMem);
         }
         CATCH_POSSIBLE_EXCEPTIONS(per_thread_api_log_str);
     }
