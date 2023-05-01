@@ -476,11 +476,11 @@ public:
         : m_done(false)
         // , m_joiner(m_api_threads)
         , m_flags(flags)
-        , m_general_position_enforcement_constant(1.5e-5), m_user_handle(handle),
-        dbgCallbackBitfieldSource(0)
+        , m_general_position_enforcement_constant(1e-4)
+        , m_user_handle(handle)
+        , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
         , dbgCallbackBitfieldSeverity(0)
-        
     {
         log_msg("\n[MCUT] Create context " << m_user_handle);
 
