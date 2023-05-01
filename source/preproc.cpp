@@ -13,8 +13,8 @@
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
-const double GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-4;
-const int MAX_PERTUBATION_ATTEMPTS = 1 << 3;
+// const double GENERAL_POSITION_ENFORCMENT_CONSTANT = 1e-4;
+// const int MAX_PERTUBATION_ATTEMPTS = 1 << 3;
 
 // this function converts an index array mesh (e.g. as recieved by the dispatch
 // function) into a halfedge mesh representation for the kernel backend.
@@ -1449,7 +1449,7 @@ extern "C" void preproc(
 
             context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, "general position assumption violated!");
 
-            if (cut_mesh_perturbation_count == MAX_PERTUBATION_ATTEMPTS) {
+            if (cut_mesh_perturbation_count == context_ptr->get_general_position_enforcement_constant()) {
 
                 context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, kernel_output.logger.get_reason_for_failure());
 

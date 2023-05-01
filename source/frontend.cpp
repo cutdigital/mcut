@@ -305,6 +305,16 @@ void bind_impl(
         context_ptr->set_general_position_enforcement_constant(value);
 
     } break;
+    case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS: {
+        McUint32 value;
+        memcpy(&value, pMem, bytes);
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general position enforcement attempts set to " + std::to_string(value));
+        if (value < 1) {
+            throw std::invalid_argument("invalid general position enforcement constant");
+        }
+        context_ptr->set_general_position_enforcement_attempts(value);
+
+    } break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;

@@ -440,6 +440,7 @@ private:
     McFlags m_flags = (McFlags)0;
 
     std::atomic<McDouble> m_general_position_enforcement_constant;
+    std::atomic<McUint32> m_max_num_perturbation_attempts;
 
     void api_thread_main(uint32_t thread_id)
     {
@@ -476,7 +477,7 @@ public:
         : m_done(false)
         // , m_joiner(m_api_threads)
         , m_flags(flags)
-        , m_general_position_enforcement_constant(1e-4)
+        , m_general_position_enforcement_constant(1e-4),m_max_num_perturbation_attempts(1<<2)
         , m_user_handle(handle)
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
@@ -537,7 +538,7 @@ public:
 
     // returns (user controllable) epsilon representing the maximum by which the cut-mesh
     // can be perturbed on any axis
-    McDouble get_general_position_enforcement_constant()
+    McDouble get_general_position_enforcement_constant() const
     {
         return this->m_general_position_enforcement_constant.load(std::memory_order_acquire);
     }
@@ -546,6 +547,19 @@ public:
     {
         this->m_general_position_enforcement_constant.store(new_value, std::memory_order_release);
     }
+
+    // returns (user controllable) maximum number of times by which the cut-mesh
+    // can be perturbed before giving (input likely need to be preprocessed)
+    McUint32 get_general_position_enforcement_attempts() const
+    {
+        return this->m_max_num_perturbation_attempts.load(std::memory_order_acquire);
+    }
+
+    void set_general_position_enforcement_attempts(McUint32 new_value)
+    {
+        this->m_max_num_perturbation_attempts.store(new_value, std::memory_order_release);
+    }
+    
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& get_shared_compute_threadpool()
