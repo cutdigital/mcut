@@ -34,4 +34,5 @@ add_subdirectory(AdjacentFaces)
 add_subdirectory(Triangulation)
 add_subdirectory(TriangulatedFaceMaps)
 add_subdirectory(EventCallback)
+add_subdirectory(MultipleContextsInParallel)
 

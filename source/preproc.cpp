@@ -1743,7 +1743,7 @@ extern "C" void preproc(
 
                 MCUT_ASSERT(asFragPtr != nullptr);
 
-                asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+                asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
                 asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
                 asFragPtr->fragmentLocation = convert(i->first);
                 asFragPtr->patchLocation = convert(j->first);
@@ -1790,7 +1790,8 @@ extern "C" void preproc(
 
             MCUT_ASSERT(asFragPtr != nullptr);
 
-            asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+            
+            asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
             asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
             asFragPtr->fragmentLocation = convert(i->first);
@@ -1832,12 +1833,12 @@ extern "C" void preproc(
 
         MCUT_ASSERT(asPatchPtr != nullptr);
 
-        asPatchPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        asPatchPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 #if 0
         // std::shared_ptr<connected_component_t> patchConnComp = std::unique_ptr<patch_cc_t, void (*)(connected_component_t*)>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(patchConnComp.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(patchConnComp));
-        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
         // allocate internal context object (including associated threadpool etc.)
         context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new patch_cc_t, fn_delete_cc<patch_cc_t>));
@@ -1881,12 +1882,12 @@ extern "C" void preproc(
 
         MCUT_ASSERT(asPatchPtr != nullptr);
 
-        asPatchPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        asPatchPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 #if 0
         /// std::shared_ptr<connected_component_t> patchConnComp = std::unique_ptr<patch_cc_t, void (*)(connected_component_t*)>(new patch_cc_t, fn_delete_cc<patch_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(patchConnComp.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(patchConnComp));
-        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
         // allocate internal context object (including associated threadpool etc.)
         context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new patch_cc_t, fn_delete_cc<patch_cc_t>));
@@ -1934,13 +1935,13 @@ extern "C" void preproc(
 
         MCUT_ASSERT(asSrcMeshSeamPtr != nullptr);
 
-        asSrcMeshSeamPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        asSrcMeshSeamPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 #if 0
         // std::shared_ptr<connected_component_t> srcMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(srcMeshSeam.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(srcMeshSeam));
         //  allocate internal context object (including associated threadpool etc.)
-        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
         context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new seam_cc_t, fn_delete_cc<seam_cc_t>));
 
@@ -1985,12 +1986,12 @@ extern "C" void preproc(
 
         MCUT_ASSERT(asCutMeshSeamPtr != nullptr);
 
-        asCutMeshSeamPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        asCutMeshSeamPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 #if 0
         // std::shared_ptr<connected_component_t> cutMeshSeam = std::unique_ptr<seam_cc_t, void (*)(connected_component_t*)>(new seam_cc_t, fn_delete_cc<seam_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(cutMeshSeam.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(cutMeshSeam));
-        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
         context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new seam_cc_t, fn_delete_cc<seam_cc_t>));
 
@@ -2036,12 +2037,12 @@ extern "C" void preproc(
 
         MCUT_ASSERT(asCutMeshInputPtr != nullptr);
 
-        asCutMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        asCutMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 #if 0
         // std::shared_ptr<connected_component_t> internalCutMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalCutMesh.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(internalCutMesh));
-        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
         context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new input_cc_t, fn_delete_cc<input_cc_t>));
 
@@ -2135,12 +2136,12 @@ extern "C" void preproc(
 
         MCUT_ASSERT(asSrcMeshInputPtr != nullptr);
 
-        asSrcMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        asSrcMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 #if 0
         // std::shared_ptr<connected_component_t> internalSrcMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalSrcMesh.get());
         // context_ptr->connected_components.emplace(clientHandle, std::move(internalSrcMesh));
-        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter++);
+        const McConnectedComponent handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
         context_ptr->connected_components.add_or_update_mapping(handle, std::shared_ptr<connected_component_t>(new input_cc_t, fn_delete_cc<input_cc_t>));
 

@@ -581,7 +581,7 @@ public:
 
         g_events.push_front(event_ptr);
 
-        event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
+        event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
         event_ptr->m_profiling_enabled = (this->m_flags & MC_PROFILING_ENABLE) != 0;
         event_ptr->m_command_type = cmdType;
 
@@ -604,7 +604,10 @@ public:
 
             const std::shared_ptr<event_t> parent_task_event_ptr = g_events.find_first_if([=](std::shared_ptr<event_t> e) { return e->m_user_handle == parent_task_event_handle; });
 
-            MCUT_ASSERT(parent_task_event_ptr != nullptr);
+            if(parent_task_event_ptr == nullptr)
+            {
+                throw std::invalid_argument("invalid event in waitlist");
+            }
 
             const bool parent_task_is_not_finished = parent_task_event_ptr->m_finished.load() == false;
 
@@ -625,7 +628,7 @@ public:
             uint32_t thread_with_empty_queue = UINT32_MAX;
 
             for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
-                if (m_queues[i].empty() == true) {
+                if (m_queues[(i+1) % (uint32_t)m_api_threads.size() ].empty() == true) {
                     thread_with_empty_queue = i;
                     break;
                 }

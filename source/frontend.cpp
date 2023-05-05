@@ -40,7 +40,7 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
 
     std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xDECAF); /*any non-ero value*/ });
 
-    const McContext handle = reinterpret_cast<McContext>(g_objects_counter++);
+    const McContext handle = reinterpret_cast<McContext>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
     g_contexts.push_front(std::shared_ptr<context_t>(
         new context_t(handle, flags
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -357,7 +357,7 @@ void create_user_event_impl(McEvent* eventHandle, McContext context)
 
     g_events.push_front(user_event_ptr);
 
-    user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter++);
+    user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
     user_event_ptr->m_profiling_enabled = (context_ptr->get_flags() & MC_PROFILING_ENABLE) != 0;
     user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
     user_event_ptr->m_context = context;
