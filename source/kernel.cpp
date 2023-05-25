@@ -2196,6 +2196,11 @@ void dispatch(output_t& output, const input_t& input)
                     tested_face_plane_param_d,
                     tested_face_vertices.data(),
                     (int)tested_face_vertices.size());
+
+                if(squared_length(tested_face_plane_normal) == 0)
+                {
+                    printf("zero area face found\n");
+                }
             }
             return output_res;
         };

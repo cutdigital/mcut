@@ -150,7 +150,22 @@ bool client_input_arrays_to_hmesh(
                 for (int j = 0; j < face_vertex_count; ++j) {
                     uint32_t idx = ((uint32_t*)pFaceIndices)[faceBaseOffset + j];
 
-                    MCUT_ASSERT(idx < numVertices);
+                    if(idx >= numVertices)
+                    {
+                        int zero = (int)McResult::MC_NO_ERROR;
+                        bool exchanged = atm_result.compare_exchange_strong(zero, 2);
+
+                        if (exchanged) // first thread to detect error
+                        {
+                            context_ptr->dbg_cb(
+                                MC_DEBUG_SOURCE_API,
+                                MC_DEBUG_TYPE_ERROR,
+                                0,
+                                MC_DEBUG_SEVERITY_HIGH,
+                                "vertex index out of range in face - " + std::to_string(faceID));
+                        }
+                        break;
+                    }
 
                     const vertex_descriptor_t descr(idx);
                     const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();

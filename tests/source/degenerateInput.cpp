@@ -70,7 +70,7 @@ UTEST_F(DegenerateInput, edgeEdgeIntersection)
 
 #if 0
 // An intersection between two triangles where a vertex from the cut-mesh triangle
-// lies on the src-mesh triangle.
+// lies on the src-mesh triangle. (This will only work with exact arith)
 UTEST_F(DegenerateInput, faceVertexIntersection)
 {
     std::vector<float> srcMeshVertices = {
@@ -101,3 +101,31 @@ UTEST_F(DegenerateInput, faceVertexIntersection)
 #endif
 
 // TODO: add vertex-edge and vertex-vertex intersection tests
+
+UTEST_F(DegenerateInput, faceWithZeroArea)
+{
+    std::vector<float> srcMeshVertices = {
+        -1.f, -1.f, 0.f,
+        1.f, -1.f, 0.f,
+        1.f, 1.f, 0.f,
+        -1.f, -1.f, 0.f
+    };
+
+    std::vector<uint32_t> srcMeshFaceIndices = { 0, 1, 2, 0, 2, 3 };
+    std::vector<uint32_t>  srcMeshFaceSizes = {3, 3}; 
+
+    std::vector<float> cutMeshVertices = {
+        -1.f, 0.f, 1.f,
+        2.f, 0.f, 1.f,
+        2.f, 0.f, -1.f,
+        -1.f, 0.f, -1.f,
+    };
+
+    std::vector<uint32_t> cutMeshFaceIndices = { 0, 1, 2 , 3};
+    uint32_t cutMeshFaceSizes = 4; // array of one
+
+    ASSERT_EQ(mcDispatch(utest_fixture->myContext, MC_DISPATCH_VERTEX_ARRAY_FLOAT, //
+                  &srcMeshVertices[0], &srcMeshFaceIndices[0], &srcMeshFaceSizes[0], 3, 1, //
+                  &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 3, 1),
+        MC_INVALID_OPERATION);
+}
