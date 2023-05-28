@@ -150,8 +150,7 @@ bool client_input_arrays_to_hmesh(
                 for (int j = 0; j < face_vertex_count; ++j) {
                     uint32_t idx = ((uint32_t*)pFaceIndices)[faceBaseOffset + j];
 
-                    if(idx >= numVertices)
-                    {
+                    if (idx >= numVertices) {
                         int zero = (int)McResult::MC_NO_ERROR;
                         bool exchanged = atm_result.compare_exchange_strong(zero, 2, std::memory_order_acq_rel);
 
@@ -242,13 +241,13 @@ bool client_input_arrays_to_hmesh(
         }
 
         if (!okay || atm_result.load(std::memory_order_acquire) != 0) { // check if worker threads (or master thread) encountered an error
-            return false; 
+            return false;
         }
 
-        //const int val = atm_result.load(); // check if master thread encountered an error
-        //okay = (val == 0);
-        //if (!okay) {
-       //     return false; 
+        // const int val = atm_result.load(); // check if master thread encountered an error
+        // okay = (val == 0);
+        // if (!okay) {
+        //     return false;
         //}
 
         // add lastly in order to maintain order
@@ -275,6 +274,18 @@ bool client_input_arrays_to_hmesh(
         for (int j = 0; j < face_vertex_count; ++j) {
 
             uint32_t idx = ((uint32_t*)pFaceIndices)[faceSizeOffset + j];
+
+            if (idx >= face_vertex_count) {
+
+                context_ptr->dbg_cb(
+                    MC_DEBUG_SOURCE_API,
+                    MC_DEBUG_TYPE_ERROR,
+                    0,
+                    MC_DEBUG_SEVERITY_HIGH,
+                    "vertex index out of range in face - " + std::to_string(faceID));
+                return false;
+            }
+
             const vertex_descriptor_t descr(idx); // = fIter->second; //vmap[*fIter.first];
             const bool isDuplicate = std::find(faceVertices.cbegin(), faceVertices.cend(), descr) != faceVertices.cend();
 
@@ -1511,8 +1522,7 @@ extern "C" void preproc(
             }
 
             /*const*/ double perturbation_scalar = cut_hmesh_aabb_diag;
-            if(dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE)
-            {
+            if (dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE) {
                 perturbation_scalar = 1.0;
             }
 
@@ -1811,7 +1821,6 @@ extern "C" void preproc(
 
             MCUT_ASSERT(asFragPtr != nullptr);
 
-            
             asFragPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
             asFragPtr->type = MC_CONNECTED_COMPONENT_TYPE_FRAGMENT;
