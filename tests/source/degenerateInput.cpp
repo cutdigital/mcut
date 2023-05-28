@@ -104,28 +104,28 @@ UTEST_F(DegenerateInput, faceVertexIntersection)
 
 UTEST_F(DegenerateInput, faceWithZeroArea)
 {
-    std::vector<float> srcMeshVertices = {
-        -1.f, -1.f, 0.f,
-        1.f, -1.f, 0.f,
-        1.f, 1.f, 0.f,
-        -1.f, -1.f, 0.f
+    std::vector<double> srcMeshVertices = {
+        -1., -1., 0.,//
+        1., -1., 0.,//
+        1., 1., 0.,//
+        -1., -1., 0.//
     };
 
     std::vector<uint32_t> srcMeshFaceIndices = { 0, 1, 2, 0, 2, 3 };
     std::vector<uint32_t>  srcMeshFaceSizes = {3, 3}; 
 
-    std::vector<float> cutMeshVertices = {
-        -1.f, 0.f, 1.f,
-        2.f, 0.f, 1.f,
-        2.f, 0.f, -1.f,
-        -1.f, 0.f, -1.f,
+    std::vector<double> cutMeshVertices = {
+        -1., 0., 1.,//
+        2., 0., 1.,//
+        2., 0., -1.,//
+        -1., 0., -1.,//
     };
 
     std::vector<uint32_t> cutMeshFaceIndices = { 0, 1, 2 , 3};
     uint32_t cutMeshFaceSizes = 4; // array of one
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, MC_DISPATCH_VERTEX_ARRAY_FLOAT, //
-                  &srcMeshVertices[0], &srcMeshFaceIndices[0], &srcMeshFaceSizes[0], 3, 1, //
-                  &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 3, 1),
+                  &srcMeshVertices[0], &srcMeshFaceIndices[0], &srcMeshFaceSizes[0], 4, 2, //
+                  &cutMeshVertices[0], &cutMeshFaceIndices[0], &cutMeshFaceSizes, 4, 1),
         MC_INVALID_OPERATION);
 }

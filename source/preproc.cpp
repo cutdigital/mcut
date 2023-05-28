@@ -131,7 +131,7 @@ bool client_input_arrays_to_hmesh(
 
                 if (face_vertex_count < 3) {
                     int zero = (int)McResult::MC_NO_ERROR;
-                    bool exchanged = atm_result.compare_exchange_strong(zero, 1);
+                    bool exchanged = atm_result.compare_exchange_strong(zero, 1, std::memory_order_acq_rel);
                     if (exchanged) // first thread to detect error
                     {
                         context_ptr->dbg_cb( //
@@ -153,7 +153,7 @@ bool client_input_arrays_to_hmesh(
                     if(idx >= numVertices)
                     {
                         int zero = (int)McResult::MC_NO_ERROR;
-                        bool exchanged = atm_result.compare_exchange_strong(zero, 2);
+                        bool exchanged = atm_result.compare_exchange_strong(zero, 2, std::memory_order_acq_rel);
 
                         if (exchanged) // first thread to detect error
                         {
@@ -172,7 +172,7 @@ bool client_input_arrays_to_hmesh(
 
                     if (isDuplicate) {
                         int zero = (int)McResult::MC_NO_ERROR;
-                        bool exchanged = atm_result.compare_exchange_strong(zero, 2);
+                        bool exchanged = atm_result.compare_exchange_strong(zero, 2, std::memory_order_acq_rel);
 
                         if (exchanged) // first thread to detect error
                         {
@@ -231,7 +231,7 @@ bool client_input_arrays_to_hmesh(
             MCUT_ASSERT(f.valid()); // The behavior is undefined if valid()== false before the call to wait_for
             OutputStorageType future_res = f.get();
 
-            const int val = atm_result.load();
+            const int val = atm_result.load(std::memory_order_acquire);
             okay = okay && val == 0;
             if (!okay) {
                 continue; // just go on (to next iteration) in order to at-least wait for all tasks to finish before we return to user
@@ -241,9 +241,15 @@ bool client_input_arrays_to_hmesh(
             okay = okay && result == true;
         }
 
-        if (!okay) {
-            return false;
+        if (!okay || atm_result.load(std::memory_order_acquire) != 0) { // check if worker threads (or master thread) encountered an error
+            return false; 
         }
+
+        //const int val = atm_result.load(); // check if master thread encountered an error
+        //okay = (val == 0);
+        //if (!okay) {
+       //     return false; 
+        //}
 
         // add lastly in order to maintain order
         bool result = add_faces(partial_res.first, partial_res.second);
