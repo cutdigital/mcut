@@ -756,34 +756,6 @@ void triangulate_face(
             cc_face_plane_eq_dparam,
             cc_face_vcoords3d.data(),
             (int)cc_face_vcount);
-        
-        #if 0
-        const double normal_vec_snorm = squared_length(cc_face_normal_vector);
-        if(std::fabs(normal_vec_snorm) < 1e-6)
-        {
-            // Although MCUT was able to resolve the cut, one (or more) of the 
-            // resulting CC-faces is too thin (with near zero-area) to 
-            // triangulate (i.e. even robust delauney triangulation with shewchcuk 
-            // predicate fails).
-            // Thus, we skip such faces.
-            //
-            // The implication here is that MCUT will return a triangulated CC 
-            // output but this output will have holes where the degenerate faces
-            // would have otherwise been.
-            //
-            // The user will have to fill those holes themselves (perhaps with
-            // additional remeshing to improve quality for further cutting)
-            context_uptr->dbg_cb(
-                MC_DEBUG_SOURCE_KERNEL,
-                MC_DEBUG_TYPE_OTHER, 0,
-                MC_DEBUG_SEVERITY_MEDIUM, 
-                "cc-face f" + std::to_string(cc_face_iter) + " has near-zero area (" + std::to_string(normal_vec_snorm) + "). Cannot be triangulated. Skipped.");
-
-            //std::cout.precision(std::numeric_limits< double >::max_digits10);
-            //std::cout << "found zero area face in outout cc" << sqred_len << std::endl;
-            return;
-        }
-        #endif
 
         project_to_2d(cc_face_vcoords2d, cc_face_vcoords3d, cc_face_normal_vector, largest_component_of_normal);
 
