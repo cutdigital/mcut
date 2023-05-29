@@ -429,8 +429,11 @@ McResult convert(const status_t& v)
     case status_t::INVALID_MESH_INTERSECTION:
         result = McResult::MC_INVALID_OPERATION;
         break;
+    case status_t::INVALID_CUT_MESH: case status_t::INVALID_SRC_MESH:
+        result = McResult::MC_INVALID_VALUE;
+        break;
     default:
-        std::fprintf(stderr, "[MCUT]: warning - conversion error (McResult=%d)\n", (int)v);
+        std::fprintf(stderr, "[MCUT]: warning - unknown conversion (McResult=%d)\n", (int)v);
     }
     return result;
 }

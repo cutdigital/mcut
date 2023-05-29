@@ -33,8 +33,8 @@
 #include "mcut/internal/hmesh.h"
 #include "mcut/internal/kernel.h"
 #include "mcut/internal/math.h"
-#include "mcut/internal/utils.h"
 #include "mcut/internal/timer.h"
+#include "mcut/internal/utils.h"
 
 #ifndef LICENSE_PURCHASED
 #define lmsg() printf("NOTE: MCUT is copyrighted and may not be sold or included in commercial products without a license.\n")
@@ -1459,7 +1459,7 @@ bool mesh_is_closed(
     const hmesh_t& mesh)
 {
     bool all_halfedges_incident_to_face = true;
-#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+#if 0 // defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
         printf("mesh=%d\n", (int)mesh.number_of_halfedges());
         all_halfedges_incident_to_face = parallel_find_if(
@@ -2167,6 +2167,8 @@ void dispatch(output_t& output, const input_t& input)
             OutputStorageTypesTuple;
         typedef std::map<fd_t, std::vector<fd_t>>::const_iterator InputStorageIteratorType;
 
+        std::atomic<int> potentially_intersecting_face_with_zero_area(-1); // did any errors occur (e.g. found a face with zero area)
+
         auto fn_compute_intersecting_face_properties = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) -> OutputStorageTypesTuple {
             OutputStorageTypesTuple output_res;
             std::unordered_map<fd_t, vec3>& ps_tested_face_to_plane_normal_LOCAL = std::get<0>(output_res);
@@ -2197,9 +2199,8 @@ void dispatch(output_t& output, const input_t& input)
                     tested_face_vertices.data(),
                     (int)tested_face_vertices.size());
 
-                if(squared_length(tested_face_plane_normal) == 0)
-                {
-                    printf("zero area face found\n");
+                if (squared_length(tested_face_plane_normal) == 0) {
+                    potentially_intersecting_face_with_zero_area.store((int)tested_faces_iter->first, std::memory_order_release);
                 }
             }
             return output_res;
@@ -2231,6 +2232,10 @@ void dispatch(output_t& output, const input_t& input)
 
             OutputStorageTypesTuple future_res = f.get();
 
+            if (potentially_intersecting_face_with_zero_area.load(std::memory_order_acquire) >= 0) {
+                break; // stop there was a runtime error
+            }
+
             std::unordered_map<fd_t, vec3>& ps_tested_face_to_plane_normal_FUTURE = std::get<0>(future_res);
             std::unordered_map<fd_t, double>& ps_tested_face_to_plane_normal_d_param_FUTURE = std::get<1>(future_res);
             std::unordered_map<fd_t, int>& ps_tested_face_to_plane_normal_max_comp_FUTURE = std::get<2>(future_res);
@@ -2251,6 +2256,19 @@ void dispatch(output_t& output, const input_t& input)
             ps_tested_face_to_vertices.insert(
                 ps_tested_face_to_vertices_FUTURE.cbegin(),
                 ps_tested_face_to_vertices_FUTURE.cend());
+        }
+
+        const int tmp_local = potentially_intersecting_face_with_zero_area.load(std::memory_order_acquire);
+
+        if (tmp_local >= 0) {
+            const bool is_cutmesh_face = (tmp_local > sm_face_count);
+            // if "tmp_local" > srcMeshFaceCount then "tmp_local" is a cut-mesh face with id="tmp_local-srcMeshFaceCount"
+            const std::string msh_name = is_cutmesh_face ? "cut-mesh" : "source-mesh";
+            // index/descriptor in the _kernel_ input mesh (note the stress on kernel since frontend might modify user-provided mesh)
+            const fd_t bad_face_desr = fd_t(is_cutmesh_face ? (tmp_local - sm_face_count) : tmp_local);
+            lg.set_reason_for_failure("face f" + std::to_string(bad_face_desr) + " of " + msh_name + " is degenerate (has zero area)");
+            output.status.store(is_cutmesh_face ? status_t::INVALID_CUT_MESH : status_t::INVALID_SRC_MESH, std::memory_order_release);
+            return; // stop there was a runtime error
         }
 
     } // end of parallel scope
@@ -2282,6 +2300,16 @@ void dispatch(output_t& output, const input_t& input)
                 tested_face_plane_param_d,
                 tested_face_vertices.data(),
                 (int)tested_face_vertices.size());
+
+            if (squared_length(tested_face_plane_normal) == 0) {
+                const int tmp_local = (int)tested_faces_iter->first;
+                const bool is_cutmesh_face = (tmp_local > sm_face_count);
+                const std::string msh_name = is_cutmesh_face ? "cut-mesh" : "source-mesh";
+                const fd_t bad_face_desr = fd_t(is_cutmesh_face ? (tmp_local - sm_face_count) : tmp_local);
+                lg.set_reason_for_failure("face f" + std::to_string(bad_face_desr) + " of " + msh_name + " is degenerate (has zero area)");
+                output.status.store(is_cutmesh_face ? status_t::INVALID_CUT_MESH : status_t::INVALID_SRC_MESH, std::memory_order_release);
+                return;
+            }
         }
     }
 #endif
