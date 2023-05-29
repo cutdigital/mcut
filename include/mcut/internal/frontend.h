@@ -304,8 +304,32 @@ struct event_t {
     // API command to be able to effectively wait on user events.
     std::unique_ptr<std::packaged_task<void()>> m_user_API_command_task_emulator;
     McContext m_context;
-    event_t()
-        : m_user_handle(MC_NULL_HANDLE)
+
+    const char* get_cmd_type_str()
+    {
+        switch (m_command_type) {
+        case McCommandType::MC_COMMAND_DISPATCH: {
+            return "MC_COMMAND_DISPATCH";
+        } break;
+        case McCommandType::MC_COMMAND_GET_CONNECTED_COMPONENT_DATA: {
+            return "MC_COMMAND_GET_CONNECTED_COMPONENT_DATA";
+        } break;
+        case McCommandType::MC_COMMAND_GET_CONNECTED_COMPONENTS: {
+            return "MC_COMMAND_GET_CONNECTED_COMPONENTS";
+        } break;
+        case McCommandType::MC_COMMAND_USER: {
+            return "MC_COMMAND_USER";
+        } break;
+        case McCommandType::MC_COMMAND_UKNOWN: {
+            return "MC_COMMAND_UKNOWN";
+        } break;
+        default:
+            fprintf(stderr, "unknown command type value (%d)\n", (int)m_command_type);
+            return "UNKNOWN VALUE";
+        }
+    }
+    explicit event_t(McEvent user_handle, McCommandType command_type)
+        : m_user_handle(user_handle)
         , m_responsible_thread_id(UINT32_MAX)
         , m_runtime_exec_status(MC_NO_ERROR)
         , m_timestamp_submit(0)
@@ -313,11 +337,11 @@ struct event_t {
         , m_timestamp_end(0)
         , m_command_exec_status(MC_RESULT_MAX_ENUM)
         , m_profiling_enabled(true)
-        , m_command_type(MC_COMMAND_UKNOWN)
+        , m_command_type(command_type)
         , m_user_API_command_task_emulator(nullptr)
         , m_context(nullptr)
     {
-        log_msg("[MCUT] Create event " << this);
+        log_msg("[MCUT] Create event (type=" << get_cmd_type_str() << ", memptr=" << this << ", handle=" << m_user_handle << ")");
 
         m_callback_info.m_fn_ptr = nullptr;
         m_callback_info.m_data_ptr = nullptr;
@@ -333,7 +357,7 @@ struct event_t {
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
 
-        log_msg("[MCUT] Destroy event " << this << "(" << m_user_handle << ")");
+        log_msg("[MCUT] Destroy event (type=" << get_cmd_type_str() << ", memptr=" << this << ", handle=" << m_user_handle << ")");
     }
 
     inline std::size_t get_time_since_epoch()
@@ -477,7 +501,8 @@ public:
         : m_done(false)
         // , m_joiner(m_api_threads)
         , m_flags(flags)
-        , m_general_position_enforcement_constant(1e-4),m_max_num_perturbation_attempts(1<<2)
+        , m_general_position_enforcement_constant(1e-4)
+        , m_max_num_perturbation_attempts(1 << 2)
         , m_user_handle(handle)
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
@@ -517,6 +542,9 @@ public:
     void shutdown()
     {
         m_done = true;
+        
+        std::atomic_thread_fence(std::memory_order_acq_rel);
+
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         m_compute_threadpool.reset();
 #endif
@@ -559,7 +587,6 @@ public:
     {
         this->m_max_num_perturbation_attempts.store(new_value, std::memory_order_release);
     }
-    
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& get_shared_compute_threadpool()
@@ -575,15 +602,17 @@ public:
         // create the event object associated with the enqueued task
         //
 
-        std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t);
+        std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t(
+            reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed)),
+            cmdType));
 
         MCUT_ASSERT(event_ptr != nullptr);
 
         g_events.push_front(event_ptr);
 
-        event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+        //event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
         event_ptr->m_profiling_enabled = (this->m_flags & MC_PROFILING_ENABLE) != 0;
-        event_ptr->m_command_type = cmdType;
+        // event_ptr->m_command_type = cmdType;
 
         event_ptr->log_submit_time();
 
@@ -604,8 +633,7 @@ public:
 
             const std::shared_ptr<event_t> parent_task_event_ptr = g_events.find_first_if([=](std::shared_ptr<event_t> e) { return e->m_user_handle == parent_task_event_handle; });
 
-            if(parent_task_event_ptr == nullptr)
-            {
+            if (parent_task_event_ptr == nullptr) {
                 throw std::invalid_argument("invalid event in waitlist");
             }
 
@@ -628,7 +656,7 @@ public:
             uint32_t thread_with_empty_queue = UINT32_MAX;
 
             for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
-                if (m_queues[(i+1) % (uint32_t)m_api_threads.size() ].empty() == true) {
+                if (m_queues[(i + 1) % (uint32_t)m_api_threads.size()].empty() == true) {
                     thread_with_empty_queue = i;
                     break;
                 }

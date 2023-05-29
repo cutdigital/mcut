@@ -351,15 +351,18 @@ void create_user_event_impl(McEvent* eventHandle, McContext context)
     // create the event object associated with the enqueued task
     //
 
-    std::shared_ptr<event_t> user_event_ptr = std::shared_ptr<event_t>(new event_t);
+    std::shared_ptr<event_t> user_event_ptr = std::shared_ptr<event_t>(new event_t(
+        reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed)),
+        McCommandType::MC_COMMAND_USER
+    ));
 
     MCUT_ASSERT(user_event_ptr != nullptr);
 
     g_events.push_front(user_event_ptr);
 
-    user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+    //user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
     user_event_ptr->m_profiling_enabled = (context_ptr->get_flags() & MC_PROFILING_ENABLE) != 0;
-    user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
+    //user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
     user_event_ptr->m_context = context;
     user_event_ptr->m_responsible_thread_id = 0; // initialized but unused for user event
 
@@ -723,7 +726,7 @@ void triangulate_face(
 
     // for each vertex in face: get its coordinates
     for (uint32_t i = 0; i < cc_face_vcount; ++i) {
-
+        cc_face_vcoords2d.clear();
         const vertex_descriptor_t cc_face_vertex_descr = SAFE_ACCESS(cc_face_vertices, i);
 
         const vec3& coords = cc.vertex(cc_face_vertex_descr);
@@ -753,6 +756,34 @@ void triangulate_face(
             cc_face_plane_eq_dparam,
             cc_face_vcoords3d.data(),
             (int)cc_face_vcount);
+        
+        #if 0
+        const double normal_vec_snorm = squared_length(cc_face_normal_vector);
+        if(std::fabs(normal_vec_snorm) < 1e-6)
+        {
+            // Although MCUT was able to resolve the cut, one (or more) of the 
+            // resulting CC-faces is too thin (with near zero-area) to 
+            // triangulate (i.e. even robust delauney triangulation with shewchcuk 
+            // predicate fails).
+            // Thus, we skip such faces.
+            //
+            // The implication here is that MCUT will return a triangulated CC 
+            // output but this output will have holes where the degenerate faces
+            // would have otherwise been.
+            //
+            // The user will have to fill those holes themselves (perhaps with
+            // additional remeshing to improve quality for further cutting)
+            context_uptr->dbg_cb(
+                MC_DEBUG_SOURCE_KERNEL,
+                MC_DEBUG_TYPE_OTHER, 0,
+                MC_DEBUG_SEVERITY_MEDIUM, 
+                "cc-face f" + std::to_string(cc_face_iter) + " has near-zero area (" + std::to_string(normal_vec_snorm) + "). Cannot be triangulated. Skipped.");
+
+            //std::cout.precision(std::numeric_limits< double >::max_digits10);
+            //std::cout << "found zero area face in outout cc" << sqred_len << std::endl;
+            return;
+        }
+        #endif
 
         project_to_2d(cc_face_vcoords2d, cc_face_vcoords3d, cc_face_normal_vector, largest_component_of_normal);
 
@@ -934,8 +965,8 @@ void triangulate_face(
 
     // Find the duplicates (if any)
     const cdt::duplicates_info_t duplicates_info_pre = cdt::find_duplicates<double>(
-        cc_face_vcoords2d.begin(),
-        cc_face_vcoords2d.end(),
+        cc_face_vcoords2d.cbegin(),
+        cc_face_vcoords2d.cend(),
         cdt::get_x_coord_vec2d<double>,
         cdt::get_y_coord_vec2d<double>);
 
@@ -977,6 +1008,44 @@ void triangulate_face(
             // vector along incident edge, pointing from current to next vertex (NOTE: counter-clockwise dir, normal)
             const vec2 to_next = next_vtx_coords - perturbed_dvertex_coords;
 
+
+            //
+            // There is a rare case in which MCUT will produce a CC from complete (not partial)! cut where at least 
+            // one face will be defined by a list of vertices such that this list contains
+            // two vertices with exactly the same coordinates (due to limitation of floating point precision e.g. after shewchuk predicates in kernel)
+            //
+            // In such a case, we "break the tie" by shifting "perturbed_dvertex_id" halfway
+            // along the vector running from "perturbed_dvertex_id" to "next_vtx_id", 
+            // if "perturbed_dvertex_id" and "next_vtx_id" are the duplicates. Otherwise, we shift 
+            // "perturbed_dvertex_id" halfway
+            // along the vector running from "perturbed_dvertex_id" to "prev_vtx_id", 
+            // if instead "perturbed_dvertex_id" and "prev_vtx_id" are the duplicates.
+            //
+            // It remains possible that next_vtx_id+1 (prev_vtx_id-1) may also be duplicates, in which
+            // case we should just throw our hands up and bail (can be fixed but too hard and rare to justify the effort)
+            // 
+            // These issue can generally be avoided if the input meshes resemble a uniform triangulation
+            const bool same_as_prev = ((uint32_t)other_dvertex_id  == prev_vtx_id);
+            const bool same_as_next = (next_vtx_id == (uint32_t)other_dvertex_id);
+            const bool have_adjacent_duplicates = same_as_prev ||  same_as_next;
+            
+            if(have_adjacent_duplicates)
+            {
+                //const bool same_as_prev = std::abs(idx_dist_to_prev)==1;
+                const vec2& shiftby = (same_as_prev) ? to_next : to_prev;
+                //if(same_as_prev)
+                //{
+                //    shiftby = to_next;
+                //}
+                //else{ /// then we have "std::abs(idx_dist_to_next) ==1"
+                //    shiftby = to_prev;
+                //}
+
+                perturbed_dvertex_coords = perturbed_dvertex_coords + (shiftby * 0.5);
+            }
+            else{ // case of partial cut
+
+            
             // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
             // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
             // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
@@ -1154,6 +1223,7 @@ void triangulate_face(
 
                 MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
             }
+            
 
             // Shortened perturbation vector: shortening from the vector that is as long as the
             // max length between any two vertices in "cc_face_iter", to a vector that runs
@@ -1176,6 +1246,7 @@ void triangulate_face(
             perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
 
             //} // for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
+            }// if(have_adjacent_duplicates)
         } // for (std::vector<std::size_t>::const_iterator duplicate_vpair_iter = duplicates_info_pre.duplicates.cbegin(); ...
     } // if (have_duplicates) {
 
@@ -1188,8 +1259,8 @@ void triangulate_face(
 
     // check for duplicate vertices again
     const cdt::duplicates_info_t duplicates_info_post = cdt::find_duplicates<double>(
-        cc_face_vcoords2d.begin(),
-        cc_face_vcoords2d.end(),
+        cc_face_vcoords2d.cbegin(),
+        cc_face_vcoords2d.cend(),
         cdt::get_x_coord_vec2d<double>,
         cdt::get_y_coord_vec2d<double>);
 
@@ -2776,9 +2847,13 @@ void get_connected_component_data_impl_detail(
 
                             triangulate_face(cc_face_triangulation, context_ptr, cc_face_vcount, cc_face_vertices, *(cc.get()), *cc_face_iter);
 
+                            // NOTE: "cc_face_triangulation" can be empty if the face has near-zero area
+
                             for (uint32_t i = 0; i < (uint32_t)cc_face_triangulation.size(); ++i) {
                                 const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
+                                MCUT_ASSERT(local_idx < cc_face_vcount);
                                 const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
+                                MCUT_ASSERT(global_idx < (uint32_t)cc->number_of_vertices());
 
                                 cdt_index_cache_local.push_back(global_idx);
 
@@ -2786,9 +2861,11 @@ void get_connected_component_data_impl_detail(
                                     if ((i % 3) == 0) { // every three indices constitute one triangle
                                         // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter" (in the user input mesh)
                                         const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
+                                        MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
                                         const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
                                             internal_inputmesh_face_idx,
                                             cc_uptr);
+                                            MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
                                         cdt_face_map_cache_local.push_back(user_inputmesh_face_idx);
                                     }
                                 }
@@ -2894,28 +2971,31 @@ void get_connected_component_data_impl_detail(
 
                     triangulate_face(cc_face_triangulation, context_ptr, cc_face_vcount, cc_face_vertices, cc.get()[0], *cc_face_iter);
 
-                    //
-                    // Change local triangle indices to global index values (in CC) and save
-                    //
+                    if(cc_face_triangulation.empty() == false)
+                    {
+                        //
+                        // Change local triangle indices to global index values (in CC) and save
+                        //
 
-                    const uint32_t cc_face_triangulation_index_count = (uint32_t)cc_face_triangulation.size();
-                    cc_uptr->cdt_index_cache.reserve(
-                        cc_uptr->cdt_index_cache.size() + cc_face_triangulation_index_count);
+                        const uint32_t cc_face_triangulation_index_count = (uint32_t)cc_face_triangulation.size();
+                        cc_uptr->cdt_index_cache.reserve(
+                            cc_uptr->cdt_index_cache.size() + cc_face_triangulation_index_count);
 
-                    for (uint32_t i = 0; i < cc_face_triangulation_index_count; ++i) {
-                        const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
-                        const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
+                        for (uint32_t i = 0; i < cc_face_triangulation_index_count; ++i) {
+                            const uint32_t local_idx = cc_face_triangulation[i]; // id local within the current face that we are triangulating
+                            const uint32_t global_idx = (uint32_t)cc_face_vertices[local_idx];
 
-                        cc_uptr->cdt_index_cache.push_back(global_idx);
+                            cc_uptr->cdt_index_cache.push_back(global_idx);
 
-                        if (user_requested_cdt_face_maps) {
-                            if ((i % 3) == 0) { // every three indices constitute one triangle
-                                // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter" (in the user input mesh)
-                                const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
-                                const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
-                                    internal_inputmesh_face_idx,
-                                    cc_uptr);
-                                cc_uptr->cdt_face_map_cache.push_back(user_inputmesh_face_idx);
+                            if (user_requested_cdt_face_maps) {
+                                if ((i % 3) == 0) { // every three indices constitute one triangle
+                                    // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter" (in the user input mesh)
+                                    const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
+                                    const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
+                                        internal_inputmesh_face_idx,
+                                        cc_uptr);
+                                    cc_uptr->cdt_face_map_cache.push_back(user_inputmesh_face_idx);
+                                }
                             }
                         }
                     }
