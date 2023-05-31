@@ -447,6 +447,17 @@ typedef enum McCommandType {
 } McCommandType;
 
 /**
+ * \enum McConnectedComponentFaceWindingOrder
+ * @brief Flags for specifying the state used to determine winding order of queried faces.
+ *
+ * This enum structure defines the flags which are used for identifying the winding order that is used to orient the vertex indices defining the faces of connected components.
+ */
+typedef enum McConnectedComponentFaceWindingOrder {
+    MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN = 1 << 0, /**< Define the order of face-vertex indices using the orientation implied by the input meshes. */
+    MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED = 1 << 1, /**< Define the order of face-vertex indices using the reversed orientation implied by the input meshes. */
+} McConnectedComponentFaceWindingOrder;
+
+/**
  * \enum McQueryFlags
  * @brief Flags for querying fixed API state.
  *
@@ -464,7 +475,8 @@ typedef enum McQueryFlags {
     MC_EVENT_COMMAND_TYPE = 1 << 8, /**< The command associated with event. Can be one of the values in :: */
     MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH = 1 << 9, /**< The maximum length of a single message return from ::mcGetDebugMessageLog */
     MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT = 1 << 10, /**< A constant small real number representing the amount by which to perturb the cut-mesh when two intersecting polygon are found to not be in general position. */
-    MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS = 1<<11 /**< The number of times that a dispatch operation will attempt to perturb the cut-mesh if the input meshes are found to not be in general position.*/
+    MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS = 1<<11, /**< The number of times that a dispatch operation will attempt to perturb the cut-mesh if the input meshes are found to not be in general position.*/
+    MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER = 1<<12 /**< The winding order that is used when specifying vertex indices that define the faces of connected components. */
 } McQueryFlags;
 
 /**

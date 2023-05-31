@@ -294,6 +294,15 @@ void get_info_impl(
             memcpy(pMem, reinterpret_cast<const McDouble*>(&attempts), sizeof(McUint32));
         }
     } break;
+    case MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER: {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McConnectedComponentFaceWindingOrder);
+        } else {
+            const McConnectedComponentFaceWindingOrder wo = context_ptr->get_connected_component_winding_order();
+            memcpy(pMem, reinterpret_cast<const McConnectedComponentFaceWindingOrder*>(&wo), sizeof(McConnectedComponentFaceWindingOrder));
+        }
+    } break;
+    
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -333,6 +342,18 @@ void bind_state_impl(
         context_ptr->set_general_position_enforcement_attempts(value);
 
     } break;
+    case MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER:
+    {
+        McConnectedComponentFaceWindingOrder value;
+        memcpy(&value, pMem, bytes);
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "winding-order set to " + std::to_string(value));
+
+         if (value !=  McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN && //
+            value != McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED ) {
+            throw std::invalid_argument("invalid winding-order param value");
+        }
+        context_ptr->set_connected_component_winding_order(value);
+    }break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -1861,12 +1882,13 @@ void get_connected_component_data_impl_detail(
                 std::vector<uint32_t> partial_sum_vec = cc_uptr->face_sizes_cache; // copy
 
                 parallel_partial_sum(context_ptr->get_shared_compute_threadpool(), partial_sum_vec.begin(), partial_sum_vec.end());
-
+                const bool flip_winding_order =  context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
+                    
                 //
                 // step 3
                 //
 
-                auto fn_face_indices_copy = [&cc_uptr, &partial_sum_vec, &casted_ptr, &num_indices_to_copy](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+                auto fn_face_indices_copy = [flip_winding_order, &cc_uptr, &partial_sum_vec, &casted_ptr, &num_indices_to_copy](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
                     const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_sizes_cache.size());
@@ -1880,7 +1902,7 @@ void get_connected_component_data_impl_detail(
 
                     std::vector<vd_t> vertices_around_face; // tmp to prevent reallocations
                     vertices_around_face.reserve(3);
-
+                        
                     for (face_array_iterator_t f_iter = block_start_; f_iter != block_end_; ++f_iter) {
 
                         vertices_around_face.clear();
@@ -1889,14 +1911,30 @@ void get_connected_component_data_impl_detail(
 
                         MCUT_ASSERT(num_vertices_around_face >= 3u);
 
-                        // for each vertex in face
-                        for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
-                            const uint32_t vertex_idx = (uint32_t)SAFE_ACCESS(vertices_around_face, i);
-                            *(casted_ptr + index_arr_offset) = vertex_idx;
-                            ++index_arr_offset;
+                        if(flip_winding_order)
+                        {
+                            // for each vertex in face
+                            for (int32_t i = (num_vertices_around_face-1); i >= (int32_t)0; --i) {
+                                const uint32_t vertex_idx = (uint32_t)SAFE_ACCESS(vertices_around_face, i);
+                                *(casted_ptr + index_arr_offset) = vertex_idx;
+                                ++index_arr_offset;
 
-                            if (index_arr_offset == num_indices_to_copy) {
-                                break;
+                                if (index_arr_offset == num_indices_to_copy) {
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // for each vertex in face
+                            for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
+                                const uint32_t vertex_idx = (uint32_t)SAFE_ACCESS(vertices_around_face, i);
+                                *(casted_ptr + index_arr_offset) = vertex_idx;
+                                ++index_arr_offset;
+
+                                if (index_arr_offset == num_indices_to_copy) {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1914,6 +1952,9 @@ void get_connected_component_data_impl_detail(
             std::vector<vd_t> cc_face_vertices;
             uint32_t elem_offset = 0;
 
+            const bool flip_winding_order =  context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
+                 
+
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
 
                 cc_face_vertices.clear();
@@ -1922,13 +1963,28 @@ void get_connected_component_data_impl_detail(
 
                 MCUT_ASSERT(num_vertices_around_face >= 3u);
 
-                for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
-                    const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
-                    *(casted_ptr + elem_offset) = vertex_idx;
-                    ++elem_offset;
+                if(flip_winding_order)
+                {
+                    for (uint32_t i = (num_vertices_around_face-1); i >= 0; --i) {
+                        const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
+                        *(casted_ptr + elem_offset) = vertex_idx;
+                        ++elem_offset;
 
-                    if (elem_offset == num_indices_to_copy) {
-                        break;
+                        if (elem_offset == num_indices_to_copy) {
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
+                        const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
+                        *(casted_ptr + elem_offset) = vertex_idx;
+                        ++elem_offset;
+
+                        if (elem_offset == num_indices_to_copy) {
+                            break;
+                        }
                     }
                 }
             }
@@ -3017,7 +3073,20 @@ void get_connected_component_data_impl_detail(
                     throw std::invalid_argument("invalid number of bytes");
                 }
 
-                memcpy(pMem, reinterpret_cast<McVoid*>(cc_uptr->cdt_index_cache.data()), bytes);
+                const bool flip_winding_order = context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
+
+                if(flip_winding_order)
+                {
+                    const uint32_t n = (uint32_t)cc_uptr->cdt_index_cache.size();
+                    for (uint32_t i=0; i < n; ++i)
+                    {
+                        ((uint32_t*)pMem)[n-1-i] = cc_uptr->cdt_index_cache[i];
+                    }
+                }   
+                else
+                {
+                    memcpy(pMem, reinterpret_cast<McVoid*>(cc_uptr->cdt_index_cache.data()), bytes);
+                }
             }
         }
     } break;

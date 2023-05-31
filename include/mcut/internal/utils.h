@@ -240,6 +240,8 @@ pair<T> make_pair(const T a, const T b)
     return pair<T>(a, b);
 }
 
+
+
 // Threadsafe logging to console which prevents std::cerr from mixing strings when
 // concatenating with the operator<< multiple time per string, across multiple
 // threads.

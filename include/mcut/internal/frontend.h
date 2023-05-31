@@ -341,7 +341,7 @@ struct event_t {
         , m_user_API_command_task_emulator(nullptr)
         , m_context(nullptr)
     {
-        log_msg("[MCUT] Create event (type=" << get_cmd_type_str() << ", memptr=" << this << ", handle=" << m_user_handle << ")");
+        log_msg("[MCUT] Create event (type=" << get_cmd_type_str() <<", handle=" << m_user_handle << ")");
 
         m_callback_info.m_fn_ptr = nullptr;
         m_callback_info.m_data_ptr = nullptr;
@@ -357,7 +357,7 @@ struct event_t {
             (*(m_callback_info.m_fn_ptr))(m_user_handle, m_callback_info.m_data_ptr);
         }
 
-        log_msg("[MCUT] Destroy event (type=" << get_cmd_type_str() << ", memptr=" << this << ", handle=" << m_user_handle << ")");
+        log_msg("[MCUT] Destroy event (type=" << get_cmd_type_str() << ", handle=" << m_user_handle << ")");
     }
 
     inline std::size_t get_time_since_epoch()
@@ -465,6 +465,7 @@ private:
 
     std::atomic<McDouble> m_general_position_enforcement_constant;
     std::atomic<McUint32> m_max_num_perturbation_attempts;
+    std::atomic<McConnectedComponentFaceWindingOrder> m_connected_component_winding_order;
 
     void api_thread_main(uint32_t thread_id)
     {
@@ -502,7 +503,8 @@ public:
         // , m_joiner(m_api_threads)
         , m_flags(flags)
         , m_general_position_enforcement_constant(1e-4)
-        , m_max_num_perturbation_attempts(1 << 2)
+        , m_max_num_perturbation_attempts(1 << 2),
+        m_connected_component_winding_order(McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN)
         , m_user_handle(handle)
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
@@ -587,6 +589,17 @@ public:
     {
         this->m_max_num_perturbation_attempts.store(new_value, std::memory_order_release);
     }
+
+ McConnectedComponentFaceWindingOrder get_connected_component_winding_order() const
+    {
+        return this->m_connected_component_winding_order.load(std::memory_order_acquire);
+    }
+
+    void set_connected_component_winding_order(McConnectedComponentFaceWindingOrder new_value)
+    {
+        this->m_connected_component_winding_order.store(new_value, std::memory_order_release);
+    }
+    
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& get_shared_compute_threadpool()

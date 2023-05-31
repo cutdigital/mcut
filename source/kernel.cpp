@@ -656,8 +656,15 @@ hmesh_t extract_connected_components(
         // structure "mesh" to the (local) connected-component
         //
 
+//#define EXTRACT_SEAM_HALFEDGES
+
+#ifdef EXTRACT_SEAM_HALFEDGES
+        std::vector<halfedge_descriptor_t> cc_seam_halfedges;
+        const std::vector<halfedge_descriptor_t>& halfedges_on_face = mesh.get_halfedges_around_face(fd);
+        bool prev_vertex_belonged_to_seam = false; // previous in face
+        #endif
         // for each vertex around the current face
-        const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd);
+        const std::vector<vertex_descriptor_t> vertices_around_face = mesh.get_vertices_around_face(fd); // order according to "halfedges_on_face" (targets)
 
         for (std::vector<vertex_descriptor_t>::const_iterator face_vertex_iter = vertices_around_face.cbegin();
              face_vertex_iter != vertices_around_face.cend();
@@ -683,9 +690,31 @@ hmesh_t extract_connected_components(
                 // check if we need to save vertex as being a seam vertex
                 // std::vector<bool>::const_iterator fiter = mesh_vertex_to_seam_flag.find(*face_vertex_iter);
                 bool is_seam_vertex = (size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size() && SAFE_ACCESS(mesh_vertex_to_seam_flag, *face_vertex_iter); //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
+                
                 if (is_seam_vertex) {
+                    
                     cc_seam_vertices.push_back(cc_descriptor);
+#ifdef EXTRACT_SEAM_HALFEDGES
+                    const uint32_t face_vertex_idx = std::distance(vertices_around_face.cbegin(), face_vertex_iter);
+
+                    const bool is_first_face_vertex = (face_vertex_idx == 0);
+                    bool have_seam_halfedge = prev_vertex_belonged_to_seam;
+
+                    if (is_first_face_vertex) {
+                        vd_t last_vtx_descr = (*(vertices_around_face.end() - 1));
+                        bool last_vertex_is_seam_vertex = (size_t)(last_vtx_descr) < mesh_vertex_to_seam_flag.size() && SAFE_ACCESS(mesh_vertex_to_seam_flag, last_vtx_descr); //(size_t)(*face_vertex_iter) < mesh_vertex_to_seam_flag.size(); //fiter != mesh_vertex_to_seam_flag.cend() && fiter->second == true;
+                        have_seam_halfedge = (last_vertex_is_seam_vertex);
+                    }
+                    
+                    if (have_seam_halfedge) {
+                        const halfedge_descriptor_t seam_he = SAFE_ACCESS(halfedges_on_face, face_vertex_idx); // number of halfedge == number of vertices in face
+                        cc_seam_halfedges.push_back(seam_he);
+                    }
+                    #endif
                 }
+#ifdef EXTRACT_SEAM_HALFEDGES
+                prev_vertex_belonged_to_seam = is_seam_vertex;
+                #endif
             }
         }
     } // for (face_array_iterator_t face_iter = mesh.faces_begin(); face_iter != mesh.faces_end(); ++face_iter)
@@ -7737,8 +7766,8 @@ void dispatch(output_t& output, const input_t& input)
     //
 
     if (proceed_to_fill_holes == false) {
-
-        return; // exit
+        printf("[mcut-kernel]: detected a configuration that does not permit filling holes. input-mesh verification advised.\n");
+        return; // done
     }
 
     if (false == (input.keep_fragments_below_cutmesh || //

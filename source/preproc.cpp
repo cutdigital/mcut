@@ -180,7 +180,7 @@ bool client_input_arrays_to_hmesh(
                                 MC_DEBUG_TYPE_ERROR,
                                 0,
                                 MC_DEBUG_SEVERITY_HIGH,
-                                "found duplicate vertex in face - " + std::to_string(faceID));
+                                "duplicate vertex index in face f" + std::to_string(faceID));
                         }
                         break;
                     }
@@ -217,7 +217,7 @@ bool client_input_arrays_to_hmesh(
                         MC_DEBUG_TYPE_ERROR, //
                         0, //
                         MC_DEBUG_SEVERITY_HIGH, //
-                        "invalid vertices on face - " + std::to_string(faceID));
+                        "invalid face f" + std::to_string(faceID) + " (potentially contains non-manifold edge)");
                     return false;
                 }
             }

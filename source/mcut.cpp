@@ -242,12 +242,14 @@ MCAPI_ATTR McResult MCAPI_CALL mcBindState(
         per_thread_api_log_str = "invalid ptr (pMem)";
     } else if (false == //
         (stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT || //
-            stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS)) // check all possible values
+            stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS ||//
+            stateInfo == MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER)) // check all possible values
     {
         per_thread_api_log_str = "invalid stateInfo ";
     } else if (
         ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT) && bytes != sizeof(McDouble)) || //
-        ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS) && bytes != sizeof(McUint32))) {
+        ((stateInfo == MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS) && bytes != sizeof(McUint32))|| //
+        ((stateInfo == MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER) && bytes != sizeof(McConnectedComponentFaceWindingOrder))) {
         per_thread_api_log_str = "invalid num bytes"; // leads to e.g. "out of bounds" memory access during memcpy
     } else {
         try {
