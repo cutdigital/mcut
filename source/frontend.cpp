@@ -337,7 +337,7 @@ void bind_state_impl(
         memcpy(&value, pMem, bytes);
         context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general position enforcement attempts set to " + std::to_string(value));
         if (value < 1) {
-            throw std::invalid_argument("invalid general position enforcement attempts");
+            throw std::invalid_argument("invalid general position enforcement attempts -> " + std::to_string(value));
         }
         context_ptr->set_general_position_enforcement_attempts(value);
 
