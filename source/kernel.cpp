@@ -2336,7 +2336,7 @@ void dispatch(output_t& output, const input_t& input)
                 const std::string msh_name = is_cutmesh_face ? "cut-mesh" : "source-mesh";
                 const fd_t bad_face_desr = fd_t(is_cutmesh_face ? (tmp_local - sm_face_count) : tmp_local);
                 lg.set_reason_for_failure("face f" + std::to_string(bad_face_desr) + " of " + msh_name + " is degenerate (has zero area)");
-                output.status.store(is_cutmesh_face ? status_t::INVALID_CUT_MESH : status_t::INVALID_SRC_MESH, std::memory_order_release);
+                output.status = (is_cutmesh_face ? status_t::INVALID_CUT_MESH : status_t::INVALID_SRC_MESH);
                 return;
             }
         }

@@ -275,14 +275,14 @@ bool client_input_arrays_to_hmesh(
 
             uint32_t idx = ((uint32_t*)pFaceIndices)[faceSizeOffset + j];
 
-            if (idx >= face_vertex_count) {
+            if (idx >= numVertices) {
 
                 context_ptr->dbg_cb(
                     MC_DEBUG_SOURCE_API,
                     MC_DEBUG_TYPE_ERROR,
                     0,
                     MC_DEBUG_SEVERITY_HIGH,
-                    "vertex index out of range in face - " + std::to_string(faceID));
+                    "vertex index out of range in face - f" + std::to_string(i));
                 return false;
             }
 

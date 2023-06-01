@@ -1965,7 +1965,7 @@ void get_connected_component_data_impl_detail(
 
                 if(flip_winding_order)
                 {
-                    for (uint32_t i = (num_vertices_around_face-1); i >= 0; --i) {
+                    for (int32_t i = (int32_t)(num_vertices_around_face-1); i >= 0; --i) {
                         const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
                         *(casted_ptr + elem_offset) = vertex_idx;
                         ++elem_offset;
