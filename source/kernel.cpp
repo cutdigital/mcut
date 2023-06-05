@@ -1792,7 +1792,7 @@ void dispatch(output_t& output, const input_t& input)
     ///////////////////////////////////////////////////////////////////////////
 
     std::unordered_map<ed_t, std::vector<fd_t>> ps_edge_face_intersection_pairs;
-
+    
     TIMESTACK_PUSH("Prepare edge-to-face pairs");
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -2000,7 +2000,7 @@ void dispatch(output_t& output, const input_t& input)
     //
     // build bounding boxes for each intersecting edge
     //
-
+#if 1
     TIMESTACK_PUSH("Build edge bounding boxes");
 
     // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
@@ -2175,7 +2175,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // assuming each edge will produce a new vertex
     m0.reserve_for_additional_elements((std::uint32_t)ps_edge_face_intersection_pairs.size());
-
+#endif
     TIMESTACK_PUSH("Compute intersecting face properties");
     // compute/extract geometry properties of each tested face
     //--------------------------------------------------------

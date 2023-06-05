@@ -11,7 +11,7 @@ jobs:
         build_type: [Debug, Release]
         std: [11]
         multithreading: [ON,OFF]
-        os: [ubuntu-18.04]
+        os: [ubuntu-latest]
         include:
           - cxx: g++-4.8
             install: sudo apt install g++-4.8
