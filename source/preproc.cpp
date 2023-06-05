@@ -401,7 +401,7 @@ bool check_input_mesh(std::shared_ptr<context_t>& context_ptr, const hmesh_t& m)
                 MC_DEBUG_TYPE_OTHER,
                 0,
                 MC_DEBUG_SEVERITY_NOTIFICATION,
-                "Vertices (" + std::to_string(fv_count) + ") on face " + std::to_string(*f) + " not coplanar");
+                "Vertices (" + std::to_string(fv_count) + ") on face f" + std::to_string(*f) + " are not coplanar");
             // No need to return false, simply warn. It is difficult to
             // know whether the non-coplanarity is severe enough to cause
             // confusion when computing intersection points between two
@@ -1458,6 +1458,8 @@ extern "C" void preproc(
     // And if floating polygons arise, then we partition the suspected face into two new faces with an edge that is guaranteed to be
     // severed during the cut.
     do {
+        TIMESTACK_RESET(); 
+
         kernel_invocation_counter++;
 
         // here we check the reason (if any) for entering the loop body.

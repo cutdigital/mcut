@@ -444,10 +444,7 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatch(
     const McEvent* pEventWaitList,
     McEvent* pEvent)
 {
-    TIMESTACK_RESET(); // reset tracking vars
-
-    SCOPED_TIMER(__FUNCTION__);
-
+   
     McResult return_value = McResult::MC_NO_ERROR;
     per_thread_api_log_str.clear();
 
