@@ -148,6 +148,20 @@ extern "C" void dispatch_impl(
     const McEvent* pEventWaitList,
     McEvent* pEvent) noexcept(false);
 
+extern "C" void dispatch_planar_section_impl(
+    McContext context,
+    McFlags flags,
+    const McVoid* pSrcMeshVertices,
+    const uint32_t* pSrcMeshFaceIndices,
+    const uint32_t* pSrcMeshFaceSizes,
+    uint32_t numSrcMeshVertices,
+    uint32_t numSrcMeshFaces,
+    const McDouble* pNormalVector,
+    const McDouble sectionOffset,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false);
+
 extern "C" void get_connected_components_impl(
     const McContext context,
     const McConnectedComponentType connectedComponentType,

@@ -984,6 +984,20 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces);
 
+extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatchPlanarSection(
+    const McContext context,
+    McFlags dispatchFlags,
+    const McVoid* pSrcMeshVertices,
+    const uint32_t* pSrcMeshFaceIndices,
+    const uint32_t* pSrcMeshFaceSizes,
+    uint32_t numSrcMeshVertices,
+    uint32_t numSrcMeshFaces,
+    const McDouble* pNormalVector,
+    const McDouble sectionOffset,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent);
+
 /**
  * @brief Return the value of a selected parameter.
  *

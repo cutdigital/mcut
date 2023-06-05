@@ -193,7 +193,7 @@ void debug_message_control_impl(
     // for each possible "source" flag
     for (auto i : { MC_DEBUG_SOURCE_API, MC_DEBUG_SOURCE_KERNEL }) {
         if (sourceBitfieldParam & i) { // was it set/included by the user (to be enabled/disabled)?
-            int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i); // get position of bit representing current "source" flag
+            int n = trailing_zeroes(MC_DEBUG_SOURCE_ALL & i); // get coords of bit representing current "source" flag
             if (enabled) { // does the user want to enabled this information (from being logged in the debug callback function)
                 context_ptr->dbgCallbackBitfieldSource = set_bit(context_ptr->dbgCallbackBitfieldSource, n);
             } else { // ... user wants to disable this information
@@ -302,7 +302,7 @@ void get_info_impl(
             memcpy(pMem, reinterpret_cast<const McConnectedComponentFaceWindingOrder*>(&wo), sizeof(McConnectedComponentFaceWindingOrder));
         }
     } break;
-    
+
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -325,9 +325,9 @@ void bind_state_impl(
     case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT: {
         McDouble value;
         memcpy(&value, pMem, bytes);
-        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general position enforcement constant set to " + std::to_string(value));
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general coords enforcement constant set to " + std::to_string(value));
         if (value <= 0) {
-            throw std::invalid_argument("invalid general position enforcement constant");
+            throw std::invalid_argument("invalid general coords enforcement constant");
         }
         context_ptr->set_general_position_enforcement_constant(value);
 
@@ -335,25 +335,24 @@ void bind_state_impl(
     case MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS: {
         McUint32 value;
         memcpy(&value, pMem, bytes);
-        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general position enforcement attempts set to " + std::to_string(value));
+        context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "general coords enforcement attempts set to " + std::to_string(value));
         if (value < 1) {
-            throw std::invalid_argument("invalid general position enforcement attempts -> " + std::to_string(value));
+            throw std::invalid_argument("invalid general coords enforcement attempts -> " + std::to_string(value));
         }
         context_ptr->set_general_position_enforcement_attempts(value);
 
     } break;
-    case MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER:
-    {
+    case MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER: {
         McConnectedComponentFaceWindingOrder value;
         memcpy(&value, pMem, bytes);
         context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "winding-order set to " + std::to_string(value));
 
-         if (value !=  McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN && //
-            value != McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED ) {
+        if (value != McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN && //
+            value != McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED) {
             throw std::invalid_argument("invalid winding-order param value");
         }
         context_ptr->set_connected_component_winding_order(value);
-    }break;
+    } break;
     default:
         throw std::invalid_argument("unknown info parameter");
         break;
@@ -374,16 +373,15 @@ void create_user_event_impl(McEvent* eventHandle, McContext context)
 
     std::shared_ptr<event_t> user_event_ptr = std::shared_ptr<event_t>(new event_t(
         reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed)),
-        McCommandType::MC_COMMAND_USER
-    ));
+        McCommandType::MC_COMMAND_USER));
 
     MCUT_ASSERT(user_event_ptr != nullptr);
 
     g_events.push_front(user_event_ptr);
 
-    //user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+    // user_event_ptr->m_user_handle = reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
     user_event_ptr->m_profiling_enabled = (context_ptr->get_flags() & MC_PROFILING_ENABLE) != 0;
-    //user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
+    // user_event_ptr->m_command_type = McCommandType::MC_COMMAND_USER;
     user_event_ptr->m_context = context;
     user_event_ptr->m_responsible_thread_id = 0; // initialized but unused for user event
 
@@ -635,6 +633,193 @@ void dispatch_impl(
                         pCutMeshFaceSizes,
                         numCutMeshVertices,
                         numCutMeshFaces);
+                }
+            }
+        });
+
+    MCUT_ASSERT(pEvent != nullptr);
+
+    *pEvent = event_handle;
+}
+
+template <typename T>
+T clamp(const T& n, const T& lower, const T& upper) {
+    return std::max(lower, std::min(n, upper));
+}
+
+void generate_plane_from_mesh_vertices(
+    std::vector<McDouble>& plane_quad_vertices,
+    std::vector<McIndex>& plane_quad_tri_indices,
+    McFlags dispatchFlags,
+    const McVoid* pMeshVertices,
+    uint32_t numMeshVertices,
+    const McDouble* pNormalVector,
+    const McDouble sectionOffset, const McDouble eps)
+{
+    const bool have_double = (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) != 0;
+    const std::size_t flt_size = (have_double ? sizeof(double) : sizeof(float));
+    const vec3 n = normalize(vec3(pNormalVector[0], pNormalVector[1], pNormalVector[2]));
+    
+    double proj_min = 1e10;
+    double proj_max = -proj_min;
+
+    // bbox
+    vec3 bbox_min(1e10);
+    vec3 bbox_max(-1e10);
+    
+    vec3 most_min_vertex_pos; // ... along given normal vector 
+    vec3 most_max_vertex_pos;
+
+    for (uint32_t i = 0; i < numMeshVertices; ++i) {
+
+        const McChar* vptr = ((McChar*)pMeshVertices) + (flt_size * 3);
+        vec3 coords;
+        
+        for (uint32_t j = 0; j < 3; ++j) {
+
+            double coord;
+            
+            if (have_double) {
+                memcpy(&coord, vptr + (j * flt_size), flt_size);
+            } else {
+                float tmp;
+                memcpy(&tmp, vptr + (j * flt_size), flt_size);
+                coord = tmp;
+            }
+
+            bbox_min[i] = std::min(bbox_min[i], coord);
+            bbox_max[i] = std::max(bbox_max[i], coord);
+
+            coords[i] = coord;
+        }
+
+        const double dot = dot_product(n, coords);
+
+        if (dot < proj_min) {
+            most_min_vertex_pos = coords;
+            proj_min = dot;
+        }
+
+        if (dot > proj_max) {
+            most_max_vertex_pos = coords;
+            proj_max = dot;
+        }
+    }
+
+    const double bbox_diag = length(bbox_max - bbox_min);
+    const double max_span = length(most_max_vertex_pos - most_min_vertex_pos);
+    const double alpha = clamp(sectionOffset, eps, 1.0-eps);
+    const double shiftby = (alpha * max_span);
+    const vec3 plane_center = most_min_vertex_pos + (n * shiftby);
+
+    double largest_comp_value = -1e10;
+    uint32_t largest_comp_idx = 0;
+
+    for (uint32_t i = 0; i < 3; ++i) {
+        double comp = n[i];
+        if (std::fabs(comp) > largest_comp_value) {
+            largest_comp_idx = i;
+        }
+    }
+
+    vec3 w(0.0);
+    w[largest_comp_idx] = 1.0;
+
+    const vec3 u = cross_product(n, w);
+    const vec3 v = cross_product(n, u);
+
+    const vec3 quad_vertex0 = plane_center + (u * bbox_diag * 0.5);
+    const vec3 quad_vertex1 = plane_center + (v * bbox_diag * 0.5);
+    const vec3 quad_vertex2 = plane_center - (u * bbox_diag * 0.5);
+    const vec3 quad_vertex3 = plane_center - (v * bbox_diag * 0.5);
+
+    plane_quad_vertices.resize(12);
+
+    uint32_t counter = 0;
+    for (uint32_t i = 0; i < 3; ++i) {
+        plane_quad_vertices[counter++] = quad_vertex0[i];
+    }
+
+    for (uint32_t i = 0; i < 3; ++i) {
+        plane_quad_vertices[counter++] = quad_vertex1[i];
+    }
+
+    for (uint32_t i = 0; i < 3; ++i) {
+        plane_quad_vertices[counter++] = quad_vertex2[i];
+    }
+
+    for (uint32_t i = 0; i < 3; ++i) {
+        plane_quad_vertices[counter++] = quad_vertex3[i];
+    }
+
+    plane_quad_tri_indices.resize(6);
+
+    plane_quad_tri_indices[0] = 0;
+    plane_quad_tri_indices[1] = 1;
+    plane_quad_tri_indices[2] = 2;
+
+    plane_quad_tri_indices[0] = 0;
+    plane_quad_tri_indices[1] = 2;
+    plane_quad_tri_indices[2] = 3;
+}
+
+void dispatch_planar_section_impl(
+    McContext context,
+    McFlags flags,
+    const McVoid* pSrcMeshVertices,
+    const uint32_t* pSrcMeshFaceIndices,
+    const uint32_t* pSrcMeshFaceSizes,
+    uint32_t numSrcMeshVertices,
+    uint32_t numSrcMeshFaces,
+    const McDouble* pNormalVector,
+    const McDouble sectionOffset,
+    uint32_t numEventsInWaitlist,
+    const McEvent* pEventWaitList,
+    McEvent* pEvent) noexcept(false)
+{
+    std::shared_ptr<context_t> context_ptr = g_contexts.find_first_if([=](const std::shared_ptr<context_t> cptr) { return cptr->m_user_handle == context; });
+
+    if (context_ptr == nullptr) {
+        throw std::invalid_argument("invalid context");
+    }
+
+    std::weak_ptr<context_t> context_weak_ptr(context_ptr);
+
+    // submit the dispatch call to be executed asynchronously and return the future
+    // object that will be waited on as an event
+    const McEvent event_handle = context_ptr->prepare_and_submit_API_task(
+        MC_COMMAND_DISPATCH, numEventsInWaitlist, pEventWaitList,
+        [=]() {
+            if (!context_weak_ptr.expired()) {
+                std::shared_ptr<context_t> context = context_weak_ptr.lock();
+                if (context) {
+                    std::vector<McDouble> plane_quad_vertices;
+                    std::vector<McIndex> plane_quad_tri_indices;
+                    
+                    // TODO: I should probably cache the plane (using the normal as lookup value)
+                    generate_plane_from_mesh_vertices(
+                        plane_quad_vertices,
+                        plane_quad_tri_indices,
+                        flags,
+                        pSrcMeshVertices,
+                        numSrcMeshVertices,
+                        pNormalVector,
+                        sectionOffset, 
+                        context->get_general_position_enforcement_constant());
+
+                    preproc(
+                        context,
+                        flags,
+                        pSrcMeshVertices,
+                        pSrcMeshFaceIndices,
+                        pSrcMeshFaceSizes,
+                        numSrcMeshVertices,
+                        numSrcMeshFaces,
+                        (McVoid*)&plane_quad_vertices[0],
+                        (McIndex*)&plane_quad_tri_indices[0],
+                        nullptr,
+                        4,
+                        2);
                 }
             }
         });
@@ -1001,245 +1186,240 @@ void triangulate_face(
             // vector along incident edge, pointing from current to next vertex (NOTE: counter-clockwise dir, normal)
             const vec2 to_next = next_vtx_coords - perturbed_dvertex_coords;
 
-
             //
-            // There is a rare case in which MCUT will produce a CC from complete (not partial)! cut where at least 
+            // There is a rare case in which MCUT will produce a CC from complete (not partial)! cut where at least
             // one face will be defined by a list of vertices such that this list contains
             // two vertices with exactly the same coordinates (due to limitation of floating point precision e.g. after shewchuk predicates in kernel)
             //
             // In such a case, we "break the tie" by shifting "perturbed_dvertex_id" halfway
-            // along the vector running from "perturbed_dvertex_id" to "next_vtx_id", 
-            // if "perturbed_dvertex_id" and "next_vtx_id" are the duplicates. Otherwise, we shift 
+            // along the vector running from "perturbed_dvertex_id" to "next_vtx_id",
+            // if "perturbed_dvertex_id" and "next_vtx_id" are the duplicates. Otherwise, we shift
             // "perturbed_dvertex_id" halfway
-            // along the vector running from "perturbed_dvertex_id" to "prev_vtx_id", 
+            // along the vector running from "perturbed_dvertex_id" to "prev_vtx_id",
             // if instead "perturbed_dvertex_id" and "prev_vtx_id" are the duplicates.
             //
             // It remains possible that next_vtx_id+1 (prev_vtx_id-1) may also be duplicates, in which
             // case we should just throw our hands up and bail (can be fixed but too hard and rare to justify the effort)
-            // 
+            //
             // These issue can generally be avoided if the input meshes resemble a uniform triangulation
-            const bool same_as_prev = ((uint32_t)other_dvertex_id  == prev_vtx_id);
+            const bool same_as_prev = ((uint32_t)other_dvertex_id == prev_vtx_id);
             const bool same_as_next = (next_vtx_id == (uint32_t)other_dvertex_id);
-            const bool have_adjacent_duplicates = same_as_prev ||  same_as_next;
-            
-            if(have_adjacent_duplicates)
-            {
-                //const bool same_as_prev = std::abs(idx_dist_to_prev)==1;
+            const bool have_adjacent_duplicates = same_as_prev || same_as_next;
+
+            if (have_adjacent_duplicates) {
+                // const bool same_as_prev = std::abs(idx_dist_to_prev)==1;
                 const vec2& shiftby = (same_as_prev) ? to_next : to_prev;
-                //if(same_as_prev)
+                // if(same_as_prev)
                 //{
-                //    shiftby = to_next;
-                //}
-                //else{ /// then we have "std::abs(idx_dist_to_next) ==1"
-                //    shiftby = to_prev;
-                //}
+                //     shiftby = to_next;
+                // }
+                // else{ /// then we have "std::abs(idx_dist_to_next) ==1"
+                //     shiftby = to_prev;
+                // }
 
                 perturbed_dvertex_coords = perturbed_dvertex_coords + (shiftby * 0.5);
-            }
-            else{ // case of partial cut
+            } else { // case of partial cut
 
-            
-            // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
-            // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
-            // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
-            const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
-            const sign_t orient2d_sgn = sign(orient2d_res);
+                // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
+                // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
+                // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
+                const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
+                const sign_t orient2d_sgn = sign(orient2d_res);
 
-            const double to_prev_sqr_len = squared_length(to_prev);
-            const double to_next_sqr_len = squared_length(to_next);
+                const double to_prev_sqr_len = squared_length(to_prev);
+                const double to_next_sqr_len = squared_length(to_next);
 
-            //
-            // Now we must determine which side is the perturbation_vector must be
-            // pointing. i.e. the side of "perturbed_dvertex_coords" or the side
-            // of its duplicate
-            //
-            // NOTE: this is only really necessary if the partially cut polygon
-            // Has more that 3 intersection points (i.e. more than the case of
-            // one tip, and two duplicates)
-            //
-
-            const int32_t flip = (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) ? -1 : 1;
-
-            //
-            // Compute the perturbation vector as the average of the two incident edges eminating
-            // from the current vertex. NOTE: This perturbation vector should generally point in
-            // the direction of the polygon-interior (i.e. analogous to pushing the polygon at
-            // the location represented by perturbed_dvertex_coords) to cause a minute dent due to small
-            // loss of area.
-            // Normalization happens below
-            vec2 perturbation_vector = ((to_prev + to_next) / 2.0) * flip;
-
-            // "orient2d()" is exact in the sense that it can depend on computations with numbers
-            // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
-            // that this threshold is too "small" a number for us to be able to reliably compute
-            // stuff with the result of "orient2d()" that is near this threshold.
-            const double errbound = 1e-2;
-
-            // We use "errbound", rather than "orient2d_res", to determine if the incident edges
-            // are parallel to give us sufficient room of numerical-precision to reliably compute
-            // the perturbation vector.
-            // In general, if the incident edges are not parallel then the perturbation vector
-            // is computed as the mean of "to_prev" and "to_next". Thus, being "too close"
-            // (within some threshold) to the edges being parallel, can induce unpredicatable
-            // numerical instabilities, where the mean-vector will be too close to the zero-vector
-            // and can complicate the task of perturbation.
-            const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
-
-            if (incident_edges_are_parallel) {
                 //
-                // pick the shortest of the two incident edges and compute the
-                // orthogonal perturbation vector as the counter-clockwise rotation
-                // of this shortest incident edge.
+                // Now we must determine which side is the perturbation_vector must be
+                // pointing. i.e. the side of "perturbed_dvertex_coords" or the side
+                // of its duplicate
+                //
+                // NOTE: this is only really necessary if the partially cut polygon
+                // Has more that 3 intersection points (i.e. more than the case of
+                // one tip, and two duplicates)
                 //
 
-                // flip sign so that the edge is in the CCW dir by pointing from "prev" to "cur"
-                vec2 edge_vec(-to_prev.x(), -to_prev.y());
+                const int32_t flip = (orient2d_sgn == sign_t::ON_NEGATIVE_SIDE) ? -1 : 1;
 
-                if (to_prev_sqr_len > to_next_sqr_len) {
-                    edge_vec = to_next; // pick shortest (NOTE: "to_next" is already in CCW dir)
-                }
+                //
+                // Compute the perturbation vector as the average of the two incident edges eminating
+                // from the current vertex. NOTE: This perturbation vector should generally point in
+                // the direction of the polygon-interior (i.e. analogous to pushing the polygon at
+                // the location represented by perturbed_dvertex_coords) to cause a minute dent due to small
+                // loss of area.
+                // Normalization happens below
+                vec2 perturbation_vector = ((to_prev + to_next) / 2.0) * flip;
 
-                // rotate the selected edge by 90 degrees
-                const vec2 edge_vec_rotated90(-edge_vec.y(), edge_vec.x());
+                // "orient2d()" is exact in the sense that it can depend on computations with numbers
+                // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
+                // that this threshold is too "small" a number for us to be able to reliably compute
+                // stuff with the result of "orient2d()" that is near this threshold.
+                const double errbound = 1e-2;
 
-                perturbation_vector = edge_vec_rotated90;
-            }
+                // We use "errbound", rather than "orient2d_res", to determine if the incident edges
+                // are parallel to give us sufficient room of numerical-precision to reliably compute
+                // the perturbation vector.
+                // In general, if the incident edges are not parallel then the perturbation vector
+                // is computed as the mean of "to_prev" and "to_next". Thus, being "too close"
+                // (within some threshold) to the edges being parallel, can induce unpredicatable
+                // numerical instabilities, where the mean-vector will be too close to the zero-vector
+                // and can complicate the task of perturbation.
+                const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
 
-            const vec2 perturbation_dir = normalize(perturbation_vector);
+                if (incident_edges_are_parallel) {
+                    //
+                    // pick the shortest of the two incident edges and compute the
+                    // orthogonal perturbation vector as the counter-clockwise rotation
+                    // of this shortest incident edge.
+                    //
 
-            //
-            // Compute the maximum length between any two vertices in "cc_face_iter" as the
-            // largest length between any two vertices.
-            //
-            // This will be used to scale "perturbation_dir" so that we find the
-            // closest edge (from "perturbed_dvertex_coords") that is intersected by this ray.
-            // We will use the resulting information to determine the amount by-which
-            // "perturbed_dvertex_coords" is to be perturbed.
-            //
+                    // flip sign so that the edge is in the CCW dir by pointing from "prev" to "cur"
+                    vec2 edge_vec(-to_prev.x(), -to_prev.y());
 
-            // largest squared length between any two vertices in "cc_face_iter"
-            double largest_sqrd_length = -1.0;
-
-            for (uint32_t i = 0; i < cc_face_vcount; ++i) {
-
-                const vec2& a = SAFE_ACCESS(cc_face_vcoords2d, i);
-
-                for (uint32_t j = 0; j < cc_face_vcount; ++j) {
-
-                    if (i == j) {
-                        continue; // skip -> comparison is redundant
+                    if (to_prev_sqr_len > to_next_sqr_len) {
+                        edge_vec = to_next; // pick shortest (NOTE: "to_next" is already in CCW dir)
                     }
 
-                    const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
+                    // rotate the selected edge by 90 degrees
+                    const vec2 edge_vec_rotated90(-edge_vec.y(), edge_vec.x());
 
-                    const double sqrd_length = squared_length(b - a);
-                    largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
+                    perturbation_vector = edge_vec_rotated90;
                 }
-            }
 
-            //
-            // construct the segment with-which will will find the closest
-            // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
-            //
+                const vec2 perturbation_dir = normalize(perturbation_vector);
 
-            const double shift_len = std::sqrt(largest_sqrd_length);
-            const vec2 shift = perturbation_dir * shift_len;
+                //
+                // Compute the maximum length between any two vertices in "cc_face_iter" as the
+                // largest length between any two vertices.
+                //
+                // This will be used to scale "perturbation_dir" so that we find the
+                // closest edge (from "perturbed_dvertex_coords") that is intersected by this ray.
+                // We will use the resulting information to determine the amount by-which
+                // "perturbed_dvertex_coords" is to be perturbed.
+                //
 
-            vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
+                // largest squared length between any two vertices in "cc_face_iter"
+                double largest_sqrd_length = -1.0;
 
-            {
-                struct {
-                    vec2 start;
-                    vec2 end;
-                } segment;
-                segment.start = perturbed_dvertex_coords;
-                segment.end = perturbed_dvertex_coords + shift;
+                for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
-                // test segment against all edges to find closest intersection point
+                    const vec2& a = SAFE_ACCESS(cc_face_vcoords2d, i);
 
-                double segment_min_tval = 1.0;
+                    for (uint32_t j = 0; j < cc_face_vcount; ++j) {
 
-                // for each edge of face to be triangulated (number of vertices == number of edges)
-                for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
-                    const std::uint32_t edge_start_idx = i;
-                    const std::uint32_t edge_end_idx = (i + 1) % cc_face_vcount;
-
-                    if ((edge_start_idx == (uint32_t)perturbed_dvertex_id || edge_end_idx == (uint32_t)perturbed_dvertex_id) || //
-                        (edge_start_idx == (uint32_t)other_dvertex_id || edge_end_idx == (uint32_t)other_dvertex_id)) {
-                        continue; // impossible to properly intersect incident edges
-                    }
-
-                    const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
-                    const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
-
-                    double segment_tval; // parameter along segment
-                    double edge_tval; // parameter along current edge
-                    vec2 ipoint; // intersection point between segment and current edge
-
-                    const char result = compute_segment_intersection(
-                        segment.start, segment.end, edge_start_coords, edge_end_coords,
-                        ipoint, segment_tval, edge_tval);
-
-                    if (result == '1' && segment_min_tval > segment_tval) { // we have an clear intersection point
-                        segment_min_tval = segment_tval;
-                        intersection_point_on_edge = ipoint;
-                    } else if (
-                        // segment and edge are collinear
-                        result == 'e' ||
-                        // segment and edge are collinear, or one entity cuts through the vertex of the other
-                        result == 'v') {
-                        // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
-
-                        // length from segment start to the start of edge
-                        const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
-                        // length from segment start to the end of edge
-                        const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
-
-                        // length from start of segment to either start of edge or end of edge (depending on which is closer)
-                        double sqr_dist_to_closest = sqr_dist_to_edge_start;
-                        const vec2* ipoint_ptr = &edge_start_coords;
-
-                        if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
-                            sqr_dist_to_closest = sqr_dist_to_edge_end;
-                            ipoint_ptr = &edge_end_coords;
+                        if (i == j) {
+                            continue; // skip -> comparison is redundant
                         }
 
-                        // ratio along segment
-                        segment_tval = std::sqrt(sqr_dist_to_closest) / shift_len;
+                        const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
 
-                        if (segment_min_tval > segment_tval) {
+                        const double sqrd_length = squared_length(b - a);
+                        largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
+                    }
+                }
+
+                //
+                // construct the segment with-which will will find the closest
+                // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
+                //
+
+                const double shift_len = std::sqrt(largest_sqrd_length);
+                const vec2 shift = perturbation_dir * shift_len;
+
+                vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
+
+                {
+                    struct {
+                        vec2 start;
+                        vec2 end;
+                    } segment;
+                    segment.start = perturbed_dvertex_coords;
+                    segment.end = perturbed_dvertex_coords + shift;
+
+                    // test segment against all edges to find closest intersection point
+
+                    double segment_min_tval = 1.0;
+
+                    // for each edge of face to be triangulated (number of vertices == number of edges)
+                    for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
+                        const std::uint32_t edge_start_idx = i;
+                        const std::uint32_t edge_end_idx = (i + 1) % cc_face_vcount;
+
+                        if ((edge_start_idx == (uint32_t)perturbed_dvertex_id || edge_end_idx == (uint32_t)perturbed_dvertex_id) || //
+                            (edge_start_idx == (uint32_t)other_dvertex_id || edge_end_idx == (uint32_t)other_dvertex_id)) {
+                            continue; // impossible to properly intersect incident edges
+                        }
+
+                        const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
+                        const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
+
+                        double segment_tval; // parameter along segment
+                        double edge_tval; // parameter along current edge
+                        vec2 ipoint; // intersection point between segment and current edge
+
+                        const char result = compute_segment_intersection(
+                            segment.start, segment.end, edge_start_coords, edge_end_coords,
+                            ipoint, segment_tval, edge_tval);
+
+                        if (result == '1' && segment_min_tval > segment_tval) { // we have an clear intersection point
                             segment_min_tval = segment_tval;
-                            intersection_point_on_edge = *ipoint_ptr; // closest point
+                            intersection_point_on_edge = ipoint;
+                        } else if (
+                            // segment and edge are collinear
+                            result == 'e' ||
+                            // segment and edge are collinear, or one entity cuts through the vertex of the other
+                            result == 'v') {
+                            // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
+
+                            // length from segment start to the start of edge
+                            const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
+                            // length from segment start to the end of edge
+                            const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
+
+                            // length from start of segment to either start of edge or end of edge (depending on which is closer)
+                            double sqr_dist_to_closest = sqr_dist_to_edge_start;
+                            const vec2* ipoint_ptr = &edge_start_coords;
+
+                            if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
+                                sqr_dist_to_closest = sqr_dist_to_edge_end;
+                                ipoint_ptr = &edge_end_coords;
+                            }
+
+                            // ratio along segment
+                            segment_tval = std::sqrt(sqr_dist_to_closest) / shift_len;
+
+                            if (segment_min_tval > segment_tval) {
+                                segment_min_tval = segment_tval;
+                                intersection_point_on_edge = *ipoint_ptr; // closest point
+                            }
                         }
                     }
+
+                    MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
                 }
 
-                MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
-            }
-            
+                // Shortened perturbation vector: shortening from the vector that is as long as the
+                // max length between any two vertices in "cc_face_iter", to a vector that runs
+                // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
+                // "perturbation_vector" and passing through the interior of "cc_face_iter")
+                const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
+                const double revised_perturbation_len = length(revised_perturbation_vector);
 
-            // Shortened perturbation vector: shortening from the vector that is as long as the
-            // max length between any two vertices in "cc_face_iter", to a vector that runs
-            // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
-            // "perturbation_vector" and passing through the interior of "cc_face_iter")
-            const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
-            const double revised_perturbation_len = length(revised_perturbation_vector);
+                const double scale = (errbound * revised_perturbation_len);
+                // The translation by which we perturb "perturbed_dvertex_coords"
+                //
+                // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
+                // "displacement" is by-default pointing in the positive/CCW direction, which is torward
+                // the interior of the polygon represented by "cc_face_iter".
+                // Thus, the cases with "orient2d_sgn == sign_t::ON_POSITIVE_SIDE" and
+                // "orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY", result in the same displacement vector
+                const vec2 displacement = (perturbation_dir * scale);
 
-            const double scale = (errbound * revised_perturbation_len);
-            // The translation by which we perturb "perturbed_dvertex_coords"
-            //
-            // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
-            // "displacement" is by-default pointing in the positive/CCW direction, which is torward
-            // the interior of the polygon represented by "cc_face_iter".
-            // Thus, the cases with "orient2d_sgn == sign_t::ON_POSITIVE_SIDE" and
-            // "orient2d_sgn == sign_t::ON_ORIENTED_BOUNDARY", result in the same displacement vector
-            const vec2 displacement = (perturbation_dir * scale);
+                // perturb
+                perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
 
-            // perturb
-            perturbed_dvertex_coords = perturbed_dvertex_coords + displacement;
-
-            //} // for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
-            }// if(have_adjacent_duplicates)
+                //} // for (std::uint32_t dv_iter = 0; dv_iter < 2; ++dv_iter) {
+            } // if(have_adjacent_duplicates)
         } // for (std::vector<std::size_t>::const_iterator duplicate_vpair_iter = duplicates_info_pre.duplicates.cbegin(); ...
     } // if (have_duplicates) {
 
@@ -1882,8 +2062,8 @@ void get_connected_component_data_impl_detail(
                 std::vector<uint32_t> partial_sum_vec = cc_uptr->face_sizes_cache; // copy
 
                 parallel_partial_sum(context_ptr->get_shared_compute_threadpool(), partial_sum_vec.begin(), partial_sum_vec.end());
-                const bool flip_winding_order =  context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
-                    
+                const bool flip_winding_order = context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
+
                 //
                 // step 3
                 //
@@ -1902,7 +2082,7 @@ void get_connected_component_data_impl_detail(
 
                     std::vector<vd_t> vertices_around_face; // tmp to prevent reallocations
                     vertices_around_face.reserve(3);
-                        
+
                     for (face_array_iterator_t f_iter = block_start_; f_iter != block_end_; ++f_iter) {
 
                         vertices_around_face.clear();
@@ -1911,10 +2091,9 @@ void get_connected_component_data_impl_detail(
 
                         MCUT_ASSERT(num_vertices_around_face >= 3u);
 
-                        if(flip_winding_order)
-                        {
+                        if (flip_winding_order) {
                             // for each vertex in face
-                            for (int32_t i = (num_vertices_around_face-1); i >= (int32_t)0; --i) {
+                            for (int32_t i = (num_vertices_around_face - 1); i >= (int32_t)0; --i) {
                                 const uint32_t vertex_idx = (uint32_t)SAFE_ACCESS(vertices_around_face, i);
                                 *(casted_ptr + index_arr_offset) = vertex_idx;
                                 ++index_arr_offset;
@@ -1923,9 +2102,7 @@ void get_connected_component_data_impl_detail(
                                     break;
                                 }
                             }
-                        }
-                        else
-                        {
+                        } else {
                             // for each vertex in face
                             for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
                                 const uint32_t vertex_idx = (uint32_t)SAFE_ACCESS(vertices_around_face, i);
@@ -1952,8 +2129,7 @@ void get_connected_component_data_impl_detail(
             std::vector<vd_t> cc_face_vertices;
             uint32_t elem_offset = 0;
 
-            const bool flip_winding_order =  context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
-                 
+            const bool flip_winding_order = context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
 
             for (face_array_iterator_t fiter = cc_uptr->kernel_hmesh_data->mesh->faces_begin(); fiter != cc_uptr->kernel_hmesh_data->mesh->faces_end(); ++fiter) {
 
@@ -1963,9 +2139,8 @@ void get_connected_component_data_impl_detail(
 
                 MCUT_ASSERT(num_vertices_around_face >= 3u);
 
-                if(flip_winding_order)
-                {
-                    for (int32_t i = (int32_t)(num_vertices_around_face-1); i >= 0; --i) {
+                if (flip_winding_order) {
+                    for (int32_t i = (int32_t)(num_vertices_around_face - 1); i >= 0; --i) {
                         const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
                         *(casted_ptr + elem_offset) = vertex_idx;
                         ++elem_offset;
@@ -1974,9 +2149,7 @@ void get_connected_component_data_impl_detail(
                             break;
                         }
                     }
-                }
-                else
-                {
+                } else {
                     for (uint32_t i = 0; i < num_vertices_around_face; ++i) {
                         const uint32_t vertex_idx = (uint32_t)cc_face_vertices[i];
                         *(casted_ptr + elem_offset) = vertex_idx;
@@ -2893,7 +3066,7 @@ void get_connected_component_data_impl_detail(
                                         const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
                                             internal_inputmesh_face_idx,
                                             cc_uptr);
-                                            MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
+                                        MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
                                         cdt_face_map_cache_local.push_back(user_inputmesh_face_idx);
                                     }
                                 }
@@ -2999,8 +3172,7 @@ void get_connected_component_data_impl_detail(
 
                     triangulate_face(cc_face_triangulation, context_ptr, cc_face_vcount, cc_face_vertices, cc.get()[0], *cc_face_iter);
 
-                    if(cc_face_triangulation.empty() == false)
-                    {
+                    if (cc_face_triangulation.empty() == false) {
                         //
                         // Change local triangle indices to global index values (in CC) and save
                         //
@@ -3075,16 +3247,12 @@ void get_connected_component_data_impl_detail(
 
                 const bool flip_winding_order = context_ptr->get_connected_component_winding_order() == McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_REVERSED;
 
-                if(flip_winding_order)
-                {
+                if (flip_winding_order) {
                     const uint32_t n = (uint32_t)cc_uptr->cdt_index_cache.size();
-                    for (uint32_t i=0; i < n; ++i)
-                    {
-                        ((uint32_t*)pMem)[n-1-i] = cc_uptr->cdt_index_cache[i];
+                    for (uint32_t i = 0; i < n; ++i) {
+                        ((uint32_t*)pMem)[n - 1 - i] = cc_uptr->cdt_index_cache[i];
                     }
-                }   
-                else
-                {
+                } else {
                     memcpy(pMem, reinterpret_cast<McVoid*>(cc_uptr->cdt_index_cache.data()), bytes);
                 }
             }
