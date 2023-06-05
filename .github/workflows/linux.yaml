@@ -13,15 +13,6 @@ jobs:
         multithreading: [ON,OFF]
         os: [ubuntu-latest]
         include:
-          - cxx: g++-8
-            build_type: Debug
-            std: 14
-            install: sudo apt install g++-8
-            os: ubuntu-18.04
-          - cxx: g++-10
-            build_type: Debug
-            std: 17
-            os: ubuntu-18.04
           - cxx: g++-11
             build_type: Debug
             std: 20
