@@ -614,7 +614,9 @@ MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatchPlanarSection(
         per_thread_api_log_str = "invalid source-mesh vertex count";
     } else if (pNormalVector == nullptr) {
         per_thread_api_log_str = "normal vector ptr undef (NULL)";
-    } else if (sectionOffset == 0) {
+    } else if (pNormalVector[0] == 0.0 && pNormalVector[1] == 0.0 && pNormalVector[2] == 0.0) {
+        per_thread_api_log_str = "invalid normal vector (zero vector)";
+    }else if (sectionOffset <= 0 && sectionOffset >= 1.0) {
         per_thread_api_log_str = "invalid section offset parameter";
     } else if (pEventWaitList == nullptr && numEventsInWaitlist > 0) {
         per_thread_api_log_str = "invalid event waitlist ptr (NULL)";

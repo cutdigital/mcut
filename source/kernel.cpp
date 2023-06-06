@@ -1482,7 +1482,7 @@ void update_neighouring_ps_iface_m0_edge_list(
 typedef std::vector<hd_t> traced_polygon_t;
 
 bool mesh_is_closed(
-#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     thread_pool& scheduler,
 #endif
     const hmesh_t& mesh)
@@ -1585,7 +1585,7 @@ void dispatch(output_t& output, const input_t& input)
 
     TIMESTACK_PUSH("Check source mesh is closed");
     const bool sm_is_watertight = mesh_is_closed(
-#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         *input.scheduler,
 #endif
         sm);
@@ -1594,7 +1594,7 @@ void dispatch(output_t& output, const input_t& input)
 
     TIMESTACK_PUSH("Check cut mesh is closed");
     const bool cm_is_watertight = mesh_is_closed(
-#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+#if 0// defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
         *input.scheduler,
 #endif
         cs);

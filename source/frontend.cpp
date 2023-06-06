@@ -643,56 +643,68 @@ void dispatch_impl(
 }
 
 template <typename T>
-T clamp(const T& n, const T& lower, const T& upper) {
+T clamp(const T& n, const T& lower, const T& upper)
+{
     return std::max(lower, std::min(n, upper));
 }
 
-void generate_plane_from_mesh_vertices(
-    std::vector<McDouble>& plane_quad_vertices,
-    std::vector<McIndex>& plane_quad_tri_indices,
+void generate_supertriangle_from_mesh_vertices(
+    std::vector<McChar>& supertriangle_vertices,
+    std::vector<McIndex>& supertriangle_indices,
     McFlags dispatchFlags,
     const McVoid* pMeshVertices,
     uint32_t numMeshVertices,
     const McDouble* pNormalVector,
     const McDouble sectionOffset, const McDouble eps)
 {
+    // did the user give us an array of doubles? (otherwise floats)
     const bool have_double = (dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE) != 0;
+    // size (number of bytes) of input floating point type
     const std::size_t flt_size = (have_double ? sizeof(double) : sizeof(float));
+    // normalized input normal vector
     const vec3 n = normalize(vec3(pNormalVector[0], pNormalVector[1], pNormalVector[2]));
-    
+
+    // minimum projection of mesh vertices along the normal vector
     double proj_min = 1e10;
+    // maximum projection of mesh vertices along the normal vector
     double proj_max = -proj_min;
 
-    // bbox
+    // mesh bbox extents
     vec3 bbox_min(1e10);
     vec3 bbox_max(-1e10);
-    
-    vec3 most_min_vertex_pos; // ... along given normal vector 
+
+    vec3 mean(0.0);
+
+    // mesh-vertex with the most-minimum projection onto the normal vector
+    vec3 most_min_vertex_pos;
+    // mesh-vertex with the most-maximum projection onto the normal vector
     vec3 most_max_vertex_pos;
 
-    for (uint32_t i = 0; i < numMeshVertices; ++i) {
+    for (uint32_t i = 0; i < numMeshVertices; ++i) { // for each vertex
 
-        const McChar* vptr = ((McChar*)pMeshVertices) + (flt_size * 3);
-        vec3 coords;
-        
-        for (uint32_t j = 0; j < 3; ++j) {
+        // input (raw) pointer in bytes
+        const McChar* vptr = ((McChar*)pMeshVertices) + (i * flt_size * 3);
+        vec3 coords; // coordinates of current vertex
+
+        for (uint32_t j = 0; j < 3; ++j) { // for each component
 
             double coord;
-            
+            const McChar* const srcptr = vptr + (j * flt_size);
+
             if (have_double) {
-                memcpy(&coord, vptr + (j * flt_size), flt_size);
+                memcpy(&coord, srcptr, flt_size);
             } else {
                 float tmp;
-                memcpy(&tmp, vptr + (j * flt_size), flt_size);
+                memcpy(&tmp, srcptr, flt_size);
                 coord = tmp;
             }
 
-            bbox_min[i] = std::min(bbox_min[i], coord);
-            bbox_max[i] = std::max(bbox_max[i], coord);
+            bbox_min[j] = std::min(bbox_min[j], coord);
+            bbox_max[j] = std::max(bbox_max[j], coord);
 
-            coords[i] = coord;
+            coords[j] = coord;
         }
-
+        mean = mean+coords;
         const double dot = dot_product(n, coords);
 
         if (dot < proj_min) {
@@ -705,62 +717,97 @@ void generate_plane_from_mesh_vertices(
             proj_max = dot;
         }
     }
-
+    mean = mean/numMeshVertices;
+    // length of bounding box diagonal
     const double bbox_diag = length(bbox_max - bbox_min);
+    // length from vertex with most-minimum projection to vertex with most-maximum projection
     const double max_span = length(most_max_vertex_pos - most_min_vertex_pos);
-    const double alpha = clamp(sectionOffset, eps, 1.0-eps);
+    // parameter indicating distance along the span from vertex with most-minimum projection to vertex with most-maximum projection
+    const double alpha = clamp(sectionOffset, eps, 1.0 - eps);
+    // actual distance along the span from vertex with most-minimum projection to vertex with most-maximum projection
     const double shiftby = (alpha * max_span);
-    const vec3 plane_center = most_min_vertex_pos + (n * shiftby);
 
-    double largest_comp_value = -1e10;
-    uint32_t largest_comp_idx = 0;
+    const vec3 centroid = most_min_vertex_pos + (n * shiftby);
+
+    // absolute value of the largest component of the normal vector
+    double max_normal_comp_val_abs = -1e10;
+    // index of the largest component of the normal vector
+    uint32_t max_normal_comp_idx = 0;
 
     for (uint32_t i = 0; i < 3; ++i) {
-        double comp = n[i];
-        if (std::fabs(comp) > largest_comp_value) {
-            largest_comp_idx = i;
+
+        const double comp = n[i];
+        const double comp_abs = std::fabs(comp);
+
+        if (comp_abs > max_normal_comp_val_abs) {
+            max_normal_comp_idx = i;
+            max_normal_comp_val_abs = comp_abs;
         }
     }
 
     vec3 w(0.0);
-    w[largest_comp_idx] = 1.0;
+    w[max_normal_comp_idx] = 1.0;
+    if (w == n) {
+        w[max_normal_comp_idx] = 0.0;
+        w[(max_normal_comp_idx + 1) % 3] = 1.0;
+    }
 
     const vec3 u = cross_product(n, w);
     const vec3 v = cross_product(n, u);
 
-    const vec3 quad_vertex0 = plane_center + (u * bbox_diag * 0.5);
-    const vec3 quad_vertex1 = plane_center + (v * bbox_diag * 0.5);
-    const vec3 quad_vertex2 = plane_center - (u * bbox_diag * 0.5);
-    const vec3 quad_vertex3 = plane_center - (v * bbox_diag * 0.5);
+    const double mean_dot_n = dot_product(mean, n);
+    vec3 mean_on_plane = mean - n*mean_dot_n;
 
-    plane_quad_vertices.resize(12);
+    vec3 uv_pos = normalize( (u + v) );
+    vec3 uv_neg = normalize( (u - v) );
+    vec3 vertex0 = mean_on_plane + uv_pos * ( bbox_diag * 2);
+    vec3 vertex1 = mean_on_plane + uv_neg * ( bbox_diag * 2);
+    vec3 vertex2 = mean_on_plane - (normalize(uv_pos + uv_neg) * ( bbox_diag * 2));// supertriangle_origin + (u * bbox_diag * 4);
+
+    supertriangle_vertices.resize(9 * flt_size);
 
     uint32_t counter = 0;
     for (uint32_t i = 0; i < 3; ++i) {
-        plane_quad_vertices[counter++] = quad_vertex0[i];
+        void* dst = supertriangle_vertices.data() + (counter * flt_size);
+        if (have_double) {
+            memcpy(dst, &vertex0[i], flt_size);
+        } else {
+            float tmp = vertex0[i];
+            memcpy(dst, &tmp, flt_size);
+        }
+        counter++;
+        // supertriangle_vertices[counter++] = quad_vertex0[i];
     }
 
     for (uint32_t i = 0; i < 3; ++i) {
-        plane_quad_vertices[counter++] = quad_vertex1[i];
+        void* dst = supertriangle_vertices.data() + (counter * flt_size);
+        if (have_double) {
+            memcpy(dst, &vertex1[i], flt_size);
+        } else {
+            float tmp = vertex1[i];
+            memcpy(dst, &tmp, flt_size);
+        }
+        counter++;
+        // supertriangle_vertices[counter++] = quad_vertex1[i];
     }
 
     for (uint32_t i = 0; i < 3; ++i) {
-        plane_quad_vertices[counter++] = quad_vertex2[i];
+        void* dst = supertriangle_vertices.data() + (counter * flt_size);
+        if (have_double) {
+            memcpy(dst, &vertex2[i], flt_size);
+        } else {
+            float tmp = vertex2[i];
+            memcpy(dst, &tmp, flt_size);
+        }
+        counter++;
+        // supertriangle_vertices[counter++] = quad_vertex2[i];
     }
 
-    for (uint32_t i = 0; i < 3; ++i) {
-        plane_quad_vertices[counter++] = quad_vertex3[i];
-    }
+    supertriangle_indices.resize(3);
 
-    plane_quad_tri_indices.resize(6);
-
-    plane_quad_tri_indices[0] = 0;
-    plane_quad_tri_indices[1] = 1;
-    plane_quad_tri_indices[2] = 2;
-
-    plane_quad_tri_indices[0] = 0;
-    plane_quad_tri_indices[1] = 2;
-    plane_quad_tri_indices[2] = 3;
+    supertriangle_indices[0] = 0;
+    supertriangle_indices[1] = 1;
+    supertriangle_indices[2] = 2;
 }
 
 void dispatch_planar_section_impl(
@@ -793,18 +840,17 @@ void dispatch_planar_section_impl(
             if (!context_weak_ptr.expired()) {
                 std::shared_ptr<context_t> context = context_weak_ptr.lock();
                 if (context) {
-                    std::vector<McDouble> plane_quad_vertices;
-                    std::vector<McIndex> plane_quad_tri_indices;
-                    
-                    // TODO: I should probably cache the plane (using the normal as lookup value)
-                    generate_plane_from_mesh_vertices(
-                        plane_quad_vertices,
-                        plane_quad_tri_indices,
+                    std::vector<McChar> supertriangle_vertices;
+                    std::vector<McIndex> supertriangle_indices;
+
+                    generate_supertriangle_from_mesh_vertices(
+                        supertriangle_vertices,
+                        supertriangle_indices,
                         flags,
                         pSrcMeshVertices,
                         numSrcMeshVertices,
                         pNormalVector,
-                        sectionOffset, 
+                        sectionOffset,
                         context->get_general_position_enforcement_constant());
 
                     preproc(
@@ -815,11 +861,11 @@ void dispatch_planar_section_impl(
                         pSrcMeshFaceSizes,
                         numSrcMeshVertices,
                         numSrcMeshFaces,
-                        (McVoid*)&plane_quad_vertices[0],
-                        (McIndex*)&plane_quad_tri_indices[0],
+                        (McVoid*)supertriangle_vertices.data(),
+                        (McIndex*)&supertriangle_indices[0],
                         nullptr,
-                        4,
-                        2);
+                        3,
+                        1);
                 }
             }
         });

@@ -31,7 +31,7 @@
 #include "mcut/internal/utils.h"
 #include "mcut/internal/tpool.h"
 
-#define PROFILING_BUILD
+//#define PROFILING_BUILD
 
 class mini_timer {
     std::chrono::time_point<std::chrono::steady_clock> m_start;
