@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        os: [macOS-10.15, macOS-11, macOS-12]
+        os: [macos-latest]
         build_type: [Debug, Release]
         multithreading: [ON,OFF]
         include:

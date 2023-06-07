@@ -102,6 +102,23 @@ UTEST_F(BooleanOperation, selfUnionWithGeneralPositionEnforcement)
         MC_NO_ERROR);
 }
 
+// Performing a Boolean "union" operation with the same object, while allowing general
+// position enforcement (with MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE).
+UTEST_F(BooleanOperation, selfUnionWithGeneralPositionEnforcement_abs)
+{
+    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
+
+    const McFlags booleanUnionFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
+
+    ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
+                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanUnionFlags | MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE,
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+        MC_NO_ERROR);
+}
+
 // Performing a Boolean "diff(A,B)" operation.
 UTEST_F(BooleanOperation, differenceA_Not_B)
 {
