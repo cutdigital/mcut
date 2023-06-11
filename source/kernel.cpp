@@ -3320,7 +3320,7 @@ void dispatch(output_t& output, const input_t& input)
         std::vector<hd_t> // list of halfedges whose target is the intersection point
         >
         ivtx_to_incoming_hlist;
-#if 1 // used for debugging colinearity bug, which occur when we have poly with eg. > 3
+#if 0 // used for debugging colinearity bug, which occur when we have poly with eg. > 3
     // vertices where at least 3 more-or-less are colinear but exact predicate says no.
     for (std::map<pair<fd_t>, std::vector<vd_t>>::const_iterator cutpath_edge_creation_info_iter = cutpath_edge_creation_info.cbegin();
          cutpath_edge_creation_info_iter != cutpath_edge_creation_info.cend();

@@ -50,6 +50,12 @@ extern "C" {
 /** MCUT 1.0 version number */
 #define MC_API_VERSION_1_0 MC_MAKE_VERSION(1, 0, 0) // Patch version should always be set to 0
 
+/** MCUT 1.1 version number */
+#define MC_API_VERSION_1_1 MC_MAKE_VERSION(1, 1, 0) // Patch version should always be set to 0
+
+/** MCUT 1.2 version number */
+#define MC_API_VERSION_1_2 MC_MAKE_VERSION(1, 2, 0) // Patch version should always be set to 0
+
 /** Macro to decode MCUT version (MAJOR) from MC_HEADER_VERSION_COMPLETE */
 #define MC_VERSION_MAJOR(version) ((uint32_t)(version) >> 22)
 
@@ -63,7 +69,7 @@ extern "C" {
 #define MC_HEADER_VERSION 100
 
 /** Complete version of this file */
-#define MC_HEADER_VERSION_COMPLETE MC_MAKE_VERSION(1, 0, MC_HEADER_VERSION)
+#define MC_HEADER_VERSION_COMPLETE MC_MAKE_VERSION(1, 2, MC_HEADER_VERSION)
 
 /** Constant value assigned to null variables and parameters */
 #define MC_NULL_HANDLE 0
