@@ -20,23 +20,11 @@
 # Author(s)     : Floyd M. Chitalu
 #
 
-cmake_minimum_required(VERSION 3.1)
-project(mcut_tutorials)
+#get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+#project(${PROJECT_NAME})
 
-#add_subdirectory(BasicGuiApp)
-add_subdirectory(BasicCmdLineApp)
-add_subdirectory(HelloWorld)
-add_subdirectory(TextureCoordinates)
-add_subdirectory(VertexNormals)
-add_subdirectory(FaceNormals)
-add_subdirectory(CSGBoolean)
-add_subdirectory(AdjacentFaces)
-add_subdirectory(Triangulation)
-add_subdirectory(TriangulatedFaceMaps)
-add_subdirectory(EventCallback)
-add_subdirectory(MultipleContextsInParallel)
-add_subdirectory(ReversedConnectedComponentFaces)
-add_subdirectory(PlanarSectioning)
-add_subdirectory(QuerySeamVerticesUnsorted)
-add_subdirectory(QuerySeamVerticesSorted)
-
+add_executable(QuerySeamVerticesSorted QuerySeamVerticesSorted.cpp)
+target_link_libraries(QuerySeamVerticesSorted mcut ${extra_libs})
+target_include_directories(QuerySeamVerticesSorted PRIVATE ${MCUT_INCLUDE_DIR})
+target_compile_options(QuerySeamVerticesSorted PRIVATE ${compilation_flags})
+target_compile_definitions(QuerySeamVerticesSorted PRIVATE ${preprocessor_defs} -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data" -DOUTPUT_DIR="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
