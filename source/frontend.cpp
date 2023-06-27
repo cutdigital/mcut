@@ -2894,6 +2894,7 @@ void get_connected_component_data_impl_detail(
                 while (disjoint_seq_stack.empty() == false) {
 
                     std::pair<vd_t, hd_t> cur_vh_pair = disjoint_seq_stack.top();
+                    disjoint_seq_stack.pop();
 
                     const vd_t v = cur_vh_pair.first; // vertex, one of whose halfedges (along the seam) is h
                     const hd_t h = cur_vh_pair.second; // halfedge whose source is v
@@ -2908,7 +2909,7 @@ void get_connected_component_data_impl_detail(
                          ++it) {
                         const hd_t incident_h = *it;
 
-                        if (incident_h == h) {
+                        if (cc->edge(incident_h) == cc->edge(h)) {
                             continue; // skip! dont want to go backwards now...
                         }
 
@@ -2931,7 +2932,7 @@ void get_connected_component_data_impl_detail(
 
                     MCUT_ASSERT(untraversed_adj_seam_vertex_count <= 1);
 
-                    // no further neighbours to wal/traverse but the stack still has seam vertices to be walked.
+                    // no further neighbours to walk/traverse but the stack still has seam vertices to be walked.
                     // This implies we have an open loop, and that we have finished finding the first disjoint part
                     // so we append vertices of the next
                     if (untraversed_adj_seam_vertex_count == 0 && !disjoint_seq_stack.empty()) {
