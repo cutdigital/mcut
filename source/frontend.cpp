@@ -2781,65 +2781,50 @@ void get_connected_component_data_impl_detail(
         const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data->seam_vertices.size();
         MCUT_ASSERT(seam_vertex_count >= 2);
 
-        // The output array computed when the user requests CC data with MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX_SEQUENCE
-        // The format of this array (of 32-bit elements) is as follows:
-        // [
-        //      <num-total-sequences>, // McIndex/uint32_t
-        //      <num-vertices-in-1st-sequence>, // McIndex/uint32_t
-        //      <1st-sequence-is-loop-flag-(McBool)>, // McBool, McIndex/uint32_t
-        //      <vertex-indices-of-1st-sequence>, // consecutive elements of McIndex
-        //      <num-vertices-in-2nd-sequence>,
-        //      <2nd-sequence-is-loop-flag-(McBool)>,
-        //      <vertex-indices-of-2nd-sequence>,
-        //      ... and so on, until last sequence
-        // ]
-        std::vector<uint32_t> seam_vertex_sequence_array; // TODO: need to cache the output array
-        McUint32 total_seq_count = 0;
-        const uint32_t total_seq_count_idx = seam_vertex_sequence_array.size();
-        MCUT_ASSERT(total_seq_count_idx == 0);
+        if (cc_uptr->seam_vertex_sequence_array_cache.empty()) {
+            std::vector<uint32_t>& seam_vertex_sequence_array = cc_uptr->seam_vertex_sequence_array_cache;
 
-        seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE); // location that we will used to store total_seq_count at the end
+            McUint32 total_seq_count = 0;
+            const uint32_t total_seq_count_idx = seam_vertex_sequence_array.size();
+            MCUT_ASSERT(total_seq_count_idx == 0);
 
-        seam_vertex_sequence_array.reserve(seam_vertex_count + 32);
-        McSize seam_vertex_sequence_array_start_offset = 1;
+            seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE); // location that we will used to store total_seq_count at the end
 
-        std::unordered_map<vd_t, bool> vertex_traversed;
-        vertex_traversed.reserve(seam_vertex_count);
-        for (uint32_t i = 0; i < seam_vertex_count; ++i) {
-            const vd_t descr = cc_uptr->kernel_hmesh_data->seam_vertices[i];
-            vertex_traversed[descr] = false;
-        }
+            seam_vertex_sequence_array.reserve(seam_vertex_count + 32);
+            McSize seam_vertex_sequence_array_start_offset = 1;
 
-        while (true) { // each iteration determines a fully-connected sequence of seam vertices
-
-            std::stack<std::pair<vd_t, hd_t>> disjoint_seq_stack; // stores the next vertices on the left and right side of seed vertex
-
-            //  find any seam vertex that is not traversed, use that as a starting point -> the "seed"
-            const std::unordered_map<vd_t, bool>::iterator seed_fiter = std::find_if( // O(n)
-                vertex_traversed.begin(),
-                vertex_traversed.end(),
-                [](const std::pair<vd_t, bool>& elem) {
-                    return elem.second == false;
-                });
-
-            if (seed_fiter == vertex_traversed.end()) { // all seam vertices have been traversed/assigned to a sequence
-                MCUT_ASSERT(seam_vertex_sequence_array.size() >= 4);
-                break; // done
+            std::unordered_map<vd_t, bool> traversed_seam_vertices;
+            traversed_seam_vertices.reserve(seam_vertex_count);
+            for (uint32_t i = 0; i < seam_vertex_count; ++i) {
+                const vd_t descr = cc_uptr->kernel_hmesh_data->seam_vertices[i];
+                traversed_seam_vertices[descr] = false;
             }
 
-            seed_fiter->second = true; // marked the seed as traversed
+            do { // each iteration determines a fully-connected sequence of seam vertices
 
-            const McSize cur_seq_size_value_idx = seam_vertex_sequence_array.size();
-            const McSize cur_seq_flag_value_idx = cur_seq_size_value_idx + 1;
+                std::stack<std::pair<vd_t, hd_t>> disjoint_seq_stack; // stores the next vertices on the left and right side of seed vertex
 
-            // seam_vertex_sequence_array_start_offset += 2; // spaces occupied by cur_seq_size_value_idx and cur_seq_flag_value_idx
-            seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE);
-            seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE);
+                //  find any seam vertex that is not traversed, use that as a starting point -> the "seed"
+                std::unordered_map<vd_t, bool>::iterator seed_fiter = std::find_if( // O(n)
+                    traversed_seam_vertices.begin(),
+                    traversed_seam_vertices.end(),
+                    [](const std::pair<vd_t, bool>& elem) {
+                        return elem.second == false;
+                    });
 
-            // Starting from the seed, each iteration of the following loop will
-            // find a sorted sequence of seam vertices, with a flag stating
-            // whether this sequence is a loop or not
-            while (seed_fiter != vertex_traversed.end()) {
+                seed_fiter->second = true; // marked the seed as traversed
+
+                const McSize cur_seq_size_value_idx = seam_vertex_sequence_array.size();
+                const McSize cur_seq_flag_value_idx = cur_seq_size_value_idx + 1;
+
+                // seam_vertex_sequence_array_start_offset += 2; // spaces occupied by cur_seq_size_value_idx and cur_seq_flag_value_idx
+                seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE);
+                seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE);
+
+                // Starting from the seed, each iteration of the following loop will
+                // find a sorted sequence of seam vertices, with a flag stating
+                // whether this sequence is a loop or not
+                // while (seed_fiter != traversed_seam_vertices.end()) {
 
                 // the seed vertex may be a vertex anywhere along a cut path/seam,
                 // and we build (collect all vertices of) its respective sequence by walking to
@@ -2865,8 +2850,8 @@ void get_connected_component_data_impl_detail(
                     const vd_t src = cc->source(h); // get the halfedge's source
 
                     // is it even a seam vertex first of all?
-                    std::unordered_map<vd_t, bool>::iterator fiter = vertex_traversed.find(src);
-                    const bool is_seam_vertex = fiter != vertex_traversed.cend();
+                    std::unordered_map<vd_t, bool>::iterator fiter = traversed_seam_vertices.find(src);
+                    const bool is_seam_vertex = fiter != traversed_seam_vertices.cend();
 
                     if (is_seam_vertex) {
                         bool& is_traversed = fiter->second;
@@ -2887,17 +2872,17 @@ void get_connected_component_data_impl_detail(
                 // if the seed vertex is a terminal vertex of the seam
                 const bool stack_initialised_with_one_element = disjoint_seq_stack.size() == 1;
 
-                // An iteration will find either
-                // 1) a single sequence (which may be a loop, or a an open sequence that does not form a loop,
-                // or 2) two disjoints sequences that will need to be merged afterward
+                // An iteration will find a single sequence (which may be a loop, or a an open sequence that does not form a loop,
 
-                while (disjoint_seq_stack.empty() == false) {
+                do {
 
                     std::pair<vd_t, hd_t> cur_vh_pair = disjoint_seq_stack.top();
                     disjoint_seq_stack.pop();
 
                     const vd_t v = cur_vh_pair.first; // vertex, one of whose halfedges (along the seam) is h
                     const hd_t h = cur_vh_pair.second; // halfedge whose source is v
+
+                    seam_vertex_sequence_array.push_back((McIndex)v);
 
                     uint32_t untraversed_adj_seam_vertex_count = 0;
 
@@ -2914,8 +2899,8 @@ void get_connected_component_data_impl_detail(
                         }
 
                         const vd_t src = cc->source(incident_h);
-                        std::unordered_map<vd_t, bool>::iterator fiter = vertex_traversed.find(src);
-                        const bool is_seam_vertex = fiter != vertex_traversed.cend();
+                        std::unordered_map<vd_t, bool>::iterator fiter = traversed_seam_vertices.find(src);
+                        const bool is_seam_vertex = fiter != traversed_seam_vertices.cend();
 
                         if (is_seam_vertex) {
                             bool& is_traversed = fiter->second;
@@ -2924,7 +2909,6 @@ void get_connected_component_data_impl_detail(
                                 untraversed_adj_seam_vertex_count++;
                                 disjoint_seq_stack.push(std::make_pair(src, incident_h));
 
-                                seam_vertex_sequence_array.push_back((McIndex)src);
                                 is_traversed = true;
                             }
                         }
@@ -2944,7 +2928,7 @@ void get_connected_component_data_impl_detail(
 
                         // NOTE: reaching this part of the code means that we definitely do not have a loop
                     }
-                }
+                } while (disjoint_seq_stack.empty() == false);
 
                 // At this point, we have traced/walked the set of vertices that belong to teh full sequence .
 
@@ -2965,8 +2949,8 @@ void get_connected_component_data_impl_detail(
                         const hd_t incident_h = *it;
 
                         const vd_t src = cc->source(incident_h);
-                        std::unordered_map<vd_t, bool>::iterator fiter = vertex_traversed.find(src);
-                        const bool is_seam_vertex = fiter != vertex_traversed.cend();
+                        std::unordered_map<vd_t, bool>::iterator fiter = traversed_seam_vertices.find(src);
+                        const bool is_seam_vertex = fiter != traversed_seam_vertices.cend();
 
                         if (is_seam_vertex) {
                             num_adj_seam_vertices++;
@@ -2988,15 +2972,32 @@ void get_connected_component_data_impl_detail(
 
                 seam_vertex_sequence_array[cur_seq_size_value_idx] = num_vertices_in_built_sequence;
                 seam_vertex_sequence_array[cur_seq_flag_value_idx] = have_loop;
-            }
 
-            seam_vertex_sequence_array[total_seq_count_idx] = total_seq_count;
-        }
+                seam_vertex_sequence_array[total_seq_count_idx] = total_seq_count;
+
+                // elements consumed by current sequence
+                seam_vertex_sequence_array_start_offset += num_vertices_in_built_sequence + 2;
+
+                // remove traversed vertices
+                for (auto it = begin(traversed_seam_vertices); it != end(traversed_seam_vertices);) {
+                    if (it->second == true) {
+                        it = traversed_seam_vertices.erase(it); // previously this was something like m_map.erase(it++);
+                    } else
+                        ++it;
+                }
+
+                traversed_seam_vertices.rehash(traversed_seam_vertices.size() + 1);
+
+            } while (traversed_seam_vertices.size() > 0);
+        } // if(seam_vertex_sequence_array.empty())
+
+        // minimum possible number of elements
+        MCUT_ASSERT(cc_uptr->seam_vertex_sequence_array_cache.size() >= 5);
 
         if (pMem == nullptr) {
-            *pNumBytes = seam_vertex_sequence_array.size() * sizeof(uint32_t);
+            *pNumBytes = cc_uptr->seam_vertex_sequence_array_cache.size() * sizeof(uint32_t);
         } else {
-            if (bytes > (seam_vertex_sequence_array.size() * sizeof(uint32_t))) {
+            if (bytes > (cc_uptr->seam_vertex_sequence_array_cache.size() * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -3008,14 +3009,17 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
+            // memcpy
             uint32_t elem_offset = 0;
+
+            // TODO: make parallel
             for (uint32_t i = 0; i < elems_to_copy; ++i) {
-                const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data->seam_vertices[i];
-                *(casted_ptr + elem_offset) = seam_vertex_idx;
+                const uint32_t value = cc_uptr->seam_vertex_sequence_array_cache[i];
+                *(casted_ptr + elem_offset) = value;
                 elem_offset++;
             }
 
-            MCUT_ASSERT(elem_offset <= seam_vertex_sequence_array.size());
+            MCUT_ASSERT(elem_offset <= cc_uptr->seam_vertex_sequence_array_cache.size());
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {
