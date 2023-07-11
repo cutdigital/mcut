@@ -2783,68 +2783,114 @@ void get_connected_component_data_impl_detail(
         const std::shared_ptr<hmesh_t>& cc = cc_uptr->kernel_hmesh_data->mesh;
 
         const uint32_t seam_vertex_count = (uint32_t)cc_uptr->kernel_hmesh_data->seam_vertices.size();
+        MCUT_ASSERT(seam_vertex_count >= 2);
 
-        std::vector<uint32_t> raw_vertex_sequences_of_same_seam;
+        if (cc_uptr->seam_vertex_sequence_array_cache.empty()) {
+            std::vector<uint32_t>& seam_vertex_sequence_array = cc_uptr->seam_vertex_sequence_array_cache;
 
-        // need to cache the output array
-        std::unordered_map<vd_t, bool> vertex_traversed; // TODO populate
+            McUint32 total_seq_count = 0;
+            const uint32_t total_seq_count_idx = seam_vertex_sequence_array.size();
+            MCUT_ASSERT(total_seq_count_idx == 0);
 
-        while (true) { // each iteration finds the next sequence of seam vertices
+            seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE); // location that we will used to store total_seq_count at the end
 
-            std::stack<std::pair<vd_t, hd_t>> stack; // store the next vertices of the left and right side of seed vertex
+            seam_vertex_sequence_array.reserve(seam_vertex_count + 32);
+            McSize seam_vertex_sequence_array_start_offset = 1;
 
-            //  find any seam vertex that is not traversed, use that as a starting point -> the seed
-            const std::unordered_map<vd_t, bool>::iterator seed_fiter = std::find_if(
-                vertex_traversed.begin(),
-                vertex_traversed.end(),
-                [](const std::pair<vd_t, bool>& elem) {
-                    return elem.second == false;
-                });
-
-            if (seed_fiter == vertex_traversed.end()) {
-                MCUT_ASSERT(raw_vertex_sequences_of_same_seam.size() >= 4);
-                break; // done
+            std::unordered_map<vd_t, bool> traversed_seam_vertices;
+            traversed_seam_vertices.reserve(seam_vertex_count);
+            for (uint32_t i = 0; i < seam_vertex_count; ++i) {
+                const vd_t descr = cc_uptr->kernel_hmesh_data->seam_vertices[i];
+                traversed_seam_vertices[descr] = false;
             }
 
-            seed_fiter->second = true; // traversed
+            do { // each iteration determines a fully-connected sequence of seam vertices
 
-            while (seed_fiter != vertex_traversed.end()) { // each iteration will find a sorted sequence of seam vertices, with a flag stating whther they form a loop or not
+                std::stack<std::pair<vd_t, hd_t>> disjoint_seq_stack; // stores the next vertices on the left and right side of seed vertex
 
-                std::vector<std::vector<vd_t>> disjoint_vertex_sequences_of_same_seam(1);
-                std::vector<vd_t>& current_sequence = disjoint_vertex_sequences_of_same_seam.back();
+                //  find any seam vertex that is not traversed, use that as a starting point -> the "seed"
+                std::unordered_map<vd_t, bool>::iterator seed_fiter = std::find_if( // O(n)
+                    traversed_seam_vertices.begin(),
+                    traversed_seam_vertices.end(),
+                    [](const std::pair<vd_t, bool>& elem) {
+                        return elem.second == false;
+                    });
 
-                current_sequence.push_back(seed_fiter->first);
+                seed_fiter->second = true; // marked the seed as traversed
 
-                const std::vector<hd_t>& halfedges_around_vertex = cc->get_halfedges_around_vertex(current_sequence.back());
+                const McSize cur_seq_size_value_idx = seam_vertex_sequence_array.size();
+                const McSize cur_seq_flag_value_idx = cur_seq_size_value_idx + 1;
 
-                for (std::vector<hd_t>::const_iterator it = halfedges_around_vertex.cbegin(); it != halfedges_around_vertex.cend(); ++it) {
+                // seam_vertex_sequence_array_start_offset += 2; // spaces occupied by cur_seq_size_value_idx and cur_seq_flag_value_idx
+                seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE);
+                seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE);
+
+                // Starting from the seed, each iteration of the following loop will
+                // find a sorted sequence of seam vertices, with a flag stating
+                // whether this sequence is a loop or not
+                // while (seed_fiter != traversed_seam_vertices.end()) {
+
+                // the seed vertex may be a vertex anywhere along a cut path/seam,
+                // and we build (collect all vertices of) its respective sequence by walking to
+                // the left and right side/neighbours.
+                // The fact that we walk left and right implies that two dijoint draft sequences
+                // will be found which will need to be merge later. These disjoint draft sequences
+                // are stored in "disjoint_vertex_sequences_of_same_seam".
+
+                const McUint32 seed_vertex_descr = (McUint32)seed_fiter->first;
+                seam_vertex_sequence_array.push_back(seed_vertex_descr);
+
+                //
+                // find the left and right neighbours of the current seed vertex
+                // which we will use to start the processing of build the sequence
+                // to which the "seed" belongs.
+                //
+
+                const std::vector<hd_t>& halfedges_around_seed_vertex = cc->get_halfedges_around_vertex(vd_t(seed_vertex_descr));
+
+                // for each halfedge whose target is the seed
+                for (std::vector<hd_t>::const_iterator it = halfedges_around_seed_vertex.cbegin(); it != halfedges_around_seed_vertex.cend(); ++it) {
                     const hd_t h = *it;
-                    const vd_t src = cc->source(h);
-                    std::unordered_map<vd_t, bool>::iterator fiter = vertex_traversed.find(src);
-                    const bool is_seam_vertex = fiter != vertex_traversed.cend();
+                    const vd_t src = cc->source(h); // get the halfedge's source
+
+                    // is it even a seam vertex first of all?
+                    std::unordered_map<vd_t, bool>::iterator fiter = traversed_seam_vertices.find(src);
+                    const bool is_seam_vertex = fiter != traversed_seam_vertices.cend();
 
                     if (is_seam_vertex) {
                         bool& is_traversed = fiter->second;
 
                         if (!is_traversed) {
-                            stack.push(std::make_pair(src, h));
-                            current_sequence.push_back(src);
-                            is_traversed = true;
+                            // push since this neighbour is a seam vertex that has not been traversed
+                            disjoint_seq_stack.push(std::make_pair(src, h));
+
+                            is_traversed = true; // mark the neighbour as traversed (because we immediately traverse it next)
                         }
                     }
                 }
 
-                // An iteration will find either 1) a whole loop, or 2) two disjoints sequences that will need to be
-                // merged afterward
+                MCUT_ASSERT(disjoint_seq_stack.size() == 1 || disjoint_seq_stack.size() == 2);
 
-                while (stack.empty() == false) {
-                    
-                    std::pair<vd_t, hd_t> cur_vh_pair = stack.top();
-                    
+                // this means will we are guarranteed to find just one sequence i.e. the draft disjoint sequence
+                // is the actual output sequence (and its an open sequence). disjoint_seq_stack will have one element
+                // if the seed vertex is a terminal vertex of the seam
+                const bool stack_initialised_with_one_element = disjoint_seq_stack.size() == 1;
+
+                // An iteration will find a single sequence (which may be a loop, or a an open sequence that does not form a loop,
+
+                do {
+
+                    std::pair<vd_t, hd_t> cur_vh_pair = disjoint_seq_stack.top();
+                    disjoint_seq_stack.pop();
+
                     const vd_t v = cur_vh_pair.first; // vertex, one of whose halfedges (along the seam) is h
                     const hd_t h = cur_vh_pair.second; // halfedge whose source is v
 
+                    seam_vertex_sequence_array.push_back((McIndex)v);
+
                     uint32_t untraversed_adj_seam_vertex_count = 0;
+
+                    // similar logic as above to find the neighours of the seed, which polulate the stack "disjoint_seq_stack"
                     const std::vector<hd_t>& halfedges_around_vertex = cc->get_halfedges_around_vertex(v);
 
                     for (std::vector<hd_t>::const_iterator it = halfedges_around_vertex.cbegin();
@@ -2852,22 +2898,21 @@ void get_connected_component_data_impl_detail(
                          ++it) {
                         const hd_t incident_h = *it;
 
-                        if (incident_h == h) {
-                            continue; // dont want to go backwards now...
+                        if (cc->edge(incident_h) == cc->edge(h)) {
+                            continue; // skip! dont want to go backwards now...
                         }
 
                         const vd_t src = cc->source(incident_h);
-                        std::unordered_map<vd_t, bool>::iterator fiter = vertex_traversed.find(src);
-                        const bool is_seam_vertex = fiter != vertex_traversed.cend();
+                        std::unordered_map<vd_t, bool>::iterator fiter = traversed_seam_vertices.find(src);
+                        const bool is_seam_vertex = fiter != traversed_seam_vertices.cend();
 
                         if (is_seam_vertex) {
                             bool& is_traversed = fiter->second;
 
                             if (!is_traversed) {
                                 untraversed_adj_seam_vertex_count++;
-                                stack.push(std::make_pair(src, h));
+                                disjoint_seq_stack.push(std::make_pair(src, incident_h));
 
-                                current_sequence.push_back(src);
                                 is_traversed = true;
                             }
                         }
@@ -2875,32 +2920,32 @@ void get_connected_component_data_impl_detail(
 
                     MCUT_ASSERT(untraversed_adj_seam_vertex_count <= 1);
 
-                    if (untraversed_adj_seam_vertex_count == 0 && !stack.empty()) // if stack is empty the we have a complete loop
-                    {
-                        // start new sequence that walks the other way around
-                        disjoint_vertex_sequences_of_same_seam.push_back(std::vector<vd_t>());
-                        current_sequence = disjoint_vertex_sequences_of_same_seam.back();
+                    // no further neighbours to walk/traverse but the stack still has seam vertices to be walked.
+                    // This implies we have an open loop, and that we have finished finding the first disjoint part
+                    // so we append vertices of the next
+                    if (untraversed_adj_seam_vertex_count == 0 && !disjoint_seq_stack.empty()) {
+                        // we reverse the vertices representing the first disjoint part because they proceed in the oppositie order
+                        // from the seed vertex, when compared with the vertices (now to be added) of the second disjoint part
+                        std::reverse(
+                            seam_vertex_sequence_array.begin() + seam_vertex_sequence_array_start_offset + 2, // the "2" is for the size and bool-flag slots
+                            seam_vertex_sequence_array.end());
 
-                        MCUT_ASSERT(current_sequence.empty());
+                        // NOTE: reaching this part of the code means that we definitely do not have a loop
                     }
-                }
+                } while (disjoint_seq_stack.empty() == false);
 
-                // At this point, we have traced/walked the set of vertices that belong to one connected sequence.
-                // If there are two elements in "disjoint_vertex_sequences_of_same_seam", then we need to do some merging, and the resulting final sequence will not be a loop (open)
-                // Otherwise, if there is only one sequence in "disjoint_vertex_sequences_of_same_seam", then there is no need to merge
-                // but we have to explicit =ly check whether the sequence is a loop or not (since the whole procedure may have started from a "terminal vertex" in the
-                // case of an open sequence).
+                // At this point, we have traced/walked the set of vertices that belong to teh full sequence .
 
-                MCUT_ASSERT(disjoint_vertex_sequences_of_same_seam.size() == 1 || disjoint_vertex_sequences_of_same_seam.size() == 2);
+                McBool have_loop = !stack_initialised_with_one_element;
 
-                const bool found_one_sequence_on_first_try = disjoint_vertex_sequences_of_same_seam.size() == 1;
-                if (found_one_sequence_on_first_try) {
+                if (!stack_initialised_with_one_element) { // confirm that we really do have a loop because an open sequence could also lead to !stack_initialised_with_one_element (depending on the seed vertex)
+
                     // Get first vertex of sequence and check whether it is connected to two other seam vertices
                     // if true then we have a loop otherwise, we have an open sequence
-                    const vd_t first = current_sequence.front();
+                    const McUint32 first = *(seam_vertex_sequence_array.cbegin() + seam_vertex_sequence_array_start_offset + 2);
 
                     uint32_t num_adj_seam_vertices = 0;
-                    const std::vector<hd_t>& halfedges_around_first_vertex = cc->get_halfedges_around_vertex(first);
+                    const std::vector<hd_t>& halfedges_around_first_vertex = cc->get_halfedges_around_vertex(vd_t(first));
 
                     for (std::vector<hd_t>::const_iterator it = halfedges_around_first_vertex.cbegin();
                          it != halfedges_around_first_vertex.cend();
@@ -2908,8 +2953,8 @@ void get_connected_component_data_impl_detail(
                         const hd_t incident_h = *it;
 
                         const vd_t src = cc->source(incident_h);
-                        std::unordered_map<vd_t, bool>::iterator fiter = vertex_traversed.find(src);
-                        const bool is_seam_vertex = fiter != vertex_traversed.cend();
+                        std::unordered_map<vd_t, bool>::iterator fiter = traversed_seam_vertices.find(src);
+                        const bool is_seam_vertex = fiter != traversed_seam_vertices.cend();
 
                         if (is_seam_vertex) {
                             num_adj_seam_vertices++;
@@ -2918,43 +2963,45 @@ void get_connected_component_data_impl_detail(
 
                     MCUT_ASSERT(num_adj_seam_vertices == 1 || num_adj_seam_vertices == 2);
 
-                    const McBool have_loop = (num_adj_seam_vertices == 2) ? MC_TRUE : MC_FALSE;
-
-                    // the found sequence is the final sequence
-                    // vertex_sequences_of_same_seam.push_back(std::move(current_sequence));
-                    raw_vertex_sequences_of_same_seam.reserve(raw_vertex_sequences_of_same_seam.size() + current_sequence.size());
-
-                    raw_vertex_sequences_of_same_seam.push_back(current_sequence.size());
-                    raw_vertex_sequences_of_same_seam.push_back(have_loop);
-                    for (std::vector<vd_t>::const_iterator it = current_sequence.cbegin(); it != current_sequence.cend(); ++it) {
-                        raw_vertex_sequences_of_same_seam.push_back(*it);
-                    }
-
-                } else {
-                    MCUT_ASSERT(disjoint_vertex_sequences_of_same_seam.size() == 2);
-
-                    // merge
-                    std::vector<vd_t>& second_seq = disjoint_vertex_sequences_of_same_seam.back();
-                    std::vector<vd_t>& first_seq = disjoint_vertex_sequences_of_same_seam.front();
-                    std::reverse(second_seq.begin(), second_seq.end());
-                    second_seq.reserve(second_seq.size() + first_seq.size());
-                    second_seq.insert(second_seq.end(), first_seq.begin(), first_seq.end());
-
-                    raw_vertex_sequences_of_same_seam.reserve(raw_vertex_sequences_of_same_seam.size() + second_seq.size());
-                    raw_vertex_sequences_of_same_seam.push_back(second_seq.size());
-                    raw_vertex_sequences_of_same_seam.push_back(MC_FALSE);
-
-                    for (std::vector<vd_t>::const_iterator it = second_seq.cbegin(); it != second_seq.cend(); ++it) {
-                        raw_vertex_sequences_of_same_seam.push_back(*it);
-                    }
+                    have_loop = (num_adj_seam_vertices == 2) ? MC_TRUE : MC_FALSE;
                 }
-            }
-        }
+
+                const uint32_t num_vertices_in_built_sequence = std::distance(
+                    seam_vertex_sequence_array.cbegin() + seam_vertex_sequence_array_start_offset + 2,
+                    seam_vertex_sequence_array.cend());
+
+                MCUT_ASSERT(cur_seq_size_value_idx == seam_vertex_sequence_array_start_offset);
+
+                total_seq_count += 1; // increment number of sequences found
+
+                seam_vertex_sequence_array[cur_seq_size_value_idx] = num_vertices_in_built_sequence;
+                seam_vertex_sequence_array[cur_seq_flag_value_idx] = have_loop;
+
+                seam_vertex_sequence_array[total_seq_count_idx] = total_seq_count;
+
+                // elements consumed by current sequence
+                seam_vertex_sequence_array_start_offset += num_vertices_in_built_sequence + 2;
+
+                // remove traversed vertices
+                for (auto it = begin(traversed_seam_vertices); it != end(traversed_seam_vertices);) {
+                    if (it->second == true) {
+                        it = traversed_seam_vertices.erase(it); // previously this was something like m_map.erase(it++);
+                    } else
+                        ++it;
+                }
+
+                traversed_seam_vertices.rehash(traversed_seam_vertices.size() + 1);
+
+            } while (traversed_seam_vertices.size() > 0);
+        } // if(seam_vertex_sequence_array.empty())
+
+        // minimum possible number of elements
+        MCUT_ASSERT(cc_uptr->seam_vertex_sequence_array_cache.size() >= 5);
 
         if (pMem == nullptr) {
-            *pNumBytes = seam_vertex_count * sizeof(uint32_t);
+            *pNumBytes = cc_uptr->seam_vertex_sequence_array_cache.size() * sizeof(uint32_t);
         } else {
-            if (bytes > (seam_vertex_count * sizeof(uint32_t))) {
+            if (bytes > (cc_uptr->seam_vertex_sequence_array_cache.size() * sizeof(uint32_t))) {
                 throw std::invalid_argument("out of bounds memory access");
             }
 
@@ -2966,14 +3013,17 @@ void get_connected_component_data_impl_detail(
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
+            // memcpy
             uint32_t elem_offset = 0;
+
+            // TODO: make parallel
             for (uint32_t i = 0; i < elems_to_copy; ++i) {
-                const uint32_t seam_vertex_idx = cc_uptr->kernel_hmesh_data->seam_vertices[i];
-                *(casted_ptr + elem_offset) = seam_vertex_idx;
+                const uint32_t value = cc_uptr->seam_vertex_sequence_array_cache[i];
+                *(casted_ptr + elem_offset) = value;
                 elem_offset++;
             }
 
-            MCUT_ASSERT(elem_offset <= seam_vertex_count);
+            MCUT_ASSERT(elem_offset <= cc_uptr->seam_vertex_sequence_array_cache.size());
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {

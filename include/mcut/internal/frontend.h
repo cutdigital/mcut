@@ -255,6 +255,24 @@ struct connected_component_t {
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // non-zero if origin source and cut-mesh where perturbed
     vec3 perturbation_vector = vec3(0.0);
+    //
+    // An array storing the lists of vertices that define seams/intersection 
+    // contours along the cut path of a CC. We need this cache because it will be 
+    // typically needed twice by users (to query number of elements for mem 
+    // allocation; and to actually copy the data to some user output array).
+    //
+    // Format: [
+    //  Total number of sequences,
+    //  number of vertices in [first] sequence,
+    //  boolean (uint) flag stating whether [first] sequence forms a loop,
+    //  N consecutive unsigned integers which identify the vertices of the [first] sequence,
+    //  number of vertices in [second] sequence,
+    //  boolean (uint) flag stating whether [second] sequence forms a loop,
+    //  N consecutive unsigned integers which identify the vertices of the [second] sequence,
+    //  ... and so on.
+    // ]
+    //
+    std::vector<uint32_t> seam_vertex_sequence_array_cache;
 };
 
 // struct representing a fragment
