@@ -454,17 +454,19 @@ void fn_delete_cc(connected_component_t* p)
 // struct defining the state of a context object
 struct context_t {
 private:
-    std::atomic<bool> m_done;
+    std::atomic<bool> m_done; // are we finished with the context (i.e. indicate to shutdown threadpool and freeup respective resourses)
+    // the work-queues associated with each API (device) thread
     std::vector<thread_safe_queue<function_wrapper>> m_queues;
-    // Master/Manager thread(s) which are responsible for running the API calls
+    // Master/Manager thread(s) which are responsible for running the API calls.
+    // Also called "device" threads.
     // When a user of MCUT calls one of the APIs (e.g. mcEnqueueDispatch) the task
     // of actually executing everything related to that task will be handled by
     // one Manager thread. This manager thread itself will be involved in
     // computing some/all part of the respective task (think of it as the "main"
-    // thread insofar as the API task is concerned). Some API tasks contain code
+    // thread insofar as the respective API task is concerned). Some API tasks contain code
     // sections that run in parallel, which is where the Manager thread will also
     // submit tasks to the shared compute threadpool ("m_compute_threadpool").
-    // NOTE: must be declared after "thread_pool_terminate" and "work_queues"
+    // NOTE: must be declared after "thread_pool_terminate" and "work_queues" (to avoid MT bugs when freeing up context memory)
     std::vector<std::thread> m_api_threads;
     // join_threads m_joiner;
 
@@ -474,13 +476,24 @@ private:
     std::unique_ptr<thread_pool> m_compute_threadpool;
 #endif
 
-    // The state and flag variable current used to configure the next dispatch call
+    // The state and flag variable currently used to configure the next dispatch call
     McFlags m_flags = (McFlags)0;
 
+    // as it says on the tin: "tiny" number used to enforce general position
     std::atomic<McDouble> m_general_position_enforcement_constant;
+    // The maximum number of iterations/attempts over which to try and resolve the input meshes into general position
     std::atomic<McUint32> m_max_num_perturbation_attempts;
+    // The state and flag variable currently used to configure the next mcGetConnectedComponentData call 
+    // (with either MC_CONNECTED_COMPONENT_DATA_FACE or MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION)
+    // This flag is primailly useful for flipping the winding order of vertices queried for a connected component
+    // of type FRAGMENT-SEALED-EXTERIOR-BELOW, which will have reversed normal orientation due to MCUT internal 
+    // handling of winding order
     std::atomic<McConnectedComponentFaceWindingOrder> m_connected_component_winding_order;
 
+    // This is the "main" function of each device/API/manger thread. When a context is created and 
+    // the internal scheduling threadpool is initialised, each (device) thread is launched with this
+    // function. The device thread loops indefinitely (sleeping most of the time and waking up to do 
+    // work) until the context is destroyed. 
     void api_thread_main(uint32_t thread_id)
     {
         log_msg("[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
@@ -488,15 +501,16 @@ private:
         do {
             function_wrapper task;
 
-            // We try_pop() first in case the task "producer" (API) thread
+            // We try_pop() first in case the task "producer" (API/device/manager) thread
             // already invoked cond_var.notify_one() of "m_queues[thread_id]""
             // BEFORE current thread first-entered this function.
             if (!m_queues[thread_id].try_pop(task)) {
+                // there is no work, so thread will wait until user thread gives it some work to do.
                 m_queues[thread_id].wait_and_pop(task);
             }
 
-            if (m_done) {
-                break;
+            if (m_done) { // are we finished?
+                break; // quit to free up resources.
             }
 
             task();
@@ -516,10 +530,12 @@ public:
         : m_done(false)
         // , m_joiner(m_api_threads)
         , m_flags(flags)
-        , m_general_position_enforcement_constant(1e-4)
-        , m_max_num_perturbation_attempts(1 << 2),
+        , m_general_position_enforcement_constant(1e-4) // 0.0001
+        , m_max_num_perturbation_attempts(1 << 2), // 4
+        // default winding order (as determing from the normals of the input mesh faces)
         m_connected_component_winding_order(McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN)
-        , m_user_handle(handle)
+        , m_user_handle(handle) // i.e. the McContext handle that the client application uses to reference an instance of the context
+        // debug callback flags (all zero/unset by default). User must specify what they want via debug control function.
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
         , dbgCallbackBitfieldSeverity(0)
@@ -542,7 +558,7 @@ public:
             m_compute_threadpool = std::unique_ptr<thread_pool>(new thread_pool(num_compute_threads, manager_thread_count));
 #endif
         } catch (...) {
-            shutdown();
+            shutdown(); // free up memory shutdown device threads etc.
 
             log_msg("[MCUT] Destroy context due to exception" << m_user_handle);
             throw;
@@ -557,21 +573,22 @@ public:
 
     void shutdown()
     {
-        m_done = true;
+        m_done = true; // notify device threads that they need to finished up
         
-        std::atomic_thread_fence(std::memory_order_acq_rel);
+        std::atomic_thread_fence(std::memory_order_acq_rel); // just for safety, put a memory barrier to make shutdown notification is recieved (probably not needed)
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-        m_compute_threadpool.reset();
+        m_compute_threadpool.reset(); // wake-up and destroy the helper/worker threads
 #endif
         for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
-            m_queues[i].disrupt_wait_for_data();
-            if (m_api_threads[i].joinable()) {
-                m_api_threads[i].join();
+            m_queues[i].disrupt_wait_for_data(); // wake up device thread from sleeping
+            if (m_api_threads[i].joinable()) { // if not already joined/shutdown
+                m_api_threads[i].join(); // wait for it to finish 
             }
         }
     }
-
+       
+    // reference handle used by client application to access and modify context state
     McContext m_user_handle;
 
     // returns the flags which determine the runtime configuration of this context
@@ -622,15 +639,24 @@ public:
     }
 #endif
 
+    /*
+    This function serves the purpose of scheduling an API task (i.e. an async API function call from the user) by submitting this
+    task into an internal work-queue that will be checked and popped-from by a device thread.
+    */
     template <typename FunctionType>
-    McEvent prepare_and_submit_API_task(McCommandType cmdType, uint32_t numEventsInWaitlist, const McEvent* pEventWaitList, FunctionType api_fn)
+    McEvent prepare_and_submit_API_task(
+        McCommandType cmdType, // the type of command that the user has submitted
+        uint32_t numEventsInWaitlist, // the number of (previously submitted or user) events to wait for
+        const McEvent* pEventWaitList, // the list/array of events to wait for _before_ executing the submitted task
+        FunctionType api_fn // a function (lambda/functor) encapsulating the API task to be executed asynchronously
+    )
     {
         //
         // create the event object associated with the enqueued task
         //
 
         std::shared_ptr<event_t> event_ptr = std::shared_ptr<event_t>(new event_t(
-            reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed)),
+            reinterpret_cast<McEvent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed)), // the handle is just a lightweight integer counter
             cmdType));
 
         MCUT_ASSERT(event_ptr != nullptr);
@@ -645,27 +671,29 @@ public:
 
         // List of events the enqueued task depends on
         //
-        // local copy that will be captured by-value (user permitted to re-use pEventWaitList)
+        // local copy that will be captured by-value (client application is permitted to re-use the memory pointed to by "pEventWaitList")
         const std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
 
         //
-        // Determine which manager thread to assign the task
+        // Determine which manager thread to assign the task to
         //
 
         // the id of manager thread that will be assigned the current task
         uint32_t responsible_thread_id = UINT32_MAX;
 
+        // for each event to wait for (before executing the current task)
         for (std::vector<McEvent>::const_iterator waitlist_iter = event_waitlist.cbegin(); waitlist_iter != event_waitlist.cend(); ++waitlist_iter) {
             const McEvent& parent_task_event_handle = *waitlist_iter;
-
+            // get actual event object
             const std::shared_ptr<event_t> parent_task_event_ptr = g_events.find_first_if([=](std::shared_ptr<event_t> e) { return e->m_user_handle == parent_task_event_handle; });
 
-            if (parent_task_event_ptr == nullptr) {
-                throw std::invalid_argument("invalid event in waitlist");
+            if (parent_task_event_ptr == nullptr) { // not found
+                throw std::invalid_argument("invalid event in waitlist"); // client gave us something we don't recognise
             }
 
             const bool parent_task_is_not_finished = parent_task_event_ptr->m_finished.load() == false;
 
+            // task associated with event is still running and the event is a user-event
             if (parent_task_is_not_finished && parent_task_event_ptr->m_command_type != McCommandType::MC_COMMAND_USER) {
                 // id of manager thread, which was assigned the parent task
                 responsible_thread_id = parent_task_event_ptr->m_responsible_thread_id.load();

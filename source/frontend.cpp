@@ -42,6 +42,10 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
     std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xDECAF); /*any non-ero value*/ });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+    
+    // Here we actually create the context object (as shared ptr) and stored in a global 
+    // variable g_contexts. Note that g_contexts can be accessed by multiple threads 
+    // simultaneously.
     g_contexts.push_front(std::shared_ptr<context_t>(
         new context_t(handle, flags
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -2783,7 +2787,7 @@ void get_connected_component_data_impl_detail(
         std::vector<uint32_t> raw_vertex_sequences_of_same_seam;
 
         // need to cache the output array
-        std::unordered_map<vd_t, bool> vertex_traversed;
+        std::unordered_map<vd_t, bool> vertex_traversed; // TODO populate
 
         while (true) { // each iteration finds the next sequence of seam vertices
 
