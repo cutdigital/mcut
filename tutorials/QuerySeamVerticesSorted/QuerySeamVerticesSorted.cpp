@@ -233,6 +233,18 @@ int main()
         // query the seam vertices (indices)
         // ---------------------------------
 
+        // The format of this array (of 32-bit unsigned int elements) is as follows:
+        // [
+        //      <num-total-sequences>, // McIndex/uint32_t
+        //      <num-vertices-in-1st-sequence>, // McIndex/uint32_t
+        //      <1st-sequence-is-loop-flag-(McBool)>, // McBool, McIndex/uint32_t
+        //      <vertex-indices-of-1st-sequence>, // consecutive elements of McIndex
+        //      <num-vertices-in-2nd-sequence>,
+        //      <2nd-sequence-is-loop-flag-(McBool)>,
+        //      <vertex-indices-of-2nd-sequence>,
+        //      ... and so on, until last sequence
+        // ]
+
         api_err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX_SEQUENCE, 0, NULL, &numBytes);
 
         if (api_err != MC_NO_ERROR) {
@@ -259,7 +271,7 @@ int main()
         std::vector<std::pair<std::vector<McUint32>, McBool>> seamVertexSequences;
         uint32_t runningOffset = 0; // a runnning offset that we use to access data in "seamVertexSequenceArrayFromMCUT"
         // number of sequences produced by MCUT
-        const uint32_t numSeamVertexSequences = seamVertexSequenceArrayFromMCUT[runningOffset]; // always the first element
+        const uint32_t numSeamVertexSequences = seamVertexSequenceArrayFromMCUT[runningOffset++]; // always the first element
 
         // for each sequence...
         for(uint32_t numSeamVertexSequenceIter = 0; numSeamVertexSequenceIter < numSeamVertexSequences; ++numSeamVertexSequenceIter)
@@ -285,6 +297,8 @@ int main()
                 currentSeamVertexSequenceIndices.data(), 
                 seamVertexSequenceArrayFromMCUT.data() + runningOffset, 
                 sizeof(McUint32) * currentSeamVertexSequenceIndicesArraySize);
+
+            runningOffset += currentSeamVertexSequenceIndicesArraySize;
         }
 
         //
