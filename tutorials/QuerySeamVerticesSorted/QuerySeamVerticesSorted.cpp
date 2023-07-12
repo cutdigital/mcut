@@ -22,6 +22,9 @@
 
 #include "mcut/mcut.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
@@ -130,8 +133,10 @@ int main()
 
     McResult api_err = MC_NO_ERROR;
 
-    const char* srcMeshFilePath = DATA_DIR "/source-mesh.off";
-    const char* cutMeshFilePath = DATA_DIR "/cut-mesh.off";
+    //const char* srcMeshFilePath = DATA_DIR "/source-mesh.off";
+    //const char* cutMeshFilePath = DATA_DIR "/cut-mesh.off";
+    const char* srcMeshFilePath = DATA_DIR "/brad/source-mesh.off";
+    const char* cutMeshFilePath = DATA_DIR "/brad/cut-mesh.off";
 
     printf(">> source-mesh file: %s\n", srcMeshFilePath);
     printf(">> cut-mesh file: %s\n", cutMeshFilePath);
@@ -486,6 +491,8 @@ void readOFF(
     unsigned int* numVertices,
     unsigned int* numFaces)
 {
+    printf("read OFF file %s: \n", fpath);
+
     // using "rb" instead of "r" to prevent linefeed conversion
     // See: https://stackoverflow.com/questions/27530636/read-text-file-in-c-with-fopen-without-linefeed-conversion
     FILE* file = fopen(fpath, "rb");
@@ -627,7 +634,7 @@ void writeOFF(
     const uint32_t numFaces,
     const uint32_t numEdges)
 {
-    fprintf(stdout, "write: %s\n", fpath);
+    fprintf(stdout, "write OFF file: %s\n", fpath);
 
     FILE* file = fopen(fpath, "w");
 
@@ -664,3 +671,395 @@ void writeOFF(
 
     fclose(file);
 }
+
+#if 0
+enum ObjFileCmdType
+{
+    /*
+    The v command specifies a vertex by its three cartesian coordinates x, y, and z. 
+    The vertex is automatically assigned a name depending on the order in which it 
+    is found in the file. The first vertex in the file gets the name ‘1’, the second ‘2’, 
+    the third ‘3’, and so on.
+    */
+    VERTEX,
+    /*
+    This is the vertex normal command. It specifies the normal vector to the surface. 
+    x, y, and z are the components of the normal vector. Note that this normal vector 
+    is not yet associated with any vertex point. We will have to associate it with a 
+    vertex later with another command called the f command.
+
+    The vertex normal command is typically omitted in files because when we group vertices 
+    into polygonal faces with the f command, it will automatically determine the normal 
+    vector from the vertex coordinates and the order in which the vertices appear.
+    */
+    NORMAL,
+    /*
+    The vertex texture command specifies a point in the texture map, which we covered 
+    in an earlier section. u and v are the x and y coordinates in the texture map. These 
+    will be floating point numbers between 0 and 1. They really don’t tell you anything 
+    by themselves, they must be grouped with a vertex in an f face command, just like 
+    the vertex normals.
+    */
+    TEXCOORD,
+    /*
+    The face command is probably the most important command. It specifies a polygonal 
+    face made from the vertices that came before this line.
+
+    To reference a vertex you follow the implicit numbering system of the vertices. For 
+    example’ f 23 24 25 27′ means a polygonal face built from vertices 23, 24, 25, and 
+    27 in order.
+
+    For each vertex, you may associate a vn command, which then associates that vertex 
+    normal to the corresponding vertex. Similarly, you can associate a vt command with 
+    a vertex, which will determine the texture mapping to use at this point.
+
+    If you specify a vt or vn for a vertex in a file, you must specify it for all of them.
+    */
+    FACE,
+    TOTAL,
+    UNKNOWN =0xFFFFFFFF
+};
+
+// Funcion to read in a .obj file storing a single 3D mesh object (in ASCII format) 
+// The double pointers will be allocated inside this function and must be freed by caller.
+// Only handles polygonal faces, so "vp" command (which is used to specify control 
+// points of the surface or curve ) is ignored if encountered in file.
+void read_OBJ_file(
+    // path to file
+    const char* fpath,
+    // pointer to list of vertex coordinates  
+    double** pVertices,
+    // pointer to list of vertex normals  
+    double** pNormals,
+    // pointer to list of texture coordinates list  
+    double** pTexcoords,
+    // pointer to list of face indices 
+    unsigned int** pFaceIndices,
+    // pointer to list of face sizes (number of vertices in each face)
+    unsigned int** pFaceSizes,
+    // number of vertices 
+    unsigned int* numVertices,
+    // number of vertex normals 
+    unsigned int* numNormals,
+    // number of texture coordinates
+    unsigned int* numTexcoords,
+    // number of faces
+    unsigned int* numFaces,
+    // use zero-based indexing when storing face vertex indices in pFaceIndices
+    bool useRelativeFaceIndices)
+{
+    fprintf(stdout, "read .obj file: %s\n", fpath);
+
+    FILE* file = fopen(fpath, "rb");
+
+    if (file == NULL) {
+        fprintf(stderr, "error: failed to open file `%s`", fpath);
+        exit(1);
+    }
+
+    // buffer used to store the contents of a line read from the file.
+    char* lineBuf = NULL;
+    // current length of the line buffer (in characters read) 
+    size_t lineBufLen = 0;
+    // flag to indicate that we read the line ok (without any error)
+    bool lineOk = true;
+    int i = 0; // iterator
+
+    // counts the number of passes we have made over the file to parse contents.
+    // this is needed because multiple passes are required e.g. to determine how much
+    // memory to allocate before actually copying data into pointers.
+    int passIterator =0;
+
+    // these variables are defined after having parsed the full file
+    int nVertices = 0; // number of vertex coordinates found in file
+    int nNormals = 0; // number of vertex normals found in file
+    int nTexCoords = 0; // number of vertex vertex texture coordnates found in file
+    int nFaces = 0; // number of faces found in file
+    int nFaceIndices = 0; // total number of face indices found in file
+    int faceIndicesCounter = 0; // running offset into pFaceIndices (final value will be same as nFaceIndices)
+
+    do{ // each iteration will parse the full file
+        
+        const size_t nread = getline(&lineBuf, &lineBufLen, file); // read contents of line
+        
+        while (nread != -1) { // each iteration will parse a line in the file      
+            
+            const size_t lineLen =  strlen(lineBuf);
+
+            assert(lineLen == nread);
+
+            const bool lineIsEmpty = (lineLen == 0);
+            
+            if (lineIsEmpty) {
+                continue; // .. to next line
+            }
+
+            const bool lineIsComment =  lineBuf[0] != '#';
+            
+            if(lineIsComment)
+            {
+                continue; // ... to next line
+            }
+
+            ObjFileCmdType lineCmdType =  ObjFileCmdType::UNKNOWN;
+            
+            char tmpBuf[3];
+            memcpy(tmpBuf, lineBuf, 2); // copy first two characters in line
+
+            //
+            // In the following, we determine the type of "command" in the object file that is
+            // contained on the current line.
+            //
+            const bool lineIsVertexCmd = strcmp("v ", tmpBuf) == 0;
+            
+            if(lineIsVertexCmd)
+            {
+                lineCmdType = ObjFileCmdType::VERTEX;
+            }
+            else{
+            
+                memcpy(tmpBuf, lineBuf, 3);
+
+                const bool lineIsVertexNormalCmd = strcmp("vn ", tmpBuf) == 0;
+
+                if(lineIsVertexNormalCmd)
+                {
+                    lineCmdType = ObjFileCmdType::NORMAL;
+                }
+                else {
+                        
+                    memcpy(tmpBuf, lineBuf, 3);
+
+                    const bool lineIsVertexTexCoordCmd = strcmp("vt ", tmpBuf) == 0;
+
+                    if (lineIsVertexTexCoordCmd) {
+                        lineCmdType = ObjFileCmdType::TEXCOORD;        
+                    }
+                    else {
+                        memcpy(tmpBuf, lineBuf, 2);
+
+                        const bool lineIsFaceCmd = strcmp("f ", tmpBuf) == 0;
+
+                        if (lineIsFaceCmd) {
+                            lineCmdType = ObjFileCmdType::FACE;        
+                        }
+                    }
+                }
+            }
+
+            if(lineCmdType == ObjFileCmdType::UNKNOWN)
+            {
+                fprintf(stderr, "warning: unrecognised command in line '%s'\n", lineBuf);
+            }
+
+            switch (lineCmdType) {
+                case ObjFileCmdType::VERTEX:
+                {
+                    int vertexId = nVertices++; // incremental vertex count in file
+                    
+                    if(passIterator == 1)
+                    {           
+                
+                        const char* delimiter = " ";
+                        char* pch = strtok(lineBuf+2, delimiter);
+                        double coords[3] = {0.0, 0.0, 0.0};
+                        int compIter = 0;
+                    
+                        while(pch != NULL)
+                        { 
+                            scanf(pch, "%f", coords+compIter);
+                            pch = strtok (NULL, delimiter);
+                        }
+                    
+                        if(compIter != 3)
+                        {
+                            fprintf(stderr, "error: have %d components for position of vertex %d\n", compIter, vertexId);
+                            std::abort();
+                        }
+                    }
+
+                }break;
+                case ObjFileCmdType::NORMAL:
+                {
+                    int normalId = nNormals++; // incremental vertex-normal count in file
+                    
+                    if(passIterator == 1)
+                    {           
+                
+                        const char* delimiter = " ";
+                        char* pch = strtok(lineBuf+2, delimiter);
+                        double comps[3] = {0.0, 0.0, 0.0}; // components
+                        int compIter = 0;
+                    
+                        while(pch != NULL)
+                        { 
+                            scanf(pch, "%f", comps+compIter);
+                            pch = strtok (NULL, delimiter);
+                        }
+                    
+                        if(compIter != 3)
+                        {
+                            fprintf(stderr, "error: have %d components for normal at idx=%d\n", compIter, normalId);
+                            std::abort();
+                        }
+                    }
+                }break;
+                case ObjFileCmdType::TEXCOORD:
+                {
+                    int texCoordId = nTexCoords++; // incremental vertex-normal count in file
+                    
+                    if(passIterator == 1)
+                    {           
+                
+                        const char* delimiter = " ";
+                        char* pch = strtok(lineBuf+2, delimiter);
+                        double comps[2] = {0.0, 0.0}; // components
+                        int compIter = 0;
+                    
+                        while(pch != NULL)
+                        { 
+                            scanf(pch, "%f", comps+compIter);
+                            pch = strtok (NULL, delimiter);
+                        }
+                    
+                        if(compIter != 3)
+                        {
+                            fprintf(stderr, "error: have %d components for texcoord at idx=%d\n", compIter, texCoordId);
+                            std::abort();
+                        }
+                    }
+                }break;
+                case ObjFileCmdType::FACE:
+                {
+                    int faceId = nFaces++; // incremental face count in file
+                    
+                    const char* delimiter = " ";
+                    
+                    if(passIterator == 1)
+                    {           
+                        //
+                        // count the number of vertices in face first
+                        //
+                        char* pch = strtok(lineBuf+2, delimiter);
+                        uint32_t faceVertexCount = 0;
+                        
+                        while(pch != NULL)
+                        { 
+                            pch = strtok (NULL, delimiter);
+                            faceVertexCount++; // track number of vertices found in face
+                        }
+
+                        *pFaceSizes[faceId] = faceVertexCount;
+
+                        nFaceIndices += faceVertexCount;
+                    }
+
+                    if(passIterator == 2) // third pass
+                    {
+                        
+                        //
+                        // allocate mem for the number of vertices in face 
+                        //
+
+                        const uint32_t faceVertexCount = (*pFaceSizes)[faceId];
+
+                        // back to start of line
+                        char* pch = strtok(lineBuf+2, " "); 
+
+                        int iter = 0; // incremented per vertex of face
+                        
+                        while(pch != NULL)
+                        { 
+
+                            uint32_t it = 0; // incremented per data item of face-vertex (i.e. position, normal and texcoord))
+                                    
+                            char* pch_ = strtok(pch, "/"); 
+                            while (pch_ != NULL) { // an iteration parses all data of a face vertex
+                                
+                                int val;
+                                scanf(pch_, "%d", &val); // extract face vertex data str
+                                pch_ = strtok (NULL, "/");
+
+                                switch (it) {
+                                    case 0: // vertex id
+                                        (*pFaceIndices)[faceIndicesCounter] = (uint32_t)val;
+                                    break;
+                                    case 1: // texcooord id
+                                        // TODO
+                                    break;
+                                    case 2: // normal id
+                                        // TODO
+                                    break;
+                                    default:
+
+                                        break;
+                                }
+                                
+                                faceIndicesCounter += 1;
+    
+                                it++;
+                            } 
+
+                            pch = strtok (NULL, delimiter); // next token
+
+                            iter++; // track number of vertices found in face
+                        }
+                    
+                        if(iter != (int)faceVertexCount)
+                        {
+                            fprintf(stderr, "error: have %d vertices when there should be =%d\n", iter, faceVertexCount);
+                            std::abort();
+                        }
+                    }
+                }break;
+                default:
+                break;
+            } // switch (lineCmdType) {  
+        } 
+        
+        if(passIterator ==0) // first pass
+        {
+            if(nVertices > 0)
+            {
+                *pVertices = (double*)malloc(nVertices * sizeof(double) *3);
+            }
+
+            if(nNormals > 0)
+            {
+                pNormals = (double*)malloc(nNormals * sizeof(double) * 3);
+            }
+
+            if(nTexCoords > 0)
+            {
+                pTexCoords = (double*)malloc(nTexCoords * sizeof(double) * 3)
+            }
+
+            if(nFaces > 0)
+            {
+                *pFaceSizes = (uint32_t* )malloc(nFaces * sizeof(uint32_t));
+                
+                if(nFaceIndices == 0)
+                {
+                    fprintf(stderr, "error: invalid face index count %d\n", nFaceIndices);
+                    std::abort();
+                }
+
+                *pFaceIndices = (uint32_t* )malloc(nFaceIndices * sizeof(uint32_t));
+            }
+        }
+    
+
+    }while(++passIterator < 3);
+
+    //
+    // finish, and free up memory
+    //
+    if(lineBuf != NULL)
+    {
+        free(lineBuf);
+    }
+
+}
+
+
+#endif
