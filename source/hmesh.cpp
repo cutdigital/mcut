@@ -594,13 +594,19 @@ face_descriptor_t hmesh_t::add_face(const std::vector<vertex_descriptor_t>& vi)
         MCUT_ASSERT(target(v1_h) == v1);
 
         if (v1_hd_ptr->f != null_face()) {
-            #if 0 // used for debugging triangulation
-            printf("face f%d uses halfedge: v%d v%d\n", (int)v1_hd_ptr->f, (int)v0, (int)v1);
+            #if 1 // used for debugging non-manifoldness 
+            printf("MCUT HALFEDGE MESH ERROR: cannot insert new face with descriptor f%d\n", (int)new_face_idx);
+            printf("\tOrdered vertices in f%d:[", (int)new_face_idx);
+            for (auto v : vi)
+                printf("v%d ", (int)v);
+            printf("]\n");
+            printf("REASON: existing face f%d already uses halfedge: h%d(v%d->v%d)\n", (int)v1_hd_ptr->f, (int)v1_h, (int)v0, (int)v1);
+            printf("\tOrdered vertices in f%d: [", (int)v1_hd_ptr->f);
             const auto verts = get_vertices_around_face(v1_hd_ptr->f);
             for (auto v : verts)
-                printf("p%d ", (int)v);
-            printf("\n");
-            printf("h%d.opp = h%d; =%d \n", (int)v1_h, (int)opposite(v1_h), (int)face(opposite(v1_h)));
+                printf("v%d ", (int)v);
+            printf("]\n");
+            printf("opp(h%d) = h%d; face(opp(h%d)) = %d \n", (int)v1_h, (int)opposite(v1_h), (int)v1_h, (int)face(opposite(v1_h)));
             #endif
             return null_face(); // face is incident to a non-manifold edge
         }
