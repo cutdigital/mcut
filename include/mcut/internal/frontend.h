@@ -507,6 +507,9 @@ private:
     // of type FRAGMENT-SEALED-EXTERIOR-BELOW, which will have reversed normal orientation due to MCUT internal 
     // handling of winding order
     std::atomic<McConnectedComponentFaceWindingOrder> m_connected_component_winding_order;
+    // The type of intersection (between source-mesh and cut-mesh) that was detected during the last/most-recent
+    // dispatch call.
+    std::atomic<McDispatchIntersectionType> m_most_recent_dispatch_intersection_type;
 
     // This is the "main" function of each device/API/manger thread. When a context is created and 
     // the internal scheduling threadpool is initialised, each (device) thread is launched with this
@@ -556,7 +559,8 @@ public:
         // debug callback flags (all zero/unset by default). User must specify what they want via debug control function.
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
-        , dbgCallbackBitfieldSeverity(0)
+        , dbgCallbackBitfieldSeverity(0),
+        m_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_ITERSECTION_MAX_ENUM)
     {
         log_msg("\n[MCUT] Create context " << m_user_handle);
 
@@ -647,6 +651,16 @@ public:
     void set_connected_component_winding_order(McConnectedComponentFaceWindingOrder new_value)
     {
         this->m_connected_component_winding_order.store(new_value, std::memory_order_release);
+    }
+
+    McDispatchIntersectionType get_most_recent_dispatch_intersection_type()const
+    {
+        return this->m_most_recent_dispatch_intersection_type.load(std::memory_order_acquire);
+    }
+
+    void set_most_recent_dispatch_intersection_type(McDispatchIntersectionType new_value)
+    {
+        this->m_most_recent_dispatch_intersection_type.store(new_value, std::memory_order_release);
     }
     
 

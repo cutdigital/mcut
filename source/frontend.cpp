@@ -307,6 +307,17 @@ void get_info_impl(
             memcpy(pMem, reinterpret_cast<const McConnectedComponentFaceWindingOrder*>(&wo), sizeof(McConnectedComponentFaceWindingOrder));
         }
     } break;
+    case MC_CONTEXT_DISPATCH_INTERSECTION_TYPE:
+    {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McDispatchIntersectionType);
+        }
+        else {
+            const McDispatchIntersectionType dit = context_ptr->get_most_recent_dispatch_intersection_type();
+            memcpy(pMem, reinterpret_cast<const McDispatchIntersectionType*>(&dit), sizeof(McDispatchIntersectionType));
+        }
+    }
+    break;
 
     default:
         throw std::invalid_argument("unknown info parameter");
