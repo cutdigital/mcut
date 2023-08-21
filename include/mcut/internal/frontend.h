@@ -560,7 +560,7 @@ public:
         , dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
         , dbgCallbackBitfieldSeverity(0),
-        m_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_ITERSECTION_MAX_ENUM)
+        m_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM)
     {
         log_msg("\n[MCUT] Create context " << m_user_handle);
 

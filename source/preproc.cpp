@@ -1665,6 +1665,10 @@ extern "C" void preproc(
                 MC_DEBUG_SEVERITY_NOTIFICATION,
                 "Polygon-pairs found = " + std::to_string(ps_face_to_potentially_intersecting_others.size()));
 
+            //
+            // TODO: add logic to start reporting intersection type from here.
+            //
+
             if (ps_face_to_potentially_intersecting_others.empty()) {
                 if (general_position_assumption_was_violated && cut_mesh_perturbation_count > 0) {
                     // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
