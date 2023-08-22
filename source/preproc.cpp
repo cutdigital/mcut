@@ -1273,6 +1273,47 @@ void resolve_floating_polygons(
     } // for (std::vector<floating_polygon_info_t>::const_iterator detected_floating_polygons_iter = kernel_output.detected_floating_polygons.cbegin(); ...
 }
 
+// Compute the signed solid angle subtended by triangle abc from query point.
+double calculate_signed_solid_angle(
+    const vec3& a,
+    const vec3& b,
+    const vec3& c,
+    const vec3& query)
+{
+    const vec3 qa = a - query;
+    const vec3 qb = b - query;
+    const vec3 qc = c - query;
+
+    const double alength = length(qa);
+    const double blength = length(qb);
+    const double clength = length(qc);
+
+    // If any triangle vertices are coincident with query,
+    // query is on the surface, which we treat as no solid angle.
+    if (alength == 0 || blength == 0 || clength == 0)
+    {
+        return 0.0;
+    }
+
+    const vec3 qa_normalized = qa/alength;
+    const vec3 qb_normalized = qb/blength;
+    const vec3 qc_normalized = qc/clength;
+
+    // equivalent to dot(qa,cross(qb,qc)),
+    const double numerator = dot_product(qa_normalized, cross_product(qb_normalized - qa_normalized, qc_normalized - qa_normalized));
+
+    // If numerator is 0, regardless of denominator, query is on the
+    // surface, which we treat as no solid angle.
+    if (numerator == 0.0)
+    {
+        return 0.0;
+    }
+
+    const double denominator = 1.0 + dot_product(qa_normalized, qb_normalized) + dot_product(qa_normalized, qc_normalized) + dot_product(qb_normalized, qc_normalized);
+
+    return 2.0 * std::atan2(numerator, denominator);
+}
+
 extern "C" void preproc(
     std::shared_ptr<context_t> context_ptr,
     McFlags dispatchFlags,
@@ -1346,8 +1387,8 @@ extern "C" void preproc(
         kernel_input.keep_unsealed_fragments = true;
         kernel_input.keep_fragments_sealed_outside = true; // mutually exclusive with exhaustive case
         kernel_input.keep_fragments_sealed_inside = true;
-        kernel_input.keep_fragments_sealed_outside_exhaustive = false;
-        kernel_input.keep_fragments_sealed_inside_exhaustive = false;
+        //kernel_input.keep_fragments_sealed_outside_exhaustive = false;
+        //kernel_input.keep_fragments_sealed_inside_exhaustive = false;
         kernel_input.keep_inside_patches = true;
         kernel_input.keep_outside_patches = true;
         kernel_input.keep_srcmesh_seam = true;
@@ -1636,7 +1677,7 @@ extern "C" void preproc(
             throw std::invalid_argument("invalid cut-mesh connectivity");
         }
 
-        if (source_or_cut_hmesh_BVH_rebuilt) {
+        if (source_or_cut_hmesh_BVH_rebuilt) { 
             // Evaluate BVHs to find polygon pairs that will be tested for intersection
             // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
             source_or_cut_hmesh_BVH_rebuilt = false;
@@ -1665,10 +1706,6 @@ extern "C" void preproc(
                 MC_DEBUG_SEVERITY_NOTIFICATION,
                 "Polygon-pairs found = " + std::to_string(ps_face_to_potentially_intersecting_others.size()));
 
-            //
-            // TODO: add logic to start reporting intersection type from here.
-            //
-
             if (ps_face_to_potentially_intersecting_others.empty()) {
                 if (general_position_assumption_was_violated && cut_mesh_perturbation_count > 0) {
                     // perturbation lead to an intersection-free state at the BVH level (and of-course the polygon level).
@@ -1681,6 +1718,10 @@ extern "C" void preproc(
                     continue;
                 } else {
                     context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+                    if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
+                    {
+                        context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+                    }
                     return; // we are done
                 }
             }
@@ -1730,6 +1771,8 @@ extern "C" void preproc(
 
         throw std::runtime_error("incomplete kernel execution");
     }
+    
+    
 
     TIMESTACK_PUSH("create face partition maps");
     // NOTE: face descriptors in "cut_hmesh_child_to_usermesh_birth_face", need to be offsetted
@@ -1758,6 +1801,8 @@ extern "C" void preproc(
     }
 
     TIMESTACK_POP();
+
+    McUint32 numConnectedComponentsCreated = 0;
 
     //
     // sealed-fragment connected components
@@ -1807,6 +1852,8 @@ extern "C" void preproc(
                 asFragPtr->perturbation_vector = perturbation;
 
                 context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+                numConnectedComponentsCreated += 1;
             }
         }
     }
@@ -1852,6 +1899,8 @@ extern "C" void preproc(
             asFragPtr->perturbation_vector = perturbation;
 
             context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+            numConnectedComponentsCreated += 1;
         }
     }
     TIMESTACK_POP();
@@ -1905,6 +1954,8 @@ extern "C" void preproc(
         asPatchPtr->perturbation_vector = perturbation;
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+        numConnectedComponentsCreated += 1;
     }
     TIMESTACK_POP();
 
@@ -1953,6 +2004,8 @@ extern "C" void preproc(
         asPatchPtr->perturbation_vector = perturbation;
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+        numConnectedComponentsCreated += 1;
     }
     TIMESTACK_POP();
 
@@ -2009,6 +2062,8 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
 
@@ -2057,6 +2112,8 @@ extern "C" void preproc(
         asCutMeshSeamPtr->perturbation_vector = perturbation;
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+        numConnectedComponentsCreated += 1;
 
         TIMESTACK_POP();
     }
@@ -2160,6 +2217,8 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
 
@@ -2255,6 +2314,114 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
+
+    const McUint32 numConnectedComponentsCreatedDefault = 2; // source-mesh and cut-mesh (potentially modified due to poly partitioning)
+
+    const bool haveStandardIntersection = numConnectedComponentsCreated > numConnectedComponentsCreatedDefault;
+    const bool haveNoIntersection = numConnectedComponentsCreated == numConnectedComponentsCreatedDefault;
+    
+    if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
+    {
+        if (haveStandardIntersection)
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
+        }
+        else
+        {
+            MCUT_ASSERT(haveNoIntersection); // we are dealing with the case where there exists no intersection of the input surfaces
+
+            // If both meshes are not watertight, then we treat return [no intersection]!
+            // NOTE: even if the meshes appear closed (in the geometric sense) as long as both meshes have at least
+            // one edge that is used by only one face we have to notify the user that there is no intersection. 
+            // This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
+            // when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
+            // to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
+            // strict limit!
+            if (kernel_output.src_mesh_is_watertight == false && kernel_output.cut_mesh_is_watertight == false)
+            {
+                context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+            }
+            else if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == true) // both watertight
+            {
+                //
+                // TODO: move this logic into its own function
+                //
+                
+                //
+                // check if cut-mesh in source-mesh
+                //
+                {
+                    // pick any point in cut-mesh (we chose the 1st)
+                    const vec3& query = cut_hmesh->vertex(vertex_descriptor_t(0));
+
+                    double windingNumber = 0;
+
+                    // test query point against all other faces
+                    for (face_array_iterator_t fiter = source_hmesh->faces_begin(); fiter != source_hmesh->faces_end(); ++fiter) {
+
+                        const std::vector<vertex_descriptor_t> vertex_descriptors = source_hmesh->get_vertices_around_face(*fiter);
+                        const uint32_t numVerticesInFace = (unsigned)vertex_descriptors.size();
+
+                        std::vector<uint32_t> triangulation;
+
+                        if (numVerticesInFace > 3)
+                        {
+                            context_ptr->dbg_cb(
+                                MC_DEBUG_SOURCE_FRONTEND,
+                                MC_DEBUG_TYPE_ERROR,
+                                0,
+                                MC_DEBUG_SEVERITY_NOTIFICATION,
+                                std::string("source mesh") + " contains non-triangulated face (" + std::to_string(*fiter) + ")");
+
+                            //
+                            // TODO: temporarilly triangulate face (maybe we can just use get_connected_component_data_impl)
+                            //
+                        }
+                        else {
+                            for (std::vector<vertex_descriptor_t>::const_iterator viter = vertex_descriptors.cbegin(); viter != vertex_descriptors.cend(); ++viter)
+                            {
+                                triangulation.push_back((uint32_t)(*viter));
+                            }
+                        }
+
+                        // for each triangle
+                        for (unsigned int i = 0; i < triangulation.size(); i += 3)
+                        {
+
+                            std::vector<vec3> triangle_vertex_coords(3); // every three vertices is a triangle
+                            triangle_vertex_coords[0] = source_hmesh->vertex(vertex_descriptor_t(triangulation[(i * 3) + 0]));
+                            triangle_vertex_coords[1] = source_hmesh->vertex(vertex_descriptor_t(triangulation[(i * 3) + 1]));
+                            triangle_vertex_coords[2] = source_hmesh->vertex(vertex_descriptor_t(triangulation[(i * 3) + 2]));
+
+                            const double solidAngle = calculate_signed_solid_angle(triangle_vertex_coords[0], triangle_vertex_coords[1], triangle_vertex_coords[2], query);
+                            windingNumber += solidAngle;
+                        }
+                    }
+
+                    printf("winding number = %f\n", windingNumber);
+                }
+
+                //
+                // check if source-mesh in cut-mesh
+                //
+
+            }
+            else if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == false) // only source mesh is watertight
+            {
+
+            }
+            else // only cut mesh is watertight
+            {
+                MCUT_ASSERT(kernel_output.src_mesh_is_watertight == false && kernel_output.cut_mesh_is_watertight == true);
+            }
+        }
+
+        // must be something valid
+        MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
+
+    } // if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE)
 }

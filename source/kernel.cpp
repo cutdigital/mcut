@@ -1599,6 +1599,9 @@ void dispatch(output_t& output, const input_t& input)
 #endif
         cs);
 
+    output.src_mesh_is_watertight = sm_is_watertight;
+    output.cut_mesh_is_watertight = cm_is_watertight;
+
     TIMESTACK_POP();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -6371,8 +6374,8 @@ void dispatch(output_t& output, const input_t& input)
             input.keep_fragments_partially_cut || //
             input.keep_unsealed_fragments || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
-            input.keep_fragments_sealed_outside_exhaustive || //
+            input.keep_fragments_sealed_outside || //input.keep_fragments_sealed_inside_exhaustive || //
+            //input.keep_fragments_sealed_outside_exhaustive || //
             input.keep_inside_patches || //
             input.keep_outside_patches)) {
         // if the user simply wants seams, then we should not have to proceed further.
@@ -7773,8 +7776,8 @@ void dispatch(output_t& output, const input_t& input)
     if (false == (input.keep_fragments_below_cutmesh || //
             input.keep_fragments_above_cutmesh || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
-            input.keep_fragments_sealed_outside_exhaustive || //
+            input.keep_fragments_sealed_outside || //input.keep_fragments_sealed_inside_exhaustive || //
+            //input.keep_fragments_sealed_outside_exhaustive || //
             input.keep_inside_patches || //
             input.keep_outside_patches)) {
         // if the user simply wants [unsealed] fragments that may be [partially cut], then we should not have to proceed further.
@@ -9275,8 +9278,9 @@ void dispatch(output_t& output, const input_t& input)
             input.keep_fragments_above_cutmesh || //
             input.keep_fragments_partially_cut || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
-            input.keep_fragments_sealed_outside_exhaustive)) {
+            input.keep_fragments_sealed_outside //|| input.keep_fragments_sealed_inside_exhaustive || //
+            //input.keep_fragments_sealed_outside_exhaustive
+            )) {
         // if the user simply wants [patches], then we should not have to proceed further.
         return;
     }
@@ -9491,8 +9495,8 @@ void dispatch(output_t& output, const input_t& input)
 
         const cm_patch_location_t& location = SAFE_ACCESS(patch_color_label_to_location, color_id);
 
-        if ((location == cm_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_exhaustive)) || //
-            (location == cm_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_exhaustive))) {
+        if ((location == cm_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside /* || input.keep_fragments_sealed_inside_exhaustive*/)) || //
+            (location == cm_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside/* || input.keep_fragments_sealed_outside_exhaustive */ ))) {
             continue; // skip stitching of exterior/ interior patches as user desires.
         }
 
@@ -10500,7 +10504,7 @@ void dispatch(output_t& output, const input_t& input)
                 // const std::string color_tag_stri = to_string(SAFE_ACCESS(patch_color_label_to_location, color_id)); // == cm_patch_location_t::OUTSIDE ? "e" : "i");
 
                 // save meshes and dump
-
+#if 0
                 if (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive) {
                     ///////////////////////////////////////////////////////////////////////////
                     // create the sealed meshes defined by the [current] set of traced polygons
@@ -10534,6 +10538,7 @@ void dispatch(output_t& output, const input_t& input)
                         input.keep_fragments_above_cutmesh,
                         input.keep_fragments_partially_cut);
                 }
+#endif
 
                 ++global_cm_poly_stitch_counter;
                 stitched_poly_counter++;
@@ -10573,11 +10578,11 @@ void dispatch(output_t& output, const input_t& input)
     //
 
     bool userWantsFullySealedFragmentsANY = (input.keep_fragments_sealed_inside || input.keep_fragments_sealed_outside);
-    bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
+    //bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
 
     // if the user wants [only] fully sealed fragment (not partially sealed)
-    if (userWantsFullySealedFragmentsANY && //
-        !userWantsEvenPartiallySealedFragmentsANY) {
+    if (userWantsFullySealedFragmentsANY/* && //
+        !userWantsEvenPartiallySealedFragmentsANY*/) {
         ///////////////////////////////////////////////////////////////////////////////
         // create the [fully] sealed meshes defined by the final set of traced polygons
         ///////////////////////////////////////////////////////////////////////////////

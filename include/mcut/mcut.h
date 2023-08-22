@@ -418,6 +418,7 @@ typedef enum McDispatchFlags {
 
     MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15), /**< Enforce general position such that the variable "c" (see detailed note above) is computed as the multiplication of the current general position enforcement constant (of current MCUT context) and the diagonal length of the bounding box of the cut-mesh. So this uses a relative perturbation of the cut-mesh based on its scale (see also ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT). */
     MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE= (1 << 16), /**< Enforce general position such that the variable "c" (see detailed note above) is the current general position enforcement constant (of current MCUT context). So this uses an absolute perturbation of the cut-mesh based on the stored constant (see also ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT). */
+    MC_DISPATCH_INCLUDE_INTERSECTION_TYPE = (1<<17)/**< Compute and store the _type_ of intersection that the input meshes where found in. See also: ::McDispatchIntersectionType and ::MC_CONTEXT_DISPATCH_INTERSECTION_TYPE */
 } McDispatchFlags;
 
 /**
