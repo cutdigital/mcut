@@ -347,7 +347,7 @@ typedef enum McDebugSeverity {
  */
 typedef enum McContextCreationFlags {
     MC_DEBUG = (1 << 0), /**< Enable debug mode (message logging etc.).*/
-    MC_OUT_OF_ORDER_EXEC_MODE_ENABLE = (1 << 1), /**< Determines whether the commands queued in the context-queue are executed in-order or out-of-order. If set, the commands in the context-queue are executed out-of-order. Otherwise, commands are executed in-order..*/
+    MC_OUT_OF_ORDER_EXEC_MODE_ENABLE = (1 << 1), /**< Determines whether the commands queued in the context-queue are executed in-order or out-of-order. If set, the commands in the context-queue (if independent) are executed out-of-order. Otherwise, commands are executed in-order..*/
     MC_PROFILING_ENABLE = (1 << 2) /**< Enable or disable profiling of commands in the context-queue. If set, the profiling of commands is enabled. Otherwise profiling of commands is disabled. See ::mcGetEventProfilingInfo for more information. */
 } McContextCreationFlags;
 

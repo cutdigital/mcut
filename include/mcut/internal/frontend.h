@@ -680,7 +680,8 @@ public:
         McCommandType cmdType, // the type of command that the user has submitted
         uint32_t numEventsInWaitlist, // the number of (previously submitted or user) events to wait for
         const McEvent* pEventWaitList, // the list/array of events to wait for _before_ executing the submitted task
-        FunctionType api_fn // a function (lambda/functor) encapsulating the API task to be executed asynchronously
+        FunctionType api_fn, // a function (lambda/functor) encapsulating the API task to be executed asynchronously
+        std::thread::id submittingDeviceThreadID /*sometimes device threads might also submit internal API tasks, in which case we use their ID to assign work to the other device thread (to prevent deadlocks) */
     )
     {
         //
@@ -740,17 +741,30 @@ public:
         const bool have_responsible_thread = responsible_thread_id != UINT32_MAX;
 
         if (!have_responsible_thread) {
-            uint32_t thread_with_empty_queue = UINT32_MAX;
+            uint32_t assignedThread = UINT32_MAX;
 
-            for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
-                if (m_queues[(i + 1) % (uint32_t)m_api_threads.size()].empty() == true) {
-                    thread_with_empty_queue = i;
-                    break;
+            if (m_api_threads.size() > 1)
+            { // assign to thread that is not the submitting thread
+                for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
+                    if (m_api_threads[i].get_id() != submittingDeviceThreadID)
+                    {
+                        assignedThread = i;
+                        break;
+                    }
                 }
             }
+            else {
+                for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {  // assign to any thread with an empty queue
+                    if (m_queues[i].empty()) {
+                        assignedThread = i;
+                        break;
+                    }
+                }
+            }
+        
 
-            if (thread_with_empty_queue != UINT32_MAX) {
-                responsible_thread_id = thread_with_empty_queue;
+            if (assignedThread != UINT32_MAX) {
+                responsible_thread_id = assignedThread;
             } else { // all threads have work to do
                 responsible_thread_id = 0; // just pick thread 0
             }

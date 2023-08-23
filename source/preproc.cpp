@@ -1314,6 +1314,63 @@ double calculate_signed_solid_angle(
     return 2.0 * std::atan2(numerator, denominator);
 }
 
+double getConnectedComponentWindingNumber(const std::shared_ptr<context_t> context_ptr, McConnectedComponent connCompId, const vec3& queryPoint)
+{
+    //
+    // The following logic piggybacks on the internal implementation of the MCUT API.
+    // We effectively pretend to request the number of bytes required to store CC triangulation indices
+    // (which in turn triggers get_connected_component_data_impl to compute the CDT traingulation of the
+    // the CC and cache it) and then use the internal CDT triangulation indices cache for the triangles that
+    // we actually need to compute solid angles.
+    //
+    {
+        McSize bytes = 0;
+        McEvent triangulationEvent = MC_NULL_HANDLE;
+
+        // NOTE: get_connected_component_data_impl will run on a different device/API thread
+        get_connected_component_data_impl(context_ptr->m_user_handle, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, nullptr, &bytes, 0, nullptr, &triangulationEvent);
+
+        MCUT_ASSERT(triangulationEvent != MC_NULL_HANDLE); // event must exist to wait on and query
+
+        {
+            McResult waitliststatus = MC_NO_ERROR;
+
+            wait_for_events_impl(1, &triangulationEvent, waitliststatus); // block until event of "get_connected_component_data_impl" is completed!
+
+            MCUT_ASSERT(waitliststatus == McResult::MC_NO_ERROR);
+
+            release_events_impl(1, &triangulationEvent); // destroy
+            triangulationEvent = MC_NULL_HANDLE;
+        }
+    }
+
+    std::shared_ptr<connected_component_t> cc_uptr = context_ptr->connected_components.find_first_if([=](const std::shared_ptr<connected_component_t> ccptr) { return ccptr->m_user_handle == connCompId; });
+    const  std::shared_ptr <hmesh_t> mesh = cc_uptr->kernel_hmesh_data->mesh;
+    MCUT_ASSERT(cc_uptr != nullptr);
+
+    MCUT_ASSERT(cc_uptr->cdt_face_map_cache_initialized == true); // since we called "get_connected_component_data_impl"
+    MCUT_ASSERT(cc_uptr->cdt_index_cache.size() >= 0);
+
+    const std::vector<uint32_t>& tris = cc_uptr->cdt_index_cache;
+
+    double windingNumber = 0;
+
+    // for each triangle
+    for (unsigned int i = 0; i < cc_uptr->cdt_index_cache.size(); i += 3)
+    {
+        const vertex_descriptor_t idx0 = vertex_descriptor_t(tris[(i * 3) + 0]);
+        const vertex_descriptor_t idx1 = vertex_descriptor_t(tris[(i * 3) + 1]);
+        const vertex_descriptor_t idx2 = vertex_descriptor_t(tris[(i * 3) + 2]);
+
+        const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
+        windingNumber += solidAngle;
+    }
+
+    printf("winding number = %f\n", windingNumber);
+
+    return windingNumber;
+}
+
 extern "C" void preproc(
     std::shared_ptr<context_t> context_ptr,
     McFlags dispatchFlags,
@@ -2120,6 +2177,7 @@ extern "C" void preproc(
 
     // input connected components
     // --------------------------
+    McConnectedComponent cutMeshUserHandle = MC_NULL_HANDLE;
 
     // internal cut-mesh (possibly with new faces and vertices)
     {
@@ -2134,6 +2192,9 @@ extern "C" void preproc(
         MCUT_ASSERT(asCutMeshInputPtr != nullptr);
 
         asCutMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+
+        cutMeshUserHandle = asCutMeshInputPtr->m_user_handle;
+
 #if 0
         // std::shared_ptr<connected_component_t> internalCutMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalCutMesh.get());
@@ -2222,7 +2283,12 @@ extern "C" void preproc(
         TIMESTACK_POP();
     }
 
+    MCUT_ASSERT(cutMeshUserHandle != MC_NULL_HANDLE);
+
+
     // internal source-mesh (possibly with new faces and vertices)
+    McConnectedComponent srcMeshUserHandle = MC_NULL_HANDLE;
+
     {
         TIMESTACK_PUSH("store original src-mesh");
 
@@ -2235,6 +2301,8 @@ extern "C" void preproc(
         MCUT_ASSERT(asSrcMeshInputPtr != nullptr);
 
         asSrcMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+
+        srcMeshUserHandle = asSrcMeshInputPtr->m_user_handle;
 #if 0
         // std::shared_ptr<connected_component_t> internalSrcMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalSrcMesh.get());
@@ -2319,6 +2387,8 @@ extern "C" void preproc(
         TIMESTACK_POP();
     }
 
+    MCUT_ASSERT(srcMeshUserHandle != MC_NULL_HANDLE);
+
     const McUint32 numConnectedComponentsCreatedDefault = 2; // source-mesh and cut-mesh (potentially modified due to poly partitioning)
 
     const bool haveStandardIntersection = numConnectedComponentsCreated > numConnectedComponentsCreatedDefault;
@@ -2326,6 +2396,14 @@ extern "C" void preproc(
     
     if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
     {
+        context_ptr->dbg_cb(
+            MC_DEBUG_SOURCE_FRONTEND,
+            MC_DEBUG_TYPE_OTHER,
+            0,
+            MC_DEBUG_SEVERITY_NOTIFICATION,
+            "Determining intersection-type of input meshes");
+
+
         if (haveStandardIntersection)
         {
             context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -2345,78 +2423,61 @@ extern "C" void preproc(
             {
                 context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
             }
-            else if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == true) // both watertight
-            {
-                //
-                // TODO: move this logic into its own function
-                //
-                
-                //
-                // check if cut-mesh in source-mesh
-                //
+            else {
+                if (!(context_ptr->get_flags() & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE))
                 {
-                    // pick any point in cut-mesh (we chose the 1st)
-                    const vec3& query = cut_hmesh->vertex(vertex_descriptor_t(0));
-
-                    double windingNumber = 0;
-
-                    // test query point against all other faces
-                    for (face_array_iterator_t fiter = source_hmesh->faces_begin(); fiter != source_hmesh->faces_end(); ++fiter) {
-
-                        const std::vector<vertex_descriptor_t> vertex_descriptors = source_hmesh->get_vertices_around_face(*fiter);
-                        const uint32_t numVerticesInFace = (unsigned)vertex_descriptors.size();
-
-                        std::vector<uint32_t> triangulation;
-
-                        if (numVerticesInFace > 3)
-                        {
-                            context_ptr->dbg_cb(
-                                MC_DEBUG_SOURCE_FRONTEND,
-                                MC_DEBUG_TYPE_ERROR,
-                                0,
-                                MC_DEBUG_SEVERITY_NOTIFICATION,
-                                std::string("source mesh") + " contains non-triangulated face (" + std::to_string(*fiter) + ")");
-
-                            //
-                            // TODO: temporarilly triangulate face (maybe we can just use get_connected_component_data_impl)
-                            //
-                        }
-                        else {
-                            for (std::vector<vertex_descriptor_t>::const_iterator viter = vertex_descriptors.cbegin(); viter != vertex_descriptors.cend(); ++viter)
-                            {
-                                triangulation.push_back((uint32_t)(*viter));
-                            }
-                        }
-
-                        // for each triangle
-                        for (unsigned int i = 0; i < triangulation.size(); i += 3)
-                        {
-
-                            std::vector<vec3> triangle_vertex_coords(3); // every three vertices is a triangle
-                            triangle_vertex_coords[0] = source_hmesh->vertex(vertex_descriptor_t(triangulation[(i * 3) + 0]));
-                            triangle_vertex_coords[1] = source_hmesh->vertex(vertex_descriptor_t(triangulation[(i * 3) + 1]));
-                            triangle_vertex_coords[2] = source_hmesh->vertex(vertex_descriptor_t(triangulation[(i * 3) + 2]));
-
-                            const double solidAngle = calculate_signed_solid_angle(triangle_vertex_coords[0], triangle_vertex_coords[1], triangle_vertex_coords[2], query);
-                            windingNumber += solidAngle;
-                        }
-                    }
-
-                    printf("winding number = %f\n", windingNumber);
+                    //
+                    // This condition is required because the logic that follows below is dependent on the internal function 
+                    // "get_connected_component_data_impl" (for CDT indices), which when called will/must run on anothe device/API
+                    // thread which is not the one that is executing the current dispatch function.
+                    // Otherwise,  it leads to a deadlock. That is, calling "get_connected_component_data_impl"
+                    // would add that task to the internal device-thread queue, which we would then wait-on indefinitely since
+                    // it is only the current thread that would be able to exeuted the submitted task (submitted task is dependent 
+                    // on current task).
+                    // 
+                    // PERSONAL NOTE: if user submits other API tasks which current thread is executing this dispatch function,
+                    // Those tasks will be assigned to the current thread if there is an explicitely specified dependency. Otherwise,
+                    // those tasks are deemed independent and will therefore run on the other device thread. So in the worst case,
+                    // the function "get_connected_component_data_impl" may have to wait on other user-submitted tasks
+                    // See also the definition of "prepare_and_submit_API_task" 
+                    // 
+                    context_ptr->dbg_cb(
+                        MC_DEBUG_SOURCE_FRONTEND,
+                        MC_DEBUG_TYPE_ERROR,
+                        0,
+                        MC_DEBUG_SEVERITY_MEDIUM,
+                        "Cannot determine intersection-type: context with must be created with MC_OUT_OF_ORDER_EXEC_MODE_ENABLE");
+                    // done
                 }
+                else {
 
-                //
-                // check if source-mesh in cut-mesh
-                //
+                    if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == true) // both watertight
+                    {                      
+                        
+                        //
+                        // check if cut-mesh in source-mesh
+                        //
+                        
+                        // pick any point in cut-mesh (we chose the 1st)
+                        const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
 
-            }
-            else if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == false) // only source mesh is watertight
-            {
+                        const double windingNumber = getConnectedComponentWindingNumber(context_ptr, srcMeshUserHandle, cutMeshQueryPoint);
 
-            }
-            else // only cut mesh is watertight
-            {
-                MCUT_ASSERT(kernel_output.src_mesh_is_watertight == false && kernel_output.cut_mesh_is_watertight == true);
+                        printf("windingNumber=%f\n", windingNumber);
+
+                        //
+                        // TODO: do stuff with windingNumber (if WN says out then we also query with src-mesh point to confirm)
+                        //
+                    }
+                    else if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == false) // only source mesh is watertight
+                    {
+
+                    }
+                    else // only cut mesh is watertight
+                    {
+                        MCUT_ASSERT(kernel_output.src_mesh_is_watertight == false && kernel_output.cut_mesh_is_watertight == true);
+                    }
+                }
             }
         }
 
