@@ -1481,37 +1481,7 @@ void update_neighouring_ps_iface_m0_edge_list(
 
 typedef std::vector<hd_t> traced_polygon_t;
 
-bool mesh_is_closed(
-#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-    thread_pool& scheduler,
-#endif
-    const hmesh_t& mesh)
-{
-    bool all_halfedges_incident_to_face = true;
-#if 0 // defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-    {
-        printf("mesh=%d\n", (int)mesh.number_of_halfedges());
-        all_halfedges_incident_to_face = parallel_find_if(
-                                             scheduler,
-                                             mesh.halfedges_begin(),
-                                             mesh.halfedges_end(),
-                                             [&](hd_t h) {
-                                                 const fd_t f = mesh.face(h);
-                                                 return (f == hmesh_t::null_face());
-                                             })
-            == mesh.halfedges_end();
-    }
-#else
-    for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
-        const fd_t f = mesh.face(*iter);
-        if (f == hmesh_t::null_face()) {
-            all_halfedges_incident_to_face = false;
-            break;
-        }
-    }
-#endif
-    return all_halfedges_incident_to_face;
-}
+
 
 // TODO: thsi can be improved by comparing based on the largest component of the difference vector
 // sort points along a straight line
@@ -1583,26 +1553,8 @@ void dispatch(output_t& output, const input_t& input)
     const int cs_face_count = cs.number_of_faces();
     const int cs_vtx_count = cs.number_of_vertices();
 
-    TIMESTACK_PUSH("Check source mesh is closed");
-    const bool sm_is_watertight = mesh_is_closed(
-#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-        *input.scheduler,
-#endif
-        sm);
-
-    TIMESTACK_POP();
-
-    TIMESTACK_PUSH("Check cut mesh is closed");
-    const bool cm_is_watertight = mesh_is_closed(
-#if 0// defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-        *input.scheduler,
-#endif
-        cs);
-
-    output.src_mesh_is_watertight = sm_is_watertight;
-    output.cut_mesh_is_watertight = cm_is_watertight;
-
-    TIMESTACK_POP();
+    const bool sm_is_watertight = input.src_mesh_is_watertight;
+    const bool cm_is_watertight = input.cut_mesh_is_watertight;
 
     ///////////////////////////////////////////////////////////////////////////
     // create polygon soup
@@ -10667,9 +10619,9 @@ void dispatch(output_t& output, const input_t& input)
             // fragment that is "below" will have zero cut-mesh polygons. Hence.
             std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>& cc_instances = cc_iter->second;
 
-            if (!userWantsEvenPartiallySealedFragmentsANY) {
-                MCUT_ASSERT(cc_instances.size() == 1); // there is only one, fully sealed, copy
-            }
+            //if (!userWantsEvenPartiallySealedFragmentsANY) {
+            //    MCUT_ASSERT(cc_instances.size() == 1); // there is only one, fully sealed, copy
+            //}
 
             // For each instance of CC (each instance differs by one stitched polygon)
             for (std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>::iterator cc_instance_iter = cc_instances.begin();

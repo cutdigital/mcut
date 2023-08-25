@@ -680,8 +680,7 @@ public:
         McCommandType cmdType, // the type of command that the user has submitted
         uint32_t numEventsInWaitlist, // the number of (previously submitted or user) events to wait for
         const McEvent* pEventWaitList, // the list/array of events to wait for _before_ executing the submitted task
-        FunctionType api_fn, // a function (lambda/functor) encapsulating the API task to be executed asynchronously
-        std::thread::id submittingDeviceThreadID /*sometimes device threads might also submit internal API tasks, in which case we use their ID to assign work to the other device thread (to prevent deadlocks) */
+        FunctionType api_fn // a function (lambda/functor) encapsulating the API task to be executed asynchronously
     )
     {
         //
@@ -742,23 +741,12 @@ public:
 
         if (!have_responsible_thread) {
             uint32_t assignedThread = UINT32_MAX;
-
-            if (m_api_threads.size() > 1)
-            { // assign to thread that is not the submitting thread
-                for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {
-                    if (m_api_threads[i].get_id() != submittingDeviceThreadID)
-                    {
-                        assignedThread = i;
-                        break;
-                    }
-                }
-            }
-            else {
-                for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {  // assign to any thread with an empty queue
-                    if (m_queues[i].empty()) {
-                        assignedThread = i;
-                        break;
-                    }
+            
+            for (uint32_t i = 0; i < (uint32_t)m_api_threads.size(); ++i) {  // assign to any thread with an empty queue
+                const uint32_t index = (i + 1) % (uint32_t)m_api_threads.size();
+                if (m_queues[index].empty()) {
+                    assignedThread = index;
+                    break;
                 }
             }
         
@@ -913,6 +901,15 @@ public:
         }
     }
 };
+
+extern "C" void triangulate_face(
+    //  list of indices which define all triangles that result from the CDT
+    std::vector<uint32_t>&cc_face_triangulation,
+    const std::shared_ptr<context_t>&context_uptr,
+    const uint32_t cc_face_vcount,
+    const std::vector<vertex_descriptor_t>&cc_face_vertices,
+    const hmesh_t & cc,
+    const fd_t cc_face_iter);
 
 // list of contexts created by client/user
 extern "C" threadsafe_list<std::shared_ptr<context_t>> g_contexts;

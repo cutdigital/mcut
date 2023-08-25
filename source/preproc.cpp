@@ -1314,6 +1314,58 @@ double calculate_signed_solid_angle(
     return 2.0 * std::atan2(numerator, denominator);
 }
 
+double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
+{
+    double windingNumber = 0;
+
+    // TODO: make parallel
+    for (face_array_iterator_t it = mesh->faces_begin(); it != mesh->faces_end(); ++it)
+    {
+        const face_descriptor_t face_descr = *it;
+
+        const std::vector<vertex_descriptor_t> vertices_around_face = mesh->get_vertices_around_face(face_descr);
+        const uint32_t num_vertices_around_face = vertices_around_face.size();
+        if (num_vertices_around_face > 3)
+        {
+            std::vector<uint32_t> cdt; // indices local to face
+            triangulate_face(cdt, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), *it);
+
+            std::vector<uint32_t> tris;
+            for (uint32_t i = 0; i < (uint32_t)cdt.size(); ++i) {
+                const uint32_t local_idx = cdt[i]; // id local within the current face that we are triangulating
+                MCUT_ASSERT(local_idx < num_vertices_around_face);
+                const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];
+                MCUT_ASSERT(global_idx < (uint32_t)mesh->number_of_vertices());
+
+                tris.push_back(global_idx);
+            }
+            // TODO: we don't need two for-loops but it help to get things working first!
+            for (uint32_t i = 0; i < (uint32_t)tris.size()/3; ++i) 
+            {
+                const vertex_descriptor_t idx0 = vertex_descriptor_t(tris[(i * 3) + 0]);
+                const vertex_descriptor_t idx1 = vertex_descriptor_t(tris[(i * 3) + 1]);
+                const vertex_descriptor_t idx2 = vertex_descriptor_t(tris[(i * 3) + 2]);
+
+                const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
+                windingNumber += solidAngle;
+            }
+        }
+        else
+        {
+            const double solidAngle = calculate_signed_solid_angle(
+                mesh->vertex(vertices_around_face[0]),
+                mesh->vertex(vertices_around_face[1]),
+                mesh->vertex(vertices_around_face[2]),
+                queryPoint);
+
+            windingNumber += solidAngle;
+        }
+    }
+
+    return windingNumber;
+}
+
+#if 0
 double getConnectedComponentWindingNumber(const std::shared_ptr<context_t> context_ptr, McConnectedComponent connCompId, const vec3& queryPoint)
 {
     //
@@ -1371,6 +1423,41 @@ double getConnectedComponentWindingNumber(const std::shared_ptr<context_t> conte
     return windingNumber;
 }
 
+#endif
+
+bool mesh_is_closed(
+#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    thread_pool& scheduler,
+#endif
+    const hmesh_t& mesh)
+{
+    bool all_halfedges_incident_to_face = true;
+#if 0 // defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    {
+        printf("mesh=%d\n", (int)mesh.number_of_halfedges());
+        all_halfedges_incident_to_face = parallel_find_if(
+            scheduler,
+            mesh.halfedges_begin(),
+            mesh.halfedges_end(),
+            [&](hd_t h) {
+                const fd_t f = mesh.face(h);
+                return (f == hmesh_t::null_face());
+            })
+            == mesh.halfedges_end();
+    }
+#else
+    for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
+        const fd_t f = mesh.face(*iter);
+        if (f == hmesh_t::null_face()) {
+            all_halfedges_incident_to_face = false;
+            break;
+        }
+    }
+#endif
+    return all_halfedges_incident_to_face;
+}
+
+
 extern "C" void preproc(
     std::shared_ptr<context_t> context_ptr,
     McFlags dispatchFlags,
@@ -1395,6 +1482,12 @@ extern "C" void preproc(
     if (false == check_input_mesh(context_ptr, *source_hmesh.get())) {
         throw std::invalid_argument("invalid source-mesh connectivity");
     }
+
+    bool sm_is_watertight = false;
+    bool cm_is_watertight = false;
+
+    
+
 
     input_t kernel_input; // kernel/backend inpout
 
@@ -1584,7 +1677,7 @@ extern "C" void preproc(
 
             context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, "general position assumption violated!");
 
-            if (cut_mesh_perturbation_count == context_ptr->get_general_position_enforcement_constant()) {
+            if (cut_mesh_perturbation_count == context_ptr->get_general_position_enforcement_attempts()) {
 
                 context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, kernel_output.logger.get_reason_for_failure());
 
@@ -1734,6 +1827,30 @@ extern "C" void preproc(
             throw std::invalid_argument("invalid cut-mesh connectivity");
         }
 
+        if (kernel_invocation_counter == 0) // first iteration
+        {
+            TIMESTACK_PUSH("Check source mesh is closed");
+            sm_is_watertight = mesh_is_closed(
+#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+                * input.scheduler,
+#endif
+                * source_hmesh.get());
+
+            TIMESTACK_POP();
+
+            TIMESTACK_PUSH("Check cut mesh is closed");
+            cm_is_watertight = mesh_is_closed(
+#if 0// defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+                * input.scheduler,
+#endif
+                * cut_hmesh.get());
+
+            kernel_input.src_mesh_is_watertight = sm_is_watertight;
+            kernel_input.cut_mesh_is_watertight = cm_is_watertight;
+
+            TIMESTACK_POP();
+        }
+
         if (source_or_cut_hmesh_BVH_rebuilt) { 
             // Evaluate BVHs to find polygon pairs that will be tested for intersection
             // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1775,9 +1892,56 @@ extern "C" void preproc(
                     continue;
                 } else {
                     context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
-                    if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
-                    {
-                        context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+                    if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
+                    { 
+                         // TODO: check if one BVH root is inside of the other, then check winding number
+
+                        // If both meshes are not watertight, then we treat return [no intersection]!
+                        // NOTE: even if the meshes appear closed (in the geometric sense) as long as both meshes have at least
+                        // one edge that is used by only one face we have to notify the user that there is no intersection. 
+                        // This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
+                        // when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
+                        // to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
+                        // strict limit!
+                        printf("%d %d\n", sm_is_watertight, cm_is_watertight);
+                        if (sm_is_watertight == false && cm_is_watertight == false)
+                        {
+                            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+                        }
+                        else if (sm_is_watertight == true && cm_is_watertight == true) // both watertight
+                        {
+
+                            //
+                            // check if cut-mesh in source-mesh
+                            //
+
+                            // pick any point in cut-mesh (we chose the 1st)
+                            const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
+
+                            const double windingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
+
+                            printf("windingNumber=%f\n", windingNumber);
+
+                            //
+                            // TODO: do stuff with windingNumber (if WN says out then we also query with src-mesh point to confirm)
+                            //
+                        }
+                        else if (sm_is_watertight == true && cm_is_watertight == false) // only source mesh is watertight
+                        {
+
+                        }
+                        else // only cut mesh is watertight
+                        {
+                            MCUT_ASSERT(sm_is_watertight == false && cm_is_watertight == true);
+                        }
+
+                    
+
+                        // must be something valid
+                        MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
+
+                        //////
+                            
                     }
                     return; // we are done
                 }
@@ -2177,7 +2341,6 @@ extern "C" void preproc(
 
     // input connected components
     // --------------------------
-    McConnectedComponent cutMeshUserHandle = MC_NULL_HANDLE;
 
     // internal cut-mesh (possibly with new faces and vertices)
     {
@@ -2193,7 +2356,6 @@ extern "C" void preproc(
 
         asCutMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
-        cutMeshUserHandle = asCutMeshInputPtr->m_user_handle;
 
 #if 0
         // std::shared_ptr<connected_component_t> internalCutMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
@@ -2283,11 +2445,10 @@ extern "C" void preproc(
         TIMESTACK_POP();
     }
 
-    MCUT_ASSERT(cutMeshUserHandle != MC_NULL_HANDLE);
 
 
     // internal source-mesh (possibly with new faces and vertices)
-    McConnectedComponent srcMeshUserHandle = MC_NULL_HANDLE;
+
 
     {
         TIMESTACK_PUSH("store original src-mesh");
@@ -2302,7 +2463,6 @@ extern "C" void preproc(
 
         asSrcMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
 
-        srcMeshUserHandle = asSrcMeshInputPtr->m_user_handle;
 #if 0
         // std::shared_ptr<connected_component_t> internalSrcMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalSrcMesh.get());
@@ -2387,14 +2547,13 @@ extern "C" void preproc(
         TIMESTACK_POP();
     }
 
-    MCUT_ASSERT(srcMeshUserHandle != MC_NULL_HANDLE);
 
     const McUint32 numConnectedComponentsCreatedDefault = 2; // source-mesh and cut-mesh (potentially modified due to poly partitioning)
 
     const bool haveStandardIntersection = numConnectedComponentsCreated > numConnectedComponentsCreatedDefault;
     const bool haveNoIntersection = numConnectedComponentsCreated == numConnectedComponentsCreatedDefault;
     
-    if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
+    if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
     {
         context_ptr->dbg_cb(
             MC_DEBUG_SOURCE_FRONTEND,
@@ -2419,70 +2578,41 @@ extern "C" void preproc(
             // when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
             // to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
             // strict limit!
-            if (kernel_output.src_mesh_is_watertight == false && kernel_output.cut_mesh_is_watertight == false)
+            if (sm_is_watertight == false && cm_is_watertight == false)
             {
                 context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
             }
-            else {
-                if (!(context_ptr->get_flags() & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE))
-                {
-                    //
-                    // This condition is required because the logic that follows below is dependent on the internal function 
-                    // "get_connected_component_data_impl" (for CDT indices), which when called will/must run on anothe device/API
-                    // thread which is not the one that is executing the current dispatch function.
-                    // Otherwise,  it leads to a deadlock. That is, calling "get_connected_component_data_impl"
-                    // would add that task to the internal device-thread queue, which we would then wait-on indefinitely since
-                    // it is only the current thread that would be able to exeuted the submitted task (submitted task is dependent 
-                    // on current task).
-                    // 
-                    // PERSONAL NOTE: if user submits other API tasks which current thread is executing this dispatch function,
-                    // Those tasks will be assigned to the current thread if there is an explicitely specified dependency. Otherwise,
-                    // those tasks are deemed independent and will therefore run on the other device thread. So in the worst case,
-                    // the function "get_connected_component_data_impl" may have to wait on other user-submitted tasks
-                    // See also the definition of "prepare_and_submit_API_task" 
-                    // 
-                    context_ptr->dbg_cb(
-                        MC_DEBUG_SOURCE_FRONTEND,
-                        MC_DEBUG_TYPE_ERROR,
-                        0,
-                        MC_DEBUG_SEVERITY_MEDIUM,
-                        "Cannot determine intersection-type: context with must be created with MC_OUT_OF_ORDER_EXEC_MODE_ENABLE");
-                    // done
-                }
-                else {
-
-                    if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == true) // both watertight
-                    {                      
+            else if (sm_is_watertight == true && cm_is_watertight == true) // both watertight
+            {                      
                         
-                        //
-                        // check if cut-mesh in source-mesh
-                        //
+                //
+                // check if cut-mesh in source-mesh
+                //
                         
-                        // pick any point in cut-mesh (we chose the 1st)
-                        const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
+                // pick any point in cut-mesh (we chose the 1st)
+                const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
 
-                        const double windingNumber = getConnectedComponentWindingNumber(context_ptr, srcMeshUserHandle, cutMeshQueryPoint);
+                const double windingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
 
-                        printf("windingNumber=%f\n", windingNumber);
+                printf("windingNumber=%f\n", windingNumber);
 
-                        //
-                        // TODO: do stuff with windingNumber (if WN says out then we also query with src-mesh point to confirm)
-                        //
-                    }
-                    else if (kernel_output.src_mesh_is_watertight == true && kernel_output.cut_mesh_is_watertight == false) // only source mesh is watertight
-                    {
-
-                    }
-                    else // only cut mesh is watertight
-                    {
-                        MCUT_ASSERT(kernel_output.src_mesh_is_watertight == false && kernel_output.cut_mesh_is_watertight == true);
-                    }
-                }
+                //
+                // TODO: do stuff with windingNumber (if WN says out then we also query with src-mesh point to confirm)
+                //
             }
+            else if (sm_is_watertight == true && cm_is_watertight == false) // only source mesh is watertight
+            {
+
+            }
+            else // only cut mesh is watertight
+            {
+                MCUT_ASSERT(sm_is_watertight == false && cm_is_watertight == true);
+            }
+                
         }
 
         // must be something valid
         MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
 
-    } // if (dispatchFlags & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE)
+    } // if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE)
 }

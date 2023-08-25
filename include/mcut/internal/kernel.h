@@ -154,6 +154,8 @@ struct input_t {
     //bool keep_fragments_sealed_outside_exhaustive = false; // TODO remove
     // NOTE TO SELF: if the user simply wants patches, then kernel should not have to proceed to stitching!!!
 
+    bool src_mesh_is_watertight = false;
+    bool cut_mesh_is_watertight = false;
 };
 
 struct output_mesh_data_maps_t {
@@ -208,8 +210,6 @@ struct output_t {
         // info about floating polygons contained on ps-face
         std::vector<floating_polygon_info_t>>
         detected_floating_polygons;
-    bool src_mesh_is_watertight;
-    bool cut_mesh_is_watertight;
 };
 
 // internal main
