@@ -1311,7 +1311,11 @@ double calculate_signed_solid_angle(
 
     const double denominator = 1.0 + dot_product(qa_normalized, qb_normalized) + dot_product(qa_normalized, qc_normalized) + dot_product(qb_normalized, qc_normalized);
 
-    return 2.0 * std::atan2(numerator, denominator);
+    const double pi = 3.14159265358979323846;
+
+    // dividing by 2*pi instead of 4*pi because there was a 2 out front
+    // see eq. 5 in https://igl.ethz.ch/projects/winding-number/robust-inside-outside-segmentation-using-generalized-winding-numbers-siggraph-2013-compressed-jacobson-et-al.pdf
+    return std::atan2(numerator, denominator)  / (2. * pi);
 }
 
 double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
@@ -1455,6 +1459,105 @@ bool mesh_is_closed(
     }
 #endif
     return all_halfedges_incident_to_face;
+}
+
+// If both meshes are not watertight, then we treat return [no intersection]!
+// NOTE: even if the meshes appear closed (in the geometric sense) as long as both meshes have at least
+// one edge that is used by only one face we have to notify the user that there is no intersection. 
+// This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
+// when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
+// to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
+// strict limit!
+void check_and_store_input_mesh_intersection_type(
+    std::shared_ptr<context_t>& context_ptr, 
+    const std::shared_ptr<hmesh_t>& source_hmesh, 
+    const std::shared_ptr<hmesh_t>& cut_hmesh,
+    const bool sm_is_watertight,
+    const bool cm_is_watertight)
+{
+    const double windingNumberEps = 1e-7;
+    // TODO: check if one BVH root is inside of the other, then check winding number
+
+    if (sm_is_watertight == false && cm_is_watertight == false)
+    {
+        context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+    }
+    else if (sm_is_watertight == true && cm_is_watertight == true) // both watertight
+    {
+
+        //
+        // There is room for optimization here: we could test first against the mesh with the larger AABB
+        // 
+
+        //
+        // check if cut-mesh in source-mesh
+        //
+
+        // pick any point in cut-mesh (we chose the 1st)
+        const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
+
+        const double cutMeshQueryPointWindingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
+
+        if (absolute_value(1.0 - cutMeshQueryPointWindingNumber) < windingNumberEps)
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
+        }
+        else
+        {
+            MCUT_ASSERT( absolute_value(1.0 - cutMeshQueryPointWindingNumber) >= windingNumberEps); // outside source mesh
+
+            const vec3& srcMeshQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
+
+            const double srcMeshQueryPointWindingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, cut_hmesh);
+
+            if ( absolute_value(1.0 - srcMeshQueryPointWindingNumber) < windingNumberEps )
+            {
+                context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
+            }
+            else
+            {
+                MCUT_ASSERT( absolute_value(1.0 - srcMeshQueryPointWindingNumber) >= windingNumberEps); // outside cut-mesh
+                context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+            }
+        }
+    }
+    else if (sm_is_watertight == true && cm_is_watertight == false) // only source mesh is watertight
+    {
+        const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
+
+        const double cutMeshQueryPointWindingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
+
+        if ( absolute_value(1.0 - cutMeshQueryPointWindingNumber) < windingNumberEps)
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
+        }
+        else
+        {
+            MCUT_ASSERT( absolute_value(1.0 - cutMeshQueryPointWindingNumber) >= windingNumberEps); // outside source-mesh
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+        }
+    }
+    else // only cut mesh is watertight
+    {
+        MCUT_ASSERT(sm_is_watertight == false && cm_is_watertight == true);
+
+        const vec3& srcMeshQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
+
+        const double srcMeshQueryPointWindingNumber = getWindingNumber(context_ptr, srcMeshQueryPoint, cut_hmesh);
+
+        if ( absolute_value(1.0 - srcMeshQueryPointWindingNumber) < windingNumberEps)
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
+        }
+        else
+        {
+            MCUT_ASSERT( absolute_value(1.0 - srcMeshQueryPointWindingNumber) >= windingNumberEps); // outside cut-mesh
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+        }
+    }
+
+    // must be something valid
+    MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
 }
 
 
@@ -1892,56 +1995,12 @@ extern "C" void preproc(
                     continue;
                 } else {
                     context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+
                     if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
-                    { 
-                         // TODO: check if one BVH root is inside of the other, then check winding number
-
-                        // If both meshes are not watertight, then we treat return [no intersection]!
-                        // NOTE: even if the meshes appear closed (in the geometric sense) as long as both meshes have at least
-                        // one edge that is used by only one face we have to notify the user that there is no intersection. 
-                        // This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
-                        // when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
-                        // to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
-                        // strict limit!
-                        printf("%d %d\n", sm_is_watertight, cm_is_watertight);
-                        if (sm_is_watertight == false && cm_is_watertight == false)
-                        {
-                            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
-                        }
-                        else if (sm_is_watertight == true && cm_is_watertight == true) // both watertight
-                        {
-
-                            //
-                            // check if cut-mesh in source-mesh
-                            //
-
-                            // pick any point in cut-mesh (we chose the 1st)
-                            const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
-
-                            const double windingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
-
-                            printf("windingNumber=%f\n", windingNumber);
-
-                            //
-                            // TODO: do stuff with windingNumber (if WN says out then we also query with src-mesh point to confirm)
-                            //
-                        }
-                        else if (sm_is_watertight == true && cm_is_watertight == false) // only source mesh is watertight
-                        {
-
-                        }
-                        else // only cut mesh is watertight
-                        {
-                            MCUT_ASSERT(sm_is_watertight == false && cm_is_watertight == true);
-                        }
-
-                    
-
-                        // must be something valid
-                        MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
-
-                        //////
-                            
+                    {                         
+                        // NOTE: since the BVHs do not overlap, it is not possible for the intersection type to be "standard" (i.e. surface are 
+                        // not intersecting since we have not even invoked the kernel)
+                        check_and_store_input_mesh_intersection_type(context_ptr, source_hmesh, cut_hmesh, sm_is_watertight, cm_is_watertight);
                     }
                     return; // we are done
                 }
@@ -2562,8 +2621,7 @@ extern "C" void preproc(
             MC_DEBUG_SEVERITY_NOTIFICATION,
             "Determining intersection-type of input meshes");
 
-
-        if (haveStandardIntersection)
+        if (haveStandardIntersection) // kernel actually found the input surfaces to be intersecting
         {
             context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
         }
@@ -2571,44 +2629,7 @@ extern "C" void preproc(
         {
             MCUT_ASSERT(haveNoIntersection); // we are dealing with the case where there exists no intersection of the input surfaces
 
-            // If both meshes are not watertight, then we treat return [no intersection]!
-            // NOTE: even if the meshes appear closed (in the geometric sense) as long as both meshes have at least
-            // one edge that is used by only one face we have to notify the user that there is no intersection. 
-            // This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
-            // when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
-            // to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
-            // strict limit!
-            if (sm_is_watertight == false && cm_is_watertight == false)
-            {
-                context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
-            }
-            else if (sm_is_watertight == true && cm_is_watertight == true) // both watertight
-            {                      
-                        
-                //
-                // check if cut-mesh in source-mesh
-                //
-                        
-                // pick any point in cut-mesh (we chose the 1st)
-                const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
-
-                const double windingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
-
-                printf("windingNumber=%f\n", windingNumber);
-
-                //
-                // TODO: do stuff with windingNumber (if WN says out then we also query with src-mesh point to confirm)
-                //
-            }
-            else if (sm_is_watertight == true && cm_is_watertight == false) // only source mesh is watertight
-            {
-
-            }
-            else // only cut mesh is watertight
-            {
-                MCUT_ASSERT(sm_is_watertight == false && cm_is_watertight == true);
-            }
-                
+            check_and_store_input_mesh_intersection_type(context_ptr, source_hmesh, cut_hmesh, sm_is_watertight, cm_is_watertight);
         }
 
         // must be something valid

@@ -39,18 +39,11 @@
 
     double absolute_value(const double& number)
     {
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::fabs(number);
-#else
-        double out(number);
-        mpfr_abs(out.get_mpfr_handle(), number.get_mpfr_handle(), arbitrary_precision_number_t::get_default_rounding_mode());
-        return out;
-#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
     sign_t sign(const double& number)
     {
-#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         int s = (double(0) < number) - (number < double(0));
         sign_t result = sign_t::ZERO;
         if (s > 0) {
@@ -59,17 +52,7 @@
             result = sign_t::NEGATIVE;
         }
         return result;
-#else
-        double out(number);
-        int s = mpfr_sgn(number.get_mpfr_handle());
-        sign_t result = sign_t::ZERO;
-        if (s > 0) {
-            result = sign_t::POSITIVE;
-        } else if (s < 0) {
-            result = sign_t::NEGATIVE;
-        }
-        return result;
-#endif // #if defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+
     }
 
     std::ostream& operator<<(std::ostream& os, const vec3& v)

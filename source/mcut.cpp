@@ -202,7 +202,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcGetInfo(const McContext context, McFlags info, 
         (info & MC_CONTEXT_FLAGS || //
             info & MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH || //
             info & MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT || //
-            info & MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS)) // check all possible values
+            info & MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS || //
+            info & MC_CONTEXT_DISPATCH_INTERSECTION_TYPE)) // check all possible values
     {
         per_thread_api_log_str = "invalid info flag val (param1)";
     } else if ((info & MC_CONTEXT_FLAGS) && (pMem != nullptr && bytes != sizeof(McFlags))) {
