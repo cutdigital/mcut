@@ -1354,6 +1354,7 @@ double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& quer
                 windingNumber += solidAngle;
             }
         }
+        // TODO: add else if (num_vertices_around_face == 3){} its possible to compute solid angle of a quad too (even a polygon in general)
         else
         {
             const double solidAngle = calculate_signed_solid_angle(
