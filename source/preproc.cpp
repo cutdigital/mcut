@@ -1508,7 +1508,7 @@ void check_and_store_input_mesh_intersection_type(
 
             const vec3& srcMeshQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
 
-            const double srcMeshQueryPointWindingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, cut_hmesh);
+            const double srcMeshQueryPointWindingNumber = getWindingNumber(context_ptr, srcMeshQueryPoint, cut_hmesh);
 
             if ( absolute_value(1.0 - srcMeshQueryPointWindingNumber) < windingNumberEps )
             {
