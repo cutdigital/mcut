@@ -1395,12 +1395,12 @@ double calculate_signed_solid_angle(
         if (numerator012 != double(0))
         {
             const double denominator012 = double(1) + dot01 + dot12 + dot02;
-            omega = std::atan2(numerator012, denominator012) / (2. * pi);
+            omega = std::atan2(numerator012, denominator012) ;
         }
         if (numerator023 != double(0))
         {
             const double denominator023 = double(1) + dot02 + dot23 + dot30;
-            omega += std::atan2(numerator023, denominator023) / (2. * pi);
+            omega += std::atan2(numerator023, denominator023);
         }
     }
     else
@@ -1415,15 +1415,15 @@ double calculate_signed_solid_angle(
         if (numerator013 != double(0))
         {
             const double denominator013 = double(1) + dot01 + dot13 + dot30;
-            omega = std::atan2(numerator013, denominator013) / (2. * pi);
+            omega = std::atan2(numerator013, denominator013) ;
         }
         if (numerator123 != double(0))
         {
             const double denominator123 = double(1) + dot12 + dot23 + dot13;
-            omega += std::atan2(numerator123, denominator123) / (2. * pi);
+            omega += std::atan2(numerator123, denominator123) ;
         }
     }
-    return double(2) * omega;
+    return double(2) * omega / (2. * pi);
 }
 
 double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
@@ -1472,9 +1472,15 @@ double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& quer
         }
         else if (num_vertices_around_face == 4) // quad
         {
+            const double solidAngle = calculate_signed_solid_angle(
+                mesh->vertex(vertices_around_face[0]),
+                mesh->vertex(vertices_around_face[1]),
+                mesh->vertex(vertices_around_face[2]),
+                mesh->vertex(vertices_around_face[3]),
+                queryPoint);
 
+            windingNumber += solidAngle;
         }
-        // TODO: add else if (num_vertices_around_face == 4){} its possible to compute solid angle of a quad too (even a polygon in general)
         else // triangle
         {
             const double solidAngle = calculate_signed_solid_angle(
