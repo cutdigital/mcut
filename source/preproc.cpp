@@ -1318,6 +1318,114 @@ double calculate_signed_solid_angle(
     return std::atan2(numerator, denominator)  / (2. * pi);
 }
 
+// Compute the signed solid angle subtended by quad abcd from query point.
+// based on libigl impl
+double calculate_signed_solid_angle(
+    const vec3& a,
+    const vec3& b,
+    const vec3& c,
+    const vec3& d,
+    const vec3& query)
+{
+    const double pi = 3.14159265358979323846;
+    // Make a, b, c, and d relative to query
+    vec3 v[4] = {
+        a - query,
+        b - query,
+        c - query,
+        d - query
+    };
+
+    const double lengths[4] = {
+        length(v[0]),
+        length(v[1]),
+        length(v[2]),
+        length(v[3])
+    };
+
+    // If any quad vertices are coincident with query,
+    // query is on the surface, which we treat as no solid angle.
+    // We could add the contribution from the non-planar part,
+    // but in the context of a mesh, we'd still miss some, like
+    // we do in the triangle case.
+    if (lengths[0] == double(0) || lengths[1] == double(0) || lengths[2] == double(0) || lengths[3] == double(0))
+        return double(0);
+
+    // Normalize the vectors
+    v[0] = v[0] / lengths[0];
+    v[1] = v[1] / lengths[1];
+    v[2] = v[2] / lengths[2];
+    v[3] = v[3] / lengths[3];
+
+    // Compute (unnormalized, but consistently-scaled) barycentric coordinates
+    // for the query point inside the tetrahedron of points.
+    // If 0 or 4 of the coordinates are positive, (or slightly negative), the
+    // query is (approximately) inside, so the choice of triangulation matters.
+    // Otherwise, the triangulation doesn't matter.
+
+    const vec3 diag02 = v[2] - v[0];
+    const vec3 diag13 = v[3] - v[1];
+    const vec3 v01 = v[1] - v[0];
+    const vec3 v23 = v[3] - v[2];
+
+    double bary[4];
+    bary[0] = dot_product(v[3], cross_product(v23, diag13));
+    bary[1] = -dot_product(v[2], cross_product(v23, diag02));
+    bary[2] = -dot_product(v[1], cross_product(v01, diag13));
+    bary[3] = dot_product(v[0], cross_product(v01, diag02));
+
+    const double dot01 = dot_product(v[0], v[1]);
+    const double dot12 = dot_product(v[1], v[2]);
+    const double dot23 = dot_product(v[2], v[3]);
+    const double dot30 = dot_product(v[3], v[0]);
+
+    double omega = double(0);
+
+    // Equation of a bilinear patch in barycentric coordinates of its
+    // tetrahedron is x0*x2 = x1*x3.  Less is one side; greater is other.
+    if (bary[0] * bary[2] < bary[1] * bary[3])
+    {
+        // Split 0-2: triangles 0,1,2 and 0,2,3
+        const double numerator012 = bary[3];
+        const double numerator023 = bary[1];
+        const double dot02 = dot_product(v[0], v[2]);
+
+        // If numerator is 0, regardless of denominator, query is on the
+        // surface, which we treat as no solid angle.
+        if (numerator012 != double(0))
+        {
+            const double denominator012 = double(1) + dot01 + dot12 + dot02;
+            omega = std::atan2(numerator012, denominator012) / (2. * pi);
+        }
+        if (numerator023 != double(0))
+        {
+            const double denominator023 = double(1) + dot02 + dot23 + dot30;
+            omega += std::atan2(numerator023, denominator023) / (2. * pi);
+        }
+    }
+    else
+    {
+        // Split 1-3: triangles 0,1,3 and 1,2,3
+        const double numerator013 = -bary[2];
+        const double numerator123 = -bary[0];
+        const double dot13 = dot_product(v[1], v[3]);
+
+        // If numerator is 0, regardless of denominator, query is on the
+        // surface, which we treat as no solid angle.
+        if (numerator013 != double(0))
+        {
+            const double denominator013 = double(1) + dot01 + dot13 + dot30;
+            omega = std::atan2(numerator013, denominator013) / (2. * pi);
+        }
+        if (numerator123 != double(0))
+        {
+            const double denominator123 = double(1) + dot12 + dot23 + dot13;
+            omega += std::atan2(numerator123, denominator123) / (2. * pi);
+        }
+    }
+    return double(2) * omega;
+}
+
 double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
 {
     double windingNumber = 0;
@@ -1329,33 +1437,45 @@ double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& quer
 
         const std::vector<vertex_descriptor_t> vertices_around_face = mesh->get_vertices_around_face(face_descr);
         const uint32_t num_vertices_around_face = vertices_around_face.size();
-        if (num_vertices_around_face > 3)
-        {
-            std::vector<uint32_t> cdt; // indices local to face
-            triangulate_face(cdt, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), *it);
 
-            std::vector<uint32_t> tris;
-            for (uint32_t i = 0; i < (uint32_t)cdt.size(); ++i) {
-                const uint32_t local_idx = cdt[i]; // id local within the current face that we are triangulating
+        if (num_vertices_around_face > 4)
+        {
+            std::vector<uint32_t> cdt_local; // triangulation indices local to the face
+            triangulate_face(cdt_local, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), *it);
+
+            std::vector<uint32_t> cdt_global;  // triangulation indices of face (indices refer to "mesh" vertex array)
+
+            // for each cdt index in face
+            for (uint32_t i = 0; i < (uint32_t)cdt_local.size(); ++i) {
+                const uint32_t local_idx = cdt_local[i]; // id local within the current face that we are triangulating
+
                 MCUT_ASSERT(local_idx < num_vertices_around_face);
+
                 const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];
+
                 MCUT_ASSERT(global_idx < (uint32_t)mesh->number_of_vertices());
 
-                tris.push_back(global_idx);
+                cdt_global.push_back(global_idx);
             }
+
             // TODO: we don't need two for-loops but it help to get things working first!
-            for (uint32_t i = 0; i < (uint32_t)tris.size()/3; ++i) 
+
+            for (uint32_t i = 0; i < (uint32_t)cdt_global.size()/3; ++i)
             {
-                const vertex_descriptor_t idx0 = vertex_descriptor_t(tris[(i * 3) + 0]);
-                const vertex_descriptor_t idx1 = vertex_descriptor_t(tris[(i * 3) + 1]);
-                const vertex_descriptor_t idx2 = vertex_descriptor_t(tris[(i * 3) + 2]);
+                const vertex_descriptor_t idx0 = vertex_descriptor_t(cdt_global[(i * 3) + 0]);
+                const vertex_descriptor_t idx1 = vertex_descriptor_t(cdt_global[(i * 3) + 1]);
+                const vertex_descriptor_t idx2 = vertex_descriptor_t(cdt_global[(i * 3) + 2]);
 
                 const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
                 windingNumber += solidAngle;
             }
         }
-        // TODO: add else if (num_vertices_around_face == 3){} its possible to compute solid angle of a quad too (even a polygon in general)
-        else
+        else if (num_vertices_around_face == 4) // quad
+        {
+
+        }
+        // TODO: add else if (num_vertices_around_face == 4){} its possible to compute solid angle of a quad too (even a polygon in general)
+        else // triangle
         {
             const double solidAngle = calculate_signed_solid_angle(
                 mesh->vertex(vertices_around_face[0]),
