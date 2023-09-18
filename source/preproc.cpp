@@ -1458,8 +1458,6 @@ double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& quer
                 cdt_global.push_back(global_idx);
             }
 
-            // TODO: we don't need two for-loops but it help to get things working first!
-
             for (uint32_t i = 0; i < (uint32_t)cdt_global.size()/3; ++i)
             {
                 const vertex_descriptor_t idx0 = vertex_descriptor_t(cdt_global[(i * 3) + 0]);
@@ -1588,24 +1586,25 @@ bool mesh_is_closed(
     return all_halfedges_incident_to_face;
 }
 
-// If both meshes are not watertight, then we treat return [no intersection]!
-// NOTE: even if the meshes appear closed (in the geometric sense) as long as both meshes have at least
+// If either mesh is not watertight, then we return [no intersection]!
+// NOTE: even if the meshes appear closed (in the geometric sense) as long as either mesh has at least
 // one edge that is used by only one face we have to notify the user that there is no intersection. 
 // This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
 // when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
-// to ask "by how much does it lie inside?"). This is "threshold" territory and we do not want to go there as a 
+// to ask "by how much does it lie inside?"). This is "threshold territory" and we do not want to go there as a 
 // strict limit!
 void check_and_store_input_mesh_intersection_type(
     std::shared_ptr<context_t>& context_ptr, 
     const std::shared_ptr<hmesh_t>& source_hmesh, 
     const std::shared_ptr<hmesh_t>& cut_hmesh,
     const bool sm_is_watertight,
-    const bool cm_is_watertight)
+    const bool cm_is_watertight,
+    const bounding_box_t<vec3>& sm_aabb,
+    const bounding_box_t<vec3>& cm_aabb)
 {
     const double windingNumberEps = 1e-7;
-    // TODO: check if one BVH root is inside of the other, then check winding number
 
-    if (sm_is_watertight == false && cm_is_watertight == false)
+    if (sm_is_watertight == false && cm_is_watertight == false || intersect_bounding_boxes(sm_aabb, cm_aabb) == false)
     {
         context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
     }
@@ -1613,37 +1612,45 @@ void check_and_store_input_mesh_intersection_type(
     {
 
         //
-        // There is room for optimization here: we could test first against the mesh with the larger AABB
+        // we test first against the mesh with the larger AABB
         // 
+        const double sm_aabb_diag = squared_length(sm_aabb.maximum() - sm_aabb.minimum());
+        const double cm_aabb_diag = squared_length(cm_aabb.maximum() - cm_aabb.minimum());
+        const bool sm_larger_than_cm = sm_aabb_diag > cm_aabb_diag;
+        // mesh with larger bounding box
+        const std::shared_ptr<hmesh_t>& meshA = sm_larger_than_cm ? source_hmesh : cut_hmesh;
+        const std::shared_ptr<hmesh_t>& meshB = sm_larger_than_cm ? cut_hmesh : source_hmesh;
 
         //
-        // check if cut-mesh in source-mesh
+        // check if meshB in meshA
         //
 
-        // pick any point in cut-mesh (we chose the 1st)
-        const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
+        // pick any point in meshB (we chose the 1st)
+        const vec3& meshBQueryPoint = meshB->vertex(vertex_descriptor_t(0));
 
-        const double cutMeshQueryPointWindingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
+        const double meshBQueryPointWindingNumber = getWindingNumber(context_ptr, meshBQueryPoint, meshA);
 
-        if (absolute_value(1.0 - cutMeshQueryPointWindingNumber) < windingNumberEps)
+        if (absolute_value(1.0 - meshBQueryPointWindingNumber) < windingNumberEps)
         {
-            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
+            const McDispatchIntersectionType itype = sm_larger_than_cm ? McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH : McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH;
+            context_ptr->set_most_recent_dispatch_intersection_type(itype);
         }
         else
         {
-            MCUT_ASSERT( absolute_value(1.0 - cutMeshQueryPointWindingNumber) >= windingNumberEps); // outside source mesh
+            MCUT_ASSERT( absolute_value(1.0 - meshBQueryPointWindingNumber) >= windingNumberEps); // outside source mesh
 
-            const vec3& srcMeshQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
+            const vec3& meshAQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
 
-            const double srcMeshQueryPointWindingNumber = getWindingNumber(context_ptr, srcMeshQueryPoint, cut_hmesh);
+            const double meshAQueryPointWindingNumber = getWindingNumber(context_ptr, meshAQueryPoint, meshB);
 
-            if ( absolute_value(1.0 - srcMeshQueryPointWindingNumber) < windingNumberEps )
+            if ( absolute_value(1.0 - meshAQueryPointWindingNumber) < windingNumberEps )
             {
-                context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
+                const McDispatchIntersectionType itype = sm_larger_than_cm ? McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH : McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH;
+                context_ptr->set_most_recent_dispatch_intersection_type(itype);
             }
             else
             {
-                MCUT_ASSERT( absolute_value(1.0 - srcMeshQueryPointWindingNumber) >= windingNumberEps); // outside cut-mesh
+                MCUT_ASSERT( absolute_value(1.0 - meshAQueryPointWindingNumber) >= windingNumberEps); // outside cut-mesh
                 context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
             }
         }
@@ -2127,7 +2134,11 @@ extern "C" void preproc(
                     {                         
                         // NOTE: since the BVHs do not overlap, it is not possible for the intersection type to be "standard" (i.e. surface are 
                         // not intersecting since we have not even invoked the kernel)
-                        check_and_store_input_mesh_intersection_type(context_ptr, source_hmesh, cut_hmesh, sm_is_watertight, cm_is_watertight);
+                        check_and_store_input_mesh_intersection_type(
+                            context_ptr, 
+                            source_hmesh, cut_hmesh, //
+                            sm_is_watertight, cm_is_watertight, //
+                            source_hmesh_BVH_aabb_array[0], cut_hmesh_BVH_aabb_array[0]);
                     }
                     return; // we are done
                 }
@@ -2756,7 +2767,11 @@ extern "C" void preproc(
         {
             MCUT_ASSERT(haveNoIntersection); // we are dealing with the case where there exists no intersection of the input surfaces
 
-            check_and_store_input_mesh_intersection_type(context_ptr, source_hmesh, cut_hmesh, sm_is_watertight, cm_is_watertight);
+            check_and_store_input_mesh_intersection_type(
+                context_ptr, //
+                source_hmesh, cut_hmesh, //
+                sm_is_watertight, cm_is_watertight, //
+                source_hmesh_BVH_aabb_array[0], cut_hmesh_BVH_aabb_array[0]);
         }
 
         // must be something valid
