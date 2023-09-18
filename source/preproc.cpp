@@ -1423,7 +1423,7 @@ double calculate_signed_solid_angle(
             omega += std::atan2(numerator123, denominator123) ;
         }
     }
-    return double(2) * omega / (2. * pi);
+    return /*double(2) **/ omega / (2. * pi);
 }
 
 double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
