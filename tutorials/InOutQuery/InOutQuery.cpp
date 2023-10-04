@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
 
     McContext context = MC_NULL_HANDLE;
 
-    api_err = mcCreateContext(&context, MC_DEBUG);
+    api_err = mcCreateContextWithHelpers(&context, MC_DEBUG, 2);
 
     if (api_err != MC_NO_ERROR) {
         printf("mcCreateContext failed (err=%d)", (int)api_err);
@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
         context,
         MC_DISPATCH_VERTEX_ARRAY_DOUBLE | 
         /* This flag is now required. Otherwise, MCUT will not check for the [type of intersection] when the inputs do not intersect to produce a cut. 
-        If this flag is not specified, then querying the intersection type will return either 1_ a stale value from some other 
+        If this flag is not specified, then querying the intersection type will return either 1) a stale value from some other 
         dispatch call (for which the flag was specified) or 2) "MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM" which is the default value. */
         MC_DISPATCH_INCLUDE_INTERSECTION_TYPE ,
         // source mesh

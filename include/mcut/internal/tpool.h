@@ -1007,4 +1007,13 @@ public:
     }
 };
 
+// NOTE: there's no guarantee that atomic<double> doesn't use mutexes
+template<typename T>
+T mc_atomic_fetch_add(std::atomic<T>* obj, T arg) {
+    T expected = obj->load();
+    while (!atomic_compare_exchange_weak(obj, &expected, expected + arg))
+        ;
+    return expected;
+}
+
 #endif // MCUT_SCHEDULER_H_

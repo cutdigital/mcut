@@ -1426,133 +1426,114 @@ double calculate_signed_solid_angle(
     return /*double(2) **/ omega / (2. * pi);
 }
 
+double computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh, const face_descriptor_t face_descr)
+{
+    const std::vector<vertex_descriptor_t> vertices_around_face = mesh->get_vertices_around_face(face_descr);
+    const uint32_t num_vertices_around_face = vertices_around_face.size();
+
+    double windingNumber = 0;
+
+    if (num_vertices_around_face > 4)
+    {
+        std::vector<uint32_t> cdt_local; // triangulation indices local to the face
+        triangulate_face(cdt_local, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), face_descr);
+
+        std::vector<uint32_t> cdt_global;  // triangulation indices of face (indices refer to "mesh" vertex array)
+
+        // for each cdt index in face
+        for (uint32_t i = 0; i < (uint32_t)cdt_local.size(); ++i) {
+            const uint32_t local_idx = cdt_local[i]; // id local within the current face that we have triangulated
+
+            MCUT_ASSERT(local_idx < num_vertices_around_face);
+
+            const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];
+
+            MCUT_ASSERT(global_idx < (uint32_t)mesh->number_of_vertices());
+
+            cdt_global.push_back(global_idx);
+        }
+
+        // for each triangle
+        for (uint32_t i = 0; i < (uint32_t)cdt_global.size() / 3; ++i)
+        {
+            const vertex_descriptor_t idx0 = vertex_descriptor_t(cdt_global[(i * 3) + 0]);
+            const vertex_descriptor_t idx1 = vertex_descriptor_t(cdt_global[(i * 3) + 1]);
+            const vertex_descriptor_t idx2 = vertex_descriptor_t(cdt_global[(i * 3) + 2]);
+
+            const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
+            windingNumber += solidAngle;
+        }
+    }
+    else if (num_vertices_around_face == 4) // face is a quad
+    {
+        const double solidAngle = calculate_signed_solid_angle(
+            mesh->vertex(vertices_around_face[0]),
+            mesh->vertex(vertices_around_face[1]),
+            mesh->vertex(vertices_around_face[2]),
+            mesh->vertex(vertices_around_face[3]),
+            queryPoint);
+
+        windingNumber += solidAngle;
+    }
+    else // face is a triangle
+    {
+        const double solidAngle = calculate_signed_solid_angle(
+            mesh->vertex(vertices_around_face[0]),
+            mesh->vertex(vertices_around_face[1]),
+            mesh->vertex(vertices_around_face[2]),
+            queryPoint);
+
+        windingNumber += solidAngle;
+    }
+
+    return windingNumber;
+}
+
 double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
 {
     double windingNumber = 0;
 
-    // TODO: make parallel
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    {
+        std::atomic<double> gWindingNumber = 0; // Some garbage value (why not 42)
+
+        auto fn_compute_winding_number = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+
+            double wn = 0; // local winding number computed by current thread
+
+            for (face_array_iterator_t face_iter = block_start_; face_iter != block_end_; ++face_iter) {
+
+                const face_descriptor_t descr = *face_iter;
+                
+                wn += computeWindingNumberOnFace(context_ptr, queryPoint, mesh, descr);
+            }
+
+            mc_atomic_fetch_add(&gWindingNumber, wn);
+        };
+
+        parallel_for(
+            context_ptr->get_shared_compute_threadpool(),
+            mesh->faces_begin(),
+            mesh->faces_end(),
+            fn_compute_winding_number, 
+            1<<12 // min 4096 elements before bothering to run multiple threads
+        );
+
+        std::atomic_thread_fence(std::memory_order_acq_rel);
+
+        windingNumber = gWindingNumber.load(std::memory_order_relaxed);
+    }
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     for (face_array_iterator_t it = mesh->faces_begin(); it != mesh->faces_end(); ++it)
     {
         const face_descriptor_t face_descr = *it;
 
-        const std::vector<vertex_descriptor_t> vertices_around_face = mesh->get_vertices_around_face(face_descr);
-        const uint32_t num_vertices_around_face = vertices_around_face.size();
-
-        if (num_vertices_around_face > 4)
-        {
-            std::vector<uint32_t> cdt_local; // triangulation indices local to the face
-            triangulate_face(cdt_local, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), *it);
-
-            std::vector<uint32_t> cdt_global;  // triangulation indices of face (indices refer to "mesh" vertex array)
-
-            // for each cdt index in face
-            for (uint32_t i = 0; i < (uint32_t)cdt_local.size(); ++i) {
-                const uint32_t local_idx = cdt_local[i]; // id local within the current face that we are triangulating
-
-                MCUT_ASSERT(local_idx < num_vertices_around_face);
-
-                const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];
-
-                MCUT_ASSERT(global_idx < (uint32_t)mesh->number_of_vertices());
-
-                cdt_global.push_back(global_idx);
-            }
-
-            for (uint32_t i = 0; i < (uint32_t)cdt_global.size()/3; ++i)
-            {
-                const vertex_descriptor_t idx0 = vertex_descriptor_t(cdt_global[(i * 3) + 0]);
-                const vertex_descriptor_t idx1 = vertex_descriptor_t(cdt_global[(i * 3) + 1]);
-                const vertex_descriptor_t idx2 = vertex_descriptor_t(cdt_global[(i * 3) + 2]);
-
-                const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
-                windingNumber += solidAngle;
-            }
-        }
-        else if (num_vertices_around_face == 4) // quad
-        {
-            const double solidAngle = calculate_signed_solid_angle(
-                mesh->vertex(vertices_around_face[0]),
-                mesh->vertex(vertices_around_face[1]),
-                mesh->vertex(vertices_around_face[2]),
-                mesh->vertex(vertices_around_face[3]),
-                queryPoint);
-
-            windingNumber += solidAngle;
-        }
-        else // triangle
-        {
-            const double solidAngle = calculate_signed_solid_angle(
-                mesh->vertex(vertices_around_face[0]),
-                mesh->vertex(vertices_around_face[1]),
-                mesh->vertex(vertices_around_face[2]),
-                queryPoint);
-
-            windingNumber += solidAngle;
-        }
+        windingNumber += computeWindingNumberOnFace(context_ptr, queryPoint, mesh, face_descr);
     }
-
-    return windingNumber;
-}
-
-#if 0
-double getConnectedComponentWindingNumber(const std::shared_ptr<context_t> context_ptr, McConnectedComponent connCompId, const vec3& queryPoint)
-{
-    //
-    // The following logic piggybacks on the internal implementation of the MCUT API.
-    // We effectively pretend to request the number of bytes required to store CC triangulation indices
-    // (which in turn triggers get_connected_component_data_impl to compute the CDT traingulation of the
-    // the CC and cache it) and then use the internal CDT triangulation indices cache for the triangles that
-    // we actually need to compute solid angles.
-    //
-    {
-        McSize bytes = 0;
-        McEvent triangulationEvent = MC_NULL_HANDLE;
-
-        // NOTE: get_connected_component_data_impl will run on a different device/API thread
-        get_connected_component_data_impl(context_ptr->m_user_handle, connCompId, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, nullptr, &bytes, 0, nullptr, &triangulationEvent);
-
-        MCUT_ASSERT(triangulationEvent != MC_NULL_HANDLE); // event must exist to wait on and query
-
-        {
-            McResult waitliststatus = MC_NO_ERROR;
-
-            wait_for_events_impl(1, &triangulationEvent, waitliststatus); // block until event of "get_connected_component_data_impl" is completed!
-
-            MCUT_ASSERT(waitliststatus == McResult::MC_NO_ERROR);
-
-            release_events_impl(1, &triangulationEvent); // destroy
-            triangulationEvent = MC_NULL_HANDLE;
-        }
-    }
-
-    std::shared_ptr<connected_component_t> cc_uptr = context_ptr->connected_components.find_first_if([=](const std::shared_ptr<connected_component_t> ccptr) { return ccptr->m_user_handle == connCompId; });
-    const  std::shared_ptr <hmesh_t> mesh = cc_uptr->kernel_hmesh_data->mesh;
-    MCUT_ASSERT(cc_uptr != nullptr);
-
-    MCUT_ASSERT(cc_uptr->cdt_face_map_cache_initialized == true); // since we called "get_connected_component_data_impl"
-    MCUT_ASSERT(cc_uptr->cdt_index_cache.size() >= 0);
-
-    const std::vector<uint32_t>& tris = cc_uptr->cdt_index_cache;
-
-    double windingNumber = 0;
-
-    // for each triangle
-    for (unsigned int i = 0; i < cc_uptr->cdt_index_cache.size(); i += 3)
-    {
-        const vertex_descriptor_t idx0 = vertex_descriptor_t(tris[(i * 3) + 0]);
-        const vertex_descriptor_t idx1 = vertex_descriptor_t(tris[(i * 3) + 1]);
-        const vertex_descriptor_t idx2 = vertex_descriptor_t(tris[(i * 3) + 2]);
-
-        const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
-        windingNumber += solidAngle;
-    }
-
-    printf("winding number = %f\n", windingNumber);
-
-    return windingNumber;
-}
-
 #endif
+
+    return windingNumber;
+}
 
 bool mesh_is_closed(
 #if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -1589,10 +1570,10 @@ bool mesh_is_closed(
 // If either mesh is not watertight, then we return [no intersection]!
 // NOTE: even if the meshes appear closed (in the geometric sense) as long as either mesh has at least
 // one edge that is used by only one face we have to notify the user that there is no intersection. 
-// This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there can be ambiguities
-// when it comes to determining whether something lies inside of another (i.e. all of a sudden we will start 
+// This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there will be ambiguities
+// when it comes to determining whether something lies inside/outside of another (i.e. all of a sudden we will start 
 // to ask "by how much does it lie inside?"). This is "threshold territory" and we do not want to go there as a 
-// strict limit!
+// strict rule!
 void check_and_store_input_mesh_intersection_type(
     std::shared_ptr<context_t>& context_ptr, 
     const std::shared_ptr<hmesh_t>& source_hmesh, 
@@ -1612,7 +1593,7 @@ void check_and_store_input_mesh_intersection_type(
     {
 
         //
-        // we test first against the mesh with the larger AABB
+        // we test first against the mesh with the larger AABB (heuristic to potentially make the query faster)
         // 
         const double sm_aabb_diag = squared_length(sm_aabb.maximum() - sm_aabb.minimum());
         const double cm_aabb_diag = squared_length(cm_aabb.maximum() - cm_aabb.minimum());
@@ -1630,14 +1611,14 @@ void check_and_store_input_mesh_intersection_type(
 
         const double meshBQueryPointWindingNumber = getWindingNumber(context_ptr, meshBQueryPoint, meshA);
 
-        if (absolute_value(1.0 - meshBQueryPointWindingNumber) < windingNumberEps)
+        if (absolute_value(1.0 - meshBQueryPointWindingNumber) < windingNumberEps) // is it inside?
         {
             const McDispatchIntersectionType itype = sm_larger_than_cm ? McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH : McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH;
             context_ptr->set_most_recent_dispatch_intersection_type(itype);
         }
         else
         {
-            MCUT_ASSERT( absolute_value(1.0 - meshBQueryPointWindingNumber) >= windingNumberEps); // outside source mesh
+            MCUT_ASSERT( absolute_value(1.0 - meshBQueryPointWindingNumber) >= windingNumberEps); // outside meshA
 
             const vec3& meshAQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
 
@@ -2130,9 +2111,9 @@ extern "C" void preproc(
                 } else {
                     context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
 
-                    if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
+                    if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // determine the intersection-type if the user requested for it.
                     {                         
-                        // NOTE: since the BVHs do not overlap, it is not possible for the intersection type to be "standard" (i.e. surface are 
+                        // NOTE: since the BVHs do not overlap, it is not possible for the intersection type to be "standard" (i.e. surfaces are 
                         // not intersecting since we have not even invoked the kernel)
                         check_and_store_input_mesh_intersection_type(
                             context_ptr, 
