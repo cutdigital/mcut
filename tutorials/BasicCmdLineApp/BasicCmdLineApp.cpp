@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
         numBytes = 0;
         err = mcGetConnectedComponentData(context, connCompId, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         mcCheckError(err);
-        uint32_t numberOfVertices = numBytes / (sizeof(double)*3);
+        uint32_t numberOfVertices = (McUint32)(numBytes / (sizeof(double)*3));
         ASSERT(numberOfVertices >= 3);
         std::vector<double> vertices((size_t)numberOfVertices * 3u);
 
@@ -240,8 +240,8 @@ int main(int argc, char* argv[])
         sprintf(fnameBuf, "cc%d.obj", i);
         
         std::vector<float> f;
-        for(uint32_t i =0; i < (uint32_t)vertices.size(); ++i)
-            f.push_back(vertices[i]);
+        for(uint32_t j =0; j < (uint32_t)vertices.size(); ++j)
+            f.push_back((float)vertices[j]);
         writeOBJ(fnameBuf,
             (float*)f.data(),
             (uint32_t)vertices.size() / 3,

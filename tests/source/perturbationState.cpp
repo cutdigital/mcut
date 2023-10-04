@@ -104,9 +104,9 @@ UTEST_F(PerturbationState, getCCPerturbationVector)
 
         McDouble sqrd_magnitude =0.0;
 
-        for(McUint32 i =0; i < (McUint32)3; ++i)
+        for(McUint32 j =0; j < (McUint32)3; ++j)
         {
-            McDouble component = perturbation_vector[i];
+            McDouble component = perturbation_vector[j];
             sqrd_magnitude += component*component;
         }
 
@@ -149,9 +149,9 @@ UTEST_F(PerturbationState, setPerturbationConstant)
         std::vector<McDouble> perturbation_vector(3);
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->myContext, cc, MC_CONNECTED_COMPONENT_DATA_DISPATCH_PERTURBATION_VECTOR, bytes, &perturbation_vector[0], NULL),MC_NO_ERROR);
 
-        for(McUint32 i =0; i < (McUint32)3; ++i)
+        for(McUint32 j =0; j < (McUint32)3; ++j)
         {
-            McDouble component = perturbation_vector[i];
+            McDouble component = perturbation_vector[j];
             ASSERT_LE(std::fabs(component), eps); // this works because we are using "MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE"
         }
     }

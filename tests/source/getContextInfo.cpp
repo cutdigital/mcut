@@ -23,6 +23,7 @@
 #include "utest.h"
 #include <mcut/mcut.h>
 
+#if 0
 struct GetContextInfo {
     McContext context_;
     McSize bytes;
@@ -41,4 +42,4 @@ UTEST_F_TEARDOWN(GetContextInfo)
     McResult err = mcReleaseContext(utest_fixture->context_);
     EXPECT_EQ(err, MC_NO_ERROR);
 }
-
+#endif

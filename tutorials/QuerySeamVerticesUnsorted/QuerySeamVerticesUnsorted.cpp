@@ -245,7 +245,7 @@ int main()
             exit(1);
         }
 
-        uint32_t faceSizesStub = seamVertexIndices.size();
+        uint32_t faceSizesStub = (McUint32)seamVertexIndices.size();
 
         char seamFnameBuf[40];
         sprintf(seamFnameBuf, "frag-%d-seam-vertices.txt", i);

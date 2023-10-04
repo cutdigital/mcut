@@ -147,7 +147,7 @@ int main()
 
     // config debug output
     // -----------------------
-    McSize numBytes = 0;
+    numBytes = 0;
     McFlags contextFlags;
     err = mcGetInfo(context, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes);
 
@@ -223,7 +223,7 @@ int main()
     for (int i = 0; i < (int)connComps.size(); ++i) {
         McConnectedComponent connComp = connComps[i]; // connected compoenent id
 
-        McSize numBytes = 0;
+        numBytes = 0;
 
         // query the vertices
         // ----------------------

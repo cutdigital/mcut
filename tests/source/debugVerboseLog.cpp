@@ -25,6 +25,7 @@
 #include <vector>
 #include <string>
 
+#if 0
 static void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
     unsigned int id,
@@ -85,6 +86,7 @@ static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 
     printf("callback: [%d:%p,%s:%s:%s:%zu] %s\n", id, userParam, debug_src.c_str(), debug_type.c_str(), severity_str.c_str(), length, message);
 }
+#endif
 
 struct DebugLog {
     McContext context_;

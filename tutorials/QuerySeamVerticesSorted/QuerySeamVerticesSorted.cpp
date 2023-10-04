@@ -677,7 +677,7 @@ int main()
     for (int i = 0; i < (int)connComps.size(); ++i) {
         McConnectedComponent connComp = connComps[i]; // connected compoenent id
 
-        McSize numBytes = 0;
+        numBytes = 0;
 
         // query the seam vertices (indices)
         // ---------------------------------
@@ -777,15 +777,15 @@ int main()
         //
 
         // stub variables for writing to file
-        uint32_t numFacesStub = seamVertexSequences.size();
+        uint32_t numFacesStub = (McUint32)seamVertexSequences.size();
         std::vector<uint32_t> faceSizesArrayStub(numFacesStub);
         std::vector<uint32_t> faceIndicesArrayStub;
 
         std::string flags_str;
 
         // for each sequence
-        for (uint32_t j = 0; j < seamVertexSequences.size(); ++j) {
-            faceSizesArrayStub[j] = seamVertexSequences[j].first.size();
+        for (uint32_t j = 0; j < (McUint32)seamVertexSequences.size(); ++j) {
+            faceSizesArrayStub[j] = (McUint32)seamVertexSequences[j].first.size();
             faceIndicesArrayStub.insert(faceIndicesArrayStub.cend(),
                 seamVertexSequences[j].first.cbegin(),
                 seamVertexSequences[j].first.cend());
