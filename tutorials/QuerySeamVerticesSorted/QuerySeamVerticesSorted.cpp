@@ -41,7 +41,7 @@
 #if defined(_WIN32)
  // if typedef doesn't exist (msvc, blah)
 typedef intptr_t ssize_t;
-ssize_t myGetline(char** lineptr, size_t * n, FILE * stream);
+ssize_t getline(char** lineptr, size_t * n, FILE * stream);
 #endif
 
 void readOFF(const char* fpath, double** pVertices, unsigned int** pFaceVertexIndices,
@@ -242,7 +242,7 @@ void readOBJ(
         // number of characters read on a lineBuf
         ssize_t nread = 0;
 
-        while ((nread = myGetline(&lineBuf, &lineBufLen, file)) != (((ssize_t)0) -1 )/*-1*/) { // each iteration will parse a line in the file
+        while ((nread = getline(&lineBuf, &lineBufLen, file)) != (((ssize_t)0) -1 )/*-1*/) { // each iteration will parse a line in the file
 
             // strip newline and carriage return
             lineBuf[strcspn(lineBuf, "\r\n")] = '\0';
@@ -926,7 +926,7 @@ int main()
 // if typedef doesn't exist (msvc, blah)
 //typedef intptr_t ssize_t;
 
-ssize_t myGetline(char** lineptr, size_t* n, FILE* stream)
+ssize_t getline(char** lineptr, size_t* n, FILE* stream)
 {
     size_t pos;
     int c;
@@ -978,7 +978,7 @@ ssize_t myGetline(char** lineptr, size_t* n, FILE* stream)
 
 bool readLine(FILE* file, char** line, size_t* len)
 {
-    while (myGetline(line, len, file)) {
+    while (getline(line, len, file)) {
         if (strlen(*line) > 1 && (*line)[0] != '#') {
             return true;
         }
