@@ -337,7 +337,7 @@ public:
     }
 };
 
-static void get_scheduling_parameters(
+static inline  void get_scheduling_parameters(
     // the number of thread that will actually do some computation (including master)
     uint32_t& num_threads,
     // maximum possible number of threads that can be scheduled to perform the task.

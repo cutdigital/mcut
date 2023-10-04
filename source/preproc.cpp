@@ -1495,7 +1495,8 @@ double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& quer
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
-        std::atomic<double> gWindingNumber = 0; // Some garbage value (why not 42)
+        std::atomic<double> gWindingNumber; 
+        std::atomic_init(&gWindingNumber, 0);
 
         auto fn_compute_winding_number = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
 
@@ -1585,7 +1586,7 @@ void check_and_store_input_mesh_intersection_type(
 {
     const double windingNumberEps = 1e-7;
 
-    if (sm_is_watertight == false && cm_is_watertight == false || intersect_bounding_boxes(sm_aabb, cm_aabb) == false)
+    if ((sm_is_watertight == false && cm_is_watertight == false) || intersect_bounding_boxes(sm_aabb, cm_aabb) == false)
     {
         context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
     }
@@ -1895,7 +1896,7 @@ extern "C" void preproc(
 
             context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, "general position assumption violated!");
 
-            if (cut_mesh_perturbation_count == context_ptr->get_general_position_enforcement_attempts()) {
+            if (cut_mesh_perturbation_count == (int)context_ptr->get_general_position_enforcement_attempts()) {
 
                 context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, kernel_output.logger.get_reason_for_failure());
 
