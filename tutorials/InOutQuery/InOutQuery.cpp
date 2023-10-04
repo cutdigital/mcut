@@ -55,7 +55,7 @@ void writeOFF(
     const uint32_t numVertices,
     const uint32_t numFaces);
 
-int main(int argc, char* argv[])
+int main()
 {
     double* srcMeshVertices = NULL;
     uint32_t* srcMeshFaceIndices = NULL;

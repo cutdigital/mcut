@@ -88,7 +88,7 @@ extern "C" void debug_message_callback_impl(
 extern "C" void get_debug_message_log_impl(McContext context,
     McUint32 count, McSize bufSize,
     McDebugSource* sources, McDebugType* types, McDebugSeverity* severities,
-    McSize* lengths, McChar* messageLog, McUint32& numFetched);
+    McSize* lengths, McChar* messageLog, McUint32& numFetched)noexcept(false);
 
 extern "C" void debug_message_control_impl(
     McContext context,
@@ -108,11 +108,11 @@ extern "C" void bind_state_impl(
     const McContext context,
     McFlags stateInfo,
     McSize bytes,
-    const McVoid* pMem);
+    const McVoid* pMem)noexcept(false);
 
-extern "C" void create_user_event_impl(McEvent* event, McContext context);
+extern "C" void create_user_event_impl(McEvent* event, McContext context)noexcept(false);
 
-extern "C" void set_user_event_status_impl(McEvent event, McInt32 execution_status);
+extern "C" void set_user_event_status_impl(McEvent event, McInt32 execution_status)noexcept(false);
 
 extern "C" void get_event_info_impl(
     const McEvent event,
@@ -124,7 +124,7 @@ extern "C" void get_event_info_impl(
 extern "C" void set_event_callback_impl(
     McEvent eventHandle,
     pfn_McEvent_CALLBACK eventCallback,
-    McVoid* data);
+    McVoid* data) noexcept(false);
 
 extern "C" void wait_for_events_impl(
     uint32_t numEventsInWaitlist,
@@ -367,7 +367,7 @@ struct event_t {
         , m_timestamp_submit(0)
         , m_timestamp_start(0)
         , m_timestamp_end(0)
-        , m_command_exec_status(MC_RESULT_MAX_ENUM)
+        , m_command_exec_status((McUint32)((int)(MC_RESULT_MAX_ENUM)))
         , m_profiling_enabled(true)
         , m_command_type(command_type)
         , m_user_API_command_task_emulator(nullptr)
@@ -558,7 +558,7 @@ public:
         , m_user_handle(handle) // i.e. the McContext handle that the client application uses to reference an instance of the context
         ,m_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM),
         // debug callback flags (all zero/unset by default). User must specify what they want via debug control function.
-        , dbgCallbackBitfieldSource(0)
+         dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
         , dbgCallbackBitfieldSeverity(0)
     {

@@ -594,7 +594,7 @@ int main()
         std::vector<McEvent> data_query_events_array; // collection of all events into one list
 
         for (McUint32 i = 0; i < num_contexts; ++i) {
-            const McUint32 num_CCs = per_context_connected_components[i].size();
+            const McUint32 num_CCs = (McUint32)per_context_connected_components[i].size();
 
             for (McUint32 j = 0; j < num_CCs; ++j) {
                 data_query_events_array.insert(
@@ -616,11 +616,11 @@ int main()
         //
         for (McUint32 i = 0; i < num_contexts; ++i) {
 
-            const McUint32 num_CCs = per_context_connected_components[i].size();
+            const McUint32 num_CCs = (McUint32)per_context_connected_components[i].size();
 
             for (McUint32 j = 0; j < num_CCs; ++j) {
 
-                const McUint32 num_events = per_context_per_cc_event_waitlist[i][j].size();
+                const McUint32 num_events = (McUint32)per_context_per_cc_event_waitlist[i][j].size();
 
                 for (McUint32 k = 0; k < num_events; ++k) {
 

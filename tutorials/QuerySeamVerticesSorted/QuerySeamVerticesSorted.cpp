@@ -38,6 +38,12 @@
         std::exit(1);                               \
     }
 
+#if defined(_WIN32)
+ // if typedef doesn't exist (msvc, blah)
+typedef intptr_t ssize_t;
+ssize_t myGetline(char** lineptr, size_t * n, FILE * stream);
+#endif
+
 void readOFF(const char* fpath, double** pVertices, unsigned int** pFaceVertexIndices,
     unsigned int** pFaceSizes, unsigned int* numVertices,
     unsigned int* numFaces);
@@ -105,6 +111,7 @@ void MCAPI_PTR mcDebugOutput(McDebugSource source, McDebugType type,
     printf("MCUT[%d:%p,%s:%s:%s:%zu] %s\n", id, userParam, debug_src.c_str(),
         debug_type.c_str(), severity_str.c_str(), length, message);
 }
+
 
 #if 1
 enum ObjFileCmdType {
@@ -233,16 +240,16 @@ void readOBJ(
                                     // will be same as nFaceIndices)
 
         // number of characters read on a lineBuf
-        size_t nread = 0;
+        ssize_t nread = 0;
 
-        while ((nread = getline(&lineBuf, &lineBufLen, file)) != (((size_t)0) -1 )/*-1*/) { // each iteration will parse a line in the file
+        while ((nread = myGetline(&lineBuf, &lineBufLen, file)) != (((ssize_t)0) -1 )/*-1*/) { // each iteration will parse a line in the file
 
             // strip newline and carriage return
             lineBuf[strcspn(lineBuf, "\r\n")] = '\0';
 
             const size_t lineLen = strlen(lineBuf);
 
-            assert(lineLen <= nread);
+            assert(lineLen <= (size_t)nread);
 
             const bool lineIsEmpty = (lineLen == 0);
 
@@ -917,9 +924,9 @@ int main()
 #include <stdint.h>
 
 // if typedef doesn't exist (msvc, blah)
-typedef intptr_t ssize_t;
+//typedef intptr_t ssize_t;
 
-ssize_t getline(char** lineptr, size_t* n, FILE* stream)
+ssize_t myGetline(char** lineptr, size_t* n, FILE* stream)
 {
     size_t pos;
     int c;
@@ -971,7 +978,7 @@ ssize_t getline(char** lineptr, size_t* n, FILE* stream)
 
 bool readLine(FILE* file, char** line, size_t* len)
 {
-    while (getline(line, len, file)) {
+    while (myGetline(line, len, file)) {
         if (strlen(*line) > 1 && (*line)[0] != '#') {
             return true;
         }

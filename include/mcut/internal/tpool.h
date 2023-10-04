@@ -421,13 +421,13 @@ void parallel_for(
     // run just one thread)
     const uint32_t min_per_thread = (1 << 10))
 {
-    uint32_t const length_ = std::distance(first, last);
+    uint32_t const length_ = (uint32_t)std::distance(first, last);
 
     MCUT_ASSERT(length_ != 0);
     uint32_t block_size = 0;
 
     uint32_t max_threads = 0;
-    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    const uint32_t available_threads = (uint32_t)(pool.get_num_threads() + 1); // workers and master (+1)
     uint32_t num_threads = 0;
 
     get_scheduling_parameters(
@@ -471,14 +471,14 @@ void parallel_for(
     // run just one thread)
     const uint32_t min_per_thread = (1 << 10))
 {
-    uint32_t const length_ = std::distance(first, last);
+    uint32_t const length_ = (uint32_t)std::distance(first, last);
 
     MCUT_ASSERT(length_ != 0);
 
     uint32_t block_size;
 
     uint32_t max_threads = 0;
-    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    const uint32_t available_threads = (uint32_t)(pool.get_num_threads() + 1); // workers and master (+1)
     uint32_t num_threads = 0;
 
     get_scheduling_parameters(
@@ -570,13 +570,13 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
     };
 
     // number of elements in range
-    unsigned long const length = std::distance(first, last);
+    uint32_t const length = (uint32_t)std::distance(first, last);
 
     if (!length)
         return;
 
     uint32_t max_threads = 0;
-    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    const uint32_t available_threads = (uint32_t)(pool.get_num_threads() + 1); // workers and master (+1)
     uint32_t num_threads = 0;
     uint32_t block_size = 0;
 
@@ -730,13 +730,13 @@ void find_map_element_by_key(Iterator begin, Iterator end,
 template <typename Iterator, typename KeyType>
 Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator last, KeyType match)
 {
-    unsigned long const length = std::distance(first, last);
+    uint32_t const length = (uint32_t)std::distance(first, last);
 
     if (!length)
         return last;
 
     uint32_t max_threads = 0;
-    const uint32_t available_threads = pool.get_num_threads() + 1; // workers and master (+1)
+    const uint32_t available_threads = (uint32_t)(pool.get_num_threads() + 1); // workers and master (+1)
     uint32_t num_threads = 0;
     uint32_t block_size = 0;
 

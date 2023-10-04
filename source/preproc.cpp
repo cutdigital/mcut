@@ -24,10 +24,10 @@ bool client_input_arrays_to_hmesh(
     hmesh_t& halfedgeMesh,
     double& bboxDiagonal,
     const void* pVertices,
-    const uint32_t* pFaceIndices,
-    const uint32_t* pFaceSizes,
-    const uint32_t numVertices,
-    const uint32_t numFaces,
+    const McUint32* pFaceIndices,
+    const McUint32* pFaceSizes,
+    const McUint32 numVertices,
+    const McUint32 numFaces,
     const vec3* perturbation = NULL)
 {
     SCOPED_TIMER(__FUNCTION__);
@@ -44,7 +44,7 @@ bool client_input_arrays_to_hmesh(
         const float* vptr = reinterpret_cast<const float*>(pVertices);
 
         // for each input mesh-vertex
-        for (uint32_t i = 0; i < numVertices; ++i) {
+        for (McUint32 i = 0; i < numVertices; ++i) {
             const float& x = vptr[(i * 3) + 0];
             const float& y = vptr[(i * 3) + 1];
             const float& z = vptr[(i * 3) + 2];
@@ -55,7 +55,7 @@ bool client_input_arrays_to_hmesh(
                 double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
                 double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
 
-            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (uint32_t)vd < numVertices);
+            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (McUint32)vd < numVertices);
         }
     }
     // did the user provide vertex arrays of 64-bit double...?
@@ -63,7 +63,7 @@ bool client_input_arrays_to_hmesh(
         const double* vptr = reinterpret_cast<const double*>(pVertices);
 
         // for each input mesh-vertex
-        for (uint32_t i = 0; i < numVertices; ++i) {
+        for (McUint32 i = 0; i < numVertices; ++i) {
             const double& x = vptr[(i * 3) + 0];
             const double& y = vptr[(i * 3) + 1];
             const double& z = vptr[(i * 3) + 2];
@@ -74,7 +74,7 @@ bool client_input_arrays_to_hmesh(
                 double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
                 double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
 
-            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (uint32_t)vd < numVertices);
+            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (McUint32)vd < numVertices);
         }
     }
 
@@ -99,11 +99,11 @@ bool client_input_arrays_to_hmesh(
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // init partial sums vec
-    std::vector<uint32_t> partial_sums(numFaces, 3); // assume that "pFaceSizes" is filled with 3's (which is the implication if pFaceSizes is null)
+    std::vector<McUint32> partial_sums(numFaces, 3); // assume that "pFaceSizes" is filled with 3's (which is the implication if pFaceSizes is null)
 
     if (pFaceSizes != nullptr) // e.g. non-triangulated user mesh
     {
-        for (uint32_t f = 0; f < numFaces; ++f) {
+        for (McUint32 f = 0; f < numFaces; ++f) {
             SAFE_ACCESS(partial_sums, f) = pFaceSizes[f];
         }
     }
@@ -114,7 +114,7 @@ bool client_input_arrays_to_hmesh(
     parallel_partial_sum(context_ptr->get_shared_compute_threadpool(), partial_sums.begin(), partial_sums.end());
 #endif
     {
-        typedef std::vector<uint32_t>::const_iterator InputStorageIteratorType;
+        typedef std::vector<McUint32>::const_iterator InputStorageIteratorType;
         typedef std::pair<InputStorageIteratorType, InputStorageIteratorType> OutputStorageType; // range of faces
         std::atomic_int atm_result;
         atm_result.store((int)McResult::MC_NO_ERROR); // 0 = ok;/ 1 = invalid face size; 2 invalid vertex index
@@ -125,9 +125,9 @@ bool client_input_arrays_to_hmesh(
                                    InputStorageIteratorType block_start_,
                                    InputStorageIteratorType block_end_) -> OutputStorageType {
             for (InputStorageIteratorType i = block_start_; i != block_end_; ++i) {
-                uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), i);
+                McUint32 faceID = (McUint32)std::distance(partial_sums.cbegin(), i);
                 std::vector<vd_t>& faceVertices = faces[faceID];
-                int face_vertex_count = assume_triangle_mesh ? 3 : ((uint32_t*)pFaceSizes)[faceID];
+                int face_vertex_count = assume_triangle_mesh ? 3 : ((McUint32*)pFaceSizes)[faceID];
 
                 if (face_vertex_count < 3) {
                     int zero = (int)McResult::MC_NO_ERROR;
@@ -148,7 +148,7 @@ bool client_input_arrays_to_hmesh(
                 int faceBaseOffset = (*i) - face_vertex_count;
 
                 for (int j = 0; j < face_vertex_count; ++j) {
-                    uint32_t idx = ((uint32_t*)pFaceIndices)[faceBaseOffset + j];
+                    McUint32 idx = ((McUint32*)pFaceIndices)[faceBaseOffset + j];
 
                     if (idx >= numVertices) {
                         int zero = (int)McResult::MC_NO_ERROR;
@@ -206,7 +206,7 @@ bool client_input_arrays_to_hmesh(
                              InputStorageIteratorType block_end_) -> bool {
             for (InputStorageIteratorType face_iter = block_start_;
                  face_iter != block_end_; ++face_iter) {
-                uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), face_iter);
+                McUint32 faceID = (McUint32)std::distance(partial_sums.cbegin(), face_iter);
                 const std::vector<vd_t>& faceVertices = SAFE_ACCESS(faces, faceID);
                 fd_t fd = halfedgeMesh.add_face(faceVertices);
 
@@ -260,9 +260,9 @@ bool client_input_arrays_to_hmesh(
     int faceSizeOffset = 0;
     std::vector<vd_t> faceVertices;
 
-    for (uint32_t i = 0; i < numFaces; ++i) {
+    for (McUint32 i = 0; i < numFaces; ++i) {
         faceVertices.clear();
-        int face_vertex_count = assume_triangle_mesh ? 3 : ((uint32_t*)pFaceSizes)[i];
+        int face_vertex_count = assume_triangle_mesh ? 3 : ((McUint32*)pFaceSizes)[i];
 
         if (face_vertex_count < 3) {
 
@@ -273,7 +273,7 @@ bool client_input_arrays_to_hmesh(
 
         for (int j = 0; j < face_vertex_count; ++j) {
 
-            uint32_t idx = ((uint32_t*)pFaceIndices)[faceSizeOffset + j];
+            McUint32 idx = ((McUint32*)pFaceIndices)[faceSizeOffset + j];
 
             if (idx >= numVertices) {
 
@@ -498,7 +498,7 @@ void resolve_floating_polygons(
 
         // NOTE: this boolean needs to be evaluated with "source_hmesh_face_count_prev" since the number of
         // src-mesh faces might change as we add more polygons due to partitioning.
-        bool parent_face_from_source_hmesh = ((uint32_t)parent_face_raw < (uint32_t)source_hmesh_face_count_prev);
+        bool parent_face_from_source_hmesh = ((McUint32)parent_face_raw < (McUint32)source_hmesh_face_count_prev);
 
         // pointer to input mesh with face containing floating polygon
         // Note: this mesh will be modified as we add new faces.
@@ -517,9 +517,9 @@ void resolve_floating_polygons(
 
         // Now compute the actual input mesh face index (accounting for offset)
         // i.e. index/descriptor into the mesh referenced by "parent_face_hmesh_ptr"
-        const fd_t parent_face = parent_face_from_source_hmesh ? parent_face_raw : fd_t((uint32_t)parent_face_raw - (uint32_t)source_hmesh_face_count_prev); // accounting for offset (NOTE: must updated "source_hmesh" state)
+        const fd_t parent_face = parent_face_from_source_hmesh ? parent_face_raw : fd_t((McUint32)parent_face_raw - (McUint32)source_hmesh_face_count_prev); // accounting for offset (NOTE: must updated "source_hmesh" state)
 
-        MCUT_ASSERT(static_cast<uint32_t>(parent_face) < (uint32_t)parent_face_hmesh_ptr->number_of_faces());
+        MCUT_ASSERT(static_cast<McUint32>(parent_face) < (McUint32)parent_face_hmesh_ptr->number_of_faces());
 
         // for each floating polygon detected on current ps-face
         for (std::vector<floating_polygon_info_t>::const_iterator floating_poly_info_iter = detected_floating_polygons_iter->second.cbegin();
@@ -1429,32 +1429,32 @@ double calculate_signed_solid_angle(
 double computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh, const face_descriptor_t face_descr)
 {
     const std::vector<vertex_descriptor_t> vertices_around_face = mesh->get_vertices_around_face(face_descr);
-    const uint32_t num_vertices_around_face = vertices_around_face.size();
+    const McUint32 num_vertices_around_face = (McUint32)vertices_around_face.size();
 
     double windingNumber = 0;
 
     if (num_vertices_around_face > 4)
     {
-        std::vector<uint32_t> cdt_local; // triangulation indices local to the face
+        std::vector<McUint32> cdt_local; // triangulation indices local to the face
         triangulate_face(cdt_local, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), face_descr);
 
-        std::vector<uint32_t> cdt_global;  // triangulation indices of face (indices refer to "mesh" vertex array)
+        std::vector<McUint32> cdt_global;  // triangulation indices of face (indices refer to "mesh" vertex array)
 
         // for each cdt index in face
-        for (uint32_t i = 0; i < (uint32_t)cdt_local.size(); ++i) {
-            const uint32_t local_idx = cdt_local[i]; // id local within the current face that we have triangulated
+        for (McUint32 i = 0; i < (McUint32)cdt_local.size(); ++i) {
+            const McUint32 local_idx = cdt_local[i]; // id local within the current face that we have triangulated
 
             MCUT_ASSERT(local_idx < num_vertices_around_face);
 
-            const uint32_t global_idx = (uint32_t)vertices_around_face[local_idx];
+            const McUint32 global_idx = (McUint32)vertices_around_face[local_idx];
 
-            MCUT_ASSERT(global_idx < (uint32_t)mesh->number_of_vertices());
+            MCUT_ASSERT(global_idx < (McUint32)mesh->number_of_vertices());
 
             cdt_global.push_back(global_idx);
         }
 
         // for each triangle
-        for (uint32_t i = 0; i < (uint32_t)cdt_global.size() / 3; ++i)
+        for (McUint32 i = 0; i < (McUint32)cdt_global.size() / 3; ++i)
         {
             const vertex_descriptor_t idx0 = vertex_descriptor_t(cdt_global[(i * 3) + 0]);
             const vertex_descriptor_t idx1 = vertex_descriptor_t(cdt_global[(i * 3) + 1]);
@@ -1681,15 +1681,15 @@ extern "C" void preproc(
     std::shared_ptr<context_t> context_ptr,
     McFlags dispatchFlags,
     const void* pSrcMeshVertices,
-    const uint32_t* pSrcMeshFaceIndices,
-    const uint32_t* pSrcMeshFaceSizes,
-    uint32_t numSrcMeshVertices,
-    uint32_t numSrcMeshFaces,
+    const McUint32* pSrcMeshFaceIndices,
+    const McUint32* pSrcMeshFaceSizes,
+    McUint32 numSrcMeshVertices,
+    McUint32 numSrcMeshFaces,
     const void* pCutMeshVertices,
-    const uint32_t* pCutMeshFaceIndices,
-    const uint32_t* pCutMeshFaceSizes,
-    uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces) noexcept(false)
+    const McUint32* pCutMeshFaceIndices,
+    const McUint32* pCutMeshFaceSizes,
+    McUint32 numCutMeshVertices,
+    McUint32 numCutMeshFaces) noexcept(false)
 {
     std::shared_ptr<hmesh_t> source_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t);
     double source_hmesh_aabb_diag(0.0);
@@ -1724,7 +1724,7 @@ extern "C" void preproc(
     kernel_input.populate_vertex_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
     kernel_input.populate_face_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);
 
-    uint32_t dispatch_filter_flag_bitset_all = ( //
+    McUint32 dispatch_filter_flag_bitset_all = ( //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE | //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED | //
@@ -1821,8 +1821,8 @@ extern "C" void preproc(
     std::unordered_map<vd_t, vec3> cut_hmesh_new_poly_partition_vertices;
 
     // the number of faces in the source mesh from the last/previous dispatch call
-    const uint32_t source_hmesh_face_count = numSrcMeshFaces;
-    uint32_t source_hmesh_face_count_prev = source_hmesh_face_count;
+    const McUint32 source_hmesh_face_count = numSrcMeshFaces;
+    McUint32 source_hmesh_face_count_prev = source_hmesh_face_count;
 
     output_t kernel_output;
 

@@ -432,7 +432,7 @@ void build_oibvh(
             // allows us to pretend that we can use an iterator over the nodes
             std::vector<uint8_t> level_nodes_placeholder(number_of_real_nodes_on_level);
             auto fn_compute_bvh_level_nodes = [&](std::vector<uint8_t>::const_iterator block_start_, std::vector<uint8_t>::const_iterator block_end_) {
-                uint32_t base_offset = std::distance(level_nodes_placeholder.cbegin(), block_start_);
+                uint32_t base_offset = (uint32_t)std::distance(level_nodes_placeholder.cbegin(), block_start_);
                 uint32_t counter = 0;
                 for (std::vector<uint8_t>::const_iterator it = block_start_; it != block_end_; ++it) {
                     const int level_node_idx_iter = base_offset + (counter++);

@@ -640,7 +640,7 @@
     // https://answers.unity.com/questions/1522620/converting-a-3d-polygon-into-a-2d-polygon.html
     void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices, const vec3& polygon_normal)
     {
-        const uint32_t N = polygon_vertices.size();
+        const uint32_t N = (uint32_t)polygon_vertices.size();
         out.resize(N);
 
         const vec3 normal = normalize(polygon_normal);

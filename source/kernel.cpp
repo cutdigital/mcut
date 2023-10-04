@@ -6947,7 +6947,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // store's the (unsealed) connected components (fragments of the source-mesh)
     hmesh_t m1;
-    m1.reserve_for_additional_elements(m0.number_of_vertices() + m0.number_of_vertices() * 0.25);
+    m1.reserve_for_additional_elements(m0.number_of_vertices() + (uint32_t)(m0.number_of_vertices() * 0.25));
     // copy vertices from m0 t0 m1 (and save mapping to avoid assumptions).
     // This map DOES NOT include patch intersection points because they are new
     // i.e. we keep only the points represent original vertices in the source-mesh
