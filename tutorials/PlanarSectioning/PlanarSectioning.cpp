@@ -147,7 +147,7 @@ int main()
 
     // config debug output
     // -----------------------
-    numBytes = 0;
+    McSize numBytes = 0;
     McFlags contextFlags;
     err = mcGetInfo(context, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes);
 
