@@ -546,26 +546,7 @@ void readOBJ(
 
 int main()
 {
-    {
-        double* pVertices = NULL;
-        double* pNormals = NULL;
-        double* pTexcCoords = NULL;
-        uint32_t* pFaceSizes = NULL;
-        uint32_t* pFaceVertexIndices = NULL;
-        uint32_t* pFaceVertexTexCoordIndices;
-        uint32_t* pFaceVertexNormalIndices;
-        uint32_t numVertices = 0;
-        uint32_t numNormals = 0;
-        uint32_t numTexCoords = 0;
-        uint32_t numFaces = 0;
-
-        readOBJ(DATA_DIR "/brad/cube-quads-normals.obj", &pVertices, &pNormals,
-            &pTexcCoords, &pFaceSizes, &pFaceVertexIndices, &pFaceVertexTexCoordIndices,
-            &pFaceVertexNormalIndices, &numVertices, &numNormals,
-            &numTexCoords, &numFaces);
-
-        printf("done!\n");
-    }
+    
     double* srcMeshVertices = NULL;
     uint32_t* srcMeshFaceIndices = NULL;
     uint32_t* srcMeshFaceSizes = NULL;
@@ -580,11 +561,9 @@ int main()
 
     McResult api_err = MC_NO_ERROR;
 
-    // const char* srcMeshFilePath = DATA_DIR "/source-mesh.off";
-    // const char* cutMeshFilePath = DATA_DIR "/cut-mesh.off";
-    const char* srcMeshFilePath = DATA_DIR "/brad/source-mesh.off";
-    const char* cutMeshFilePath = DATA_DIR "/brad/cut-mesh.off";
-
+    const char* srcMeshFilePath = DATA_DIR "/source-mesh.off";
+    const char* cutMeshFilePath = DATA_DIR "/cut-mesh.off";
+    
     printf(">> source-mesh file: %s\n", srcMeshFilePath);
     printf(">> cut-mesh file: %s\n", cutMeshFilePath);
 

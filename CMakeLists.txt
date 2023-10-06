@@ -28,6 +28,7 @@
 #	MCUT_BUILD_TESTS [default=OFF] - Build the tests (implicit dependancy on GoogleTest)
 #	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
 #	MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL [default=ON] - Build as configurable multi-threaded library
+#   MCUT_BUILD_WITH_API_EVENT_LOGGING [default=OFF] - Build with logging functionality which dumps event creation and destruction notices to the console
 #
 # This script will define the following CMake cache variables:
 #
@@ -117,6 +118,8 @@ option(MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL "Configure to build MCUT engine
 if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS) 
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
+option(MCUT_BUILD_WITH_API_EVENT_LOGGING "Configure to build MCUT with event logging to console" OFF)
+
 #
 # machine-precision-numbers library targets
 #
@@ -142,6 +145,11 @@ list(APPEND extra_libs Threads::Threads)
 if (MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL)
 	list(APPEND preprocessor_defs -DMCUT_WITH_COMPUTE_HELPER_THREADPOOL=1)
 endif()
+
+if (MCUT_BUILD_WITH_API_EVENT_LOGGING)
+	list(APPEND preprocessor_defs -DMCUT_WITH_API_EVENT_LOGGING=1)
+endif()
+
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	list(APPEND compilation_flags -Wall -Wextra)

@@ -240,8 +240,7 @@ pair<T> make_pair(const T a, const T b)
     return pair<T>(a, b);
 }
 
-
-
+#ifdef MCUT_WITH_API_EVENT_LOGGING
 // Threadsafe logging to console which prevents std::cerr from mixing strings when
 // concatenating with the operator<< multiple time per string, across multiple
 // threads.
@@ -251,6 +250,10 @@ pair<T> make_pair(const T a, const T b)
         ss << msg_str << std::endl;          \
         std::cerr << ss.str() << std::flush; \
         }
+#else
+//  no-op
+#define log_msg(msg_str)
+#endif
 
 // used to marked/label unused function parameters to prevent warnings
 #define UNUSED(x) [&x] {}()

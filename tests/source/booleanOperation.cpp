@@ -33,11 +33,90 @@ struct BooleanOperation {
     std::vector<uint32_t> meshFaceSizes;
 };
 
+static void MCAPI_PTR mcDebugOutput_(McDebugSource source,
+    McDebugType type,
+    unsigned int id,
+    McDebugSeverity severity,
+    size_t length,
+    const char* message,
+    const void* userParam)
+{
+
+    //printf("Debug message ( %d ), length=%zu\n%s\n--\n", id, length, message);
+    //printf("userParam=%p\n", userParam);
+
+    std::string debug_src;
+    switch (source) {
+    case MC_DEBUG_SOURCE_API:
+        debug_src = "API";
+        break;
+    case MC_DEBUG_SOURCE_KERNEL:
+        debug_src = "KERNEL";
+        break;
+    case MC_DEBUG_SOURCE_ALL:
+        break;
+    }
+    std::string debug_type;
+    switch (type) {
+    case MC_DEBUG_TYPE_ERROR:
+        debug_type = "ERROR";
+        break;
+    case MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+        debug_type = "DEPRECATION";
+        break;
+    case MC_DEBUG_TYPE_OTHER:
+        //printf("Type: Other");
+        debug_type = "OTHER";
+        break;
+    case MC_DEBUG_TYPE_ALL:
+        break;
+
+    }
+
+    std::string severity_str;
+
+    switch (severity) {
+    case MC_DEBUG_SEVERITY_HIGH:
+        severity_str = "HIGH";
+        break;
+    case MC_DEBUG_SEVERITY_MEDIUM:
+        severity_str = "MEDIUM";
+        break;
+    case MC_DEBUG_SEVERITY_LOW:
+        severity_str = "LOW";
+        break;
+    case MC_DEBUG_SEVERITY_NOTIFICATION:
+        severity_str = "NOTIFICATION";
+        break;
+    case MC_DEBUG_SEVERITY_ALL:
+        break;
+    }
+
+    printf("MCUT[%d:%p,%s:%s:%s:%zu] %s\n", id, userParam, debug_src.c_str(), debug_type.c_str(), severity_str.c_str(), length, message);
+}
+
 UTEST_F_SETUP(BooleanOperation)
 {
     // create with no flags (default)
-    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, 0), MC_NO_ERROR);
+    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_DEBUG), MC_NO_ERROR);
     EXPECT_TRUE(utest_fixture->myContext != nullptr);
+
+    // config debug output
+    // -----------------------
+    McSize numBytes = 0;
+    McFlags contextFlags;
+    EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes), MC_NO_ERROR);
+
+
+    EXPECT_TRUE(sizeof(McFlags) == numBytes);
+
+    EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, numBytes, &contextFlags, nullptr), MC_NO_ERROR);
+
+
+    if (contextFlags & MC_DEBUG) {
+        EXPECT_EQ(mcDebugMessageCallback(utest_fixture->myContext, mcDebugOutput_, nullptr), MC_NO_ERROR);
+        EXPECT_EQ(mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, true), MC_NO_ERROR);
+    }
 
     utest_fixture->srcMeshVertices = {
         -1.f, -1.f, 1.f, // 0
