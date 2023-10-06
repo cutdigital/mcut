@@ -256,6 +256,6 @@ pair<T> make_pair(const T a, const T b)
 #endif
 
 // used to marked/label unused function parameters to prevent warnings
-#define UNUSED(x) [&x] {}()
+#define UNUSED(x) [&x] {x;}()
 
 #endif // MCUT_UTILS_H_

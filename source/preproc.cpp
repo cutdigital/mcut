@@ -1520,7 +1520,7 @@ double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& quer
             1<<12 // min 4096 elements before bothering to run multiple threads
         );
 
-        std::atomic_thread_fence(std::memory_order_acq_rel);
+        //std::atomic_thread_fence(std::memory_order_acq_rel); // only the API thread touch the mem of 
 
         windingNumber = gWindingNumber.load(std::memory_order_relaxed);
     }

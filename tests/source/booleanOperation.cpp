@@ -24,6 +24,7 @@
 #include <mcut/mcut.h>
 
 #include <vector>
+#include <string>
 
 struct BooleanOperation {
     McContext myContext = MC_NULL_HANDLE;
@@ -115,7 +116,7 @@ UTEST_F_SETUP(BooleanOperation)
 
     if (contextFlags & MC_DEBUG) {
         EXPECT_EQ(mcDebugMessageCallback(utest_fixture->myContext, mcDebugOutput_, nullptr), MC_NO_ERROR);
-        EXPECT_EQ(mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, true), MC_NO_ERROR);
+        EXPECT_EQ(mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, MC_FALSE), MC_NO_ERROR);
     }
 
     utest_fixture->srcMeshVertices = {

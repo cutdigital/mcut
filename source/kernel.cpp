@@ -9475,7 +9475,8 @@ void dispatch(output_t& output, const input_t& input)
         m1_polygons_colored.reserve(m1_polygons_colored.size() + cs_face_count);
 
         // reference to the list connected components (see declaration for details)
-        std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
+        //std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
+        color_to_separated_connected_ccsponents.insert(std::make_pair(color_id, std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>())); // insert (used below when extractring connected components)
 
         std::unordered_map<int, int>& m0_to_m1_face_colored = SAFE_ACCESS(color_to_m0_to_m1_face, color_id); // note: containing mappings only for traced source mesh polygons initially!
         m0_to_m1_face_colored.reserve(m0_polygons.size());

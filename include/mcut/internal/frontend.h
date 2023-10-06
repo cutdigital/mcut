@@ -555,8 +555,8 @@ public:
         , m_max_num_perturbation_attempts(1 << 2), // 4
         // default winding order (as determing from the normals of the input mesh faces)
         m_connected_component_winding_order(McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN)
-        , m_user_handle(handle) // i.e. the McContext handle that the client application uses to reference an instance of the context
-        ,m_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM),
+        , m_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM)
+        , m_user_handle(handle), // i.e. the McContext handle that the client application uses to reference an instance of the context
         // debug callback flags (all zero/unset by default). User must specify what they want via debug control function.
          dbgCallbackBitfieldSource(0)
         , dbgCallbackBitfieldType(0)
