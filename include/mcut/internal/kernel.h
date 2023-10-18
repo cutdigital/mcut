@@ -150,9 +150,12 @@ struct input_t {
     bool keep_fragments_sealed_inside = false;
     bool keep_fragments_sealed_outside = false;
     // bool include_fragment_sealed_partial = false; // See: variable above "keep_partially_sealed_connected_components"
-    bool keep_fragments_sealed_inside_exhaustive = false; // TODO remove
-    bool keep_fragments_sealed_outside_exhaustive = false; // TODO remove
+    //bool keep_fragments_sealed_inside_exhaustive = false; // TODO remove
+    //bool keep_fragments_sealed_outside_exhaustive = false; // TODO remove
     // NOTE TO SELF: if the user simply wants patches, then kernel should not have to proceed to stitching!!!
+
+    bool src_mesh_is_watertight = false;
+    bool cut_mesh_is_watertight = false;
 };
 
 struct output_mesh_data_maps_t {

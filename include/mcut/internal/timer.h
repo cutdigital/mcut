@@ -48,10 +48,12 @@ public:
     ~mini_timer()
     {
         if (m_valid) {
+#ifdef MCUT_WITH_API_EVENT_LOGGING
             const std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
             const std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_start);
             unsigned long long elapsed_ = elapsed.count();
             log_msg("[MCUT][PROF:" << std::this_thread::get_id() << "]: \"" << m_name << "\" ("<< elapsed_ << "ms)");
+#endif // #ifdef MCUT_WITH_API_EVENT_LOGGING
         }
     }
     void set_invalid()

@@ -50,10 +50,10 @@ void readOFF(
 void writeOFF(
     const char* fpath,
     const double* pVertices,
-    const uint32_t* pFaceIndices,
-    const uint32_t* pFaceSizes,
-    const uint32_t numVertices,
-    const uint32_t numFaces);
+    const McUint32* pFaceIndices,
+    const McUint32* pFaceSizes,
+    const McUint32 numVertices,
+    const McUint32 numFaces);
 
 struct Timer {
     std::string m_name;
@@ -74,21 +74,21 @@ struct Timer {
     }
 };
 
-int main(int argc, char* argv[])
+int main()
 {
     Timer scoped_timer_main_fn("main-function");
 
     double* srcMeshVertices = NULL;
-    uint32_t* srcMeshFaceIndices = NULL;
-    uint32_t* srcMeshFaceSizes = NULL;
-    uint32_t srcMeshNumFaces = 0;
-    uint32_t srcMeshNumVertices = 0;
+    McUint32* srcMeshFaceIndices = NULL;
+    McUint32* srcMeshFaceSizes = NULL;
+    McUint32 srcMeshNumFaces = 0;
+    McUint32 srcMeshNumVertices = 0;
 
     double* cutMeshVertices = NULL;
-    uint32_t* cutMeshFaceIndices = NULL;
-    uint32_t* cutMeshFaceSizes = NULL;
-    uint32_t cutMeshNumFaces = 0;
-    uint32_t cutMeshNumVertices = 0;
+    McUint32* cutMeshFaceIndices = NULL;
+    McUint32* cutMeshFaceSizes = NULL;
+    McUint32 cutMeshNumFaces = 0;
+    McUint32 cutMeshNumVertices = 0;
 
     McResult api_err = MC_NO_ERROR;
 
@@ -116,12 +116,12 @@ int main(int argc, char* argv[])
 
         printf("\n>> Create MCUT contexts\n");
 
-        const uint32_t num_system_threads = std::thread::hardware_concurrency();
-        const uint32_t num_contexts_to_create = num_system_threads / 2; // since we are using "MC_OUT_OF_ORDER_EXEC_MODE_ENABLE"
+        const McUint32 num_system_threads = std::thread::hardware_concurrency();
+        const McUint32 num_contexts_to_create = num_system_threads / 2; // since we are using "MC_OUT_OF_ORDER_EXEC_MODE_ENABLE"
 
         contexts_array.resize(num_contexts_to_create);
 
-        for (uint32_t i = 0; i < num_contexts_to_create; ++i) {
+        for (McUint32 i = 0; i < num_contexts_to_create; ++i) {
 
             api_err = mcCreateContext(&contexts_array[i], MC_DEBUG | MC_OUT_OF_ORDER_EXEC_MODE_ENABLE);
 
@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
         printf("\n>> Have %u MCUT contexts\n", num_contexts_to_create);
     }
 
-    const uint32_t num_contexts = contexts_array.size();
+    const McUint32 num_contexts = (McUint32)contexts_array.size();
 
     // do the cutting
     // -------------------------------------------------------------------------
@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
         //
 
         // Spin-off multiple dispatch calls that will run in parallel
-        for (uint32_t i = 0; i < num_contexts; ++i) {
+        for (McUint32 i = 0; i < num_contexts; ++i) {
 
             per_context_dispatch_events[i].resize(2); // there are two enqueue commands in "schedule_dispatch_call"
 
@@ -248,7 +248,7 @@ int main(int argc, char* argv[])
         {
             std::vector<McEvent> dispatch_events_array; // collection of all events into one list
 
-            for (uint32_t i = 0; i < num_contexts; ++i) {
+            for (McUint32 i = 0; i < num_contexts; ++i) {
 
                 dispatch_events_array.insert(
                     dispatch_events_array.cend(),
@@ -265,9 +265,9 @@ int main(int argc, char* argv[])
 
             // check for any runtime errors and request the connected components
 
-            for (uint32_t i = 0; i < num_contexts; ++i) {
+            for (McUint32 i = 0; i < num_contexts; ++i) {
 
-                for (uint32_t j = 0; j < (uint32_t)per_context_dispatch_events[i].size(); ++j) {
+                for (McUint32 j = 0; j < (McUint32)per_context_dispatch_events[i].size(); ++j) {
 
                     McResult schedule_dispatch_call_fn_status = MC_NO_ERROR;
 
@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
                     }
                 }
 
-                const uint32_t num_connected_components = per_context_CC_count_array[i]; // ... in context
+                const McUint32 num_connected_components = per_context_CC_count_array[i]; // ... in context
 
                 if (num_connected_components == 0) {
                     printf("context %p has no connected components\n", contexts_array[i]);
@@ -338,12 +338,12 @@ int main(int argc, char* argv[])
                                                    std::vector<std::vector<McEvent>>& per_cc_event_waitlist,
                                                    std::vector<McSize>& per_cc_vertices_bytes,
                                                    std::vector<McSize>& per_cc_triangles_bytes) {
-            const uint32_t num_connected_components = (uint32_t)context_connected_components.size();
+            const McUint32 num_connected_components = (McUint32)context_connected_components.size();
 
-            for (uint32_t i = 0; i < num_connected_components; ++i) {
+            for (McUint32 i = 0; i < num_connected_components; ++i) {
                 McConnectedComponent connCompId = context_connected_components[i]; // connected compoenent id
 
-                const uint32_t async_queries_per_cc = 2; // vertices and triangles
+                const McUint32 async_queries_per_cc = 2; // vertices and triangles
 
                 std::vector<McEvent>& cc_events = per_cc_event_waitlist[i];
                 cc_events.resize(async_queries_per_cc);
@@ -393,9 +393,9 @@ int main(int argc, char* argv[])
         //
         // **Fork**
         //
-        for (uint32_t i = 0; i < num_contexts; ++i) {
+        for (McUint32 i = 0; i < num_contexts; ++i) {
 
-            const uint32_t num_connected_components = (uint32_t)per_context_connected_components[i].size();
+            const McUint32 num_connected_components = (McUint32)per_context_connected_components[i].size();
 
             per_context_per_cc_event_waitlist[i].resize(num_connected_components);
             per_context_per_cc_vertices_bytes[i].resize(num_connected_components);
@@ -422,11 +422,11 @@ int main(int argc, char* argv[])
         {
             std::vector<McEvent> bytes_size_query_events_array; // collection of all events into one list
 
-            for (uint32_t i = 0; i < num_contexts; ++i) {
+            for (McUint32 i = 0; i < num_contexts; ++i) {
 
-                const uint32_t num_CCs = per_context_connected_components[i].size();
+                const McUint32 num_CCs = (McUint32)per_context_connected_components[i].size();
 
-                for (uint32_t j = 0; j < num_CCs; ++j) {
+                for (McUint32 j = 0; j < num_CCs; ++j) {
                     bytes_size_query_events_array.insert(
                         bytes_size_query_events_array.cend(),
                         per_context_per_cc_event_waitlist[i][j].cbegin(),
@@ -444,18 +444,18 @@ int main(int argc, char* argv[])
             //
             // check for any errors
             //
-            for (uint32_t i = 0; i < num_contexts; ++i) {
+            for (McUint32 i = 0; i < num_contexts; ++i) {
 
-                const uint32_t num_CCs = per_context_connected_components[i].size();
+                const McUint32 num_CCs = (McUint32)per_context_connected_components[i].size();
 
-                for (uint32_t j = 0; j < num_CCs; ++j) {
+                for (McUint32 j = 0; j < num_CCs; ++j) {
 
-                    const uint32_t num_events = per_context_per_cc_event_waitlist[i][j].size();
+                    const McUint32 num_events = (McUint32)per_context_per_cc_event_waitlist[i][j].size();
 
-                    for (uint32_t k = 0; k < num_events; ++k) {
+                    for (McUint32 k = 0; k < num_events; ++k) {
 
                         McResult schedule_cc_data_bytesize_query_fn_status = MC_NO_ERROR;
-                        const McResult api_err = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &schedule_cc_data_bytesize_query_fn_status, NULL);
+                         api_err = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &schedule_cc_data_bytesize_query_fn_status, NULL);
 
                         if (api_err != MC_NO_ERROR) {
                             fprintf(stderr, "1:mcGetEventInfo(dispatchEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)api_err);
@@ -504,9 +504,9 @@ int main(int argc, char* argv[])
                                           const std::vector<McSize>& per_cc_triangles_bytes,
                                           std::vector<std::vector<McDouble>>& per_cc_vertices_array,
                                           std::vector<std::vector<McUint32>>& per_cc_triangles_array) {
-            const uint32_t num_connected_components = (uint32_t)context_connected_components.size();
+            const McUint32 num_connected_components = (McUint32)context_connected_components.size();
 
-            for (uint32_t i = 0; i < num_connected_components; ++i) {
+            for (McUint32 i = 0; i < num_connected_components; ++i) {
                 McConnectedComponent connCompId = context_connected_components[i]; // connected compoenent id
 
                 std::vector<McEvent>& cc_events = per_cc_event_waitlist[i];
@@ -554,9 +554,9 @@ int main(int argc, char* argv[])
                     McEvent>>>
             per_context_per_cc_event_waitlist(num_contexts);
 
-        for (uint32_t i = 0; i < num_contexts; ++i) {
+        for (McUint32 i = 0; i < num_contexts; ++i) {
 
-            const uint32_t num_connected_components = (uint32_t)per_context_connected_components[i].size();
+            const McUint32 num_connected_components = (McUint32)per_context_connected_components[i].size();
 
             
             per_context_per_cc_event_waitlist[i].resize(num_connected_components);
@@ -564,14 +564,14 @@ int main(int argc, char* argv[])
             per_context_per_cc_triangles_array[i].resize(num_connected_components);
 
             // allocate arrays (since we know how much to allocated)
-            for(uint32_t j = 0; j < num_connected_components; ++j)
+            for(McUint32 j = 0; j < num_connected_components; ++j)
             {
-                const uint32_t async_queries_per_cc = 2; // vertices and triangles
+                const McUint32 async_queries_per_cc = 2; // vertices and triangles
 
                 per_context_per_cc_event_waitlist[i][j].resize(async_queries_per_cc);
 
-                const uint32_t num_vertex_array_doubles = per_context_per_cc_vertices_bytes[i][j]/sizeof(McDouble);
-                const uint32_t num_triangles_array_uints = per_context_per_cc_vertices_bytes[i][j]/sizeof(McUint32);
+                const McUint32 num_vertex_array_doubles = (McUint32)per_context_per_cc_vertices_bytes[i][j]/sizeof(McDouble);
+                const McUint32 num_triangles_array_uints = (McUint32)per_context_per_cc_vertices_bytes[i][j]/sizeof(McUint32);
 
                 per_context_per_cc_vertices_array[i][j].resize(num_vertex_array_doubles);
                 per_context_per_cc_triangles_array[i][j].resize(num_triangles_array_uints);
@@ -593,10 +593,10 @@ int main(int argc, char* argv[])
         // -------------------------------------------------------------------------
         std::vector<McEvent> data_query_events_array; // collection of all events into one list
 
-        for (uint32_t i = 0; i < num_contexts; ++i) {
-            const uint32_t num_CCs = per_context_connected_components[i].size();
+        for (McUint32 i = 0; i < num_contexts; ++i) {
+            const McUint32 num_CCs = (McUint32)per_context_connected_components[i].size();
 
-            for (uint32_t j = 0; j < num_CCs; ++j) {
+            for (McUint32 j = 0; j < num_CCs; ++j) {
                 data_query_events_array.insert(
                     data_query_events_array.cend(),
                     per_context_per_cc_event_waitlist[i][j].cbegin(),
@@ -614,18 +614,18 @@ int main(int argc, char* argv[])
         //
         // check for any errors
         //
-        for (uint32_t i = 0; i < num_contexts; ++i) {
+        for (McUint32 i = 0; i < num_contexts; ++i) {
 
-            const uint32_t num_CCs = per_context_connected_components[i].size();
+            const McUint32 num_CCs = (McUint32)per_context_connected_components[i].size();
 
-            for (uint32_t j = 0; j < num_CCs; ++j) {
+            for (McUint32 j = 0; j < num_CCs; ++j) {
 
-                const uint32_t num_events = per_context_per_cc_event_waitlist[i][j].size();
+                const McUint32 num_events = (McUint32)per_context_per_cc_event_waitlist[i][j].size();
 
-                for (uint32_t k = 0; k < num_events; ++k) {
+                for (McUint32 k = 0; k < num_events; ++k) {
 
                     McResult exec_status = MC_NO_ERROR;
-                    const McResult api_err = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &exec_status, NULL);
+                    api_err = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &exec_status, NULL);
 
                     if (api_err != MC_NO_ERROR) {
                         fprintf(stderr, "mcGetEventInfo(MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)api_err);
@@ -653,11 +653,11 @@ int main(int argc, char* argv[])
     {
         Timer scoped_timer("save-files");
 
-        for (uint32_t i = 0; i < num_contexts; ++i) {
+        for (McUint32 i = 0; i < num_contexts; ++i) {
 
-            const uint32_t num_CCs = per_context_per_cc_vertices_array[i].size();
+            const McUint32 num_CCs = (McUint32)per_context_per_cc_vertices_array[i].size();
 
-            for (uint32_t j = 0; j < num_CCs; ++j) {
+            for (McUint32 j = 0; j < num_CCs; ++j) {
 
                 const std::vector<McDouble>& vertex_array = per_context_per_cc_vertices_array[i][j];
                 const std::vector<McUint32>& triangles_array = per_context_per_cc_triangles_array[i][j];
@@ -668,10 +668,10 @@ int main(int argc, char* argv[])
 
                 writeOFF(fnameBuf,
                     vertex_array.data(),
-                    (uint32_t*)triangles_array.data(),
-                    (uint32_t*)face_sizes.data(),
-                    (uint32_t)vertex_array.size() / 3,
-                    (uint32_t)triangles_array.size() / 3);
+                    (McUint32*)triangles_array.data(),
+                    (McUint32*)face_sizes.data(),
+                    (McUint32)vertex_array.size() / 3,
+                    (McUint32)triangles_array.size() / 3);
             }
         }
     }
@@ -682,12 +682,12 @@ int main(int argc, char* argv[])
     {
         Timer scoped_timer("teardown");
 
-        for (uint32_t i = 0; i < num_contexts; ++i) {
+        for (McUint32 i = 0; i < num_contexts; ++i) {
 
             McContext context = contexts_array[i];
 
             // destroy internal data associated with each connected component
-            api_err = mcReleaseConnectedComponents(context, (uint32_t)per_context_connected_components[i].size(), per_context_connected_components[i].data());
+            api_err = mcReleaseConnectedComponents(context, (McUint32)per_context_connected_components[i].size(), per_context_connected_components[i].data());
 
             if (api_err != MC_NO_ERROR) {
                 fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)api_err);
@@ -1009,10 +1009,10 @@ void readOFF(
 void writeOFF(
     const char* fpath,
     const double* pVertices,
-    const uint32_t* pFaceIndices,
-    const uint32_t* pFaceSizes,
-    const uint32_t numVertices,
-    const uint32_t numFaces)
+    const McUint32* pFaceIndices,
+    const McUint32* pFaceSizes,
+    const McUint32 numVertices,
+    const McUint32 numFaces)
 {
     fprintf(stdout, "write: %s\n", fpath);
 
@@ -1033,11 +1033,11 @@ void writeOFF(
 
     int faceBaseOffset = 0;
     for (i = 0; i < (int)numFaces; ++i) {
-        uint32_t faceVertexCount = pFaceSizes[i];
+        McUint32 faceVertexCount = pFaceSizes[i];
         fprintf(file, "%d", (int)faceVertexCount);
         int j;
         for (j = 0; j < (int)faceVertexCount; ++j) {
-            const uint32_t* fptr = pFaceIndices + faceBaseOffset + j;
+            const McUint32* fptr = pFaceIndices + faceBaseOffset + j;
             fprintf(file, " %d", *fptr);
         }
         fprintf(file, "\n");

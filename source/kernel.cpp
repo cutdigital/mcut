@@ -1481,37 +1481,7 @@ void update_neighouring_ps_iface_m0_edge_list(
 
 typedef std::vector<hd_t> traced_polygon_t;
 
-bool mesh_is_closed(
-#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-    thread_pool& scheduler,
-#endif
-    const hmesh_t& mesh)
-{
-    bool all_halfedges_incident_to_face = true;
-#if 0 // defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-    {
-        printf("mesh=%d\n", (int)mesh.number_of_halfedges());
-        all_halfedges_incident_to_face = parallel_find_if(
-                                             scheduler,
-                                             mesh.halfedges_begin(),
-                                             mesh.halfedges_end(),
-                                             [&](hd_t h) {
-                                                 const fd_t f = mesh.face(h);
-                                                 return (f == hmesh_t::null_face());
-                                             })
-            == mesh.halfedges_end();
-    }
-#else
-    for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
-        const fd_t f = mesh.face(*iter);
-        if (f == hmesh_t::null_face()) {
-            all_halfedges_incident_to_face = false;
-            break;
-        }
-    }
-#endif
-    return all_halfedges_incident_to_face;
-}
+
 
 // TODO: thsi can be improved by comparing based on the largest component of the difference vector
 // sort points along a straight line
@@ -1583,23 +1553,8 @@ void dispatch(output_t& output, const input_t& input)
     const int cs_face_count = cs.number_of_faces();
     const int cs_vtx_count = cs.number_of_vertices();
 
-    TIMESTACK_PUSH("Check source mesh is closed");
-    const bool sm_is_watertight = mesh_is_closed(
-#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-        *input.scheduler,
-#endif
-        sm);
-
-    TIMESTACK_POP();
-
-    TIMESTACK_PUSH("Check cut mesh is closed");
-    const bool cm_is_watertight = mesh_is_closed(
-#if 0// defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
-        *input.scheduler,
-#endif
-        cs);
-
-    TIMESTACK_POP();
+    const bool sm_is_watertight = input.src_mesh_is_watertight;
+    const bool cm_is_watertight = input.cut_mesh_is_watertight;
 
     ///////////////////////////////////////////////////////////////////////////
     // create polygon soup
@@ -6371,8 +6326,8 @@ void dispatch(output_t& output, const input_t& input)
             input.keep_fragments_partially_cut || //
             input.keep_unsealed_fragments || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
-            input.keep_fragments_sealed_outside_exhaustive || //
+            input.keep_fragments_sealed_outside || //input.keep_fragments_sealed_inside_exhaustive || //
+            //input.keep_fragments_sealed_outside_exhaustive || //
             input.keep_inside_patches || //
             input.keep_outside_patches)) {
         // if the user simply wants seams, then we should not have to proceed further.
@@ -6992,7 +6947,7 @@ void dispatch(output_t& output, const input_t& input)
 
     // store's the (unsealed) connected components (fragments of the source-mesh)
     hmesh_t m1;
-    m1.reserve_for_additional_elements(m0.number_of_vertices() + m0.number_of_vertices() * 0.25);
+    m1.reserve_for_additional_elements(m0.number_of_vertices() + (uint32_t)(m0.number_of_vertices() * 0.25));
     // copy vertices from m0 t0 m1 (and save mapping to avoid assumptions).
     // This map DOES NOT include patch intersection points because they are new
     // i.e. we keep only the points represent original vertices in the source-mesh
@@ -7773,8 +7728,8 @@ void dispatch(output_t& output, const input_t& input)
     if (false == (input.keep_fragments_below_cutmesh || //
             input.keep_fragments_above_cutmesh || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
-            input.keep_fragments_sealed_outside_exhaustive || //
+            input.keep_fragments_sealed_outside || //input.keep_fragments_sealed_inside_exhaustive || //
+            //input.keep_fragments_sealed_outside_exhaustive || //
             input.keep_inside_patches || //
             input.keep_outside_patches)) {
         // if the user simply wants [unsealed] fragments that may be [partially cut], then we should not have to proceed further.
@@ -9275,8 +9230,9 @@ void dispatch(output_t& output, const input_t& input)
             input.keep_fragments_above_cutmesh || //
             input.keep_fragments_partially_cut || //
             input.keep_fragments_sealed_inside || //
-            input.keep_fragments_sealed_outside || input.keep_fragments_sealed_inside_exhaustive || //
-            input.keep_fragments_sealed_outside_exhaustive)) {
+            input.keep_fragments_sealed_outside //|| input.keep_fragments_sealed_inside_exhaustive || //
+            //input.keep_fragments_sealed_outside_exhaustive
+            )) {
         // if the user simply wants [patches], then we should not have to proceed further.
         return;
     }
@@ -9491,8 +9447,8 @@ void dispatch(output_t& output, const input_t& input)
 
         const cm_patch_location_t& location = SAFE_ACCESS(patch_color_label_to_location, color_id);
 
-        if ((location == cm_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside || input.keep_fragments_sealed_inside_exhaustive)) || //
-            (location == cm_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside || input.keep_fragments_sealed_outside_exhaustive))) {
+        if ((location == cm_patch_location_t::INSIDE && !(input.keep_fragments_sealed_inside /* || input.keep_fragments_sealed_inside_exhaustive*/)) || //
+            (location == cm_patch_location_t::OUTSIDE && !(input.keep_fragments_sealed_outside/* || input.keep_fragments_sealed_outside_exhaustive */ ))) {
             continue; // skip stitching of exterior/ interior patches as user desires.
         }
 
@@ -9519,7 +9475,8 @@ void dispatch(output_t& output, const input_t& input)
         m1_polygons_colored.reserve(m1_polygons_colored.size() + cs_face_count);
 
         // reference to the list connected components (see declaration for details)
-        std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
+        //std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>& separated_stitching_CCs = color_to_separated_connected_ccsponents[color_id]; // insert
+        color_to_separated_connected_ccsponents.insert(std::make_pair(color_id, std::map<std::size_t, std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>>())); // insert (used below when extractring connected components)
 
         std::unordered_map<int, int>& m0_to_m1_face_colored = SAFE_ACCESS(color_to_m0_to_m1_face, color_id); // note: containing mappings only for traced source mesh polygons initially!
         m0_to_m1_face_colored.reserve(m0_polygons.size());
@@ -10500,8 +10457,8 @@ void dispatch(output_t& output, const input_t& input)
                 // const std::string color_tag_stri = to_string(SAFE_ACCESS(patch_color_label_to_location, color_id)); // == cm_patch_location_t::OUTSIDE ? "e" : "i");
 
                 // save meshes and dump
-
-                if (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive) {
+#if 0
+                /*if (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive)*/ {
                     ///////////////////////////////////////////////////////////////////////////
                     // create the sealed meshes defined by the [current] set of traced polygons
                     ///////////////////////////////////////////////////////////////////////////
@@ -10534,6 +10491,7 @@ void dispatch(output_t& output, const input_t& input)
                         input.keep_fragments_above_cutmesh,
                         input.keep_fragments_partially_cut);
                 }
+#endif
 
                 ++global_cm_poly_stitch_counter;
                 stitched_poly_counter++;
@@ -10573,11 +10531,11 @@ void dispatch(output_t& output, const input_t& input)
     //
 
     bool userWantsFullySealedFragmentsANY = (input.keep_fragments_sealed_inside || input.keep_fragments_sealed_outside);
-    bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
+    //bool userWantsEvenPartiallySealedFragmentsANY = (input.keep_fragments_sealed_inside_exhaustive || input.keep_fragments_sealed_outside_exhaustive);
 
     // if the user wants [only] fully sealed fragment (not partially sealed)
-    if (userWantsFullySealedFragmentsANY && //
-        !userWantsEvenPartiallySealedFragmentsANY) {
+    if (userWantsFullySealedFragmentsANY/* && //
+        !userWantsEvenPartiallySealedFragmentsANY*/) {
         ///////////////////////////////////////////////////////////////////////////////
         // create the [fully] sealed meshes defined by the final set of traced polygons
         ///////////////////////////////////////////////////////////////////////////////
@@ -10662,9 +10620,9 @@ void dispatch(output_t& output, const input_t& input)
             // fragment that is "below" will have zero cut-mesh polygons. Hence.
             std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>& cc_instances = cc_iter->second;
 
-            if (!userWantsEvenPartiallySealedFragmentsANY) {
-                MCUT_ASSERT(cc_instances.size() == 1); // there is only one, fully sealed, copy
-            }
+            //if (!userWantsEvenPartiallySealedFragmentsANY) {
+            //    MCUT_ASSERT(cc_instances.size() == 1); // there is only one, fully sealed, copy
+            //}
 
             // For each instance of CC (each instance differs by one stitched polygon)
             for (std::vector<std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>>::iterator cc_instance_iter = cc_instances.begin();

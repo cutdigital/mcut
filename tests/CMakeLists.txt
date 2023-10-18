@@ -71,7 +71,8 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/source/getEventInfo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/concurrentSynchronizedContexts.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/source/userEvents.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/perturbationState.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/perturbationState.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/source/intersectionType.cpp)
 
 target_include_directories(mcut_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${MCUT_INCLUDE_DIR} ${utest_include_dir} ${libigl_include_dir} ${eigen_include_dir})
 target_link_libraries(mcut_tests PRIVATE mcut Threads::Threads)

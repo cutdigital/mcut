@@ -42,6 +42,10 @@ void create_context_impl(McContext* pOutContext, McFlags flags, uint32_t helperT
     std::call_once(g_objects_counter_init_flag, []() { g_objects_counter.store(0xDECAF); /*any non-ero value*/ });
 
     const McContext handle = reinterpret_cast<McContext>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+    
+    // Here we actually create the context object (as shared ptr) and stored in a global 
+    // variable g_contexts. Note that g_contexts can be accessed by multiple threads 
+    // simultaneously.
     g_contexts.push_front(std::shared_ptr<context_t>(
         new context_t(handle, flags
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -303,6 +307,17 @@ void get_info_impl(
             memcpy(pMem, reinterpret_cast<const McConnectedComponentFaceWindingOrder*>(&wo), sizeof(McConnectedComponentFaceWindingOrder));
         }
     } break;
+    case MC_CONTEXT_DISPATCH_INTERSECTION_TYPE:
+    {
+        if (pMem == nullptr) {
+            *pNumBytes = sizeof(McDispatchIntersectionType);
+        }
+        else {
+            const McDispatchIntersectionType dit = context_ptr->get_most_recent_dispatch_intersection_type();
+            memcpy(pMem, reinterpret_cast<const McDispatchIntersectionType*>(&dit), sizeof(McDispatchIntersectionType));
+        }
+    }
+    break;
 
     default:
         throw std::invalid_argument("unknown info parameter");
@@ -773,7 +788,7 @@ void generate_supertriangle_from_mesh_vertices(
         if (have_double) {
             memcpy(dst, &vertex0[i], flt_size);
         } else {
-            float tmp = vertex0[i];
+            float tmp = (float)vertex0[i];
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -785,7 +800,7 @@ void generate_supertriangle_from_mesh_vertices(
         if (have_double) {
             memcpy(dst, &vertex1[i], flt_size);
         } else {
-            float tmp = vertex1[i];
+            float tmp = (float)vertex1[i];
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -797,7 +812,7 @@ void generate_supertriangle_from_mesh_vertices(
         if (have_double) {
             memcpy(dst, &vertex2[i], flt_size);
         } else {
-            float tmp = vertex2[i];
+            float tmp = (float)vertex2[i];
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -2068,7 +2083,7 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint32_t num_indices_to_copy = bytes / sizeof(uint32_t);
+            const uint32_t num_indices_to_copy = (uint32_t)(bytes / sizeof(uint32_t));
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -2116,7 +2131,7 @@ void get_connected_component_data_impl_detail(
                 //
 
                 auto fn_face_indices_copy = [flip_winding_order, &cc_uptr, &partial_sum_vec, &casted_ptr, &num_indices_to_copy](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
-                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
+                    const uint32_t base_face_offset = (uint32_t)std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_sizes_cache.size());
 
@@ -2409,7 +2424,7 @@ void get_connected_component_data_impl_detail(
                 //
 
                 auto fn_face_adjface_indices_copy = [&cc_uptr, &partial_sum_vec, &casted_ptr](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
-                    const uint32_t base_face_offset = std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
+                    const uint32_t base_face_offset = (uint32_t)std::distance(cc_uptr->kernel_hmesh_data->mesh->faces_begin(), block_start_);
 
                     MCUT_ASSERT(base_face_offset < (uint32_t)cc_uptr->face_adjacent_faces_size_cache.size());
 
@@ -2730,7 +2745,7 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint32_t elems_to_copy = bytes / sizeof(uint32_t);
+            const uint32_t elems_to_copy = (uint32_t)(bytes / sizeof(uint32_t));
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
@@ -2785,7 +2800,7 @@ void get_connected_component_data_impl_detail(
             std::vector<uint32_t>& seam_vertex_sequence_array = cc_uptr->seam_vertex_sequence_array_cache;
 
             McUint32 total_seq_count = 0;
-            const uint32_t total_seq_count_idx = seam_vertex_sequence_array.size();
+            const uint32_t total_seq_count_idx = (uint32_t)seam_vertex_sequence_array.size();
             MCUT_ASSERT(total_seq_count_idx == 0);
 
             seam_vertex_sequence_array.push_back(MC_UNDEFINED_VALUE); // location that we will used to store total_seq_count at the end
@@ -2962,7 +2977,7 @@ void get_connected_component_data_impl_detail(
                     have_loop = (num_adj_seam_vertices == 2) ? MC_TRUE : MC_FALSE;
                 }
 
-                const uint32_t num_vertices_in_built_sequence = std::distance(
+                const uint32_t num_vertices_in_built_sequence = (uint32_t)std::distance(
                     seam_vertex_sequence_array.cbegin() + seam_vertex_sequence_array_start_offset + 2,
                     seam_vertex_sequence_array.cend());
 
@@ -3005,7 +3020,7 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint32_t elems_to_copy = bytes / sizeof(uint32_t);
+            const uint32_t elems_to_copy = (uint32_t)(bytes / sizeof(uint32_t));
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
@@ -3019,13 +3034,13 @@ void get_connected_component_data_impl_detail(
                 elem_offset++;
             }
 
-            MCUT_ASSERT(elem_offset <= cc_uptr->seam_vertex_sequence_array_cache.size());
+            MCUT_ASSERT(elem_offset <= (uint32_t)cc_uptr->seam_vertex_sequence_array_cache.size());
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP");
 
-        const uint32_t vertex_map_size = cc_uptr->kernel_hmesh_data->data_maps.vertex_map.size();
+        const uint32_t vertex_map_size = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.vertex_map.size();
 
         if (vertex_map_size == 0) {
             throw std::invalid_argument("vertex map not available"); // user probably forgot to set the dispatch flag
@@ -3044,7 +3059,7 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint32_t elems_to_copy = (bytes / sizeof(uint32_t));
+            const uint32_t elems_to_copy = (uint32_t)(bytes / sizeof(uint32_t));
 
             MCUT_ASSERT(elems_to_copy <= vertex_map_size);
 
@@ -3173,7 +3188,7 @@ void get_connected_component_data_impl_detail(
     case MC_CONNECTED_COMPONENT_DATA_FACE_MAP: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_MAP");
 
-        const uint32_t face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
+        const uint32_t face_map_size = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
 
         if (face_map_size == 0) {
             throw std::invalid_argument("face map not available"); // user probably forgot to set the dispatch flag
@@ -3192,7 +3207,7 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
 
-            const uint32_t elems_to_copy = (bytes / sizeof(uint32_t));
+            const uint32_t elems_to_copy = (uint32_t)(bytes / sizeof(uint32_t));
 
             uint32_t* casted_ptr = reinterpret_cast<uint32_t*>(pMem);
 
@@ -3253,7 +3268,7 @@ void get_connected_component_data_impl_detail(
         // internal halfedge data structure from the current connected component
         const std::shared_ptr<hmesh_t> cc = cc_uptr->kernel_hmesh_data->mesh;
 
-        const uint32_t nontri_face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
+        const uint32_t nontri_face_map_size = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
 
         // user has set the dispatch flag to allow us to save the face maps.
         const bool user_requested_cdt_face_maps = (nontri_face_map_size != 0);
@@ -3262,9 +3277,9 @@ void get_connected_component_data_impl_detail(
         {
             MCUT_ASSERT(cc_uptr->cdt_index_cache.empty());
 
-            const uint32_t cc_face_count = cc->number_of_faces();
+            const uint32_t cc_face_count = (uint32_t)cc->number_of_faces();
             if (user_requested_cdt_face_maps) {
-                cc_uptr->cdt_face_map_cache.reserve(cc_face_count * 1.2);
+                cc_uptr->cdt_face_map_cache.reserve((uint32_t)(cc_face_count * 1.2));
             }
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -3287,7 +3302,7 @@ void get_connected_component_data_impl_detail(
                 const uint32_t min_per_thread = 1 << 10;
                 {
                     uint32_t max_threads = 0;
-                    const uint32_t available_threads = context_ptr->get_shared_compute_threadpool().get_num_threads() + 1; // workers and master (+1)
+                    const uint32_t available_threads = (uint32_t)(context_ptr->get_shared_compute_threadpool().get_num_threads() + 1); // workers and master (+1)
                     uint32_t block_size_unused = 0;
                     const uint32_t length = cc_face_count;
 
@@ -3310,7 +3325,7 @@ void get_connected_component_data_impl_detail(
                     const uint32_t num_elems_to_process = (uint32_t)std::distance(block_start_, block_end_);
                     cdt_index_cache_local.reserve(num_elems_to_process * 4);
                     std::vector<uint32_t> cdt_face_map_cache_local;
-                    cdt_face_map_cache_local.reserve(num_elems_to_process * 1.2);
+                    cdt_face_map_cache_local.reserve((uint32_t)(num_elems_to_process * 1.2));
 
                     std::vector<vertex_descriptor_t> cc_face_vertices;
                     std::vector<uint32_t> cc_face_triangulation;
@@ -3373,7 +3388,7 @@ void get_connected_component_data_impl_detail(
                     }
 
                     // local num triangulation indices computed by thread
-                    const uint32_t cdt_index_cache_local_len = cdt_index_cache_local.size();
+                    const uint32_t cdt_index_cache_local_len = (uint32_t)cdt_index_cache_local.size();
 
                     const uint32_t write_offset = cdt_index_cache_offset.fetch_add(cdt_index_cache_local_len);
 
@@ -3559,7 +3574,7 @@ void get_connected_component_data_impl_detail(
     case MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP");
         // The default/standard non-tri face map. If this is defined then the tri-face map must also be defined
-        const uint32_t face_map_size = cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
+        const uint32_t face_map_size = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map.size();
 
         if (face_map_size == 0) {
             throw std::invalid_argument("face map not available"); // user probably forgot to set the dispatch flag
@@ -3593,7 +3608,7 @@ void get_connected_component_data_impl_detail(
             MCUT_ASSERT(cc_uptr->cdt_face_map_cache_initialized == true);
         }
 
-        const uint32_t triangulated_face_map_size = cc_uptr->cdt_face_map_cache.size();
+        const uint32_t triangulated_face_map_size = (uint32_t)cc_uptr->cdt_face_map_cache.size();
 
         MCUT_ASSERT(triangulated_face_map_size >= face_map_size);
 

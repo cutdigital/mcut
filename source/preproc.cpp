@@ -24,10 +24,10 @@ bool client_input_arrays_to_hmesh(
     hmesh_t& halfedgeMesh,
     double& bboxDiagonal,
     const void* pVertices,
-    const uint32_t* pFaceIndices,
-    const uint32_t* pFaceSizes,
-    const uint32_t numVertices,
-    const uint32_t numFaces,
+    const McUint32* pFaceIndices,
+    const McUint32* pFaceSizes,
+    const McUint32 numVertices,
+    const McUint32 numFaces,
     const vec3* perturbation = NULL)
 {
     SCOPED_TIMER(__FUNCTION__);
@@ -44,7 +44,7 @@ bool client_input_arrays_to_hmesh(
         const float* vptr = reinterpret_cast<const float*>(pVertices);
 
         // for each input mesh-vertex
-        for (uint32_t i = 0; i < numVertices; ++i) {
+        for (McUint32 i = 0; i < numVertices; ++i) {
             const float& x = vptr[(i * 3) + 0];
             const float& y = vptr[(i * 3) + 1];
             const float& z = vptr[(i * 3) + 2];
@@ -55,7 +55,7 @@ bool client_input_arrays_to_hmesh(
                 double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
                 double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
 
-            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (uint32_t)vd < numVertices);
+            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (McUint32)vd < numVertices);
         }
     }
     // did the user provide vertex arrays of 64-bit double...?
@@ -63,7 +63,7 @@ bool client_input_arrays_to_hmesh(
         const double* vptr = reinterpret_cast<const double*>(pVertices);
 
         // for each input mesh-vertex
-        for (uint32_t i = 0; i < numVertices; ++i) {
+        for (McUint32 i = 0; i < numVertices; ++i) {
             const double& x = vptr[(i * 3) + 0];
             const double& y = vptr[(i * 3) + 1];
             const double& z = vptr[(i * 3) + 2];
@@ -74,7 +74,7 @@ bool client_input_arrays_to_hmesh(
                 double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
                 double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
 
-            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (uint32_t)vd < numVertices);
+            MCUT_ASSERT(vd != hmesh_t::null_vertex() && (McUint32)vd < numVertices);
         }
     }
 
@@ -99,11 +99,11 @@ bool client_input_arrays_to_hmesh(
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // init partial sums vec
-    std::vector<uint32_t> partial_sums(numFaces, 3); // assume that "pFaceSizes" is filled with 3's (which is the implication if pFaceSizes is null)
+    std::vector<McUint32> partial_sums(numFaces, 3); // assume that "pFaceSizes" is filled with 3's (which is the implication if pFaceSizes is null)
 
     if (pFaceSizes != nullptr) // e.g. non-triangulated user mesh
     {
-        for (uint32_t f = 0; f < numFaces; ++f) {
+        for (McUint32 f = 0; f < numFaces; ++f) {
             SAFE_ACCESS(partial_sums, f) = pFaceSizes[f];
         }
     }
@@ -114,7 +114,7 @@ bool client_input_arrays_to_hmesh(
     parallel_partial_sum(context_ptr->get_shared_compute_threadpool(), partial_sums.begin(), partial_sums.end());
 #endif
     {
-        typedef std::vector<uint32_t>::const_iterator InputStorageIteratorType;
+        typedef std::vector<McUint32>::const_iterator InputStorageIteratorType;
         typedef std::pair<InputStorageIteratorType, InputStorageIteratorType> OutputStorageType; // range of faces
         std::atomic_int atm_result;
         atm_result.store((int)McResult::MC_NO_ERROR); // 0 = ok;/ 1 = invalid face size; 2 invalid vertex index
@@ -125,9 +125,9 @@ bool client_input_arrays_to_hmesh(
                                    InputStorageIteratorType block_start_,
                                    InputStorageIteratorType block_end_) -> OutputStorageType {
             for (InputStorageIteratorType i = block_start_; i != block_end_; ++i) {
-                uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), i);
+                McUint32 faceID = (McUint32)std::distance(partial_sums.cbegin(), i);
                 std::vector<vd_t>& faceVertices = faces[faceID];
-                int face_vertex_count = assume_triangle_mesh ? 3 : ((uint32_t*)pFaceSizes)[faceID];
+                int face_vertex_count = assume_triangle_mesh ? 3 : ((McUint32*)pFaceSizes)[faceID];
 
                 if (face_vertex_count < 3) {
                     int zero = (int)McResult::MC_NO_ERROR;
@@ -148,7 +148,7 @@ bool client_input_arrays_to_hmesh(
                 int faceBaseOffset = (*i) - face_vertex_count;
 
                 for (int j = 0; j < face_vertex_count; ++j) {
-                    uint32_t idx = ((uint32_t*)pFaceIndices)[faceBaseOffset + j];
+                    McUint32 idx = ((McUint32*)pFaceIndices)[faceBaseOffset + j];
 
                     if (idx >= numVertices) {
                         int zero = (int)McResult::MC_NO_ERROR;
@@ -206,7 +206,7 @@ bool client_input_arrays_to_hmesh(
                              InputStorageIteratorType block_end_) -> bool {
             for (InputStorageIteratorType face_iter = block_start_;
                  face_iter != block_end_; ++face_iter) {
-                uint32_t faceID = (uint32_t)std::distance(partial_sums.cbegin(), face_iter);
+                McUint32 faceID = (McUint32)std::distance(partial_sums.cbegin(), face_iter);
                 const std::vector<vd_t>& faceVertices = SAFE_ACCESS(faces, faceID);
                 fd_t fd = halfedgeMesh.add_face(faceVertices);
 
@@ -260,9 +260,9 @@ bool client_input_arrays_to_hmesh(
     int faceSizeOffset = 0;
     std::vector<vd_t> faceVertices;
 
-    for (uint32_t i = 0; i < numFaces; ++i) {
+    for (McUint32 i = 0; i < numFaces; ++i) {
         faceVertices.clear();
-        int face_vertex_count = assume_triangle_mesh ? 3 : ((uint32_t*)pFaceSizes)[i];
+        int face_vertex_count = assume_triangle_mesh ? 3 : ((McUint32*)pFaceSizes)[i];
 
         if (face_vertex_count < 3) {
 
@@ -273,7 +273,7 @@ bool client_input_arrays_to_hmesh(
 
         for (int j = 0; j < face_vertex_count; ++j) {
 
-            uint32_t idx = ((uint32_t*)pFaceIndices)[faceSizeOffset + j];
+            McUint32 idx = ((McUint32*)pFaceIndices)[faceSizeOffset + j];
 
             if (idx >= numVertices) {
 
@@ -498,7 +498,7 @@ void resolve_floating_polygons(
 
         // NOTE: this boolean needs to be evaluated with "source_hmesh_face_count_prev" since the number of
         // src-mesh faces might change as we add more polygons due to partitioning.
-        bool parent_face_from_source_hmesh = ((uint32_t)parent_face_raw < (uint32_t)source_hmesh_face_count_prev);
+        bool parent_face_from_source_hmesh = ((McUint32)parent_face_raw < (McUint32)source_hmesh_face_count_prev);
 
         // pointer to input mesh with face containing floating polygon
         // Note: this mesh will be modified as we add new faces.
@@ -517,9 +517,9 @@ void resolve_floating_polygons(
 
         // Now compute the actual input mesh face index (accounting for offset)
         // i.e. index/descriptor into the mesh referenced by "parent_face_hmesh_ptr"
-        const fd_t parent_face = parent_face_from_source_hmesh ? parent_face_raw : fd_t((uint32_t)parent_face_raw - (uint32_t)source_hmesh_face_count_prev); // accounting for offset (NOTE: must updated "source_hmesh" state)
+        const fd_t parent_face = parent_face_from_source_hmesh ? parent_face_raw : fd_t((McUint32)parent_face_raw - (McUint32)source_hmesh_face_count_prev); // accounting for offset (NOTE: must updated "source_hmesh" state)
 
-        MCUT_ASSERT(static_cast<uint32_t>(parent_face) < (uint32_t)parent_face_hmesh_ptr->number_of_faces());
+        MCUT_ASSERT(static_cast<McUint32>(parent_face) < (McUint32)parent_face_hmesh_ptr->number_of_faces());
 
         // for each floating polygon detected on current ps-face
         for (std::vector<floating_polygon_info_t>::const_iterator floating_poly_info_iter = detected_floating_polygons_iter->second.cbegin();
@@ -1273,19 +1273,423 @@ void resolve_floating_polygons(
     } // for (std::vector<floating_polygon_info_t>::const_iterator detected_floating_polygons_iter = kernel_output.detected_floating_polygons.cbegin(); ...
 }
 
+// Compute the signed solid angle subtended by triangle abc from query point.
+double calculate_signed_solid_angle(
+    const vec3& a,
+    const vec3& b,
+    const vec3& c,
+    const vec3& query)
+{
+    const vec3 qa = a - query;
+    const vec3 qb = b - query;
+    const vec3 qc = c - query;
+
+    const double alength = length(qa);
+    const double blength = length(qb);
+    const double clength = length(qc);
+
+    // If any triangle vertices are coincident with query,
+    // query is on the surface, which we treat as no solid angle.
+    if (alength == 0 || blength == 0 || clength == 0)
+    {
+        return 0.0;
+    }
+
+    const vec3 qa_normalized = qa/alength;
+    const vec3 qb_normalized = qb/blength;
+    const vec3 qc_normalized = qc/clength;
+
+    // equivalent to dot(qa,cross(qb,qc)),
+    const double numerator = dot_product(qa_normalized, cross_product(qb_normalized - qa_normalized, qc_normalized - qa_normalized));
+
+    // If numerator is 0, regardless of denominator, query is on the
+    // surface, which we treat as no solid angle.
+    if (numerator == 0.0)
+    {
+        return 0.0;
+    }
+
+    const double denominator = 1.0 + dot_product(qa_normalized, qb_normalized) + dot_product(qa_normalized, qc_normalized) + dot_product(qb_normalized, qc_normalized);
+
+    const double pi = 3.14159265358979323846;
+
+    // dividing by 2*pi instead of 4*pi because there was a 2 out front
+    // see eq. 5 in https://igl.ethz.ch/projects/winding-number/robust-inside-outside-segmentation-using-generalized-winding-numbers-siggraph-2013-compressed-jacobson-et-al.pdf
+    return std::atan2(numerator, denominator)  / (2. * pi);
+}
+
+// Compute the signed solid angle subtended by quad abcd from query point.
+// based on libigl impl
+double calculate_signed_solid_angle(
+    const vec3& a,
+    const vec3& b,
+    const vec3& c,
+    const vec3& d,
+    const vec3& query)
+{
+    const double pi = 3.14159265358979323846;
+    // Make a, b, c, and d relative to query
+    vec3 v[4] = {
+        a - query,
+        b - query,
+        c - query,
+        d - query
+    };
+
+    const double lengths[4] = {
+        length(v[0]),
+        length(v[1]),
+        length(v[2]),
+        length(v[3])
+    };
+
+    // If any quad vertices are coincident with query,
+    // query is on the surface, which we treat as no solid angle.
+    // We could add the contribution from the non-planar part,
+    // but in the context of a mesh, we'd still miss some, like
+    // we do in the triangle case.
+    if (lengths[0] == double(0) || lengths[1] == double(0) || lengths[2] == double(0) || lengths[3] == double(0))
+        return double(0);
+
+    // Normalize the vectors
+    v[0] = v[0] / lengths[0];
+    v[1] = v[1] / lengths[1];
+    v[2] = v[2] / lengths[2];
+    v[3] = v[3] / lengths[3];
+
+    // Compute (unnormalized, but consistently-scaled) barycentric coordinates
+    // for the query point inside the tetrahedron of points.
+    // If 0 or 4 of the coordinates are positive, (or slightly negative), the
+    // query is (approximately) inside, so the choice of triangulation matters.
+    // Otherwise, the triangulation doesn't matter.
+
+    const vec3 diag02 = v[2] - v[0];
+    const vec3 diag13 = v[3] - v[1];
+    const vec3 v01 = v[1] - v[0];
+    const vec3 v23 = v[3] - v[2];
+
+    double bary[4];
+    bary[0] = dot_product(v[3], cross_product(v23, diag13));
+    bary[1] = -dot_product(v[2], cross_product(v23, diag02));
+    bary[2] = -dot_product(v[1], cross_product(v01, diag13));
+    bary[3] = dot_product(v[0], cross_product(v01, diag02));
+
+    const double dot01 = dot_product(v[0], v[1]);
+    const double dot12 = dot_product(v[1], v[2]);
+    const double dot23 = dot_product(v[2], v[3]);
+    const double dot30 = dot_product(v[3], v[0]);
+
+    double omega = double(0);
+
+    // Equation of a bilinear patch in barycentric coordinates of its
+    // tetrahedron is x0*x2 = x1*x3.  Less is one side; greater is other.
+    if (bary[0] * bary[2] < bary[1] * bary[3])
+    {
+        // Split 0-2: triangles 0,1,2 and 0,2,3
+        const double numerator012 = bary[3];
+        const double numerator023 = bary[1];
+        const double dot02 = dot_product(v[0], v[2]);
+
+        // If numerator is 0, regardless of denominator, query is on the
+        // surface, which we treat as no solid angle.
+        if (numerator012 != double(0))
+        {
+            const double denominator012 = double(1) + dot01 + dot12 + dot02;
+            omega = std::atan2(numerator012, denominator012) ;
+        }
+        if (numerator023 != double(0))
+        {
+            const double denominator023 = double(1) + dot02 + dot23 + dot30;
+            omega += std::atan2(numerator023, denominator023);
+        }
+    }
+    else
+    {
+        // Split 1-3: triangles 0,1,3 and 1,2,3
+        const double numerator013 = -bary[2];
+        const double numerator123 = -bary[0];
+        const double dot13 = dot_product(v[1], v[3]);
+
+        // If numerator is 0, regardless of denominator, query is on the
+        // surface, which we treat as no solid angle.
+        if (numerator013 != double(0))
+        {
+            const double denominator013 = double(1) + dot01 + dot13 + dot30;
+            omega = std::atan2(numerator013, denominator013) ;
+        }
+        if (numerator123 != double(0))
+        {
+            const double denominator123 = double(1) + dot12 + dot23 + dot13;
+            omega += std::atan2(numerator123, denominator123) ;
+        }
+    }
+    return /*double(2) **/ omega / (2. * pi);
+}
+
+double computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh, const face_descriptor_t face_descr)
+{
+    const std::vector<vertex_descriptor_t> vertices_around_face = mesh->get_vertices_around_face(face_descr);
+    const McUint32 num_vertices_around_face = (McUint32)vertices_around_face.size();
+
+    double windingNumber = 0;
+
+    if (num_vertices_around_face > 4)
+    {
+        std::vector<McUint32> cdt_local; // triangulation indices local to the face
+        triangulate_face(cdt_local, context_ptr, num_vertices_around_face, vertices_around_face, *mesh.get(), face_descr);
+
+        std::vector<McUint32> cdt_global;  // triangulation indices of face (indices refer to "mesh" vertex array)
+
+        // for each cdt index in face
+        for (McUint32 i = 0; i < (McUint32)cdt_local.size(); ++i) {
+            const McUint32 local_idx = cdt_local[i]; // id local within the current face that we have triangulated
+
+            MCUT_ASSERT(local_idx < num_vertices_around_face);
+
+            const McUint32 global_idx = (McUint32)vertices_around_face[local_idx];
+
+            MCUT_ASSERT(global_idx < (McUint32)mesh->number_of_vertices());
+
+            cdt_global.push_back(global_idx);
+        }
+
+        // for each triangle
+        for (McUint32 i = 0; i < (McUint32)cdt_global.size() / 3; ++i)
+        {
+            const vertex_descriptor_t idx0 = vertex_descriptor_t(cdt_global[(i * 3) + 0]);
+            const vertex_descriptor_t idx1 = vertex_descriptor_t(cdt_global[(i * 3) + 1]);
+            const vertex_descriptor_t idx2 = vertex_descriptor_t(cdt_global[(i * 3) + 2]);
+
+            const double solidAngle = calculate_signed_solid_angle(mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint);
+            windingNumber += solidAngle;
+        }
+    }
+    else if (num_vertices_around_face == 4) // face is a quad
+    {
+        const double solidAngle = calculate_signed_solid_angle(
+            mesh->vertex(vertices_around_face[0]),
+            mesh->vertex(vertices_around_face[1]),
+            mesh->vertex(vertices_around_face[2]),
+            mesh->vertex(vertices_around_face[3]),
+            queryPoint);
+
+        windingNumber += solidAngle;
+    }
+    else // face is a triangle
+    {
+        const double solidAngle = calculate_signed_solid_angle(
+            mesh->vertex(vertices_around_face[0]),
+            mesh->vertex(vertices_around_face[1]),
+            mesh->vertex(vertices_around_face[2]),
+            queryPoint);
+
+        windingNumber += solidAngle;
+    }
+
+    return windingNumber;
+}
+
+double getWindingNumber(std::shared_ptr<context_t> context_ptr, const vec3& queryPoint, const std::shared_ptr<hmesh_t>& mesh)
+{
+    double windingNumber = 0;
+
+#if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    {
+        std::atomic<double> gWindingNumber; 
+        std::atomic_init(&gWindingNumber, 0);
+
+        auto fn_compute_winding_number = [&](face_array_iterator_t block_start_, face_array_iterator_t block_end_) {
+
+            double wn = 0; // local winding number computed by current thread
+
+            for (face_array_iterator_t face_iter = block_start_; face_iter != block_end_; ++face_iter) {
+
+                const face_descriptor_t descr = *face_iter;
+                
+                wn += computeWindingNumberOnFace(context_ptr, queryPoint, mesh, descr);
+            }
+
+            mc_atomic_fetch_add(&gWindingNumber, wn);
+        };
+
+        parallel_for(
+            context_ptr->get_shared_compute_threadpool(),
+            mesh->faces_begin(),
+            mesh->faces_end(),
+            fn_compute_winding_number, 
+            1<<12 // min 4096 elements before bothering to run multiple threads
+        );
+
+        //std::atomic_thread_fence(std::memory_order_acq_rel); // only the API thread touch the mem of 
+
+        windingNumber = gWindingNumber.load(std::memory_order_relaxed);
+    }
+#else // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    for (face_array_iterator_t it = mesh->faces_begin(); it != mesh->faces_end(); ++it)
+    {
+        const face_descriptor_t face_descr = *it;
+
+        windingNumber += computeWindingNumberOnFace(context_ptr, queryPoint, mesh, face_descr);
+    }
+#endif
+
+    return windingNumber;
+}
+
+bool mesh_is_closed(
+#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    thread_pool& scheduler,
+#endif
+    const hmesh_t& mesh)
+{
+    bool all_halfedges_incident_to_face = true;
+#if 0 // defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+    {
+        printf("mesh=%d\n", (int)mesh.number_of_halfedges());
+        all_halfedges_incident_to_face = parallel_find_if(
+            scheduler,
+            mesh.halfedges_begin(),
+            mesh.halfedges_end(),
+            [&](hd_t h) {
+                const fd_t f = mesh.face(h);
+                return (f == hmesh_t::null_face());
+            })
+            == mesh.halfedges_end();
+    }
+#else
+    for (halfedge_array_iterator_t iter = mesh.halfedges_begin(); iter != mesh.halfedges_end(); ++iter) {
+        const fd_t f = mesh.face(*iter);
+        if (f == hmesh_t::null_face()) {
+            all_halfedges_incident_to_face = false;
+            break;
+        }
+    }
+#endif
+    return all_halfedges_incident_to_face;
+}
+
+// If either mesh is not watertight, then we return [no intersection]!
+// NOTE: even if the meshes appear closed (in the geometric sense) as long as either mesh has at least
+// one edge that is used by only one face we have to notify the user that there is no intersection. 
+// This is because a non-watertight mesh is homeomorphic to a plane/disk, which implies that there will be ambiguities
+// when it comes to determining whether something lies inside/outside of another (i.e. all of a sudden we will start 
+// to ask "by how much does it lie inside?"). This is "threshold territory" and we do not want to go there as a 
+// strict rule!
+void check_and_store_input_mesh_intersection_type(
+    std::shared_ptr<context_t>& context_ptr, 
+    const std::shared_ptr<hmesh_t>& source_hmesh, 
+    const std::shared_ptr<hmesh_t>& cut_hmesh,
+    const bool sm_is_watertight,
+    const bool cm_is_watertight,
+    const bounding_box_t<vec3>& sm_aabb,
+    const bounding_box_t<vec3>& cm_aabb)
+{
+    const double windingNumberEps = 1e-7;
+
+    if ((sm_is_watertight == false && cm_is_watertight == false) || intersect_bounding_boxes(sm_aabb, cm_aabb) == false)
+    {
+        context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+    }
+    else if (sm_is_watertight == true && cm_is_watertight == true) // both watertight
+    {
+
+        //
+        // we test first against the mesh with the larger AABB (heuristic to potentially make the query faster)
+        // 
+        const double sm_aabb_diag = squared_length(sm_aabb.maximum() - sm_aabb.minimum());
+        const double cm_aabb_diag = squared_length(cm_aabb.maximum() - cm_aabb.minimum());
+        const bool sm_larger_than_cm = sm_aabb_diag > cm_aabb_diag;
+        // mesh with larger bounding box
+        const std::shared_ptr<hmesh_t>& meshA = sm_larger_than_cm ? source_hmesh : cut_hmesh;
+        const std::shared_ptr<hmesh_t>& meshB = sm_larger_than_cm ? cut_hmesh : source_hmesh;
+
+        //
+        // check if meshB in meshA
+        //
+
+        // pick any point in meshB (we chose the 1st)
+        const vec3& meshBQueryPoint = meshB->vertex(vertex_descriptor_t(0));
+
+        const double meshBQueryPointWindingNumber = getWindingNumber(context_ptr, meshBQueryPoint, meshA);
+
+        if (absolute_value(1.0 - meshBQueryPointWindingNumber) < windingNumberEps) // is it inside?
+        {
+            const McDispatchIntersectionType itype = sm_larger_than_cm ? McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH : McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH;
+            context_ptr->set_most_recent_dispatch_intersection_type(itype);
+        }
+        else
+        {
+            MCUT_ASSERT( absolute_value(1.0 - meshBQueryPointWindingNumber) >= windingNumberEps); // outside meshA
+
+            const vec3& meshAQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
+
+            const double meshAQueryPointWindingNumber = getWindingNumber(context_ptr, meshAQueryPoint, meshB);
+
+            if ( absolute_value(1.0 - meshAQueryPointWindingNumber) < windingNumberEps )
+            {
+                const McDispatchIntersectionType itype = sm_larger_than_cm ? McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH : McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH;
+                context_ptr->set_most_recent_dispatch_intersection_type(itype);
+            }
+            else
+            {
+                MCUT_ASSERT( absolute_value(1.0 - meshAQueryPointWindingNumber) >= windingNumberEps); // outside cut-mesh
+                context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+            }
+        }
+    }
+    else if (sm_is_watertight == true && cm_is_watertight == false) // only source mesh is watertight
+    {
+        const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
+
+        const double cutMeshQueryPointWindingNumber = getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh);
+
+        if ( absolute_value(1.0 - cutMeshQueryPointWindingNumber) < windingNumberEps)
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
+        }
+        else
+        {
+            MCUT_ASSERT( absolute_value(1.0 - cutMeshQueryPointWindingNumber) >= windingNumberEps); // outside source-mesh
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+        }
+    }
+    else // only cut mesh is watertight
+    {
+        MCUT_ASSERT(sm_is_watertight == false && cm_is_watertight == true);
+
+        const vec3& srcMeshQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
+
+        const double srcMeshQueryPointWindingNumber = getWindingNumber(context_ptr, srcMeshQueryPoint, cut_hmesh);
+
+        if ( absolute_value(1.0 - srcMeshQueryPointWindingNumber) < windingNumberEps)
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
+        }
+        else
+        {
+            MCUT_ASSERT( absolute_value(1.0 - srcMeshQueryPointWindingNumber) >= windingNumberEps); // outside cut-mesh
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
+        }
+    }
+
+    // must be something valid
+    MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
+}
+
+
 extern "C" void preproc(
     std::shared_ptr<context_t> context_ptr,
     McFlags dispatchFlags,
     const void* pSrcMeshVertices,
-    const uint32_t* pSrcMeshFaceIndices,
-    const uint32_t* pSrcMeshFaceSizes,
-    uint32_t numSrcMeshVertices,
-    uint32_t numSrcMeshFaces,
+    const McUint32* pSrcMeshFaceIndices,
+    const McUint32* pSrcMeshFaceSizes,
+    McUint32 numSrcMeshVertices,
+    McUint32 numSrcMeshFaces,
     const void* pCutMeshVertices,
-    const uint32_t* pCutMeshFaceIndices,
-    const uint32_t* pCutMeshFaceSizes,
-    uint32_t numCutMeshVertices,
-    uint32_t numCutMeshFaces) noexcept(false)
+    const McUint32* pCutMeshFaceIndices,
+    const McUint32* pCutMeshFaceSizes,
+    McUint32 numCutMeshVertices,
+    McUint32 numCutMeshFaces) noexcept(false)
 {
     std::shared_ptr<hmesh_t> source_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t);
     double source_hmesh_aabb_diag(0.0);
@@ -1297,6 +1701,12 @@ extern "C" void preproc(
     if (false == check_input_mesh(context_ptr, *source_hmesh.get())) {
         throw std::invalid_argument("invalid source-mesh connectivity");
     }
+
+    bool sm_is_watertight = false;
+    bool cm_is_watertight = false;
+
+    
+
 
     input_t kernel_input; // kernel/backend inpout
 
@@ -1314,7 +1724,7 @@ extern "C" void preproc(
     kernel_input.populate_vertex_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_VERTEX_MAP);
     kernel_input.populate_face_maps = static_cast<bool>(dispatchFlags & MC_DISPATCH_INCLUDE_FACE_MAP);
 
-    uint32_t dispatch_filter_flag_bitset_all = ( //
+    McUint32 dispatch_filter_flag_bitset_all = ( //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE | //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_BELOW | //
         MC_DISPATCH_FILTER_FRAGMENT_LOCATION_UNDEFINED | //
@@ -1346,8 +1756,8 @@ extern "C" void preproc(
         kernel_input.keep_unsealed_fragments = true;
         kernel_input.keep_fragments_sealed_outside = true; // mutually exclusive with exhaustive case
         kernel_input.keep_fragments_sealed_inside = true;
-        kernel_input.keep_fragments_sealed_outside_exhaustive = false;
-        kernel_input.keep_fragments_sealed_inside_exhaustive = false;
+        //kernel_input.keep_fragments_sealed_outside_exhaustive = false;
+        //kernel_input.keep_fragments_sealed_inside_exhaustive = false;
         kernel_input.keep_inside_patches = true;
         kernel_input.keep_outside_patches = true;
         kernel_input.keep_srcmesh_seam = true;
@@ -1411,8 +1821,8 @@ extern "C" void preproc(
     std::unordered_map<vd_t, vec3> cut_hmesh_new_poly_partition_vertices;
 
     // the number of faces in the source mesh from the last/previous dispatch call
-    const uint32_t source_hmesh_face_count = numSrcMeshFaces;
-    uint32_t source_hmesh_face_count_prev = source_hmesh_face_count;
+    const McUint32 source_hmesh_face_count = numSrcMeshFaces;
+    McUint32 source_hmesh_face_count_prev = source_hmesh_face_count;
 
     output_t kernel_output;
 
@@ -1486,7 +1896,7 @@ extern "C" void preproc(
 
             context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, "general position assumption violated!");
 
-            if (cut_mesh_perturbation_count == context_ptr->get_general_position_enforcement_constant()) {
+            if (cut_mesh_perturbation_count == (int)context_ptr->get_general_position_enforcement_attempts()) {
 
                 context_ptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_HIGH, kernel_output.logger.get_reason_for_failure());
 
@@ -1636,7 +2046,31 @@ extern "C" void preproc(
             throw std::invalid_argument("invalid cut-mesh connectivity");
         }
 
-        if (source_or_cut_hmesh_BVH_rebuilt) {
+        if (kernel_invocation_counter == 0) // first iteration
+        {
+            TIMESTACK_PUSH("Check source mesh is closed");
+            sm_is_watertight = mesh_is_closed(
+#if 0 //defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+                * input.scheduler,
+#endif
+                * source_hmesh.get());
+
+            TIMESTACK_POP();
+
+            TIMESTACK_PUSH("Check cut mesh is closed");
+            cm_is_watertight = mesh_is_closed(
+#if 0// defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
+                * input.scheduler,
+#endif
+                * cut_hmesh.get());
+
+            kernel_input.src_mesh_is_watertight = sm_is_watertight;
+            kernel_input.cut_mesh_is_watertight = cm_is_watertight;
+
+            TIMESTACK_POP();
+        }
+
+        if (source_or_cut_hmesh_BVH_rebuilt) { 
             // Evaluate BVHs to find polygon pairs that will be tested for intersection
             // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
             source_or_cut_hmesh_BVH_rebuilt = false;
@@ -1677,6 +2111,17 @@ extern "C" void preproc(
                     continue;
                 } else {
                     context_ptr->dbg_cb(MC_DEBUG_SOURCE_API, MC_DEBUG_TYPE_OTHER, 0, MC_DEBUG_SEVERITY_NOTIFICATION, "Mesh BVHs do not overlap.");
+
+                    if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // determine the intersection-type if the user requested for it.
+                    {                         
+                        // NOTE: since the BVHs do not overlap, it is not possible for the intersection type to be "standard" (i.e. surfaces are 
+                        // not intersecting since we have not even invoked the kernel)
+                        check_and_store_input_mesh_intersection_type(
+                            context_ptr, 
+                            source_hmesh, cut_hmesh, //
+                            sm_is_watertight, cm_is_watertight, //
+                            source_hmesh_BVH_aabb_array[0], cut_hmesh_BVH_aabb_array[0]);
+                    }
                     return; // we are done
                 }
             }
@@ -1726,6 +2171,8 @@ extern "C" void preproc(
 
         throw std::runtime_error("incomplete kernel execution");
     }
+    
+    
 
     TIMESTACK_PUSH("create face partition maps");
     // NOTE: face descriptors in "cut_hmesh_child_to_usermesh_birth_face", need to be offsetted
@@ -1754,6 +2201,8 @@ extern "C" void preproc(
     }
 
     TIMESTACK_POP();
+
+    McUint32 numConnectedComponentsCreated = 0;
 
     //
     // sealed-fragment connected components
@@ -1803,6 +2252,8 @@ extern "C" void preproc(
                 asFragPtr->perturbation_vector = perturbation;
 
                 context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+                numConnectedComponentsCreated += 1;
             }
         }
     }
@@ -1848,6 +2299,8 @@ extern "C" void preproc(
             asFragPtr->perturbation_vector = perturbation;
 
             context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+            numConnectedComponentsCreated += 1;
         }
     }
     TIMESTACK_POP();
@@ -1901,6 +2354,8 @@ extern "C" void preproc(
         asPatchPtr->perturbation_vector = perturbation;
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+        numConnectedComponentsCreated += 1;
     }
     TIMESTACK_POP();
 
@@ -1949,6 +2404,8 @@ extern "C" void preproc(
         asPatchPtr->perturbation_vector = perturbation;
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
+
+        numConnectedComponentsCreated += 1;
     }
     TIMESTACK_POP();
 
@@ -2005,6 +2462,8 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
 
@@ -2054,6 +2513,8 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
 
@@ -2073,6 +2534,8 @@ extern "C" void preproc(
         MCUT_ASSERT(asCutMeshInputPtr != nullptr);
 
         asCutMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+
+
 #if 0
         // std::shared_ptr<connected_component_t> internalCutMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalCutMesh.get());
@@ -2156,10 +2619,16 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
 
+
+
     // internal source-mesh (possibly with new faces and vertices)
+
+
     {
         TIMESTACK_PUSH("store original src-mesh");
 
@@ -2172,6 +2641,7 @@ extern "C" void preproc(
         MCUT_ASSERT(asSrcMeshInputPtr != nullptr);
 
         asSrcMeshInputPtr->m_user_handle = reinterpret_cast<McConnectedComponent>(g_objects_counter.fetch_add(1, std::memory_order_relaxed));
+
 #if 0
         // std::shared_ptr<connected_component_t> internalSrcMesh = std::unique_ptr<input_cc_t, void (*)(connected_component_t*)>(new input_cc_t, fn_delete_cc<input_cc_t>);
         // McConnectedComponent clientHandle = reinterpret_cast<McConnectedComponent>(internalSrcMesh.get());
@@ -2251,6 +2721,43 @@ extern "C" void preproc(
 
         context_ptr->connected_components.push_front(cc_ptr); // copy the connected component ptr into the context object
 
+        numConnectedComponentsCreated += 1;
+
         TIMESTACK_POP();
     }
+
+
+    const McUint32 numConnectedComponentsCreatedDefault = 2; // source-mesh and cut-mesh (potentially modified due to poly partitioning)
+
+    const bool haveStandardIntersection = numConnectedComponentsCreated > numConnectedComponentsCreatedDefault;
+    const bool haveNoIntersection = numConnectedComponentsCreated == numConnectedComponentsCreatedDefault;
+    
+    if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
+    {
+        context_ptr->dbg_cb(
+            MC_DEBUG_SOURCE_FRONTEND,
+            MC_DEBUG_TYPE_OTHER,
+            0,
+            MC_DEBUG_SEVERITY_NOTIFICATION,
+            "Determining intersection-type of input meshes");
+
+        if (haveStandardIntersection) // kernel actually found the input surfaces to be intersecting
+        {
+            context_ptr->set_most_recent_dispatch_intersection_type(McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
+        }
+        else
+        {
+            MCUT_ASSERT(haveNoIntersection); // we are dealing with the case where there exists no intersection of the input surfaces
+
+            check_and_store_input_mesh_intersection_type(
+                context_ptr, //
+                source_hmesh, cut_hmesh, //
+                sm_is_watertight, cm_is_watertight, //
+                source_hmesh_BVH_aabb_array[0], cut_hmesh_BVH_aabb_array[0]);
+        }
+
+        // must be something valid
+        MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
+
+    } // if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE)
 }

@@ -222,7 +222,7 @@ int main()
     for (int i = 0; i < (int)connComps.size(); ++i) {
         McConnectedComponent connComp = connComps[i]; // connected compoenent id
 
-        McSize numBytes = 0;
+        numBytes = 0;
 
         // query the seam vertices (indices)
         // ---------------------------------
@@ -245,7 +245,7 @@ int main()
             exit(1);
         }
 
-        uint32_t faceSizesStub = seamVertexIndices.size();
+        uint32_t faceSizesStub = (McUint32)seamVertexIndices.size();
 
         char seamFnameBuf[40];
         sprintf(seamFnameBuf, "frag-%d-seam-vertices.txt", i);

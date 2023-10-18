@@ -223,7 +223,7 @@ int main()
     for (int i = 0; i < (int)connComps.size(); ++i) {
         McConnectedComponent connComp = connComps[i]; // connected compoenent id
 
-        McSize numBytes = 0;
+        numBytes = 0;
 
         // query the vertices
         // ----------------------

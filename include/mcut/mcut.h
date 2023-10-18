@@ -353,7 +353,7 @@ typedef enum McDebugSeverity {
  */
 typedef enum McContextCreationFlags {
     MC_DEBUG = (1 << 0), /**< Enable debug mode (message logging etc.).*/
-    MC_OUT_OF_ORDER_EXEC_MODE_ENABLE = (1 << 1), /**< Determines whether the commands queued in the context-queue are executed in-order or out-of-order. If set, the commands in the context-queue are executed out-of-order. Otherwise, commands are executed in-order..*/
+    MC_OUT_OF_ORDER_EXEC_MODE_ENABLE = (1 << 1), /**< Determines whether the commands queued in the context-queue are executed in-order or out-of-order. If set, the commands in the context-queue (if independent) are executed out-of-order. Otherwise, commands are executed in-order..*/
     MC_PROFILING_ENABLE = (1 << 2) /**< Enable or disable profiling of commands in the context-queue. If set, the profiling of commands is enabled. Otherwise profiling of commands is disabled. See ::mcGetEventProfilingInfo for more information. */
 } McContextCreationFlags;
 
@@ -424,6 +424,7 @@ typedef enum McDispatchFlags {
 
     MC_DISPATCH_ENFORCE_GENERAL_POSITION = (1 << 15), /**< Enforce general position such that the variable "c" (see detailed note above) is computed as the multiplication of the current general position enforcement constant (of current MCUT context) and the diagonal length of the bounding box of the cut-mesh. So this uses a relative perturbation of the cut-mesh based on its scale (see also ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT). */
     MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE= (1 << 16), /**< Enforce general position such that the variable "c" (see detailed note above) is the current general position enforcement constant (of current MCUT context). So this uses an absolute perturbation of the cut-mesh based on the stored constant (see also ::MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT). */
+    MC_DISPATCH_INCLUDE_INTERSECTION_TYPE = (1<<17)/**< Compute and store the _type_ of intersection that the input meshes where found in. See also: ::McDispatchIntersectionType and ::MC_CONTEXT_DISPATCH_INTERSECTION_TYPE */
 } McDispatchFlags;
 
 /**
@@ -464,6 +465,20 @@ typedef enum McConnectedComponentFaceWindingOrder {
 } McConnectedComponentFaceWindingOrder;
 
 /**
+ * \enum McIntersectionType
+ * @brief Types of input mesh intersections that may be encountered during a dispatch call
+ *
+ * This enum structure defines the possible type geometrical configurations that the input meshes may be found in. The values identify whether the mesh intersect, one lies inside of the other, or that they are not intersecting at all (the union of their occupied space is empty)..
+ */
+typedef enum McDispatchIntersectionType {
+    MC_DISPATCH_INTERSECTION_TYPE_STANDARD = 0, /**<  The input meshes were found to be in standard geometric configuration, where at-least two edges (from either source-mesh or cut-mesh or both as in one from each) intersect a face to allow for cutting to be performed. */
+    MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH = (1 << 1), /**< The input source-mesh is found lie inside of the cut-mesh, where the notion of "inside" is determine based on the orientation of the surface normals of the cut-mesh faces. The cut-mesh must be "watertight" (every edge incident to two faces) for this flag to ever be returned. Note further that ::MC_INTERSECTION_INSIDE_CUTMESH implies that the cut-mesh is outside (i.e. encloses)  of the source-mesh, in the sense that the source-mesh (if it is watertight) geometrically represents a void inside the cut-mesh. The source-mesh need not be watertight. */
+    MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH = (1 << 2), /**< The input cut-mesh is found lie inside of the source-mesh, where the notion of "inside" is determine based on the orientation of the surface normals of the source-mesh faces. The source-mesh must be "watertight" (every edge incident to two faces) for this flag to ever be returned. Note further that ::MC_INTERSECTION_INSIDE_SOURCEMESH implies that the source-mesh is outside (i.e. encloses)  of the cut-mesh, in the sense that the cut-mesh (if it is watertight) geometrically represents a void inside the source-mesh. The cut-mesh need not be watertight.*/
+    MC_DISPATCH_INTERSECTION_TYPE_NONE = (1 << 3), /**< The input meshes (A and B) do not intersect or overlap (i.e. one enclosing the other) in anyway. That is: (A is watertight AND B is NOT watertight) AND (B does not lie inside A), and vice versa, where A,B = {source-mesh, cut-mesh}. */
+    MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM = 0xFFFFFFFF /**< Wildcard (match all) . */
+} McDispatchIntersectionType;
+
+/**
  * \enum McQueryFlags
  * @brief Flags for querying fixed API state.
  *
@@ -482,7 +497,8 @@ typedef enum McQueryFlags {
     MC_CONTEXT_MAX_DEBUG_MESSAGE_LENGTH = 1 << 9, /**< The maximum length of a single message return from ::mcGetDebugMessageLog */
     MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_CONSTANT = 1 << 10, /**< A constant small real number representing the amount by which to perturb the cut-mesh when two intersecting polygon are found to not be in general position. */
     MC_CONTEXT_GENERAL_POSITION_ENFORCEMENT_ATTEMPTS = 1<<11, /**< The number of times that a dispatch operation will attempt to perturb the cut-mesh if the input meshes are found to not be in general position.*/
-    MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER = 1<<12 /**< The winding order that is used when specifying vertex indices that define the faces of connected components. */
+    MC_CONTEXT_CONNECTED_COMPONENT_FACE_WINDING_ORDER = 1<<12, /**< The winding order that is used when specifying vertex indices that define the faces of connected components. */
+    MC_CONTEXT_DISPATCH_INTERSECTION_TYPE = 1<<13 /**< The type of intersection found during the most recent dispatch call. Refer to  ::McDispatchIntersectionType.  */
 } McQueryFlags;
 
 /**

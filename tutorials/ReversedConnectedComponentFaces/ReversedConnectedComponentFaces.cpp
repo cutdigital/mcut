@@ -191,7 +191,7 @@ int main()
 
             // in this example we flip the faces of all fragments
 
-            bool flip_faces = (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
+            flip_faces = (type == McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_FRAGMENT);
 
             McConnectedComponentFaceWindingOrder windingOrder = McConnectedComponentFaceWindingOrder::MC_CONNECTED_COMPONENT_FACE_WINDING_ORDER_AS_GIVEN;
 
