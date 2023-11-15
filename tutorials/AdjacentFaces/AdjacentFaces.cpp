@@ -64,73 +64,21 @@ void mergeAdjacentMeshFacesByProperty(
 
 McInt32 main()
 {
-    // structure for our source- and cut-mesh that are loaded from file
-	struct MeshArrays
-	{ 
-		McDouble* pVertices = NULL;
-		McDouble* pNormals = NULL;
-		McDouble* pTexCoords = NULL;
-
-		McUint32* pFaceSizes = NULL;
-		McUint32* pFaceVertexIndices = NULL;
-		McUint32* pFaceVertexTexCoordIndices = NULL;
-		McUint32* pFaceVertexNormalIndices = NULL;
-		
-        McUint32 numVertices = 0;
-		McUint32 numNormals = 0;
-		McUint32 numTexCoords = 0;
-		McUint32 numFaces = 0;
-
-        ~MeshArrays()
-        {
-			if(pVertices)
-			{
-				free(pVertices);
-				pVertices = nullptr;
-			}
-
-            if(pNormals)
-			{
-				free(pNormals);
-				pNormals = nullptr;
-			}
-
-            if(pTexCoords)
-			{
-				free(pTexCoords);
-				pTexCoords = nullptr;
-			}
-
-            if(pFaceSizes)
-			{
-				free(pFaceSizes);
-				pFaceSizes = nullptr;
-			}
-			
-            if(pFaceVertexIndices)
-			{
-				free(pFaceVertexIndices);
-				pFaceVertexIndices = nullptr;
-			}
-
-            if(pFaceVertexTexCoordIndices)
-			{
-				free(pFaceVertexTexCoordIndices);
-				pFaceVertexTexCoordIndices = nullptr;
-			}
-
-            if(pFaceVertexNormalIndices)
-			{
-				free(pFaceVertexNormalIndices);
-				pFaceVertexNormalIndices = nullptr;
-			}
-			
-			numVertices = 0;
-			numNormals = 0;
-			numTexCoords = 0;
-			numFaces = 0;
-        }
-	} srcMesh, cutMesh;
+	MioMesh srcMesh  = {
+        nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+        0, // numVertices
+        0, // numNormals
+        0, // numTexCoords
+        0, // numFaces
+    };
+	
+    MioMesh cutMesh = srcMesh;
 
     //
     // read-in the source-mesh from file
@@ -229,9 +177,7 @@ McInt32 main()
 		exit(1);
     }
 
-    //
-    //  do the cutting
-    // 
+    
 
     status = mcDispatch(
         context,
@@ -249,11 +195,17 @@ McInt32 main()
 		cutMesh.numVertices,
 		cutMesh.numFaces);
 
-   if(status != MC_NO_ERROR)
-	{
-		fprintf(stderr, "mcDispatch failed (%d)\n", (McInt32)status);
-		exit(1);
-	}
+    if(status != MC_NO_ERROR)
+    {
+	    fprintf(stderr, "mcDispatch failed (%d)\n", (McInt32)status);
+	    exit(1);
+    }
+
+    //
+    // MCUT is not longer using mem of input meshes, so we can free it!
+    //
+	mioFreeMesh(&srcMesh);
+	mioFreeMesh(&cutMesh);
 
     //
     // query the number of available connected components
@@ -299,7 +251,7 @@ McInt32 main()
         //
         // type
         //
-        McConnectedComponentType type;
+		McConnectedComponentType type = (McConnectedComponentType)0;
 
         status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL);
 
@@ -319,7 +271,7 @@ McInt32 main()
 
         if (type == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
             
-            McInputOrigin origin;
+            McInputOrigin origin = (McInputOrigin)0;
             
             status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL);
 			
@@ -425,8 +377,7 @@ McInt32 main()
         {
             char buf[512];
             sprintf(buf, OUTPUT_DIR "/cc%d.obj", c);
-            //writeOBJ(buf, &ccVertices[0], ccVertexCount, &ccFaceIndices[0], &ccFaceSizes[0], ccFaceCount);
-			
+            
             mioWriteOBJ(buf,
 						&ccVertices[0],
 						nullptr,
@@ -569,9 +520,9 @@ McInt32 main()
         {
             char buf[512];
             sprintf(buf, OUTPUT_DIR "/cc%d-merged.obj", c);
+            
             // NOTE: For the sake of simplicity, we keep unreferenced vertices.
-            //writeOBJ(buf, &ccVertices[0], ccVertexCount, &ccFaceIndicesMerged[0], &ccFaceSizesMerged[0], (McUint32)ccFaceSizesMerged.size());
-
+            
             mioWriteOBJ(buf,
 						&ccVertices[0],
 						nullptr,
