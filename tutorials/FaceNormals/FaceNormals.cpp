@@ -45,6 +45,7 @@
 		std::exit(1);                                                                              \
 	}
 
+// simple structure representing a 3d vector and the operator we will perform with it
 struct vec3
 {
 	union
@@ -57,28 +58,28 @@ struct vec3
 	};
 
     vec3 operator*(const McDouble c) const {
-        vec3 out;
-		out.x = x *c;
-		out.y = y  *c;
-		out.z = z  *c;
-		return out;
+        vec3 result;
+		result.x = x * c;
+		result.y = y * c;
+		result.z = z * c;
+		return result;
     }
 
     vec3 operator+(const vec3& rhs) const {
-        vec3 out;
-		out.x = x + rhs.x;
-		out.y = y + rhs.y;
-		out.z = z + rhs.z;
-		return out;
+		vec3 result;
+		result.x = x + rhs.x;
+		result.y = y + rhs.y;
+		result.z = z + rhs.z;
+		return result;
     }
 
 	vec3 operator-(const vec3& rhs) const
 	{
-		vec3 out;
-		out.x = x - rhs.x;
-		out.y = y - rhs.y;
-		out.z = z - rhs.z;
-		return out;
+		vec3 result;
+		result.x = x - rhs.x;
+		result.y = y - rhs.y;
+		result.z = z - rhs.z;
+		return result;
 	}
 };
 
@@ -88,7 +89,7 @@ getTriangleArea2D(McDouble x1, McDouble y1, McDouble x2, McDouble y2, McDouble x
 	return (x1 - x2) * (y2 - y3) - (x2 - x3) * (y1 - y2);
 }
 
-vec3 crossProduct(vec3& u, const vec3& v)
+vec3 crossProduct(const vec3& u, const vec3& v)
 {
 	vec3 out;
 	out.x = u.y * v.z - u.z * v.y;
@@ -101,11 +102,11 @@ vec3 crossProduct(vec3& u, const vec3& v)
 vec3 getBarycentricCoords(const vec3& p, const vec3& a, const vec3& b, const vec3& c)
 {
 	// Unnormalized triangle normal
-	vec3 m = crossProduct(b - a, c - a);
+	const vec3 m = crossProduct(b - a, c - a);
 	// Nominators and one-over-denominator for u and v ratios
 	McDouble nu, nv, ood;
 	// Absolute components for determining projection plane
-	McDouble x = std::abs(m.x), y = std::abs(m.y), z = std::abs(m.z);
+	const McDouble x = std::abs(m.x), y = std::abs(m.y), z = std::abs(m.z);
 
 	// Compute areas in plane of largest projection
 	if(x >= y && x >= z)
@@ -140,7 +141,7 @@ vec3 getBarycentricCoords(const vec3& p, const vec3& a, const vec3& b, const vec
 }
 
 // basic comparison of doubles
-bool are_equal(McDouble x, McDouble y)
+bool are_equal(const McDouble& x, const McDouble &y)
 {
 	const McDouble eps = 1e-6;
 	const McDouble diff = (x > y) ? (x - y) : (y - x);
@@ -151,8 +152,8 @@ bool are_equal(McDouble x, McDouble y)
 // assigns a string name to a connected component based on it unique properties
 std::string resolve_cc_name_string(McContext context,
 								   McConnectedComponent cc,
-								   bool isFragment,
-								   McFragmentLocation fragmentLocation);
+								   bool &isFragment,
+								   McFragmentLocation& fragmentLocation);
 
 int main()
 {
@@ -381,7 +382,7 @@ int main()
 		bool isFragment = false;
 		McFragmentLocation fragmentLocation = (McFragmentLocation)0;
 
-		std::string name = resolve_cc_name_string(context, cc, isFragment, fragmentLocation);
+		const std::string name = resolve_cc_name_string(context, cc, isFragment, fragmentLocation);
 
 		McUint32 faceVertexOffsetBase = 0;
 
@@ -648,11 +649,11 @@ int main()
 
 std::string resolve_cc_name_string(McContext context,
 								   McConnectedComponent cc,
-								   bool isFragment,
-								   McFragmentLocation fragmentLocation)
+								   bool &isFragment,
+								   McFragmentLocation &fragmentLocation)
 {
 	// get type
-	McConnectedComponentType ccType;
+	McConnectedComponentType ccType = (McConnectedComponentType)0;
 
 	McResult status = mcGetConnectedComponentData(context,
 												  cc,

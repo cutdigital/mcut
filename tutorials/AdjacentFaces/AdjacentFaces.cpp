@@ -177,8 +177,6 @@ McInt32 main()
 		exit(1);
     }
 
-    
-
     status = mcDispatch(
         context,
         MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_FACE_MAP,
@@ -232,7 +230,7 @@ McInt32 main()
     connectedComponents.resize(connectedComponentCount);
     status = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)connectedComponents.size(), connectedComponents.data(), NULL);
 
-     if(status != MC_NO_ERROR)
+    if(status != MC_NO_ERROR)
 	{
 		fprintf(stderr,
 				"2:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (%d)\n",
