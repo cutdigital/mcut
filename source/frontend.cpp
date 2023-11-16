@@ -3222,7 +3222,7 @@ void get_connected_component_data_impl_detail(
 
                     for (std::vector<fd_t>::const_iterator f_iter = block_start_; f_iter != block_end_; ++f_iter) {
 
-                        if ((elem_offset + 1) >= elems_to_copy) {
+                        if ((elem_offset + 1) > elems_to_copy) {
                             break;
                         }
 

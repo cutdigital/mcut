@@ -54,7 +54,10 @@ struct vec3
 		{
 			McDouble x, y, z;
 		};
-		McDouble u, v, w;
+		struct
+		{
+			McDouble u, v, w;
+		};
 	};
 
     vec3 operator*(const McDouble c) const {
@@ -93,8 +96,8 @@ vec3 crossProduct(const vec3& u, const vec3& v)
 {
 	vec3 out;
 	out.x = u.y * v.z - u.z * v.y;
-	out.x = u.z * v.x - u.x * v.z;
-	out.x = u.x * v.y - u.y * v.x;
+	out.y = u.z * v.x - u.x * v.z;
+	out.z = u.x * v.y - u.y * v.x;
 	return out;
 }
 
@@ -590,9 +593,9 @@ int main()
                 else{
                     normalIndex = ccNormals.size()/3;
 
-                    ccNormals.push_back(pNormalIter[0]);
-                    ccNormals.push_back(pNormalIter[1]);
-                    ccNormals.push_back(pNormalIter[2]);
+                    ccNormals.push_back(normal.x);
+					ccNormals.push_back(normal.y);
+					ccNormals.push_back(normal.z);
                 }
 
 				ccFaceVertexNormalIndices.push_back(normalIndex);
@@ -600,12 +603,6 @@ int main()
 
 			faceVertexOffsetBase += faceSize;
 		} // for (int f = 0; f < ccFaceCount; ++f) {
-
-		//
-		// We no longer need the mem of input meshes, so we can free it!
-		//
-		mioFreeMesh(&srcMesh);
-		mioFreeMesh(&cutMesh);
 
         //
 		// save connected component (mesh) to an .obj file
@@ -629,6 +626,12 @@ int main()
             0, // numTexCoords
             ccFaceCount);
 	}
+
+	//
+	// We no longer need the mem of input meshes, so we can free it!
+	//
+	mioFreeMesh(&srcMesh);
+	mioFreeMesh(&cutMesh);
 
     //
 	// free connected component data
