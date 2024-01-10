@@ -16,7 +16,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *
- *  AdjacentFaces.cpp
+ *  FaceNormals.cpp
  *
  *  \brief:
  *  This tutorial shows how to propagate per-face normals (flat shading) 
@@ -45,7 +45,7 @@
 		std::exit(1);                                                                              \
 	}
 
-// simple structure representing a 3d vector and the operator we will perform with it
+// simple structure representing a 3d vector and the operations we will perform with it
 struct vec3
 {
 	union
@@ -61,7 +61,7 @@ struct vec3
 	};
 
     vec3 operator*(const McDouble c) const {
-        vec3 result;
+		vec3 result = {};
 		result.x = x * c;
 		result.y = y * c;
 		result.z = z * c;
@@ -69,7 +69,7 @@ struct vec3
     }
 
     vec3 operator+(const vec3& rhs) const {
-		vec3 result;
+		vec3 result = {};
 		result.x = x + rhs.x;
 		result.y = y + rhs.y;
 		result.z = z + rhs.z;
@@ -78,7 +78,7 @@ struct vec3
 
 	vec3 operator-(const vec3& rhs) const
 	{
-		vec3 result;
+		vec3 result = {};
 		result.x = x - rhs.x;
 		result.y = y - rhs.y;
 		result.z = z - rhs.z;
@@ -94,7 +94,7 @@ getTriangleArea2D(McDouble x1, McDouble y1, McDouble x2, McDouble y2, McDouble x
 
 vec3 crossProduct(const vec3& u, const vec3& v)
 {
-	vec3 out;
+	vec3 out = {};
 	out.x = u.y * v.z - u.z * v.y;
 	out.y = u.z * v.x - u.x * v.z;
 	out.z = u.x * v.y - u.y * v.x;
@@ -107,7 +107,7 @@ vec3 getBarycentricCoords(const vec3& p, const vec3& a, const vec3& b, const vec
 	// Unnormalized triangle normal
 	const vec3 m = crossProduct(b - a, c - a);
 	// Nominators and one-over-denominator for u and v ratios
-	McDouble nu, nv, ood;
+	McDouble nu = 0.0, nv = 0.0, ood = 0.0;
 	// Absolute components for determining projection plane
 	const McDouble x = std::abs(m.x), y = std::abs(m.y), z = std::abs(m.z);
 
@@ -136,7 +136,7 @@ vec3 getBarycentricCoords(const vec3& p, const vec3& a, const vec3& b, const vec
 		ood = 1.0f / m.z;
 	}
 
-	vec3 result;
+	vec3 result = {};
 	result.u = nu * ood;
 	result.v = nv * ood;
 	result.w = 1.0f - result.u - result.v;
@@ -376,24 +376,18 @@ int main()
 
 		my_assert(status == MC_NO_ERROR);
 
-		//
-		//  resolve fragment name
-		//
-
+        //
 		// Here we create a name for the connected component based on its properties
+        // and save whether its a fragment, and if so the location of this fragment
+        //
 
 		bool isFragment = false;
 		McFragmentLocation fragmentLocation = (McFragmentLocation)0;
-
 		const std::string name = resolve_cc_name_string(context, cc, isFragment, fragmentLocation);
-
-		McUint32 faceVertexOffsetBase = 0;
-
-		std::vector<McDouble> ccNormals; // our normals (what we want)
-
-		// CC-vertex-index-to-normal-indices.
-		// Its possible to map to more than one normal since such coordinates are specified to per-face.
-		//std::map<int, std::vector<int>> ccVertexIndexToNormalIndices;
+		McUint32 faceVertexOffsetBase = 0; // offset of vertex in face
+        // our array normals (what we want). This is the list that will be referred to by
+        // the face-vertices of the cc (each face will have vertex indices and normal indices) 
+		std::vector<McDouble> ccNormals; 
 
 		std::vector<McUint32> ccFaceVertexNormalIndices; // normal indices reference by each face of cc
 
@@ -446,13 +440,14 @@ int main()
 				vec3 normal; // the normal of the current vertex
 
 				if(isSeamVertex)
-				{ // normal completely unknown and must be computed
+				{ // normal completely unknown and must be inferred
 
-					// interpolate texture coords from input-mesh values
-					// --------------------------------------------------
+                    //
+					// interpolate from input-mesh values
+					//
 
-					// coordinates of current point (whose barycentric coord we want)
-                    vec3 p;
+					// coordinates of current point (whose barycentric coords we want)
+					vec3 p = {0.0, 0.0,0.0};
 					p.x = (ccVertices[((McSize)ccVertexIdx * 3u) + 0u]);
 					p.y = (ccVertices[((McSize)ccVertexIdx * 3u) + 1u]);
 					p.z = (ccVertices[((McSize)ccVertexIdx * 3u) + 2u]);
@@ -460,14 +455,14 @@ int main()
 					// vertices of the origin face (i.e. the face from which the current face came from).
 					// NOTE: we have assumed triangulated input meshes for simplicity. Otherwise, interpolation
 					// will be more complex, which is unnecessary for now.
-                    vec3 a;
+					vec3 a = {0.0, 0.0, 0.0};
 					{
                         const McDouble* ptr = inputMeshPtr->pVertices + imFace[0]*3;
                         a.x = ptr[0];
                         a.y = ptr[1];
                         a.z = ptr[2];
                     }
-                    vec3 b;
+					vec3 b = {0.0, 0.0, 0.0};
                     {
                         const McDouble* ptr = inputMeshPtr->pVertices + imFace[1]*3;
                         b.x = ptr[0];
@@ -475,11 +470,11 @@ int main()
                         b.z = ptr[2];
                     }
 
-                    vec3 c;
+                    vec3 c = {0.0, 0.0, 0.0};
                     {
                         const McDouble* ptr = inputMeshPtr->pVertices + imFace[2]*3;
                         c.x = ptr[0];
-                        c.y= ptr[1];
+                        c.y = ptr[1];
                         c.z = ptr[2];
                     }
 					
@@ -494,21 +489,21 @@ int main()
 
 					// normal coordinates of vertices in the origin face
 					
-                    vec3 normalA;
+                    vec3 normalA = {0.0, 0.0, 0.0};
 					{
                         const McDouble* ptr = inputMeshPtr->pNormals + (imFaceNormalIndices[0]*3);
                         normalA.x = ptr[0];
                         normalA.y = ptr[1];
                         normalA.z = ptr[2];
                     }
-					vec3 normalB;
+					vec3 normalB = {0.0, 0.0, 0.0};
 					{
                         const McDouble* ptr = inputMeshPtr->pNormals + (imFaceNormalIndices[1]*3);
                         normalB.x = ptr[0];
                         normalB.y = ptr[1];
                         normalB.z = ptr[2];
                     }
-					vec3 normalC;
+					vec3 normalC = {0.0, 0.0, 0.0};
 					{
                         const McDouble* ptr = inputMeshPtr->pNormals + (imFaceNormalIndices[2]*3);
                         normalC.x = ptr[0];
@@ -610,7 +605,7 @@ int main()
 
 		char fnameBuf[64];
 		sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), i);
-		std::string fpath(DATA_DIR "/" + std::string(fnameBuf));
+		std::string fpath(OUTPUT_DIR "/" + std::string(fnameBuf));
 
         mioWriteOBJ(
             fpath.c_str(), 

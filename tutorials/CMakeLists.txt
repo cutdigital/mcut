@@ -13,6 +13,7 @@ endfunction()
 
 create_tutorial_target(AdjacentFaces)
 create_tutorial_target(FaceNormals)
+create_tutorial_target(VertexNormals)
 
 #add_subdirectory(BasicCmdLineApp)
 #add_subdirectory(HelloWorld)
