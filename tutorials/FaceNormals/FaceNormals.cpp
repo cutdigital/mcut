@@ -604,7 +604,7 @@ int main()
 		// 
 
 		char fnameBuf[64];
-		sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), i);
+		sprintf(fnameBuf, ("OUT_" + name + "-%d.obj").c_str(), i);
 		std::string fpath(OUTPUT_DIR "/" + std::string(fnameBuf));
 
         mioWriteOBJ(

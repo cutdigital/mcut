@@ -212,8 +212,9 @@ McInt32 main()
 
 	my_assert(status == MC_NO_ERROR);
 
-    // 3. do the cutting
-    // -----------------
+    //
+	//  do the cutting
+	//
 	status = mcDispatch(
         context,
         MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_VERTEX_MAP | MC_DISPATCH_INCLUDE_FACE_MAP, // We need vertex and face maps to propagate normals
@@ -261,8 +262,9 @@ McInt32 main()
 
 	my_assert(status == MC_NO_ERROR);
 
-    //  query the data of each connected component from MCUT
-    // -------------------------------------------------------
+    //
+	// query the data of each connected component
+	//
 
     for(McUint32 ci = 0; ci < (McUint32)connectedComponents.size(); ++ci)
     {
@@ -450,32 +452,6 @@ McInt32 main()
 					p.x = (ccVertices[((McSize)ccVertexIdx * 3u) + 0u]);
 					p.y = (ccVertices[((McSize)ccVertexIdx * 3u) + 1u]);
 					p.z = (ccVertices[((McSize)ccVertexIdx * 3u) + 2u]);
-
-                    /*McDouble x(ccVertices[((McSize)ccVertexIdx * 3u) + 0u]);
-                    McDouble y(ccVertices[((McSize)ccVertexIdx * 3u) + 1u]);
-                    McDouble z(ccVertices[((McSize)ccVertexIdx * 3u) + 2u]);*/
-
-     //               // vertices of the origin face
-					//const std::vector<McDouble>& a = inputMeshPtr->V[imFace[0]];
-     //               const std::vector<McDouble> &b = inputMeshPtr->V[imFace[1]];
-     //               const std::vector<McDouble> &c = inputMeshPtr->V[imFace[2]];
-
-     //               // barycentric coords of our intersection point on the origin face
-     //               Eigen::MatrixXd P;
-     //               P.resize(1, 3);
-     //               P << x, y, z;
-     //               Eigen::MatrixXd A;
-     //               A.resize(1, 3);
-     //               A << a[0], a[1], a[2];
-     //               Eigen::MatrixXd B;
-     //               B.resize(1, 3);
-     //               B << b[0], b[1], b[2];
-     //               Eigen::MatrixXd C;
-     //               C.resize(1, 3);
-     //               C << c[0], c[1], c[2];
-     //               Eigen::MatrixXd L;
-
-     //               igl::barycentric_coordinates(P, A, B, C, L);
 	 
 					// vertices of the origin face (i.e. the face from which the current face came from).
 					// NOTE: we have assumed triangulated input meshes for simplicity. Otherwise, interpolation
@@ -505,21 +481,6 @@ McInt32 main()
 
 					const vec3 bary = getBarycentricCoords(p, a, b, c);
 
-
-                    
-					//inputMeshPtr->FN[imFaceIdx];
-                    //my_assert(imFaceNormalIndices.size() == 3);
-
-                    //// normals of vertices in origin face
-                    //const std::vector<McDouble> &Na_ = inputMeshPtr->N[imFaceNormalIndices[0]];
-                    //const std::vector<McDouble> &Nb_ = inputMeshPtr->N[imFaceNormalIndices[1]];
-                    //const std::vector<McDouble> &Nc_ = inputMeshPtr->N[imFaceNormalIndices[2]];
-
-                    //const Eigen::Vector3d Na(Na_[0], Na_[1], Na_[2]);
-                    //const Eigen::Vector3d Nb(Nb_[0], Nb_[1], Nb_[2]);
-                    //const Eigen::Vector3d Nc(Nc_[0], Nc_[1], Nc_[2]);
-                    //const Eigen::Vector3d baryCoords = L.row(0);
-
 					// normal coordinates of vertices in the origin face
 
 					vec3 normalA = {0.0, 0.0, 0.0};
@@ -545,8 +506,6 @@ McInt32 main()
 					}
 
 					
-                    // interpolate using barycentric coords
-                    //Eigen::Vector3d normal = (Na * baryCoords.x()) + (Nb * baryCoords.y()) + (Nc * baryCoords.z()) * (flipNormalsOnFace ? -1.0 : 1.0);
 					// interpolate at point "p" using barycentric coords
 					const vec3 normal = ((normalA * bary.u) + (normalB * bary.v) + (normalC * bary.w)) * (flipNormalsOnFace ? -1.0 : 1.0);
 
@@ -584,14 +543,10 @@ McInt32 main()
                         my_assert(faceVertexOffset != -1);
 
                         const McUint32 imNormalIdx = imFaceNormalIndices[faceVertexOffset];
-                        //const std::vector<McDouble> &n = inputMeshPtr->N[imNormalIdx];
 						const McDouble* imNormal = inputMeshPtr->pNormals + (imNormalIdx * 3);
-                        //my_assert(n.size() == 3);
-                        //Eigen::Vector3d normal = Eigen::Vector3d(n[0], n[1], n[2]) * (flipNormalsOnFace ? -1.0 : 1.0);
 						normal.x = imNormal[0];
 						normal.y = imNormal[1];
 						normal.z = imNormal[2];
-                        //ccVertexNormals[ccVertexIdx] = normal;
                     }
                 }
 				
@@ -621,7 +576,7 @@ McInt32 main()
         // -------------------------
 
         char fnameBuf[64];
-        sprintf(fnameBuf, ("OUT_" + name + ".obj").c_str(), ci);
+        sprintf(fnameBuf, ("OUT_" + name + "-%d.obj").c_str(), ci);
 		std::string fpath(OUTPUT_DIR "/" + std::string(fnameBuf));
 
 		mioWriteOBJ(fpath.c_str(),
@@ -636,42 +591,6 @@ McInt32 main()
 					(McUint32)ccVertexNormals.size(),
 					0, // numTexCoords
 					ccFaceCount);
-
-        //printf("write file: %s\n", fpath.c_str());
-
-        //std::ofstream file(fpath);
-
-        //// write vertices and normals
-
-        //for (McInt32 i = 0; i < (McInt32)ccVertexCount; ++i)
-        //{
-        //    McDouble x = ccVertices[(McSize)i * 3 + 0];
-        //    McDouble y = ccVertices[(McSize)i * 3 + 1];
-        //    McDouble z = ccVertices[(McSize)i * 3 + 2];
-        //    file << "v " << std::setprecision(std::numeric_limits<long McDouble>::digits10 + 1) << x << " " << y << " " << z << std::endl;
-
-        //    Eigen::Vector3d n = ccVertexNormals[i];
-        //    file << "vn " << std::setprecision(std::numeric_limits<long McDouble>::digits10 + 1) << n.x() << " " << n.y() << " " << n.z() << std::endl;
-        //}
-
-        //// write faces (with normal indices)
-
-        //faceVertexOffsetBase = 0;
-        //for (McInt32 i = 0; i < (McInt32)ccFaceCount; ++i)
-        //{
-        //    McInt32 faceSize = faceSizes.at(i);
-
-        //    file << "f ";
-        //    for (McInt32 j = 0; j < faceSize; ++j)
-        //    {
-        //        const McInt32 idx = faceVertexOffsetBase + j;
-        //        const McInt32 ccVertexIdx = ccFaceIndices[idx];
-        //        file << (ccVertexIdx + 1) << "//" << (ccVertexIdx + 1) << " ";
-        //    }
-        //    file << std::endl;
-
-        //    faceVertexOffsetBase += faceSize;
-        //}
     }
 
 	//

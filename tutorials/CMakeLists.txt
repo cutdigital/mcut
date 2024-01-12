@@ -14,12 +14,11 @@ endfunction()
 create_tutorial_target(AdjacentFaces)
 create_tutorial_target(FaceNormals)
 create_tutorial_target(VertexNormals)
+create_tutorial_target(TextureCoordinates) # untested
+create_tutorial_target(BasicCmdLineApp) 
+create_tutorial_target(HelloWorld)
+create_tutorial_target(CSGBoolean)
 
-#add_subdirectory(BasicCmdLineApp)
-#add_subdirectory(HelloWorld)
-#add_subdirectory(TextureCoordinates)
-#add_subdirectory(VertexNormals)
-#add_subdirectory(CSGBoolean)
 #add_subdirectory(Triangulation)
 #add_subdirectory(TriangulatedFaceMaps)
 #add_subdirectory(EventCallback)
@@ -29,5 +28,11 @@ create_tutorial_target(VertexNormals)
 #add_subdirectory(QuerySeamVerticesUnsorted)
 #add_subdirectory(QuerySeamVerticesSorted)
 #add_subdirectory(InOutQuery)
+
+#
+# TODO
+#
+#add_subdirectory(ConnectedComponentProperties)
+#add_subdirectory(EnableDebugMode)
 
 
