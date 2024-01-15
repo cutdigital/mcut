@@ -38,6 +38,7 @@
 #include <vector>
 #include <string>
 #include <cmath> // std::sqrt
+
 #define my_assert(cond)                             \
     if (!(cond))                                    \
     {                                               \

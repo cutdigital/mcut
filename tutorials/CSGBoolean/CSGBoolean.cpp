@@ -78,6 +78,7 @@ int main(int argc, const char* argv[])
 	MioMesh cutMesh = srcMesh;
 
     const bool user_provided_meshes = argc > 1;
+
     if (user_provided_meshes && argc < 3) {
         fprintf(stderr, "usage: <exec> <srcmesh/path> <cutmesh/path> <boolOp>\n"
                         "The possible values for the <boolOp> arguments are:\n"
@@ -155,7 +156,7 @@ int main(int argc, const char* argv[])
     // 
     McContext context = MC_NULL_HANDLE;
 
-    // a debug context is created in a you load your own (possibly faulty) meshes
+    // a debug context is created in case you load your own (possibly faulty) meshes
     McResult status = mcCreateContext(&context, MC_DEBUG);
     
     my_assert(status == MC_NO_ERROR);
@@ -231,12 +232,6 @@ int main(int argc, const char* argv[])
             cutMesh.numFaces);
 
         my_assert(status == MC_NO_ERROR);
-
-        //
-        // We no longer need the mem of input meshes, so we can free it!
-        //
-        mioFreeMesh(&srcMesh);
-        mioFreeMesh(&cutMesh);
 
         //
         // query the number of available fragments
@@ -382,6 +377,12 @@ int main(int argc, const char* argv[])
 
         my_assert(status == MC_NO_ERROR);
     }
+
+    //
+	// We no longer need the mem of input meshes, so we can free it!
+	//
+	mioFreeMesh(&srcMesh);
+	mioFreeMesh(&cutMesh);
 
     //
 	// destroy context

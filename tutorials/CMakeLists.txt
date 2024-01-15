@@ -18,8 +18,9 @@ create_tutorial_target(TextureCoordinates) # untested
 create_tutorial_target(BasicCmdLineApp) 
 create_tutorial_target(HelloWorld)
 create_tutorial_target(CSGBoolean)
+create_tutorial_target(Triangulation)
 
-#add_subdirectory(Triangulation)
+#
 #add_subdirectory(TriangulatedFaceMaps)
 #add_subdirectory(EventCallback)
 #add_subdirectory(MultipleContextsInParallel)
