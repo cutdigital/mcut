@@ -133,7 +133,7 @@ McUint32 main(McUint32 argc, char* argv[])
 
 	McContext context = MC_NULL_HANDLE;
 
-	#ifdef  NDEBUG
+#ifdef  NDEBUG
     McResult status = mcCreateContext(&context, MC_NULL_HANDLE);
 #else
     McResult status = mcCreateContext(&context, MC_DEBUG);

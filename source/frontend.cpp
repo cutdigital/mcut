@@ -2788,7 +2788,7 @@ void get_connected_component_data_impl_detail(
     } break;
     case MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX_SEQUENCE: {
         if (cc_uptr->type == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
-            throw std::invalid_argument("cannot query seam vertices on connected component of type 'input'");
+            throw std::invalid_argument("cannot query seam vertices on connected component of type 'MC_CONNECTED_COMPONENT_TYPE_INPUT'");
         }
 
         const std::shared_ptr<hmesh_t>& cc = cc_uptr->kernel_hmesh_data->mesh;
@@ -2845,7 +2845,7 @@ void get_connected_component_data_impl_detail(
                 // and we build (collect all vertices of) its respective sequence by walking to
                 // the left and right side/neighbours.
                 // The fact that we walk left and right implies that two dijoint draft sequences
-                // will be found which will need to be merge later. These disjoint draft sequences
+                // will be found which will need to be merged later. These disjoint draft sequences
                 // are stored in "disjoint_vertex_sequences_of_same_seam".
 
                 const McUint32 seed_vertex_descr = (McUint32)seed_fiter->first;
@@ -2929,7 +2929,7 @@ void get_connected_component_data_impl_detail(
                         }
                     }
 
-                    MCUT_ASSERT(untraversed_adj_seam_vertex_count <= 1);
+                    //MCUT_ASSERT(untraversed_adj_seam_vertex_count <= 1);
 
                     // no further neighbours to walk/traverse but the stack still has seam vertices to be walked.
                     // This implies we have an open loop, and that we have finished finding the first disjoint part

@@ -42,7 +42,7 @@
 	if(!(cond))                                                                                    \
 	{                                                                                              \
 		fprintf(stderr, "MCUT error: %s\n", #cond);                                                \
-		std::exit(1);                                                                              \
+		std::abort();                                                                              \
 	}
 
 // simple structure representing a 3d vector and the operations we will perform with it

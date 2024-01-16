@@ -209,7 +209,7 @@ McInt32 main()
 		// 
 
 		char fnameBuf[64];
-		sprintf(fnameBuf, "conncomp%d.obj", i);
+		sprintf(fnameBuf, "OUT_conncomp%d.obj", i);
 		std::string fpath(OUTPUT_DIR "/" + std::string(fnameBuf));
 
         // "mioWriteOBJ" expects a vertex array of doubles. So we temporarilly create one.

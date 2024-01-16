@@ -19,16 +19,14 @@ create_tutorial_target(BasicCmdLineApp)
 create_tutorial_target(HelloWorld)
 create_tutorial_target(CSGBoolean)
 create_tutorial_target(Triangulation)
-
-#
-#add_subdirectory(TriangulatedFaceMaps)
-#add_subdirectory(EventCallback)
-#add_subdirectory(MultipleContextsInParallel)
-#add_subdirectory(ReversedConnectedComponentFaces)
-#add_subdirectory(PlanarSectioning)
-#add_subdirectory(QuerySeamVerticesUnsorted)
-#add_subdirectory(QuerySeamVerticesSorted)
-#add_subdirectory(InOutQuery)
+create_tutorial_target(TriangulatedFaceMaps)
+create_tutorial_target(EventCallback) 
+create_tutorial_target(ReversedConnectedComponentFaces)
+create_tutorial_target(QuerySeamVerticesUnsorted)
+create_tutorial_target(QuerySeamVerticesSorted)
+create_tutorial_target(MultipleContextsInParallel)
+create_tutorial_target(PlanarSectioning)
+create_tutorial_target(InOutQuery)
 
 #
 # TODO
