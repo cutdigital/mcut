@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2021-2022 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
  * 
- * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from Floyd M. Chitalu. 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
  *  
- * License details:
- * 
- * (A)  GNU General Public License ("GPL"); a copy of which you should have 
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
- * 
- * The commercial license options is for users that wish to use MCUT in 
- * their products for comercial purposes but do not wish to release their 
- * software products under the GPL license. 
- * 
- * Author(s)     : Floyd M. Chitalu
- */
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
+ *
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
+ *
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
+ *
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
+ *
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #include "utest.h"
 #include <mcut/mcut.h>
@@ -35,17 +48,17 @@ struct DispatchFilterFlags {
     std::vector<McConnectedComponent> connComps_ = {};
     McContext context_ = MC_NULL_HANDLE;
 
-    float* pSrcMeshVertices = NULL;
-    uint32_t* pSrcMeshFaceIndices = NULL;
-    uint32_t* pSrcMeshFaceSizes = NULL;
-    uint32_t numSrcMeshVertices = 0;
-    uint32_t numSrcMeshFaces = 0;
+    McFloat* pSrcMeshVertices = NULL;
+    McUint32* pSrcMeshFaceIndices = NULL;
+    McUint32* pSrcMeshFaceSizes = NULL;
+    McUint32 numSrcMeshVertices = 0;
+    McUint32 numSrcMeshFaces = 0;
 
-    float* pCutMeshVertices = NULL;
-    uint32_t* pCutMeshFaceIndices = NULL;
-    uint32_t* pCutMeshFaceSizes = NULL;
-    uint32_t numCutMeshVertices = 0;
-    uint32_t numCutMeshFaces = 0;
+    McFloat* pCutMeshVertices = NULL;
+    McUint32* pCutMeshFaceIndices = NULL;
+    McUint32* pCutMeshFaceSizes = NULL;
+    McUint32 numCutMeshVertices = 0;
+    McUint32 numCutMeshFaces = 0;
 };
 
 UTEST_F_SETUP(DispatchFilterFlags)
@@ -72,7 +85,7 @@ UTEST_F_TEARDOWN(DispatchFilterFlags)
     if (utest_fixture->connComps_.size() > 0) {
         EXPECT_EQ(mcReleaseConnectedComponents(
                       utest_fixture->context_,
-                      (int)utest_fixture->connComps_.size(),
+                      (McInt32)utest_fixture->connComps_.size(),
                       utest_fixture->connComps_.data()),
             MC_NO_ERROR);
     }
@@ -107,8 +120,8 @@ UTEST_F(DispatchFilterFlags, noFiltering)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -117,8 +130,8 @@ UTEST_F(DispatchFilterFlags, noFiltering)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -135,13 +148,13 @@ UTEST_F(DispatchFilterFlags, noFiltering)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(uint32_t(12), numConnectedComponents); // including sealed, partially, unsealed, above, below, patches & seams
+    ASSERT_EQ(McUint32(12), numConnectedComponents); // including sealed, partially, unsealed, above, below, patches & seams
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+    for (McUint32 i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
     }
@@ -156,8 +169,8 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/bunnyCuttingPlanePartial.off";
 
@@ -166,8 +179,8 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -184,13 +197,13 @@ UTEST_F(DispatchFilterFlags, partialCutWithInsideSealing)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(4)); // one completely filled (from the inside) fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(4)); // one completely filled (from the inside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+    for (McUint32 i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
@@ -226,8 +239,8 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -236,8 +249,8 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -254,13 +267,13 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowInside)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one completely filled (from the inside) fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one completely filled (from the inside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+    for (McUint32 i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
@@ -296,8 +309,8 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -306,8 +319,8 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -324,13 +337,13 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowOutside)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one completely filled (from the outside) fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one completely filled (from the outside) fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (uint32_t i = 0; i < numConnectedComponents; ++i) {
+    for (McUint32 i = 0; i < numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
@@ -363,8 +376,8 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -373,8 +386,8 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -391,11 +404,11 @@ UTEST_F(DispatchFilterFlags, fragmentLocationBelowUnsealed)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one unsealed fragment plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one unsealed fragment plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0];
     ASSERT_TRUE(cc != MC_NULL_HANDLE);
@@ -429,8 +442,8 @@ UTEST_F(DispatchFilterFlags, patchInside)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -439,8 +452,8 @@ UTEST_F(DispatchFilterFlags, patchInside)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -457,13 +470,13 @@ UTEST_F(DispatchFilterFlags, patchInside)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+    for (McInt32 i = 0; i < (McInt32)numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[0];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
@@ -487,8 +500,8 @@ UTEST_F(DispatchFilterFlags, patchOutside)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -497,8 +510,8 @@ UTEST_F(DispatchFilterFlags, patchOutside)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -515,13 +528,13 @@ UTEST_F(DispatchFilterFlags, patchOutside)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+    for (McInt32 i = 0; i < (McInt32)numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
@@ -547,8 +560,8 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -557,8 +570,8 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -575,13 +588,13 @@ UTEST_F(DispatchFilterFlags, seamFromSrcMesh)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus input
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one interior patch plus input
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+    for (McInt32 i = 0; i < (McInt32)numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 
@@ -606,8 +619,8 @@ UTEST_F(DispatchFilterFlags, seamFromCutMesh)
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
 
     const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
 
@@ -616,8 +629,8 @@ UTEST_F(DispatchFilterFlags, seamFromCutMesh)
     ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
     ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
+    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -634,13 +647,13 @@ UTEST_F(DispatchFilterFlags, seamFromCutMesh)
                   utest_fixture->numCutMeshFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnectedComponents = 0;
+    McUint32 numConnectedComponents = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnectedComponents), MC_NO_ERROR);
-    ASSERT_EQ(numConnectedComponents, uint32_t(3)); // one interior patch plus inputs
+    ASSERT_EQ(numConnectedComponents, McUint32(3)); // one interior patch plus inputs
     utest_fixture->connComps_.resize(numConnectedComponents);
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), &utest_fixture->connComps_[0], NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)numConnectedComponents; ++i) {
+    for (McInt32 i = 0; i < (McInt32)numConnectedComponents; ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i];
         ASSERT_TRUE(cc != MC_NULL_HANDLE);
 

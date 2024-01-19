@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2021-2022 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
  * 
- * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from Floyd M. Chitalu. 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
  *  
- * License details:
- * 
- * (A)  GNU General Public License ("GPL"); a copy of which you should have 
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
- * 
- * The commercial license options is for users that wish to use MCUT in 
- * their products for comercial purposes but do not wish to release their 
- * software products under the GPL license. 
- * 
- * Author(s)     : Floyd M. Chitalu
- */
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
+ *
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
+ *
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
+ *
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
+ *
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #include "utest.h"
 #include <mcut/mcut.h>
@@ -39,12 +52,12 @@ struct TestConfig {
 struct DataMapsQueryTest {
     McContext context_ = MC_NULL_HANDLE;
     std::vector<McConnectedComponent> connComps_;
-    std::vector<float> pSrcMeshVertices;
-    std::vector<uint32_t> pSrcMeshFaceIndices;
-    std::vector<uint32_t> pSrcMeshFaceSizes;
-    std::vector<float> pCutMeshVertices;
-    std::vector<uint32_t> pCutMeshFaceIndices;
-    std::vector<uint32_t> pCutMeshFaceSizes;
+    std::vector<McFloat> pSrcMeshVertices;
+    std::vector<McUint32> pSrcMeshFaceIndices;
+    std::vector<McUint32> pSrcMeshFaceSizes;
+    std::vector<McFloat> pCutMeshVertices;
+    std::vector<McUint32> pCutMeshFaceIndices;
+    std::vector<McUint32> pCutMeshFaceSizes;
 
     McFlags dispatchflags = 0;
 };
@@ -72,12 +85,12 @@ TestConfig testConfigs[] = {
 };
 
 void createCubeSMAndtwoTriCM(
-    std::vector<float>& pSrcMeshVertices,
-    std::vector<uint32_t>& pSrcMeshFaceIndices,
-    std::vector<uint32_t>& pSrcMeshFaceSizes,
-    std::vector<float>& pCutMeshVertices,
-    std::vector<uint32_t>& pCutMeshFaceIndices,
-    std::vector<uint32_t>& pCutMeshFaceSizes)
+    std::vector<McFloat>& pSrcMeshVertices,
+    std::vector<McUint32>& pSrcMeshFaceIndices,
+    std::vector<McUint32>& pSrcMeshFaceSizes,
+    std::vector<McFloat>& pCutMeshVertices,
+    std::vector<McUint32>& pCutMeshFaceIndices,
+    std::vector<McUint32>& pCutMeshFaceSizes)
 {
     // NOTE: same mesh as hello world
     pSrcMeshVertices = {
@@ -123,12 +136,12 @@ void createCubeSMAndtwoTriCM(
     };
 }
 
-void CreateInputsRequiringFacePartitioning(std::vector<float>& pSrcMeshVertices,
-    std::vector<uint32_t>& pSrcMeshFaceIndices,
-    std::vector<uint32_t>& pSrcMeshFaceSizes,
-    std::vector<float>& pCutMeshVertices,
-    std::vector<uint32_t>& pCutMeshFaceIndices,
-    std::vector<uint32_t>& pCutMeshFaceSizes)
+void CreateInputsRequiringFacePartitioning(std::vector<McFloat>& pSrcMeshVertices,
+    std::vector<McUint32>& pSrcMeshFaceIndices,
+    std::vector<McUint32>& pSrcMeshFaceSizes,
+    std::vector<McFloat>& pCutMeshVertices,
+    std::vector<McUint32>& pCutMeshFaceIndices,
+    std::vector<McUint32>& pCutMeshFaceSizes)
 {
     // NOTE: same mesh as benchmark 8
     pSrcMeshVertices = {
@@ -225,7 +238,7 @@ UTEST_I_TEARDOWN(DataMapsQueryTest)
         utest_fixture->pCutMeshVertices.clear();
         utest_fixture->pCutMeshFaceIndices.clear();
         utest_fixture->pCutMeshFaceSizes.clear();
-        EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->context_, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data()), MC_NO_ERROR);
+        EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->context_, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data()), MC_NO_ERROR);
         utest_fixture->connComps_.clear();
         EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
     }
@@ -233,10 +246,10 @@ UTEST_I_TEARDOWN(DataMapsQueryTest)
 
 UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
 {
-    uint32_t srcMeshVertexCount = (uint32_t)utest_fixture->pSrcMeshVertices.size() / 3;
-    uint32_t srcMeshFaceCount = (uint32_t)utest_fixture->pSrcMeshFaceSizes.size();
-    uint32_t cutMeshVertexCount = (uint32_t)utest_fixture->pCutMeshVertices.size() / 3;
-    uint32_t cutMeshFaceCount = (uint32_t)utest_fixture->pCutMeshFaceSizes.size();
+    McUint32 srcMeshVertexCount = (McUint32)utest_fixture->pSrcMeshVertices.size() / 3;
+    McUint32 srcMeshFaceCount = (McUint32)utest_fixture->pSrcMeshFaceSizes.size();
+    McUint32 cutMeshVertexCount = (McUint32)utest_fixture->pCutMeshVertices.size() / 3;
+    McUint32 cutMeshFaceCount = (McUint32)utest_fixture->pCutMeshFaceSizes.size();
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
@@ -257,14 +270,14 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
     // Now we query [all] connected components, including the input CCs
     // We want to ensure that we can query vertex- and face-data map for all each of them
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
     utest_fixture->connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
         McConnectedComponentType type = McConnectedComponentType::MC_CONNECTED_COMPONENT_TYPE_ALL;
@@ -274,47 +287,47 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
             McSize numBytes = 0;
 
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_FLOAT, 0, NULL, &numBytes), MC_NO_ERROR);
-            ASSERT_GT((int)numBytes, 0);
-            uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(float)*3));
+            ASSERT_GT((McInt32)numBytes, 0);
+            McUint32 ccVertexCount = (McUint32)(numBytes / (sizeof(McFloat)*3));
 
             numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
-            ASSERT_EQ(numBytes / sizeof(uint32_t), ccVertexCount);
+            ASSERT_EQ(numBytes / sizeof(McUint32), ccVertexCount);
 
-            std::vector<uint32_t> vertexMap;
+            std::vector<McUint32> vertexMap;
             vertexMap.resize(ccVertexCount);
 
-            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, vertexMap.size() * sizeof(uint32_t), vertexMap.data(), NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, vertexMap.size() * sizeof(McUint32), vertexMap.data(), NULL), MC_NO_ERROR);
 
             auto testSrcMeshCC = [&]() {
-                for (int i = 0; i < (int)ccVertexCount; i++) {
+                for (McInt32 i = 0; i < (McInt32)ccVertexCount; i++) {
 
-                    const uint32_t imVertexIdxRaw = vertexMap[i];
+                    const McUint32 imVertexIdxRaw = vertexMap[i];
                     bool vertexIsFromSrcMesh = (imVertexIdxRaw < srcMeshVertexCount);
                     const bool isIntersectionPoint = (imVertexIdxRaw == MC_UNDEFINED_VALUE);
 
                     if (!isIntersectionPoint) {
 
-                        uint32_t imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
+                        McUint32 imVertexIdx = imVertexIdxRaw; // actual index value, accounting for offset
 
                         if (!vertexIsFromSrcMesh) {
                             imVertexIdx = (imVertexIdxRaw - srcMeshVertexCount); // account for offset (i.e. where the input msh is the cutmesh)
-                            ASSERT_LT((int)imVertexIdx, (int)cutMeshVertexCount);
+                            ASSERT_LT((McInt32)imVertexIdx, (McInt32)cutMeshVertexCount);
                         } else {
-                            ASSERT_LT((int)imVertexIdx, (int)srcMeshVertexCount);
+                            ASSERT_LT((McInt32)imVertexIdx, (McInt32)srcMeshVertexCount);
                         }
                     }
                 }
             };
 
             auto testPatchCC = [&]() {
-                for (int i = 0; i < (int)ccVertexCount; i++) {
-                    uint32_t correspondingCutMeshVertex = vertexMap[i];
+                for (McInt32 i = 0; i < (McInt32)ccVertexCount; i++) {
+                    McUint32 correspondingCutMeshVertex = vertexMap[i];
                     const bool isIntersectionPoint = (correspondingCutMeshVertex == MC_UNDEFINED_VALUE);
                     if (!isIntersectionPoint) {
                         correspondingCutMeshVertex -= srcMeshVertexCount; // account for offset
-                        ASSERT_GE((int)correspondingCutMeshVertex, (int)0);
-                        ASSERT_LT((int)correspondingCutMeshVertex, (int)cutMeshVertexCount);
+                        ASSERT_GE((McInt32)correspondingCutMeshVertex, (McInt32)0);
+                        ASSERT_LT((McInt32)correspondingCutMeshVertex, (McInt32)cutMeshVertexCount);
                     }
                 }
             };
@@ -360,31 +373,31 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
         if (utest_fixture->dispatchflags & MC_DISPATCH_INCLUDE_FACE_MAP) {
             McSize numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes), MC_NO_ERROR);
-            uint32_t ccFaceCount = (uint32_t)(numBytes / sizeof(uint32_t));
-            ASSERT_GT((int)ccFaceCount, (int)0);
+            McUint32 ccFaceCount = (McUint32)(numBytes / sizeof(McUint32));
+            ASSERT_GT((McInt32)ccFaceCount, (McInt32)0);
 
             numBytes = 0;
             ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes), MC_NO_ERROR);
-            ASSERT_EQ(numBytes / sizeof(uint32_t), ccFaceCount);
+            ASSERT_EQ(numBytes / sizeof(McUint32), ccFaceCount);
 
-            std::vector<uint32_t> faceMap;
+            std::vector<McUint32> faceMap;
             faceMap.resize(ccFaceCount);
 
-            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, faceMap.size() * sizeof(uint32_t), faceMap.data(), NULL), MC_NO_ERROR);
+            ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, faceMap.size() * sizeof(McUint32), faceMap.data(), NULL), MC_NO_ERROR);
 
-            for (int v = 0; v < (int)ccFaceCount; v++) {
-                const uint32_t imFaceIdxRaw = faceMap[v];
+            for (McInt32 v = 0; v < (McInt32)ccFaceCount; v++) {
+                const McUint32 imFaceIdxRaw = faceMap[v];
                 bool faceIsFromSrcMesh = (imFaceIdxRaw < srcMeshFaceCount);
 
                 ASSERT_TRUE(imFaceIdxRaw != MC_UNDEFINED_VALUE); // all face indices are mapped!
 
-                uint32_t imFaceIdx = imFaceIdxRaw; // actual index value, accounting for offset
+                McUint32 imFaceIdx = imFaceIdxRaw; // actual index value, accounting for offset
 
                 if (!faceIsFromSrcMesh) {
                     imFaceIdx = (imFaceIdxRaw - srcMeshFaceCount); // account for offset
-                    ASSERT_LT((int)imFaceIdx, (int)cutMeshFaceCount);
+                    ASSERT_LT((McInt32)imFaceIdx, (McInt32)cutMeshFaceCount);
                 } else {
-                    ASSERT_LT((int)imFaceIdx, (int)srcMeshFaceCount);
+                    ASSERT_LT((McInt32)imFaceIdx, (McInt32)srcMeshFaceCount);
                 }
             }
         }
@@ -394,12 +407,12 @@ UTEST_I(DataMapsQueryTest, testConfigID, NUM_TEST_CONFIGS)
 struct FaceAndVertexDataMapsQueryMissingFlagTest {
     McContext context_ = MC_NULL_HANDLE;
     std::vector<McConnectedComponent> connComps_;
-    std::vector<float> pSrcMeshVertices;
-    std::vector<uint32_t> pSrcMeshFaceIndices;
-    std::vector<uint32_t> pSrcMeshFaceSizes;
-    std::vector<float> pCutMeshVertices;
-    std::vector<uint32_t> pCutMeshFaceIndices;
-    std::vector<uint32_t> pCutMeshFaceSizes;
+    std::vector<McFloat> pSrcMeshVertices;
+    std::vector<McUint32> pSrcMeshFaceIndices;
+    std::vector<McUint32> pSrcMeshFaceSizes;
+    std::vector<McFloat> pCutMeshVertices;
+    std::vector<McUint32> pCutMeshFaceIndices;
+    std::vector<McUint32> pCutMeshFaceSizes;
 };
 
 UTEST_F_SETUP(FaceAndVertexDataMapsQueryMissingFlagTest)
@@ -426,7 +439,7 @@ UTEST_F_TEARDOWN(FaceAndVertexDataMapsQueryMissingFlagTest)
     utest_fixture->pCutMeshVertices.clear();
     utest_fixture->pCutMeshFaceIndices.clear();
     utest_fixture->pCutMeshFaceSizes.clear();
-    EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->context_, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data()), MC_NO_ERROR);
+    EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->context_, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data()), MC_NO_ERROR);
     utest_fixture->connComps_.clear();
     EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
 }
@@ -439,24 +452,24 @@ UTEST_F(FaceAndVertexDataMapsQueryMissingFlagTest, vertexMapFlag)
                   utest_fixture->pSrcMeshVertices.data(),
                   utest_fixture->pSrcMeshFaceIndices.data(),
                   utest_fixture->pSrcMeshFaceSizes.data(),
-                  (uint32_t)utest_fixture->pSrcMeshVertices.size() / 3,
-                  (uint32_t)utest_fixture->pSrcMeshFaceIndices.size() / 4,
+                  (McUint32)utest_fixture->pSrcMeshVertices.size() / 3,
+                  (McUint32)utest_fixture->pSrcMeshFaceIndices.size() / 4,
                   utest_fixture->pCutMeshVertices.data(),
                   utest_fixture->pCutMeshFaceIndices.data(),
                   utest_fixture->pCutMeshFaceSizes.data(),
-                  (uint32_t)utest_fixture->pCutMeshVertices.size() / 3,
-                  (uint32_t)utest_fixture->pCutMeshFaceIndices.size() / 3),
+                  (McUint32)utest_fixture->pCutMeshVertices.size() / 3,
+                  (McUint32)utest_fixture->pCutMeshFaceIndices.size() / 3),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
     utest_fixture->connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
         McSize numBytes = 0;
@@ -472,24 +485,24 @@ UTEST_F(FaceAndVertexDataMapsQueryMissingFlagTest, faceMapFlag)
                   utest_fixture->pSrcMeshVertices.data(),
                   utest_fixture->pSrcMeshFaceIndices.data(),
                   utest_fixture->pSrcMeshFaceSizes.data(),
-                  (uint32_t)utest_fixture->pSrcMeshVertices.size() / 3,
-                  (uint32_t)utest_fixture->pSrcMeshFaceIndices.size() / 4,
+                  (McUint32)utest_fixture->pSrcMeshVertices.size() / 3,
+                  (McUint32)utest_fixture->pSrcMeshFaceIndices.size() / 4,
                   utest_fixture->pCutMeshVertices.data(),
                   utest_fixture->pCutMeshFaceIndices.data(),
                   utest_fixture->pCutMeshFaceSizes.data(),
-                  (uint32_t)utest_fixture->pCutMeshVertices.size() / 3,
-                  (uint32_t)utest_fixture->pCutMeshFaceIndices.size() / 3),
+                  (McUint32)utest_fixture->pCutMeshVertices.size() / 3,
+                  (McUint32)utest_fixture->pCutMeshFaceIndices.size() / 3),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
     utest_fixture->connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
-    for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
         McSize numBytes = 0;
