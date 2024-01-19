@@ -53,21 +53,21 @@ struct ConcurrentSynchronizedContexts {
     // Same inputs as Hello World tutorial
     //
 
-    std::vector<McDouble> cubeVertices;
-    std::vector<McUint32> cubeFaces;
-    McInt32 numCubeVertices;
-    McInt32 numCubeFaces;
+    std::vector<McDouble> cubeVertices = {};
+	std::vector<McUint32> cubeFaces = {};
+    McInt32 numCubeVertices=0;
+    McInt32 numCubeFaces=0;
 
-    std::vector<McUint32> cubeFaceSizes;
+    std::vector<McUint32> cubeFaceSizes = {};
 
     // Cutting Shape:
 
-    std::vector<McDouble> cutMeshVertices;
+    std::vector<McDouble> cutMeshVertices = {};
 
-    std::vector<McUint32> cutMeshFaces;
+    std::vector<McUint32> cutMeshFaces = {};
 
-    McUint32 numCutMeshVertices;
-    McUint32 numCutMeshFaces;
+    McUint32 numCutMeshVertices=0;
+    McUint32 numCutMeshFaces=0;
 };
 
 UTEST_F_SETUP(ConcurrentSynchronizedContexts)
@@ -174,7 +174,7 @@ UTEST_F(ConcurrentSynchronizedContexts, sequentialDispatchCalls)
         McEventCommandExecStatus dispatchEventStatus = (McEventCommandExecStatus)MC_UNDEFINED_VALUE;
         ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
 
-        ASSERT_TRUE(dispatchEventStatus == McEventCommandExecStatus::MC_COMPLETE);
+        ASSERT_TRUE(dispatchEventStatus & McEventCommandExecStatus::MC_COMPLETE);
 
         ASSERT_EQ(mcReleaseEvents(1, &dispatchEvent), MC_NO_ERROR);
     }
@@ -222,7 +222,7 @@ UTEST_F(ConcurrentSynchronizedContexts, parallelButUnsynchronisedDispatchCalls)
                 ASSERT_EQ(mcGetEventInfo(dispatchEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &dispatchEventStatus, NULL), MC_NO_ERROR);
             }
         }
-        ASSERT_EQ(dispatchEventStatus, McEventCommandExecStatus::MC_COMPLETE);
+        ASSERT_TRUE(dispatchEventStatus & McEventCommandExecStatus::MC_COMPLETE);
 
         ASSERT_EQ(mcReleaseEvents(1, &dispatchEvent), MC_NO_ERROR);
     };

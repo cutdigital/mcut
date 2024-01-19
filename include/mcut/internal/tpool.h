@@ -503,7 +503,7 @@ void parallel_for(
         min_per_thread);
 
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+	futures.resize((std::size_t)num_threads - 1);
     InputStorageIteratorType block_start = first;
 
     for (uint32_t i = 0; i < (num_threads - 1); ++i) {
@@ -612,7 +612,7 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
     std::vector<std::future<value_type>> previous_end_values;
     previous_end_values.reserve(num_threads - 1);
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+	futures.resize((std::size_t)num_threads - 1);
 
     Iterator block_start = first;
 
@@ -689,7 +689,7 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+	futures.resize((std::size_t)num_threads - 1);
 
     {
         Iterator block_start = first;
@@ -767,7 +767,7 @@ Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator
 
     {
         std::vector<std::future<void>> futures;
-        futures.resize(num_threads - 1);
+		futures.resize((std::size_t)num_threads - 1);
 
         Iterator block_start = first;
         for (unsigned long i = 0; i < (num_threads - 1); ++i) {
@@ -846,7 +846,7 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+    futures.resize((std::size_t)num_threads - 1);
 
     Iterator block_start = first;
     for (uint32_t i = 0; i < (num_threads - 1); ++i) {

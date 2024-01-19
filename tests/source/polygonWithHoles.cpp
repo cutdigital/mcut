@@ -35,10 +35,10 @@
 
 #include "utest.h"
 #include <mcut/mcut.h>
+#include "mio/mio.h"
+
 #include <string>
 #include <vector>
-
-#include "off.h"
 
 #ifdef _WIN32
 #pragma warning(disable : 26812) // Unscoped enums from mcut.h
@@ -47,17 +47,33 @@
 struct PolygonsWithHoles { 
     McContext context_ {};
 
-    McFloat* pSrcMeshVertices {};
-    McUint32* pSrcMeshFaceIndices {};
-    McUint32* pSrcMeshFaceSizes {};
-    McUint32 numSrcMeshVertices{};
-    McUint32 numSrcMeshFaces {};
+    MioMesh srcMesh = {
+		nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+		0, // numVertices
+		0, // numNormals
+		0, // numTexCoords
+		0, // numFaces
+	};
 
-    McFloat* pCutMeshVertices {};
-    McUint32* pCutMeshFaceIndices {};
-    McUint32* pCutMeshFaceSizes {};
-    McUint32 numCutMeshVertices {};
-    McUint32 numCutMeshFaces {};
+	MioMesh cutMesh = {
+		nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+		0, // numVertices
+		0, // numNormals
+		0, // numTexCoords
+		0, // numFaces
+	};
 };
 
 UTEST_F_SETUP(PolygonsWithHoles)
@@ -65,78 +81,57 @@ UTEST_F_SETUP(PolygonsWithHoles)
     McResult err = mcCreateContext(&utest_fixture->context_, 0);
     EXPECT_TRUE(utest_fixture->context_ != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
-
-    utest_fixture->pSrcMeshVertices = nullptr;
-    utest_fixture->pSrcMeshFaceIndices = nullptr;
-    utest_fixture->pSrcMeshFaceSizes = nullptr;
-    utest_fixture->numSrcMeshVertices = 0;
-    utest_fixture->numSrcMeshFaces = 0;
-
-    utest_fixture->pCutMeshVertices = nullptr;
-    utest_fixture->pCutMeshFaceIndices = nullptr;
-    utest_fixture->pCutMeshFaceSizes = nullptr;
-    utest_fixture->numCutMeshVertices = 0;
-    utest_fixture->numCutMeshFaces = 0;
 }
 
 UTEST_F_TEARDOWN(PolygonsWithHoles)
 {
     EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
 
-    if (utest_fixture->pSrcMeshVertices)
-        free(utest_fixture->pSrcMeshVertices);
-
-    if (utest_fixture->pSrcMeshFaceIndices)
-        free(utest_fixture->pSrcMeshFaceIndices);
-
-    if (utest_fixture->pSrcMeshFaceSizes)
-        free(utest_fixture->pSrcMeshFaceSizes);
-
-    if (utest_fixture->pCutMeshVertices)
-        free(utest_fixture->pCutMeshVertices);
-
-    if (utest_fixture->pCutMeshFaceIndices)
-        free(utest_fixture->pCutMeshFaceIndices);
-
-    if (utest_fixture->pCutMeshFaceSizes)
-        free(utest_fixture->pCutMeshFaceSizes);
+    mioFreeMesh(&utest_fixture->srcMesh);
+	mioFreeMesh(&utest_fixture->cutMesh);
 }
 
 UTEST_F(PolygonsWithHoles, outputWillHaveHoles)
 {
     // partial cut intersection between a cube and a quad
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/cube-flattened.off";
+    
+    //
+	// read-in the source-mesh from file
+	//
 
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+	mioReadOFF((std::string(MESHES_DIR) + "/cube-flattened.off").c_str(),
+			   &utest_fixture->srcMesh.pVertices,
+			   &utest_fixture->srcMesh.pFaceVertexIndices,
+			   &utest_fixture->srcMesh.pFaceSizes,
+			   &utest_fixture->srcMesh.numVertices,
+			   &utest_fixture->srcMesh.numFaces);
 
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((McInt32)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((McInt32)utest_fixture->numSrcMeshFaces, 0);
+	//
+	// read-in the cut-mesh from file
+	//
 
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/cube-flattened-with-holes.off";
-
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((McInt32)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((McInt32)utest_fixture->numCutMeshFaces, 0);
+	mioReadOFF((std::string(MESHES_DIR) + "/cube-flattened-with-holes.off").c_str(),
+			   &utest_fixture->cutMesh.pVertices,
+			   &utest_fixture->cutMesh.pFaceVertexIndices,
+			   &utest_fixture->cutMesh.pFaceSizes,
+			   &utest_fixture->cutMesh.numVertices,
+			   &utest_fixture->cutMesh.numFaces);
 
     ASSERT_EQ(mcDispatch(
                   utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
+                  MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
+						 // source mesh
+						 utest_fixture->srcMesh.pVertices,
+						 utest_fixture->srcMesh.pFaceVertexIndices,
+						 utest_fixture->srcMesh.pFaceSizes,
+						 utest_fixture->srcMesh.numVertices,
+						 utest_fixture->srcMesh.numFaces,
+						 // cut mesh
+						 utest_fixture->cutMesh.pVertices,
+						 utest_fixture->cutMesh.pFaceVertexIndices,
+						 utest_fixture->cutMesh.pFaceSizes,
+						 utest_fixture->cutMesh.numVertices,
+						 utest_fixture->cutMesh.numFaces),
         MC_INVALID_OPERATION);
 }

@@ -224,7 +224,7 @@ if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
 	# tests
 	#
 	if(MCUT_BUILD_TESTS)
-		#add_subdirectory(tests)
+		add_subdirectory(tests)
 	endif()
 
 	#

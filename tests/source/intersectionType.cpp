@@ -47,18 +47,18 @@
 #include <vector>
 
 struct Mesh {
-    std::vector<McDouble> vertices;
-    std::vector<McUint32>  faceIndices;
-    std::vector<McUint32> faceSizes;
-    McUint32 numVertices;
-    McUint32 numFaces;
+	std::vector<McDouble> vertices = {};
+	std::vector<McUint32> faceIndices = {};
+	std::vector<McUint32> faceSizes = {};
+    McUint32 numVertices=0;
+    McUint32 numFaces=0;
 };
 
 struct IntersectionType {
-    McContext context;
+    McContext context = MC_NULL_HANDLE;
 
-    Mesh srcMesh;
-    Mesh cutMesh;    
+    Mesh srcMesh = {};
+	Mesh cutMesh = {};
 };
 
 UTEST_F_SETUP(IntersectionType)
@@ -81,7 +81,7 @@ UTEST_F(IntersectionType, defaultValue)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     // we have not yet called the dispatch function to the value should be undefined i.e. MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM
@@ -97,7 +97,7 @@ Mesh makeCube(McDouble halfExtent, McDouble translX, McDouble translY, McDouble 
     m.numFaces = 6;
     std::vector<McDouble>& verts = m.vertices;
 
-    verts.resize(m.numVertices*3); 
+    verts.resize((McSize)m.numVertices*3); 
 
     // front 
 
@@ -146,13 +146,13 @@ Mesh makeCube(McDouble halfExtent, McDouble translX, McDouble translY, McDouble 
 
     for (McInt32 j = 0; j < 8; ++j)
     {
-        verts[j * 3 + 0] += translX;
-        verts[j * 3 + 1] += translY;
-        verts[j * 3 + 2] += translZ;
+		verts[(McSize)j * 3 + 0] += translX;
+		verts[(McSize)j * 3 + 1] += translY;
+		verts[(McSize)j * 3 + 2] += translZ;
     }
 
     std::vector<McIndex>& faces = m.faceIndices;
-    faces.resize(m.numFaces *4);
+	faces.resize((McSize)m.numFaces * 4);
 
     i = 0;
     // front
@@ -192,7 +192,7 @@ Mesh makeCube(McDouble halfExtent, McDouble translX, McDouble translY, McDouble 
     faces[i++] = 1;
 
     m.faceSizes.resize(m.numFaces);
-    for (McInt32 j = 0; j < m.numFaces; ++j)
+    for (McUint32 j = 0; j < m.numFaces; ++j)
     {
         m.faceSizes[j] = 4;
     }
@@ -209,7 +209,7 @@ Mesh makeQuad_xz(
     m.numFaces = 1;
     std::vector<McDouble>& verts = m.vertices;
 
-    verts.resize(m.numVertices * 3);
+    verts.resize((McSize)m.numVertices * 3);
 
     McInt32 i = 0;
 
@@ -231,13 +231,13 @@ Mesh makeQuad_xz(
 
     for (McInt32 j = 0; j < 4; ++j)
     {
-        verts[j * 3 + 0] += translX;
-        verts[j * 3 + 1] += translY;
-        verts[j * 3 + 2] += translZ;
+		verts[(McSize)j * 3 + 0] += translX;
+		verts[(McSize)j * 3 + 1] += translY;
+		verts[(McSize)j * 3 + 2] += translZ;
     }
 
     std::vector<McIndex>& faces = m.faceIndices;
-    faces.resize(m.numFaces * 4);
+	faces.resize((McSize)m.numFaces * 4);
 
     i = 0;
     // front
@@ -247,7 +247,7 @@ Mesh makeQuad_xz(
     faces[i++] = 3;
 
     m.faceSizes.resize(m.numFaces);
-    for (McInt32 j = 0; j < m.numFaces; ++j)
+	for(McUint32 j = 0; j < m.numFaces; ++j)
     {
         m.faceSizes[j] = 4;
     }
@@ -264,7 +264,7 @@ Mesh makeQuad_xy(
     m.numFaces = 1;
     std::vector<McDouble>& verts = m.vertices;
 
-    verts.resize(m.numVertices * 3);
+    verts.resize((McSize)m.numVertices * 3);
 
     McInt32 i = 0;
 
@@ -286,13 +286,13 @@ Mesh makeQuad_xy(
 
     for (McInt32 j = 0; j < 4; ++j)
     {
-        verts[j * 3 + 0] += translX;
-        verts[j * 3 + 1] += translY;
-        verts[j * 3 + 2] += translZ;
+		verts[(McSize)j * 3 + 0] += translX;
+		verts[(McSize)j * 3 + 1] += translY;
+		verts[(McSize)j * 3 + 2] += translZ;
     }
 
     std::vector<McIndex>& faces = m.faceIndices;
-    faces.resize(m.numFaces * 4);
+	faces.resize((McSize)m.numFaces * 4);
 
     i = 0;
     // front
@@ -302,7 +302,7 @@ Mesh makeQuad_xy(
     faces[i++] = 3;
 
     m.faceSizes.resize(m.numFaces);
-    for (McInt32 j = 0; j < m.numFaces; ++j)
+	for(McUint32 j = 0; j < m.numFaces; ++j)
     {
         m.faceSizes[j] = 4;
     }
@@ -338,7 +338,7 @@ UTEST_F(IntersectionType, watertightCutMeshInsideWatertightSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
@@ -372,7 +372,7 @@ UTEST_F(IntersectionType, watertightSourceMeshInsideWatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
@@ -406,7 +406,7 @@ UTEST_F(IntersectionType, separatedWatertightSourceMeshAndWatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -440,7 +440,7 @@ UTEST_F(IntersectionType, stdIntersectionWatertightSourceMeshAndWatertightCutMes
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -474,7 +474,7 @@ UTEST_F(IntersectionType, stdIntersectionWatertightSourceMeshAndWatertightCutMes
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -511,7 +511,7 @@ UTEST_F(IntersectionType, separatedWatertightSourceMeshAndOpenCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -545,7 +545,7 @@ UTEST_F(IntersectionType, openCutMeshInsideWatertightSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
@@ -579,7 +579,7 @@ UTEST_F(IntersectionType, openCutMeshIntersectsWatertightSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -613,7 +613,7 @@ UTEST_F(IntersectionType, watertightCutMeshIntersectsOpenSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -647,7 +647,7 @@ UTEST_F(IntersectionType, openSourceMeshInsidewatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
@@ -681,7 +681,7 @@ UTEST_F(IntersectionType, separatedOpenSourceMeshAndWatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -720,7 +720,7 @@ UTEST_F(IntersectionType, separatedOpenSourceMeshAndOpenCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -754,7 +754,7 @@ UTEST_F(IntersectionType, openCutMeshIntersectsOpenSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);

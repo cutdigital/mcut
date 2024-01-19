@@ -96,6 +96,9 @@ UTEST_I_TEARDOWN(Benchmark)
     if (utest_index < NUMBER_OF_BENCHMARKS) {
         EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
     }
+
+    mioFreeMesh(&utest_fixture->srcMesh);
+    mioFreeMesh(&utest_fixture->cutMesh);
 }
 
 UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
@@ -158,8 +161,8 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
         //
         // We no longer need the mem of input meshes, so we can free it!
         //
-        mioFreeMesh(&srcMesh);
-        mioFreeMesh(&cutMesh);
+		mioFreeMesh(&utest_fixture->srcMesh);
+		mioFreeMesh(&utest_fixture->cutMesh);
         
         McUint32 connectedComponentCount = 0;
 

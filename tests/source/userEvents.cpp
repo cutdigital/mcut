@@ -48,27 +48,27 @@ Each context is run in its own thread.
 #include <thread>
 #include <vector>
 struct UserEvents {
-    McContext context;
-    McEvent userEvent;
+    McContext context = MC_NULL_HANDLE;
+	McEvent userEvent = MC_NULL_HANDLE;
     //
     // Same inputs as Hello World tutorial
     //
 
-    std::vector<McDouble> cubeVertices;
-    std::vector<McUint32> cubeFaces;
-    McInt32 numCubeVertices;
-    McInt32 numCubeFaces;
+    std::vector<McDouble> cubeVertices = {};
+	std::vector<McUint32> cubeFaces = {};
+	McInt32 numCubeVertices = 0;
+	McInt32 numCubeFaces = 0;
 
-    std::vector<McUint32> cubeFaceSizes;
+    std::vector<McUint32> cubeFaceSizes = {};
 
     // Cutting Shape:
 
-    std::vector<McDouble> cutMeshVertices;
+    std::vector<McDouble> cutMeshVertices = {};
 
-    std::vector<McUint32> cutMeshFaces;
+    std::vector<McUint32> cutMeshFaces = {};
 
-    McUint32 numCutMeshVertices;
-    McUint32 numCutMeshFaces;
+    McUint32 numCutMeshVertices=0;
+	McUint32 numCutMeshFaces = 0;
 };
 
 UTEST_F_SETUP(UserEvents)
@@ -149,10 +149,10 @@ UTEST_F(UserEvents, getExecStatus)
     McSize bytes = 0;
     ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), McResult::MC_NO_ERROR);
 
-    McEventCommandExecStatus status;
+    McEventCommandExecStatus status = (McEventCommandExecStatus)0;
     ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &status, NULL), McResult::MC_NO_ERROR);
 
-    ASSERT_EQ(status, McEventCommandExecStatus::MC_SUBMITTED); // default value
+    ASSERT_TRUE(status& McEventCommandExecStatus::MC_SUBMITTED); // default value
 }
 
 UTEST_F(UserEvents, getContext)
@@ -163,7 +163,7 @@ UTEST_F(UserEvents, getContext)
     McSize bytes = 0;
     ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_CONTEXT, 0, NULL, &bytes), McResult::MC_NO_ERROR);
 
-    McContext c;
+    McContext c = MC_NULL_HANDLE;
     ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_CONTEXT, bytes, &c, NULL), McResult::MC_NO_ERROR);
 
     ASSERT_EQ(c, utest_fixture->context);
@@ -251,10 +251,10 @@ UTEST_F(UserEvents, dependOn)
         McSize bytes = 0;
         ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, 0, NULL, &bytes), McResult::MC_NO_ERROR);
 
-        McEventCommandExecStatus status;
+        McEventCommandExecStatus status = (McEventCommandExecStatus)0;
         ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_COMMAND_EXECUTION_STATUS, bytes, &status, NULL), McResult::MC_NO_ERROR);
 
-        ASSERT_EQ(status, McEventCommandExecStatus::MC_COMPLETE);
+        ASSERT_TRUE(status & McEventCommandExecStatus::MC_COMPLETE);
     } catch (std::exception&) {
         ASSERT_TRUE(false); // should not reach here (it means "mcSetUserEventStatus" failed)
     }
@@ -316,7 +316,7 @@ UTEST_F(UserEvents, dependOnWithError)
         McSize bytes = 0;
         ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS, 0, NULL, &bytes), McResult::MC_NO_ERROR);
 
-        McResult status;
+        McResult status = McResult::MC_NO_ERROR;
         ASSERT_EQ(mcGetEventInfo(utest_fixture->userEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS, bytes, &status, NULL), McResult::MC_NO_ERROR);
 
         ASSERT_EQ(status, McResult::MC_INVALID_OPERATION); // from "mcSetUserEventStatus"

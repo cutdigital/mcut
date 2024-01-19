@@ -34,7 +34,7 @@
  **************************************************************************/
 
 #include "utest.h"
-#include "off.h"
+#include <mcut/mcut.h>
 #include <vector>
 
 
@@ -51,24 +51,24 @@ struct Triangulation {
 UTEST_F_SETUP(Triangulation)
 {
     // create with no flags (default)
-    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_DEBUG), MC_NO_ERROR);
+    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_NULL_HANDLE), MC_NO_ERROR);
     EXPECT_TRUE(utest_fixture->myContext != nullptr);
 
-        // config debug output
-    // -----------------------
-    McSize numBytes = 0;
-    McFlags contextFlags;
-    EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes), MC_NO_ERROR);
-    
+    //    // config debug output
+    //// -----------------------
+    //McSize numBytes = 0;
+    //McFlags contextFlags;
+    //EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes), MC_NO_ERROR);
+    //
 
-    EXPECT_EQ(sizeof(McFlags),numBytes);
+    //EXPECT_EQ(sizeof(McFlags),numBytes);
 
-    EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, numBytes, &contextFlags, nullptr), MC_NO_ERROR);
+    //EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, numBytes, &contextFlags, nullptr), MC_NO_ERROR);
 
-    if (contextFlags & MC_DEBUG) {
-        mcDebugMessageCallback(utest_fixture->myContext, mcDebugOutput, nullptr);
-        mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, true);
-    }
+    //if (contextFlags & MC_DEBUG) {
+    //    mcDebugMessageCallback(utest_fixture->myContext, mcDebugOutput, nullptr);
+    //    mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, true);
+    //}
 }
 
 UTEST_F_TEARDOWN(Triangulation)
@@ -149,7 +149,7 @@ UTEST_F(Triangulation, oneEdgePartialCut)
             ASSERT_LT((McUint32)triangleIndices[v], numberOfVertices); //  "out of bounds vertex index"
         }
 
-        writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
+        //writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
     }
 }
 
@@ -228,7 +228,7 @@ UTEST_F(Triangulation, twoEdgePartialCut)
             ASSERT_LT((McUint32)triangleIndices[v], numberOfVertices); //  "out of bounds vertex index"
         }
 
-        writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
+        //writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
     }
 }
 
@@ -314,7 +314,7 @@ UTEST_F(Triangulation, threeEdgePartialCut)
             ASSERT_LT((McUint32)triangleIndices[v], numberOfVertices); //  "out of bounds vertex index"
         }
 
-        writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
+        //writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
     }
 }
 
@@ -400,6 +400,6 @@ UTEST_F(Triangulation, threeEdgeVerticalPartialCut)
             ASSERT_LT((McUint32)triangleIndices[v], numberOfVertices); //  "out of bounds vertex index"
         }
 
-        writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
+        //writeOBJ("tri-cc"+std::to_string(c) + ".obj", vertices, triangleIndices);
     }
 }

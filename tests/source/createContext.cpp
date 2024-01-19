@@ -35,7 +35,77 @@
 
 #include "utest.h"
 #include <mcut/mcut.h>
-#include "off.h"
+
+static void MCAPI_PTR mcDebugOutput(McDebugSource source,
+									McDebugType type,
+									McUint32 id,
+									McDebugSeverity severity,
+									size_t length,
+									const char* message,
+									const void* userParam)
+{
+
+	// printf("Debug message ( %d ), length=%zu\n%s\n--\n", id, length, message);
+	// printf("userParam=%p\n", userParam);
+
+	std::string debug_src;
+	switch(source)
+	{
+	case MC_DEBUG_SOURCE_API:
+		debug_src = "API";
+		break;
+	case MC_DEBUG_SOURCE_KERNEL:
+		debug_src = "KERNEL";
+		break;
+	case MC_DEBUG_SOURCE_ALL:
+		break;
+	}
+	std::string debug_type;
+	switch(type)
+	{
+	case MC_DEBUG_TYPE_ERROR:
+		debug_type = "ERROR";
+		break;
+	case MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+		debug_type = "DEPRECATION";
+		break;
+	case MC_DEBUG_TYPE_OTHER:
+		// printf("Type: Other");
+		debug_type = "OTHER";
+		break;
+	case MC_DEBUG_TYPE_ALL:
+		break;
+	}
+
+	std::string severity_str;
+
+	switch(severity)
+	{
+	case MC_DEBUG_SEVERITY_HIGH:
+		severity_str = "HIGH";
+		break;
+	case MC_DEBUG_SEVERITY_MEDIUM:
+		severity_str = "MEDIUM";
+		break;
+	case MC_DEBUG_SEVERITY_LOW:
+		severity_str = "LOW";
+		break;
+	case MC_DEBUG_SEVERITY_NOTIFICATION:
+		severity_str = "NOTIFICATION";
+		break;
+	case MC_DEBUG_SEVERITY_ALL:
+		break;
+	}
+
+	printf("callback: [%d:%p,%s:%s:%s:%zu] %s\n",
+		   id,
+		   userParam,
+		   debug_src.c_str(),
+		   debug_type.c_str(),
+		   severity_str.c_str(),
+		   length,
+		   message);
+}
 
 UTEST(CreateContext, noFlags)
 {

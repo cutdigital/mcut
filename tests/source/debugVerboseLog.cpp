@@ -41,7 +41,7 @@
 #if 0
 static void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
-    unsigned McInt32 id,
+    McUint32 id,
     McDebugSeverity severity,
     size_t length,
     const char* message,
@@ -102,24 +102,24 @@ static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 #endif
 
 struct DebugLog {
-    McContext context_;
+    McContext context_ = MC_NULL_HANDLE;
     // 1. Create meshes.
     // -----------------
     // Shape to Cut:
-    std::vector<McDouble> cubeVertices;
-    std::vector<McUint32> cubeFaces;
-    McInt32 numCubeVertices;
-    McInt32 numCubeFaces;
+	std::vector<McDouble> cubeVertices = {};
+	std::vector<McUint32> cubeFaces = {};
+    McInt32 numCubeVertices=0;
+    McInt32 numCubeFaces=0;
 
-    std::vector<McUint32> cubeFaceSizes;
+    std::vector<McUint32> cubeFaceSizes = {};
 
     // Cutting Shape:
 
-    std::vector<McDouble> cutMeshVertices;
+    std::vector<McDouble> cutMeshVertices = {};
 
-    std::vector<McUint32> cutMeshFaces;
-    McUint32 numCutMeshVertices;
-    McUint32 numCutMeshFaces;
+    std::vector<McUint32> cutMeshFaces = {};
+    McUint32 numCutMeshVertices=0;
+    McUint32 numCutMeshFaces=0;
 };
 
 UTEST_F_SETUP(DebugLog)
@@ -192,7 +192,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
     // config debug output
     // -----------------------
     McSize numBytes = 0;
-    McFlags contextFlags;
+	McFlags contextFlags = 0;
     ASSERT_EQ(MC_NO_ERROR, mcGetInfo(utest_fixture->context_, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes));
 
     ASSERT_EQ(sizeof(McFlags), numBytes);
