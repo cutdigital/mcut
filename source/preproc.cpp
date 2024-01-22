@@ -903,10 +903,25 @@ void resolve_floating_polygons(
             } // while (fp_edge_pair_priority_queue.size() > 0 && successivelyPartitionedOriginFaceWithCurrentEdgePair == false) {
 
             if (!haveSegmentOnFP) {
-                // OH OH!
-                // You have encountered an extremely rare problem case.
-                // Email the developers (there is a solution but it requires numerical perturbation on "fpSegment").
-                throw std::logic_error("Floating-polygon partitioning step could not find a usable fpSegment");
+                // Your input meshes have been found to be in a problematic configuration for which a (clear and robust) 
+                // solution is unknown. 
+				std::string user_msg = "Floating-polygon Partitioning algorithm could not find a usable fpSegment\n";
+				if(detected_floating_polygons.size() > 1)
+				{
+					std::string workaround_msg =
+						"\t WORKAROUND: Consider mesh-refinement around face f" +
+						std::to_string((unsigned int)parent_face) + " in " +
+						(parent_face_from_source_hmesh ? "source" : "cut") + "-mesh";
+					user_msg.append(workaround_msg);
+
+                    // There might be a solution to this issue but finding it would require significant time.
+                    // GIST: You have a polygon P (i.e. "parent_face"). And inside (the area) of P are child polygons 'c' that
+                    // where produced as a result of P slicing some solid volume (e.g. sphere or torus). In the simplest case there is
+                    // only one child (imagine a plane slicing a sphere). However, in the more general (and hence more complex) case, the are two or more.
+                    // The problem to solve is that of determining the polyline that runs from one edge in P to another 
+                    // (different) edge of P, while also plassing through the area of each child polygon 'c'.
+				}
+				throw std::logic_error(user_msg);
             }
 
             // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
