@@ -218,7 +218,7 @@ if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
 
 	set(mio_include_dir ${mio_SOURCE_DIR}/include)
 
-	add_subdirectory(${mio_SOURCE_DIR})
+	add_subdirectory(${mio_SOURCE_DIR} build)
 
 	#
 	# tests
