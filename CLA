@@ -8,7 +8,7 @@ These agreements help achieve the goal of providing a reliable and long-lived so
 
 ## Overview
 
-The Individual Contributor License Agreement (ICLA) is provided below. The purpose of this agreement is to clearly define the terms under which intellectual property has been contributed to the MCUT project and thereby allow the copyright holder of the MCUT project to defend it should there be a legal dispute regarding the software. By contribution of ideas, code, or documentation to the MCUT project, a contributor acknowledges that they are bound by the terms laid out herein. The ICLA an individual signs is not tied to any employer they may have.
+The Individual Contributor License Agreement (ICLA) is provided below. The purpose of this agreement is to clearly define the terms under which intellectual property has been contributed to the MCUT project and thereby allow the copyright holder of the MCUT project to defend it should there be a legal dispute regarding the software. By contribution of ideas, code, or documentation to the MCUT project, a contributor acknowledges that they are bound by the terms laid out herein. The ICLA an individual acknowledges is not tied to any employer they may have.
 
 The Corporate Contributor License Agreement (CCLA) is also provided below. The CCLA is available to cover contributing intellectual property via a corporation that may have been assigned as part of an employment agreement. Note that a Corporate CLA does not remove the need for every developer to acknowledge their own ICLA as an individual, which covers both contributions the corporation owns, and those it does not own. The CCLA legally binds the corporation, so a person with authority to enter into legal contracts on behalf of the corporation must acknowledge it.
 
@@ -26,7 +26,7 @@ You accept and agree to the following terms and conditions for Your Contribution
 
 "You" (or "Your") shall mean the copyright owner or legal entity authorized by the copyright owner that is making this Agreement with CutDigital Enterprise. For legal entities, the entity making a Contribution and all other entities that control, are controlled by, or are under common control with that entity are considered to be a single Contributor. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
 
-"Contribution" shall mean any original work of authorship, including any modifications or additions to an existing work, that is intentionally submitted by You to CutDigital Enterprise for inclusion in, or documentation of, any of the products owned or managed by CutDigital Enterprise (the "Work"). For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to CutDigital Enterprise or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, CutDigital Enterprise for the purpose of   discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by You as "Not a Contribution."
+"Contribution" shall mean any original work of authorship, including any modifications or additions to an existing work, that is intentionally submitted by You to CutDigital Enterprise for inclusion in, or documentation of, any of the products owned or managed by CutDigital Enterprise (the "Work"). For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to CutDigital Enterprise or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, CutDigital Enterprise for the purpose of discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by You as "Not a Contribution."
 
 2.  Grant of Copyright License. 
 
@@ -38,7 +38,7 @@ Subject to the terms and conditions of this Agreement, You hereby grant to CutDi
 
 4. You represent that you are legally entitled to grant the above license. 
 
-If your employer(s) has rights to intellectual propertythat you create that includes your Contributions, you representthat you have received permission to make Contributions on behalf of that employer, that your employer has waived such rights for your Contributions to CutDigital Enterprise, or that your employer has executed a separate Corporate CLA with CutDigital Enterprise.
+If your employer(s) has rights to intellectual property that you create that includes your Contributions, you represent that you have received permission to make Contributions on behalf of that employer, that your employer has waived such rights for your Contributions to CutDigital Enterprise, or that your employer has executed a separate Corporate CLA with CutDigital Enterprise.
 
 5. You represent that each of Your Contributions is Your original creation (see section 7 for submissions on behalf of others).  
 

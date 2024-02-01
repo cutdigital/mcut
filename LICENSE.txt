@@ -4,13 +4,13 @@ MCUT is available under an [Open Source](https://opensource.org/) license as wel
 
 ## Open Source License
 
-The Open Source license is the GNU [Lesser General Public License (v3+)](https://www.gnu.org/licenses/lgpl-3.0.en.html) (LGPL), which is allows developers to easily build on top of MCUT. 
+The Open Source license is the GNU [Lesser General Public License, Version 3](https://www.gnu.org/licenses/lgpl-3.0.en.html) (LGPL), which is allows developers to easily build on top of MCUT. 
 
-Users of code licensed under LGPL must:
+In general, users of code that is licensed under LGPL must:
 
 * Include a copy of the full license text and the original copyright notice
-* Make available the source updates when you distribute a derivative work based on the licensed library
-* License any derivative works of the library under the same or later version of the LGPL or GPL as described above
+* Make available the source updates when distributing a derivative work based on the licensed sofware
+* License any derivative works of the sofware under the same or later version of the LGPL or GPL as described above
 
 In sum, the LGPL license gives you the right to use and copy the source code of MCUT freely. It is also possible to modify the MCUT code under the condition that the resulting modifications are released as source code under LGPL with any binary distribution of your software that uses these LGPL parts. 
 

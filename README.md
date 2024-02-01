@@ -1,6 +1,6 @@
 # MCUT Overview
 
-Gist: _A robust library for detecting and resolving surface intersections between two objects._ 
+Gist: _A library for detecting and resolving surface-mesh intersections._ 
 
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
 [![MacOS](https://github.com/cutdigital/mcut/actions/workflows/macos.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/macos.yml) [![Linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
@@ -18,7 +18,7 @@ The project is designed for a broad range of real-world problems relating to 3D 
 
 MCUT is a tool for partitioning objects represented as meshes that model solids or open surfaces: It is a code library for cutting 3D mesh objects using their geometry to produce crisp fragments at fine scale, which is useful for operations like slicing and boolean operations (union, subtraction and intersection). Supported features include (see images below):
 
-* **Stencilling**: exact cut-outs of the cutting surface
+* **Stenciling**: exact cut-outs of the cutting surface
 * **Intersection curve access**: geometry representing lines of intersection-contour points
 * **Partial cuts**: producing valid results where an open-surface is not necessarily completely cutting through a solid.
 * **Concatenation**: merging a solids or open-surfaces with another.
@@ -82,26 +82,14 @@ The following images show more examples of what users can do with MCUT:
   Figure 11: An example of sectioning with a flat plane, which can be used to eliminate material/volume on either side of this plane or create hollow carve-outs.
 </p>
 
-# Source code and test applications
-
-The source code is available for your perusal and evaluation. You can access right here on Github. This is an opportunity for you to trial and experiment with MCUT for your needs. Here is a quick example of how you clone and build the library:
-
-* `git clone https://github.com/cutdigital/mcut.git` 
-* `mkdir build`
-* `cd build`
-* `cmake ..` (see `CMakeLists.txt` for available build configuration options) 
-* run `make -j4` *IF* you are on Linux/MacOS terminal, *ELSE* open the generated `.sln` with e.g. Visual Studio
-
-Next, try out one of the tutorials!
-
 # Licensing
 
 MCUT is available under an Open Source license as well as a commercial license. Users choosing to use MCUT under the free-of-charge Open Source license (e.g. for academic purposes) simply need to comply to its terms, otherwise a commercial license is required. 
 
-* The Open Source license is the GNU [Lesser General Public License (v3+)](https://www.gnu.org/licenses/lgpl-3.0.en.html) (LGPL), which is allows developers to easily build on top of MCUT. 
+* The Open Source license is the GNU [LGPL v3](https://www.gnu.org/licenses/lgpl-3.0.en.html) (LGPL), which is allows developers to easily build on top of MCUT. 
 * The commercial license option is for users that wish to use MCUT in their products for commercial purposes but do not wish to release their software under the LGPL. You can buy a commercial license from [CutDigital Enterprise](contact@cut-digital.com). The commercial offer is adapted based on company size (number of employees).
 
-These options facilitate the adoption of MCUT in other [Open Source](https://opensource.org/) projects, while protecting its commercial value and thus make it possible to guarantee long term support, maintenance and further development of the code for the benefit of its users.
+These options facilitate winder adoption of MCUT in other [Open Source](https://opensource.org/) projects, while ensuring long term support, maintenance and further development of the code for the benefit of its users.
 
 ---
 
