@@ -312,7 +312,7 @@ if(MCUT_BUILD_AS_SHARED_LIB)
 
 	install(TARGETS ${target_name}
 			LIBRARY
-			DESTINATION bin/
+			DESTINATION lib/
 			COMPONENT dynamic_libraries)
 else()
 	#
