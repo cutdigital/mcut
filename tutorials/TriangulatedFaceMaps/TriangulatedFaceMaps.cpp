@@ -284,19 +284,19 @@ int main()
 	//
 
     for (McInt32 i = 0; i < (McInt32)connectedComponents.size(); ++i) {
-        McConnectedComponent connComp = connectedComponents[i]; // connected compoene
+        McConnectedComponent cc = connectedComponents[i]; 
 
         //
 		//  vertices
 		//
 
         McSize numBytes = 0;
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
         my_assert(status == MC_NO_ERROR);
 
         McUint32 ccVertexCount = (McUint32)(numBytes / (sizeof(double) * 3));
         std::vector<double> ccVertices((size_t)ccVertexCount * 3u, 0.0);
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
         my_assert(status == MC_NO_ERROR);
 
         //
@@ -304,20 +304,20 @@ int main()
         // 
 
         numBytes = 0;
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, 0, NULL, &numBytes);
         my_assert(status == MC_NO_ERROR);
         std::vector<McUint32> ccTriangulatedFaceIndices(numBytes / sizeof(McUint32), 0);
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, numBytes, ccTriangulatedFaceIndices.data(), NULL);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION, numBytes, ccTriangulatedFaceIndices.data(), NULL);
         my_assert(status == MC_NO_ERROR);
 
         //
         //  vertex map
         // 
 
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, 0, NULL, &numBytes);
         my_assert(status == MC_NO_ERROR);
         std::vector<McUint32> ccVertexMap(numBytes / sizeof(McUint32), 0);
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, numBytes, ccVertexMap.data(), NULL);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_MAP, numBytes, ccVertexMap.data(), NULL);
         my_assert(status == MC_NO_ERROR);
 
         //
@@ -325,12 +325,12 @@ int main()
         // 
 
         const McUint32 ccTriangulatedFaceCount = static_cast<McUint32>(ccTriangulatedFaceIndices.size()/3);
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP, 0, NULL, &numBytes);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP, 0, NULL, &numBytes);
         
         my_assert(status == MC_NO_ERROR);
         
         std::vector<McUint32> ccTriangleFaceMap(numBytes / sizeof(McUint32), 0);
-        status = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP, numBytes, ccTriangleFaceMap.data(), NULL);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION_MAP, numBytes, ccTriangleFaceMap.data(), NULL);
         
         my_assert(status == MC_NO_ERROR);
 

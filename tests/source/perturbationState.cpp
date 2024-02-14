@@ -123,7 +123,7 @@ UTEST_F(PerturbationState, getCCPerturbationVector)
             sqrd_magnitude += component*component;
         }
 
-        ASSERT_TRUE(sqrd_magnitude > 0);
+        ASSERT_TRUE(sqrd_magnitude > 0.0);
     }
 }
 

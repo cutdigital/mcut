@@ -190,6 +190,7 @@ inline int trailing_zeroes(uint32_t v)
 #if __linux__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
 
     r = (*(uint32_t*)&f >> 23) - 0x7f;

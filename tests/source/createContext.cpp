@@ -44,10 +44,6 @@ static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 									const char* message,
 									const void* userParam)
 {
-
-	// printf("Debug message ( %d ), length=%zu\n%s\n--\n", id, length, message);
-	// printf("userParam=%p\n", userParam);
-
 	std::string debug_src;
 	switch(source)
 	{
@@ -57,8 +53,10 @@ static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 	case MC_DEBUG_SOURCE_KERNEL:
 		debug_src = "KERNEL";
 		break;
-	case MC_DEBUG_SOURCE_ALL:
-		break;
+	case MC_DEBUG_SOURCE_FRONTEND:
+        debug_src = "FRONTEND";
+    case MC_DEBUG_SOURCE_ALL:case MC_DEBUG_SOURCE_IGNORE:
+        break;
 	}
 	std::string debug_type;
 	switch(type)
@@ -70,10 +68,9 @@ static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 		debug_type = "DEPRECATION";
 		break;
 	case MC_DEBUG_TYPE_OTHER:
-		// printf("Type: Other");
 		debug_type = "OTHER";
 		break;
-	case MC_DEBUG_TYPE_ALL:
+	case MC_DEBUG_TYPE_ALL:case MC_DEBUG_TYPE_IGNORE:
 		break;
 	}
 

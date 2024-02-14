@@ -59,6 +59,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 McUint32 getAdjFacesBaseOffset(const McUint32 faceIdx, const McUint32* faceAdjFacesSizes);
 

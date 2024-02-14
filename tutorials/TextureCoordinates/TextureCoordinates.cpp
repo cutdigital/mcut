@@ -48,6 +48,7 @@
 #include <vector>
 #include <cmath>
 #include <string>
+#include <algorithm>
 
 #define my_assert(cond)                             \
     if (!(cond))                                    \

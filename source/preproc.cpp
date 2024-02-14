@@ -2780,7 +2780,6 @@ extern "C" void preproc(
     const McUint32 numConnectedComponentsCreatedDefault = 2; // source-mesh and cut-mesh (potentially modified due to poly partitioning)
 
     const bool haveStandardIntersection = numConnectedComponentsCreated > numConnectedComponentsCreatedDefault;
-    const bool haveNoIntersection = numConnectedComponentsCreated == numConnectedComponentsCreatedDefault;
     
     if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
     {
@@ -2797,7 +2796,7 @@ extern "C" void preproc(
         }
         else
         {
-            MCUT_ASSERT(haveNoIntersection); // we are dealing with the case where there exists no intersection of the input surfaces
+            MCUT_ASSERT(numConnectedComponentsCreated == numConnectedComponentsCreatedDefault); // we are dealing with the case where there exists no intersection of the input surfaces
 
             check_and_store_input_mesh_intersection_type(
                 context_ptr, //

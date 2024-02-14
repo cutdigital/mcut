@@ -226,7 +226,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
 
     ASSERT_EQ(MC_NO_ERROR, mcGetDebugMessageLog(utest_fixture->context_, numMsgs, msgData.size(), &sources[0], &types[0], &severities[0], &lengths[0], &msgData[0], &numFound));
 
-    ASSERT_GT(numFound, 0);
+    ASSERT_GT(numFound, (McUint32)0);
 
     sources.resize(numFound);
     types.resize(numFound);
@@ -238,7 +238,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
     std::vector<McChar>::iterator currPos = msgData.begin();
 
     for (size_t msg = 0; msg < lengths.size(); ++msg) {
-        ASSERT_GT(lengths[msg], 0);
+        ASSERT_GT(lengths[msg], (McSize)0);
         messages.push_back(std::string(currPos, currPos + lengths[msg]));
         currPos = currPos + lengths[msg];
 

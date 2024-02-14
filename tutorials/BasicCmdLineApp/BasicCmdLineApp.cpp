@@ -51,7 +51,7 @@
 #include <inttypes.h> // PRId64
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 #define my_assert(cond)                                                                            \
 	if(!(cond))                                                                                    \
 	{                                                                                              \
@@ -71,11 +71,11 @@ void MCAPI_PTR mcDebugOutput(McDebugSource source,
     const char* message,
     const void* userParam);
 
-McUint32 main(McUint32 argc, char* argv[])
+int main(int argc, char* argv[])
 {
     bool help = false;
 
-    for (McUint32 i = 0; help == false && i < argc; ++i) {
+    for (int i = 0; help == false && i < argc; ++i) {
         if (!strcmp("--help", argv[i]) || !strcmp("-h", argv[i])) {
             help = true;
         }
@@ -346,7 +346,9 @@ void MCAPI_PTR mcDebugOutput(McDebugSource source,
     case MC_DEBUG_SOURCE_KERNEL:
         debug_src = "KERNEL";
         break;
-    case MC_DEBUG_SOURCE_ALL:
+    case MC_DEBUG_SOURCE_FRONTEND:
+        debug_src = "FRONTEND";
+    case MC_DEBUG_SOURCE_ALL:case MC_DEBUG_SOURCE_IGNORE:
         break;
     }
 
@@ -362,7 +364,7 @@ void MCAPI_PTR mcDebugOutput(McDebugSource source,
         //printf("Type: Other");
         debug_type = "OTHER";
         break;
-    case MC_DEBUG_TYPE_ALL:
+    case MC_DEBUG_TYPE_ALL:case MC_DEBUG_TYPE_IGNORE:
         break;
        
     }

@@ -47,7 +47,8 @@
 #include <stdlib.h>
 #include <vector>
 #include <string>
-
+#include <algorithm>
+#include <string.h>
 #if defined(_WIN32)
 #define _CRT_SECURE_NO_WARNINGS 1
 
@@ -328,9 +329,6 @@ int main(int argc, const char* argv[])
 
         my_assert(status == MC_NO_ERROR);
 #endif
-
-        const McUint32 ccFaceCount = static_cast<McUint32>(ccFaceSizes.size());
-
         /// ------------------------------------------------------------------------------------
 
         // Here we show, how to know when connected components pertain particular boolean operations.
@@ -422,7 +420,9 @@ void MCAPI_PTR mcDebugOutput(McDebugSource source,
     case MC_DEBUG_SOURCE_KERNEL:
         debug_src = "KERNEL";
         break;
-    case MC_DEBUG_SOURCE_ALL:
+    case MC_DEBUG_SOURCE_FRONTEND:
+        debug_src = "FRONTEND";
+    case MC_DEBUG_SOURCE_ALL:case MC_DEBUG_SOURCE_IGNORE:
         break;
     }
 
@@ -438,7 +438,7 @@ void MCAPI_PTR mcDebugOutput(McDebugSource source,
         //printf("Type: Other");
         debug_type = "OTHER";
         break;
-    case MC_DEBUG_TYPE_ALL:
+    case MC_DEBUG_TYPE_ALL:case MC_DEBUG_TYPE_IGNORE:
         break;
        
     }

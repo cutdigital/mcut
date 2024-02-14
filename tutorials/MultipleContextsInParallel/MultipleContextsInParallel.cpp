@@ -779,7 +779,9 @@ void MCAPI_PTR mcDebugOutputCALLBACK(McDebugSource source,
     case MC_DEBUG_SOURCE_KERNEL:
         debug_src = "KERNEL";
         break;
-    case MC_DEBUG_SOURCE_ALL:
+    case MC_DEBUG_SOURCE_FRONTEND:
+        debug_src = "FRONTEND";
+    case MC_DEBUG_SOURCE_ALL:case MC_DEBUG_SOURCE_IGNORE:
         break;
     }
     std::string debug_type;
@@ -791,10 +793,9 @@ void MCAPI_PTR mcDebugOutputCALLBACK(McDebugSource source,
         debug_type = "DEPRECATION";
         break;
     case MC_DEBUG_TYPE_OTHER:
-        // printf("Type: Other");
         debug_type = "OTHER";
         break;
-    case MC_DEBUG_TYPE_ALL:
+    case MC_DEBUG_TYPE_ALL:case MC_DEBUG_TYPE_IGNORE:
         break;
     }
 
