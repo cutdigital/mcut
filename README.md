@@ -89,7 +89,7 @@ MCUT is available under an Open Source license as well as a commercial license. 
 * The Open Source license is the GNU [LGPL v3](https://www.gnu.org/licenses/lgpl-3.0.en.html) (LGPL), which is allows developers to easily build on top of MCUT. 
 * The commercial license option is for users that wish to use MCUT in their products for commercial purposes but do not wish to release their software under the LGPL. You can buy a commercial license from [CutDigital Enterprise](contact@cut-digital.com). The commercial offer is adapted based on company size (number of employees).
 
-These options facilitate winder adoption of MCUT in other [Open Source](https://opensource.org/) projects, while ensuring long term support, maintenance and further development of the code for the benefit of its users.
+These options facilitate wider adoption of MCUT in other [Open Source](https://opensource.org/) projects, while ensuring long term support, maintenance and further development of the code for the benefit of its users.
 
 ---
 
