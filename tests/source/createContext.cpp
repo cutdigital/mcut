@@ -35,6 +35,7 @@
 
 #include "utest.h"
 #include <mcut/mcut.h>
+#include <string>
 
 static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 									McDebugType type,

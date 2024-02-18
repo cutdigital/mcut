@@ -466,14 +466,14 @@ int main()
 					// vertices of the origin face (i.e. the face from which the current face came from).
 					// NOTE: we have assumed triangulated input meshes for simplicity. Otherwise, interpolation
 					// will be more complex, which is unnecessary for now.
-					vec3 a = {0.0, 0.0, 0.0};
+					vec3 a = {{0.0, 0.0, 0.0}};
 					{
                         const McDouble* ptr = inputMeshPtr->pVertices + imFace[0]*3;
                         a.x = ptr[0];
                         a.y = ptr[1];
                         a.z = ptr[2];
                     }
-					vec3 b = {0.0, 0.0, 0.0};
+					vec3 b = {{0.0, 0.0, 0.0}};
                     {
                         const McDouble* ptr = inputMeshPtr->pVertices + imFace[1]*3;
                         b.x = ptr[0];
@@ -481,7 +481,7 @@ int main()
                         b.z = ptr[2];
                     }
 
-                    vec3 c = {0.0, 0.0, 0.0};
+                    vec3 c = {{0.0, 0.0, 0.0}};
                     {
                         const McDouble* ptr = inputMeshPtr->pVertices + imFace[2]*3;
                         c.x = ptr[0];
@@ -500,21 +500,21 @@ int main()
 
 					// normal coordinates of vertices in the origin face
 					
-                    vec3 normalA = {0.0, 0.0, 0.0};
+                    vec3 normalA = {{0.0, 0.0, 0.0}};;
 					{
                         const McDouble* ptr = inputMeshPtr->pNormals + (imFaceNormalIndices[0]*3);
                         normalA.x = ptr[0];
                         normalA.y = ptr[1];
                         normalA.z = ptr[2];
                     }
-					vec3 normalB = {0.0, 0.0, 0.0};
+					vec3 normalB = {{0.0, 0.0, 0.0}};;
 					{
                         const McDouble* ptr = inputMeshPtr->pNormals + (imFaceNormalIndices[1]*3);
                         normalB.x = ptr[0];
                         normalB.y = ptr[1];
                         normalB.z = ptr[2];
                     }
-					vec3 normalC = {0.0, 0.0, 0.0};
+					vec3 normalC = {{0.0, 0.0, 0.0}};;
 					{
                         const McDouble* ptr = inputMeshPtr->pNormals + (imFaceNormalIndices[2]*3);
                         normalC.x = ptr[0];

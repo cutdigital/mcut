@@ -86,7 +86,7 @@ struct vec2
 
 	vec2 operator*(const McDouble c) const
 	{
-		vec2 result = {0.0, 0.0};
+		vec2 result = {{0.0, 0.0}};
 		result.x = x * c;
 		result.y = y * c;
 		return result;
@@ -94,7 +94,7 @@ struct vec2
 
 	vec2 operator+(const vec2& rhs) const
 	{
-		vec2 result = {0.0, 0.0};
+		vec2 result = {{0.0, 0.0}};
 		result.x = x + rhs.x;
 		result.y = y + rhs.y;
 		return result;
@@ -102,7 +102,7 @@ struct vec2
 
 	vec2 operator-(const vec2& rhs) const
 	{
-		vec2 result = {0.0, 0.0};
+		vec2 result = {{0.0, 0.0}};
 		result.x = x - rhs.x;
 		result.y = y - rhs.y;
 		return result;
@@ -127,7 +127,7 @@ struct vec3
 
 	vec3 operator*(const McDouble c) const
 	{
-		vec3 result = {0.0, 0.0, 0.0};
+		vec3 result = {{0.0, 0.0, 0.0}};
 		result.x = x * c;
 		result.y = y * c;
 		result.z = z * c;
@@ -136,7 +136,7 @@ struct vec3
 
 	vec3 operator+(const vec3& rhs) const
 	{
-		vec3 result = {0.0, 0.0, 0.0};
+		vec3 result = {{0.0, 0.0, 0.0}};
 		result.x = x + rhs.x;
 		result.y = y + rhs.y;
 		result.z = z + rhs.z;
@@ -145,7 +145,7 @@ struct vec3
 
 	vec3 operator-(const vec3& rhs) const
 	{
-		vec3 result = {0.0, 0.0, 0.0};
+		vec3 result = {{0.0, 0.0, 0.0}};
 		result.x = x - rhs.x;
 		result.y = y - rhs.y;
 		result.z = z - rhs.z;
@@ -166,7 +166,7 @@ getTriangleArea2D(McDouble x1, McDouble y1, McDouble x2, McDouble y2, McDouble x
 
 vec3 crossProduct(const vec3& u, const vec3& v)
 {
-	vec3 out = {0.0, 0.0, 0.0};
+	vec3 out = {{0.0, 0.0, 0.0}};
 	out.x = u.y * v.z - u.z * v.y;
 	out.y = u.z * v.x - u.x * v.z;
 	out.z = u.x * v.y - u.y * v.x;
@@ -208,7 +208,7 @@ vec3 getBarycentricCoords(const vec3& p, const vec3& a, const vec3& b, const vec
 		ood = 1.0f / m.z;
 	}
 
-	vec3 result = {0.0, 0.0, 0.0};
+	vec3 result = {{0.0, 0.0, 0.0}};
 	result.u = nu * ood;
 	result.v = nv * ood;
 	result.w = 1.0f - result.u - result.v;
@@ -461,7 +461,7 @@ McInt32 main()
                 // the face on which the current cc face came from
 				const McIndex* imFaceVertexIndices = inputMeshPtr->pFaceVertexIndices + (imFaceIdx * 3);
 
-                vec2 texCoord = {0.0, 0.0};
+                vec2 texCoord = {{0.0, 0.0}};;
 
                 if (vertexIsIntersectionPoint)
                 { // texture coords unknown and must be computed
@@ -471,7 +471,7 @@ McInt32 main()
 					//
 
 					// coordinates of current point (whose barycentric coords we want)
-					vec3 p = {0.0, 0.0, 0.0};
+					vec3 p = {{0.0, 0.0, 0.0}};
 					p.x = (ccVertices[((McSize)ccVertexIdx * 3u) + 0u]);
 					p.y = (ccVertices[((McSize)ccVertexIdx * 3u) + 1u]);
 					p.z = (ccVertices[((McSize)ccVertexIdx * 3u) + 2u]);
@@ -479,14 +479,14 @@ McInt32 main()
 					// vertices of the origin face (i.e. the face from which the current face came from).
 					// NOTE: we have assumed triangulated input meshes for simplicity. Otherwise, interpolation
 					// will be more complex, which is unnecessary for now.
-					vec3 a = {0.0, 0.0, 0.0};
+					vec3 a = {{0.0, 0.0, 0.0}};
 					{
 						const McDouble* ptr = inputMeshPtr->pVertices + imFaceVertexIndices[0] * 3;
 						a.x = ptr[0];
 						a.y = ptr[1];
 						a.z = ptr[2];
 					}
-					vec3 b = {0.0, 0.0, 0.0};
+					vec3 b = {{0.0, 0.0, 0.0}};
 					{
 						const McDouble* ptr = inputMeshPtr->pVertices + imFaceVertexIndices[1] * 3;
 						b.x = ptr[0];
@@ -494,7 +494,7 @@ McInt32 main()
 						b.z = ptr[2];
 					}
 
-					vec3 c = {0.0, 0.0, 0.0};
+					vec3 c = {{0.0, 0.0, 0.0}};
 					{
 						const McDouble* ptr = inputMeshPtr->pVertices + imFaceVertexIndices[2] * 3;
 						c.x = ptr[0];
