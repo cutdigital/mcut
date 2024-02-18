@@ -1,6 +1,6 @@
 # MCUT Overview
 
-Gist: _A library for detecting and resolving surface-mesh intersections._ 
+Gist: _A library for detecting and resolving intersections between two surface meshes._ 
 
 [![Windows](https://github.com/cutdigital/mcut/actions/workflows/windows.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/windows.yml)
 [![MacOS](https://github.com/cutdigital/mcut/actions/workflows/macos.yml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/macos.yml) [![Linux](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml/badge.svg)](https://github.com/cutdigital/mcut/actions/workflows/linux.yaml)
@@ -12,7 +12,7 @@ This project is called "MCUT" (short for 'mesh cutting'), and it provides functi
   Figure 1: Generate, slice and perform Booleans without errors.
 </p>
 
-The project is designed for a broad range of real-world problems relating to 3D modelling and design tasks. Application areas include computer animation, aerospace and automotive engineering, mining, civil and mechanical engineering amongst others. 
+The project is designed for a broad range of real-world problems relating to 3D modelling and design tasks. Application areas include computer animation, aerospace and automotive engineering, digital dental modelling, mining, civil and mechanical engineering amongst others. 
 
 # Capabilities
 
@@ -38,9 +38,9 @@ What is being offered is a general solution to the problem of resolving solid- a
 
 # Practical benefits and advantages for users
 
-The expert capabilities of MCUT will allow companies, individuals and researchers-alike to develop robust (and fast) Computer-Aided Design (CAD) and Manufacturing (CAM) tools. For example, these tools could cater to the design of industry-specific structural models like tunnels, drill holes, mechanical instruments and rock-block models. All this alongside the ability to handle general 3D modelling tasks that are typical in industry and academic-fields related to computer graphics (e.g. game-engine level design) and mechanical engineering (e.g. fracture simulation). In essence, users of MCUT are provided with the capability to create robust derivative products and tools for generating (and testing) structural designs in a virtual setting for short- and long-term production operations and feasibility tests/studies.
+The capabilities of MCUT will allow users to develop robust design tools. For example, these tools could cater to the design of industry-specific structural models like open-pit mines, tunnels, drill holes, mechanical instruments and rock-block models. All this alongside the ability to handle general 3D modelling tasks that are typical in industry and academic-fields related to computer graphics (e.g. game-engine level design) and mechanical engineering (e.g. fracture simulation). In essence, users of MCUT are provided with the capability to create robust derivative products and tools for generating (and testing) structural designs in a virtual setting for short- and long-term production operations and feasibility tests/studies.
 
-The following images show more examples of what users can do with MCUT:
+The following images show more examples of what you can do with MCUT:
 
 <p align="center">
   <img src="https://github.com/cutdigital/mcut.github.io/blob/master/docs/media/repo-teaser/extra-images/eg-teaser.jpg?raw=true">
