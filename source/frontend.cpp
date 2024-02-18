@@ -2035,15 +2035,15 @@ void get_connected_component_data_impl_detail(
     case MC_CONNECTED_COMPONENT_DATA_DISPATCH_PERTURBATION_VECTOR: {
         SCOPED_TIMER("MC_CONNECTED_COMPONENT_DATA_DISPATCH_PERTURBATION_VECTOR");
         if (pMem == nullptr) {
-            *pNumBytes = sizeof(vec3);
+            *pNumBytes = sizeof(McDouble)*3;
         } else {
-            if (bytes > sizeof(vec3)) {
+            if (bytes > sizeof(McDouble)*3) {
                 throw std::invalid_argument("out of bounds memory access");
             }
-            if (bytes % sizeof(vec3) != 0) {
+            if (bytes % (sizeof(McDouble)*3) != 0) {
                 throw std::invalid_argument("invalid number of bytes");
             }
-
+            
             ((McDouble*)pMem)[0] = cc_uptr->perturbation_vector[0];
             ((McDouble*)pMem)[1] = cc_uptr->perturbation_vector[1];
             ((McDouble*)pMem)[2] = cc_uptr->perturbation_vector[2];
