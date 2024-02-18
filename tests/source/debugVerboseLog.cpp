@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2023 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
+ * 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
+ *  
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
  *
- * NOTE: This file is licensed under GPL-3.0-or-later (default).
- * A commercial license can be purchased from Floyd M. Chitalu.
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
  *
- * License details:
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
  *
- * (A)  GNU General Public License ("GPL"); a copy of which you should have
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
  *
- * The commercial license options is for users that wish to use MCUT in
- * their products for comercial purposes but do not wish to release their
- * software products under the GPL license.
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * Author(s)     : Floyd M. Chitalu
- */
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #include "utest.h"
 #include <mcut/mcut.h>
@@ -28,7 +41,7 @@
 #if 0
 static void MCAPI_PTR mcDebugOutput(McDebugSource source,
     McDebugType type,
-    unsigned int id,
+    McUint32 id,
     McDebugSeverity severity,
     size_t length,
     const char* message,
@@ -89,24 +102,24 @@ static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 #endif
 
 struct DebugLog {
-    McContext context_;
+    McContext context_ = MC_NULL_HANDLE;
     // 1. Create meshes.
     // -----------------
     // Shape to Cut:
-    std::vector<double> cubeVertices;
-    std::vector<uint32_t> cubeFaces;
-    int numCubeVertices;
-    int numCubeFaces;
+	std::vector<McDouble> cubeVertices = {};
+	std::vector<McUint32> cubeFaces = {};
+    McInt32 numCubeVertices=0;
+    McInt32 numCubeFaces=0;
 
-    std::vector<uint32_t> cubeFaceSizes;
+    std::vector<McUint32> cubeFaceSizes = {};
 
     // Cutting Shape:
 
-    std::vector<double> cutMeshVertices;
+    std::vector<McDouble> cutMeshVertices = {};
 
-    std::vector<uint32_t> cutMeshFaces;
-    uint32_t numCutMeshVertices;
-    uint32_t numCutMeshFaces;
+    std::vector<McUint32> cutMeshFaces = {};
+    McUint32 numCutMeshVertices=0;
+    McUint32 numCutMeshFaces=0;
 };
 
 UTEST_F_SETUP(DebugLog)
@@ -179,7 +192,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
     // config debug output
     // -----------------------
     McSize numBytes = 0;
-    McFlags contextFlags;
+	McFlags contextFlags = 0;
     ASSERT_EQ(MC_NO_ERROR, mcGetInfo(utest_fixture->context_, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes));
 
     ASSERT_EQ(sizeof(McFlags), numBytes);
@@ -213,7 +226,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
 
     ASSERT_EQ(MC_NO_ERROR, mcGetDebugMessageLog(utest_fixture->context_, numMsgs, msgData.size(), &sources[0], &types[0], &severities[0], &lengths[0], &msgData[0], &numFound));
 
-    ASSERT_GT(numFound, 0);
+    ASSERT_GT(numFound, (McUint32)0);
 
     sources.resize(numFound);
     types.resize(numFound);
@@ -225,7 +238,7 @@ UTEST_F(DebugLog, MessageControl_EnableAll)
     std::vector<McChar>::iterator currPos = msgData.begin();
 
     for (size_t msg = 0; msg < lengths.size(); ++msg) {
-        ASSERT_GT(lengths[msg], 0);
+        ASSERT_GT(lengths[msg], (McSize)0);
         messages.push_back(std::string(currPos, currPos + lengths[msg]));
         currPos = currPos + lengths[msg];
 

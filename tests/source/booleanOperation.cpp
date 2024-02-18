@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2021-2022 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
  * 
- * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from Floyd M. Chitalu. 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
  *  
- * License details:
- * 
- * (A)  GNU General Public License ("GPL"); a copy of which you should have 
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
- * 
- * The commercial license options is for users that wish to use MCUT in 
- * their products for comercial purposes but do not wish to release their 
- * software products under the GPL license. 
- * 
- * Author(s)     : Floyd M. Chitalu
- */
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
+ *
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
+ *
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
+ *
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
+ *
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #include "utest.h"
 #include <mcut/mcut.h>
@@ -29,95 +42,95 @@
 struct BooleanOperation {
     McContext myContext = MC_NULL_HANDLE;
     std::vector<McConnectedComponent> pConnComps_;
-    std::vector<float> srcMeshVertices;
-    std::vector<uint32_t> meshFaceIndices;
-    std::vector<uint32_t> meshFaceSizes;
+    std::vector<McFloat> srcMeshVertices;
+    std::vector<McUint32> meshFaceIndices;
+    std::vector<McUint32> meshFaceSizes;
 };
 
-static void MCAPI_PTR mcDebugOutput_(McDebugSource source,
-    McDebugType type,
-    unsigned int id,
-    McDebugSeverity severity,
-    size_t length,
-    const char* message,
-    const void* userParam)
-{
-
-    //printf("Debug message ( %d ), length=%zu\n%s\n--\n", id, length, message);
-    //printf("userParam=%p\n", userParam);
-
-    std::string debug_src;
-    switch (source) {
-    case MC_DEBUG_SOURCE_API:
-        debug_src = "API";
-        break;
-    case MC_DEBUG_SOURCE_KERNEL:
-        debug_src = "KERNEL";
-        break;
-    case MC_DEBUG_SOURCE_ALL:
-        break;
-    }
-    std::string debug_type;
-    switch (type) {
-    case MC_DEBUG_TYPE_ERROR:
-        debug_type = "ERROR";
-        break;
-    case MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-        debug_type = "DEPRECATION";
-        break;
-    case MC_DEBUG_TYPE_OTHER:
-        //printf("Type: Other");
-        debug_type = "OTHER";
-        break;
-    case MC_DEBUG_TYPE_ALL:
-        break;
-
-    }
-
-    std::string severity_str;
-
-    switch (severity) {
-    case MC_DEBUG_SEVERITY_HIGH:
-        severity_str = "HIGH";
-        break;
-    case MC_DEBUG_SEVERITY_MEDIUM:
-        severity_str = "MEDIUM";
-        break;
-    case MC_DEBUG_SEVERITY_LOW:
-        severity_str = "LOW";
-        break;
-    case MC_DEBUG_SEVERITY_NOTIFICATION:
-        severity_str = "NOTIFICATION";
-        break;
-    case MC_DEBUG_SEVERITY_ALL:
-        break;
-    }
-
-    printf("MCUT[%d:%p,%s:%s:%s:%zu] %s\n", id, userParam, debug_src.c_str(), debug_type.c_str(), severity_str.c_str(), length, message);
-}
+//static void MCAPI_PTR mcDebugOutput_(McDebugSource source,
+//    McDebugType type,
+//    McInt32 id,
+//    McDebugSeverity severity,
+//    size_t length,
+//    const char* message,
+//    const void* userParam)
+//{
+//
+//    //printf("Debug message ( %d ), length=%zu\n%s\n--\n", id, length, message);
+//    //printf("userParam=%p\n", userParam);
+//
+//    std::string debug_src;
+//    switch (source) {
+//    case MC_DEBUG_SOURCE_API:
+//        debug_src = "API";
+//        break;
+//    case MC_DEBUG_SOURCE_KERNEL:
+//        debug_src = "KERNEL";
+//        break;
+//    case MC_DEBUG_SOURCE_ALL:
+//        break;
+//    }
+//    std::string debug_type;
+//    switch (type) {
+//    case MC_DEBUG_TYPE_ERROR:
+//        debug_type = "ERROR";
+//        break;
+//    case MC_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+//        debug_type = "DEPRECATION";
+//        break;
+//    case MC_DEBUG_TYPE_OTHER:
+//        //printf("Type: Other");
+//        debug_type = "OTHER";
+//        break;
+//    case MC_DEBUG_TYPE_ALL:
+//        break;
+//
+//    }
+//
+//    std::string severity_str;
+//
+//    switch (severity) {
+//    case MC_DEBUG_SEVERITY_HIGH:
+//        severity_str = "HIGH";
+//        break;
+//    case MC_DEBUG_SEVERITY_MEDIUM:
+//        severity_str = "MEDIUM";
+//        break;
+//    case MC_DEBUG_SEVERITY_LOW:
+//        severity_str = "LOW";
+//        break;
+//    case MC_DEBUG_SEVERITY_NOTIFICATION:
+//        severity_str = "NOTIFICATION";
+//        break;
+//    case MC_DEBUG_SEVERITY_ALL:
+//        break;
+//    }
+//
+//    printf("MCUT[%d:%p,%s:%s:%s:%zu] %s\n", id, userParam, debug_src.c_str(), debug_type.c_str(), severity_str.c_str(), length, message);
+//}
 
 UTEST_F_SETUP(BooleanOperation)
 {
     // create with no flags (default)
-    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_DEBUG), MC_NO_ERROR);
+    EXPECT_EQ(mcCreateContext(&utest_fixture->myContext, MC_NULL_HANDLE), MC_NO_ERROR);
     EXPECT_TRUE(utest_fixture->myContext != nullptr);
 
-    // config debug output
-    // -----------------------
-    McSize numBytes = 0;
-    McFlags contextFlags;
-    EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes), MC_NO_ERROR);
+    //// config debug output
+    //// -----------------------
+    //McSize numBytes = 0;
+    //McFlags contextFlags;
+    //EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, 0, nullptr, &numBytes), MC_NO_ERROR);
 
 
-    EXPECT_TRUE(sizeof(McFlags) == numBytes);
+    //EXPECT_TRUE(sizeof(McFlags) == numBytes);
 
-    EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, numBytes, &contextFlags, nullptr), MC_NO_ERROR);
+    //EXPECT_EQ(mcGetInfo(utest_fixture->myContext, MC_CONTEXT_FLAGS, numBytes, &contextFlags, nullptr), MC_NO_ERROR);
 
 
-    if (contextFlags & MC_DEBUG) {
-        EXPECT_EQ(mcDebugMessageCallback(utest_fixture->myContext, mcDebugOutput_, nullptr), MC_NO_ERROR);
-        EXPECT_EQ(mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, MC_FALSE), MC_NO_ERROR);
-    }
+    //if (contextFlags & MC_DEBUG) {
+    //    EXPECT_EQ(mcDebugMessageCallback(utest_fixture->myContext, mcDebugOutput_, nullptr), MC_NO_ERROR);
+    //    EXPECT_EQ(mcDebugMessageControl(utest_fixture->myContext, McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, MC_FALSE), MC_NO_ERROR);
+    //}
 
     utest_fixture->srcMeshVertices = {
         -1.f, -1.f, 1.f, // 0
@@ -144,7 +157,7 @@ UTEST_F_SETUP(BooleanOperation)
 
 UTEST_F_TEARDOWN(BooleanOperation)
 {
-    EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->myContext, (uint32_t)utest_fixture->pConnComps_.size(), utest_fixture->pConnComps_.data()), MC_NO_ERROR);
+    EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->myContext, (McUint32)utest_fixture->pConnComps_.size(), utest_fixture->pConnComps_.data()), MC_NO_ERROR);
     EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
 }
 
@@ -152,16 +165,16 @@ UTEST_F_TEARDOWN(BooleanOperation)
 // pass the appropriate MC_DISPATCH_ENFORCE_GENERAL_POSITION flag.
 UTEST_F(BooleanOperation, selfUnionWithoutGeneralPositionEnforcement)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
 
     const McFlags booleanUnionFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanUnionFlags,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_INVALID_OPERATION);
 }
 
@@ -169,16 +182,16 @@ UTEST_F(BooleanOperation, selfUnionWithoutGeneralPositionEnforcement)
 // position enforcement.
 UTEST_F(BooleanOperation, selfUnionWithGeneralPositionEnforcement)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
 
     const McFlags booleanUnionFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanUnionFlags | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_NO_ERROR);
 }
 
@@ -186,29 +199,29 @@ UTEST_F(BooleanOperation, selfUnionWithGeneralPositionEnforcement)
 // position enforcement (with MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE).
 UTEST_F(BooleanOperation, selfUnionWithGeneralPositionEnforcement_abs)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
 
     const McFlags booleanUnionFlags = MC_DISPATCH_FILTER_FRAGMENT_SEALING_OUTSIDE | MC_DISPATCH_FILTER_FRAGMENT_LOCATION_ABOVE;
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanUnionFlags | MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_NO_ERROR);
 }
 
 // Performing a Boolean "diff(A,B)" operation.
 UTEST_F(BooleanOperation, differenceA_Not_B)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
-    std::vector<float> cutMeshVertices = srcMeshVertices;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    std::vector<McFloat> cutMeshVertices = srcMeshVertices;
 
     // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
-    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)cutMeshVertices.size(); ++i) {
         cutMeshVertices[i] += 1.f;
     }
 
@@ -216,25 +229,25 @@ UTEST_F(BooleanOperation, differenceA_Not_B)
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanA_Not_BFlags,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(cutMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_NO_ERROR);
 
-    uint32_t numConnComps;
+    McUint32 numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(uint32_t(3), numConnComps);
+    ASSERT_EQ(McUint32(3), numConnComps);
 }
 
 UTEST_F(BooleanOperation, differenceB_Not_A)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
-    std::vector<float> cutMeshVertices = srcMeshVertices;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    std::vector<McFloat> cutMeshVertices = srcMeshVertices;
 
     // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
-    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)cutMeshVertices.size(); ++i) {
         cutMeshVertices[i] += 1.f;
     }
 
@@ -242,25 +255,25 @@ UTEST_F(BooleanOperation, differenceB_Not_A)
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanB_Not_AFlags,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(cutMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_NO_ERROR);
 
-    uint32_t numConnComps;
+    McUint32 numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, uint32_t(3));
+    ASSERT_EQ(numConnComps, McUint32(3));
 }
 
 UTEST_F(BooleanOperation, unionOp)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
-    std::vector<float> cutMeshVertices = srcMeshVertices;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    std::vector<McFloat> cutMeshVertices = srcMeshVertices;
 
     // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
-    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)cutMeshVertices.size(); ++i) {
         cutMeshVertices[i] += 1.f;
     }
 
@@ -268,25 +281,25 @@ UTEST_F(BooleanOperation, unionOp)
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanB_Not_AFlags,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(cutMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_NO_ERROR);
 
-    uint32_t numConnComps;
+    McUint32 numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(uint32_t(3), numConnComps);
+    ASSERT_EQ(McUint32(3), numConnComps);
 }
 
 UTEST_F(BooleanOperation, intersectionOp)
 {
-    const std::vector<float>& srcMeshVertices = utest_fixture->srcMeshVertices;
-    const std::vector<uint32_t>& meshFaceIndices = utest_fixture->meshFaceIndices;
-    const std::vector<uint32_t>& meshFaceSizes = utest_fixture->meshFaceSizes;
-    std::vector<float> cutMeshVertices = srcMeshVertices;
+    const std::vector<McFloat>& srcMeshVertices = utest_fixture->srcMeshVertices;
+    const std::vector<McUint32>& meshFaceIndices = utest_fixture->meshFaceIndices;
+    const std::vector<McUint32>& meshFaceSizes = utest_fixture->meshFaceSizes;
+    std::vector<McFloat> cutMeshVertices = srcMeshVertices;
 
     // shifted so that the front-bottom-left vertex is located at (0,0,0) and the centre is at (1,1,1)
-    for (int i = 0; i < (int)cutMeshVertices.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)cutMeshVertices.size(); ++i) {
         cutMeshVertices[i] += 1.f;
     }
 
@@ -294,12 +307,12 @@ UTEST_F(BooleanOperation, intersectionOp)
 
     ASSERT_EQ(mcDispatch(utest_fixture->myContext, //
                   MC_DISPATCH_VERTEX_ARRAY_FLOAT | booleanB_Not_AFlags,
-                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(srcMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size(), //
-                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (uint32_t)(cutMeshVertices.size() / 3), (uint32_t)meshFaceSizes.size()),
+                  &srcMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(srcMeshVertices.size() / 3), (McUint32)meshFaceSizes.size(), //
+                  &cutMeshVertices[0], &meshFaceIndices[0], &meshFaceSizes[0], (McUint32)(cutMeshVertices.size() / 3), (McUint32)meshFaceSizes.size()),
         MC_NO_ERROR);
 
-    uint32_t numConnComps;
+    McUint32 numConnComps;
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->myContext, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
 
-    ASSERT_EQ(numConnComps, uint32_t(3));
+    ASSERT_EQ(numConnComps, McUint32(3));
 }

@@ -1,40 +1,56 @@
-/**
- * Copyright (c) 2021-2022 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
  * 
- * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from Floyd M. Chitalu. 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
  *  
- * License details:
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
+ *
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
+ *
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
+ *
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
+ *
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ *  AdjacentFaces.cpp
+ *
+ *  \brief:
+ *  This tutorial shows how to query adjacent faces of any face of a connected 
+ *  component.
  * 
- * (A)  GNU General Public License ("GPL"); a copy of which you should have 
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
+ *  The tutorial is presented in the context of merging neighbouring faces of a 
+ *  connected component that share some property (e.g. an ID tag), where this 
+ *  property is _derived_ from origin/birth faces. 
  * 
- * The commercial license options is for users that wish to use MCUT in 
- * their products for comercial purposes but do not wish to release their 
- * software products under the GPL license. 
- * 
- * Author(s)     : Floyd M. Chitalu
- */
+ *  A group of faces that share the property and define a connected patch will 
+ *  be merged into a single face. This is useful in situations where e.g. one 
+ *  has to triangulate the faces of an input mesh before cutting and then 
+ *  recover the untriangulated faces afterwards.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Efnterprise Ltd.
+ *
+ **************************************************************************/
 
-/*
-This tutorial shows how to query adjacent faces of any face of a connected component.
-
-The tutorial is presented in the context of merging neighouring faces of a 
-connected component that share some property (e.g. an ID tag), where 
-this property is _derived_ from origin/birth faces. 
-
-A group of faces that share the property and define a connected patch will be merged 
-into a single face. This is useful in situations where e.g. one has to triangulate the 
-faces of an input mesh before cutting and then recover the untriangulated faces afterwards.
-
-We assume that all faces to be merged are coplanar.
-*/
 
 #include "mcut/mcut.h"
+#include "mio/mio.h"
 
 #include <cassert>
 #include <fstream>
@@ -43,39 +59,55 @@ We assume that all faces to be merged are coplanar.
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
-// libigl dependencies
-#include <Eigen/Core>
-#include <igl/read_triangle_mesh.h>
+McUint32 getAdjFacesBaseOffset(const McUint32 faceIdx, const McUint32* faceAdjFacesSizes);
 
-#define my_assert(cond) if(!(cond)){fprintf(stderr, "MCUT error: %s\n", #cond );std::exit(1);}
+McUint32 getFaceIndicesBaseOffset(const McUint32 faceIdx, const McUint32* faceSizes);
 
-void writeOBJ(
-    const std::string& path,
-    const double* ccVertices,
-    const int ccVertexCount,
-    const uint32_t* ccFaceIndices,
-    const uint32_t* faceSizes,
-    const uint32_t ccFaceCount);
-void readOBJ(const std::string& path, std::vector<double>& V, std::vector<uint32_t>& F, std::vector<uint32_t>& Fsizes);
-uint32_t getAdjFacesBaseOffset(const uint32_t faceIdx, const uint32_t* faceAdjFacesSizes);
-uint32_t getFaceIndicesBaseOffset(const uint32_t faceIdx, const uint32_t* faceSizes);
 void mergeAdjacentMeshFacesByProperty(
-    std::vector<uint32_t>& meshFaceIndicesOUT,
-    std::vector<uint32_t>& meshFaceSizesOUT,
-    const std::vector<uint32_t>& meshFaces,
-    const std::vector<uint32_t>& meshFaceSizes,
-    const std::vector<uint32_t>& meshFaceAdjFace,
-    const std::vector<uint32_t>& meshFaceAdjFaceSizes,
-    const std::map<int, std::vector<uint32_t>>& tagToMeshFace,
-    const std::map<uint32_t, int>& meshFaceToTag);
+    std::vector<McUint32>& meshFaceIndicesOUT,
+    std::vector<McUint32>& meshFaceSizesOUT,
+    const std::vector<McUint32>& meshFaces,
+    const std::vector<McUint32>& meshFaceSizes,
+    const std::vector<McUint32>& meshFaceAdjFace,
+    const std::vector<McUint32>& meshFaceAdjFaceSizes,
+    const std::map<McInt32, std::vector<McUint32>>& tagToMeshFace,
+    const std::map<McUint32, McInt32>& meshFaceToTag);
 
-int main()
+McInt32 main()
 {
-    std::vector<double> srcMeshVertices;
-    std::vector<uint32_t> srcMeshFaceIndices;
-    std::vector<uint32_t> srcMeshFaceSizes;
-    readOBJ(DATA_DIR "/triangulatedGrid4x4.obj", srcMeshVertices, srcMeshFaceIndices, srcMeshFaceSizes);
+	MioMesh srcMesh  = {
+        nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+        0, // numVertices
+        0, // numNormals
+        0, // numTexCoords
+        0, // numFaces
+    };
+	
+    MioMesh cutMesh = srcMesh;
+
+    //
+    // read-in the source-mesh from file
+    // 
+    mioReadOBJ(DATA_DIR "/triangulatedGrid4x4.obj",
+			   &srcMesh.pVertices,
+			   &srcMesh.pNormals,
+			   &srcMesh.pTexCoords,
+			   &srcMesh.pFaceSizes,
+			   &srcMesh.pFaceVertexIndices,
+			   &srcMesh.pFaceVertexTexCoordIndices,
+			   &srcMesh.pFaceVertexNormalIndices,
+			   &srcMesh.numVertices,
+			   &srcMesh.numNormals,
+			   &srcMesh.numTexCoords,
+			   &srcMesh.numFaces);
 
     // A map denoting the adjacent faces of the source mesh that share some property
     // (a tag/number) that we will use to merge adjacent faces.
@@ -83,7 +115,7 @@ int main()
     // Faces in each group are merged into one face/polygon.
     // Groups which are adjacent and share a tag are also merged.
 
-    std::map<uint32_t, int> srcMeshFaceToTag = {
+    std::map<McUint32, McInt32> srcMeshFaceToTag = {
         // Bottom-right quadrant faces
         // group 0
         { 0, 0 },
@@ -122,73 +154,126 @@ int main()
         { 17, 0xBEEF }
     };
 
-    std::map<int, std::vector<uint32_t>> tagToSrcMeshFaces;
-    for (std::map<uint32_t, int>::const_iterator i = srcMeshFaceToTag.cbegin(); i != srcMeshFaceToTag.cend(); ++i) {
+    std::map<McInt32, std::vector<McUint32>> tagToSrcMeshFaces;
+    for (std::map<McUint32, McInt32>::const_iterator i = srcMeshFaceToTag.cbegin(); i != srcMeshFaceToTag.cend(); ++i) {
         tagToSrcMeshFaces[i->second].push_back(i->first);
     }
 
-    std::vector<double> cutMeshVertices;
-    std::vector<uint32_t> cutMeshFaceIndices;
-    std::vector<uint32_t> cutMeshFaceSizes;
-    readOBJ(DATA_DIR "/quad.obj", cutMeshVertices, cutMeshFaceIndices, cutMeshFaceSizes);
+    //
+	// read-in the cut-mesh from file
+	// 
 
+    mioReadOBJ(DATA_DIR "/quad.obj",
+			   &cutMesh.pVertices,
+			   &cutMesh.pNormals,
+			   &cutMesh.pTexCoords,
+			   &cutMesh.pFaceSizes,
+			   &cutMesh.pFaceVertexIndices,
+			   &cutMesh.pFaceVertexTexCoordIndices,
+			   &cutMesh.pFaceVertexNormalIndices,
+			   &cutMesh.numVertices,
+			   &cutMesh.numNormals,
+			   &cutMesh.numTexCoords,
+			   &cutMesh.numFaces);
+
+    //
     // create a context
-    // -------------------
+    // 
+
     McContext context = MC_NULL_HANDLE;
-    McResult err = mcCreateContext(&context, MC_NULL_HANDLE);
-    my_assert(err == MC_NO_ERROR);
 
-    //  do the cutting (boolean ops)
-    // -------------------------------
+    McResult status = mcCreateContext(&context, MC_NULL_HANDLE);
+    
+    if (status != MC_NO_ERROR)
+    {
+		fprintf(stderr, "mcCreateContext failed (%d)\n", (McInt32)status);
+		exit(1);
+    }
 
-    err = mcDispatch(
+    status = mcDispatch(
         context,
         MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_INCLUDE_FACE_MAP,
         // source mesh
-        reinterpret_cast<const void*>(srcMeshVertices.data()),
-        reinterpret_cast<const uint32_t*>(srcMeshFaceIndices.data()),
-        srcMeshFaceSizes.data(),
-        static_cast<uint32_t>(srcMeshVertices.size() / 3),
-        static_cast<uint32_t>(srcMeshFaceSizes.size()),
+        srcMesh.pVertices,
+        srcMesh.pFaceVertexIndices,
+        srcMesh.pFaceSizes,
+        srcMesh.numVertices,
+		srcMesh.numFaces,
         // cut mesh
-        reinterpret_cast<const void*>(cutMeshVertices.data()),
-        reinterpret_cast<const uint32_t*>(cutMeshFaceIndices.data()),
-        cutMeshFaceSizes.data(),
-        static_cast<uint32_t>(cutMeshVertices.size() / 3),
-        static_cast<uint32_t>(cutMeshFaceSizes.size()));
+	    cutMesh.pVertices,
+		cutMesh.pFaceVertexIndices,
+	    cutMesh.pFaceSizes,
+		cutMesh.numVertices,
+		cutMesh.numFaces);
 
-    my_assert(err == MC_NO_ERROR);
+    if(status != MC_NO_ERROR)
+    {
+	    fprintf(stderr, "mcDispatch failed (%d)\n", (McInt32)status);
+	    exit(1);
+    }
 
-    // query the number of available connected component
-    // --------------------------------------------------
-    uint32_t numConnComps;
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps);
-    my_assert(err == MC_NO_ERROR);
+    //
+    // MCUT is not longer using mem of input meshes, so we can free it!
+    //
+	mioFreeMesh(&srcMesh);
+	mioFreeMesh(&cutMesh);
 
-    printf("connected components: %d\n", (int)numConnComps);
+    //
+    // query the number of available connected components
+    // 
 
-    if (numConnComps == 0) {
+    McUint32 connectedComponentCount = 0;
+
+    status = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &connectedComponentCount);
+    
+    if(status != MC_NO_ERROR)
+	{
+		fprintf(stderr, "1:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (%d)\n", (McInt32)status);
+		exit(1);
+	}
+
+    printf("connected components: %d\n", (McInt32)connectedComponentCount);
+
+    if (connectedComponentCount == 0) {
         fprintf(stdout, "no connected components found\n");
         exit(0);
     }
 
-    my_assert(numConnComps > 0);
+    std::vector<McConnectedComponent> connectedComponents(connectedComponentCount, MC_NULL_HANDLE);
+    connectedComponents.resize(connectedComponentCount);
+    status = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (McUint32)connectedComponents.size(), connectedComponents.data(), NULL);
 
-    std::vector<McConnectedComponent> connectedComponents(numConnComps, MC_NULL_HANDLE);
-    connectedComponents.resize(numConnComps);
-    err = mcGetConnectedComponents(context, MC_CONNECTED_COMPONENT_TYPE_ALL, (uint32_t)connectedComponents.size(), connectedComponents.data(), NULL);
+    if(status != MC_NO_ERROR)
+	{
+		fprintf(stderr,
+				"2:mcGetConnectedComponents(MC_CONNECTED_COMPONENT_TYPE_ALL) failed (%d)\n",
+				(McInt32)status);
+		exit(1);
+	}
 
-    my_assert(err == MC_NO_ERROR);
+    //
+    // query the data of each connected component 
+    // 
 
-    // query the data of each connected component from MCUT
-    // -------------------------------------------------------
+    for (McInt32 c = 0; c < (McInt32)connectedComponentCount; ++c) {
+        
+        McConnectedComponent cc = connectedComponents[c];
 
-    for (int c = 0; c < (int)numConnComps; ++c) {
-        McConnectedComponent connComp = connectedComponents[c];
+        //
+        // type
+        //
+		McConnectedComponentType type = (McConnectedComponentType)0;
 
-        McConnectedComponentType type;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL);
-        my_assert(err == MC_NO_ERROR);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_TYPE, sizeof(McConnectedComponentType), &type, NULL);
+
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(
+				stderr,
+				"1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_TYPE) failed (%d)\n",
+				(McInt32)status);
+			exit(1);
+		}
 
         if (!(type == MC_CONNECTED_COMPONENT_TYPE_INPUT || type == MC_CONNECTED_COMPONENT_TYPE_FRAGMENT)) {
             // we only care about the input source mesh, and the "fragment" connected components
@@ -196,103 +281,242 @@ int main()
         }
 
         if (type == MC_CONNECTED_COMPONENT_TYPE_INPUT) {
-            McInputOrigin origin;
-            err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL);
-            my_assert(err == MC_NO_ERROR);
+            
+            McInputOrigin origin = (McInputOrigin)0;
+            
+            status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_ORIGIN, sizeof(McInputOrigin), &origin, NULL);
+			
+            if(status != MC_NO_ERROR)
+			{
+				fprintf(stderr,
+						"mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_ORIGIN)"
+						"failed (%d)\n",
+						(McInt32)status);
+				exit(1);
+			}
+            
             if (origin == MC_INPUT_ORIGIN_CUTMESH) {
                 continue; // we only care about the source mesh
             }
         }
 
-        // query the vertices
-        // ----------------------
+        //
+        // vertices
+        // 
 
         McSize numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        uint32_t ccVertexCount = (uint32_t)(numBytes / (sizeof(double) * 3));
-        std::vector<double> ccVertices((McSize)ccVertexCount * 3u, 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (void*)ccVertices.data(), NULL);
-        my_assert(err == MC_NO_ERROR);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, 0, NULL, &numBytes);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr, "1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE) failed (%d)\n", (McInt32)status);
+			exit(1);
+		}
 
-        // query the faces
-        // -------------------
+        McUint32 ccVertexCount = (McUint32)(numBytes / (sizeof(McDouble) * 3));
+        std::vector<McDouble> ccVertices((McSize)ccVertexCount * 3u, 0);
+
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE, numBytes, (McVoid*)ccVertices.data(), NULL);
+		
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        //
+        // faces
+        // 
 
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        std::vector<uint32_t> ccFaceIndices(numBytes / sizeof(uint32_t), 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
-        my_assert(err == MC_NO_ERROR);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE, 0, NULL, &numBytes);
+		
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
 
-        // query the face sizes
-        // ------------------------
+        std::vector<McUint32> ccFaceIndices(numBytes / sizeof(McUint32), 0);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE, numBytes, ccFaceIndices.data(), NULL);
+		
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        //
+        // face sizes
+        // 
+
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        std::vector<uint32_t> ccFaceSizes(numBytes / sizeof(uint32_t), 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, ccFaceSizes.data(), NULL);
-        my_assert(err == MC_NO_ERROR);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, 0, NULL, &numBytes);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
 
-        const uint32_t ccFaceCount = static_cast<uint32_t>(ccFaceSizes.size());
+        std::vector<McUint32> ccFaceSizes(numBytes / sizeof(McUint32), 0);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_SIZE, numBytes, ccFaceSizes.data(), NULL);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_SIZE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        const McUint32 ccFaceCount = static_cast<McUint32>(ccFaceSizes.size());
 
         {
             char buf[512];
             sprintf(buf, OUTPUT_DIR "/cc%d.obj", c);
-            writeOBJ(buf, &ccVertices[0], ccVertexCount, &ccFaceIndices[0], &ccFaceSizes[0], ccFaceCount);
+            
+            mioWriteOBJ(buf,
+						&ccVertices[0],
+						nullptr,
+						nullptr,
+						&ccFaceSizes[0],
+						&ccFaceIndices[0],
+						nullptr,
+						nullptr,
+						ccVertexCount,
+						0,
+						0,
+						ccFaceCount);
         }
 
-        // query the face map
-        // ------------------
-        numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        std::vector<uint32_t> ccFaceMap(numBytes / sizeof(uint32_t), 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
-        my_assert(err == MC_NO_ERROR);
-
-        // query the face adjacency
-        // ------------------------
+        //
+        // face map
+        // 
 
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        std::vector<uint32_t> ccFaceAdjFaces(numBytes / sizeof(uint32_t), 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE, numBytes, ccFaceAdjFaces.data(), NULL);
-        my_assert(err == MC_NO_ERROR);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, 0, NULL, &numBytes);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_MAP) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
 
-        // query the face adjacency sizes
-        // -------------------------------
+        std::vector<McUint32> ccFaceMap(numBytes / sizeof(McUint32), 0);
+
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_MAP, numBytes, ccFaceMap.data(), NULL);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_MAP) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        //
+        // face adjacency info
+        // 
+
         numBytes = 0;
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, 0, NULL, &numBytes);
-        my_assert(err == MC_NO_ERROR);
-        std::vector<uint32_t> ccFaceAdjFacesSizes(numBytes / sizeof(uint32_t), 0);
-        err = mcGetConnectedComponentData(context, connComp, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, numBytes, ccFaceAdjFacesSizes.data(), NULL);
-        my_assert(err == MC_NO_ERROR);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE, 0, NULL, &numBytes);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
 
+        std::vector<McUint32> ccFaceAdjFaces(numBytes / sizeof(McUint32), 0);
+
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE, numBytes, ccFaceAdjFaces.data(), NULL);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        //
+        // face adjacency sizes (number of adjacent faces per face)
+        // 
+        numBytes = 0;
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, 0, NULL, &numBytes);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"1:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        std::vector<McUint32> ccFaceAdjFacesSizes(numBytes / sizeof(McUint32), 0);
+        status = mcGetConnectedComponentData(context, cc, MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE, numBytes, ccFaceAdjFacesSizes.data(), NULL);
+        
+        if(status != MC_NO_ERROR)
+		{
+			fprintf(stderr,
+					"2:mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_ADJACENT_FACE_SIZE"
+					"SIZE) "
+					"failed (%d)\n",
+					(McInt32)status);
+			exit(1);
+		}
+
+        //
         // resolve mapping between tags and CC faces
+        //
+        
         // NOTE: only those CC face whose origin face was tagged will themselves be tagged.
-        std::map<int, std::vector<uint32_t>> tagToCcFaces;
-        std::map<uint32_t, int> ccFaceToTag;
+        
+        std::map<McInt32, std::vector<McUint32>> tagToCcFaces;
+        std::map<McUint32, McInt32> ccFaceToTag;
 
-        for (int ccFaceID = 0; ccFaceID < (int)ccFaceCount; ++ccFaceID) {
-            int imFaceID = ccFaceMap[ccFaceID];
-            std::map<uint32_t, int>::const_iterator srcMeshFaceToTagIter = srcMeshFaceToTag.find(imFaceID);
+        for (McInt32 ccFaceID = 0; ccFaceID < (McInt32)ccFaceCount; ++ccFaceID) {
+            
+            McInt32 imFaceID = ccFaceMap[ccFaceID];
+            std::map<McUint32, McInt32>::const_iterator srcMeshFaceToTagIter = srcMeshFaceToTag.find(imFaceID);
             bool faceWasTagged = (srcMeshFaceToTagIter != srcMeshFaceToTag.cend());
 
             if (faceWasTagged) {
-                const int tag = srcMeshFaceToTagIter->second;
+                const McInt32 tag = srcMeshFaceToTagIter->second;
                 ccFaceToTag[ccFaceID] = tag;
                 tagToCcFaces[tag].push_back(ccFaceID);
             }
         }
 
-        for (std::map<uint32_t, int>::const_iterator i = srcMeshFaceToTag.cbegin(); i != srcMeshFaceToTag.cend(); ++i) {
+        for (std::map<McUint32, McInt32>::const_iterator i = srcMeshFaceToTag.cbegin(); i != srcMeshFaceToTag.cend(); ++i) {
             tagToSrcMeshFaces[i->second].push_back(i->first);
         }
 
-        std::vector<uint32_t> ccFaceIndicesMerged;
-        std::vector<uint32_t> ccFaceSizesMerged;
+        std::vector<McUint32> ccFaceIndicesMerged;
+        std::vector<McUint32> ccFaceSizesMerged;
 
         mergeAdjacentMeshFacesByProperty(
             ccFaceIndicesMerged,
@@ -307,160 +531,127 @@ int main()
         {
             char buf[512];
             sprintf(buf, OUTPUT_DIR "/cc%d-merged.obj", c);
+            
             // NOTE: For the sake of simplicity, we keep unreferenced vertices.
-            writeOBJ(buf, &ccVertices[0], ccVertexCount, &ccFaceIndicesMerged[0], &ccFaceSizesMerged[0], (uint32_t)ccFaceSizesMerged.size());
+            
+            mioWriteOBJ(buf,
+						&ccVertices[0],
+						nullptr,
+						nullptr,
+						&ccFaceSizesMerged[0],
+						&ccFaceIndicesMerged[0],
+						nullptr,
+						nullptr,
+						ccVertexCount,
+						0,
+						0,
+						(McUint32)ccFaceSizesMerged.size());
         }
     }
 
+    //
     // free connected component data
-    // --------------------------------
-    err = mcReleaseConnectedComponents(context, (uint32_t)connectedComponents.size(), connectedComponents.data());
-    my_assert(err == MC_NO_ERROR);
+    // 
 
+    status = mcReleaseConnectedComponents(context, (McUint32)connectedComponents.size(), connectedComponents.data());
+
+	if(status != MC_NO_ERROR)
+	{
+		fprintf(stderr, "mcReleaseConnectedComponents failed (%d)\n", (McInt32)status);
+		exit(1);
+	}
+
+    //
     // destroy context
-    // ------------------
-    err = mcReleaseContext(context);
+    // 
+    
+    status = mcReleaseContext(context);
 
-    my_assert(err == MC_NO_ERROR);
+    if(status != MC_NO_ERROR)
+	{
+		fprintf(stderr, "mcReleaseContext failed (%d)\n", (McInt32)status);
+		exit(1);
+	}
 
     return 0;
 }
 
-void writeOBJ(
-    const std::string& path,
-    const double* ccVertices,
-    const int ccVertexCount,
-    const uint32_t* ccFaceIndices,
-    const uint32_t* faceSizes,
-    const uint32_t ccFaceCount)
+McUint32 getAdjFacesBaseOffset(const McUint32 faceIdx, const McUint32* faceAdjFacesSizes)
 {
-    printf("write file: %s\n", path.c_str());
-
-    std::ofstream file(path);
-
-    // write vertices and normals
-    for (uint32_t i = 0; i < (uint32_t)ccVertexCount; ++i) {
-        double x = ccVertices[(McSize)i * 3 + 0];
-        double y = ccVertices[(McSize)i * 3 + 1];
-        double z = ccVertices[(McSize)i * 3 + 2];
-        file << "v " << x << " " << y << " " << z << std::endl;
-    }
-
-    int faceVertexOffsetBase = 0;
-
-    // for each face in CC
-    for (uint32_t f = 0; f < ccFaceCount; ++f) {
-
-        int faceSize = faceSizes[f];
-        file << "f ";
-        // for each vertex in face
-        for (int v = 0; (v < faceSize); v++) {
-            const int ccVertexIdx = ccFaceIndices[(McSize)faceVertexOffsetBase + v];
-            file << (ccVertexIdx + 1) << " ";
-        } // for (int v = 0; v < faceSize; ++v) {
-        file << std::endl;
-
-        faceVertexOffsetBase += faceSize;
-    }
-}
-
-void readOBJ(const std::string& path, std::vector<double>& V, std::vector<uint32_t>& F, std::vector<uint32_t>& Fsizes)
-{
-    std::vector<std::vector<double>> V_;
-    std::vector<std::vector<int>> F_;
-
-    igl::read_triangle_mesh(path, V_, F_);
-
-    for (int i = 0; i < (int)V_.size(); ++i) {
-        V.push_back(V_[i][0]);
-        V.push_back(V_[i][1]);
-        V.push_back(V_[i][2]);
-    }
-
-    for (int i = 0; i < (int)F_.size(); ++i) {
-        F.push_back((uint32_t)F_[i][0]);
-        F.push_back((uint32_t)F_[i][1]);
-        F.push_back((uint32_t)F_[i][2]);
-        Fsizes.push_back(3);
-    }
-}
-
-uint32_t getAdjFacesBaseOffset(const uint32_t faceIdx, const uint32_t* faceAdjFacesSizes)
-{
-    uint32_t baseOffset = 0;
-    for (uint32_t f = 0; f < faceIdx; ++f) {
+    McUint32 baseOffset = 0;
+    for (McUint32 f = 0; f < faceIdx; ++f) {
         baseOffset += faceAdjFacesSizes[f];
     }
     return baseOffset;
 }
 
-uint32_t getFaceIndicesBaseOffset(const uint32_t faceIdx, const uint32_t* faceSizes)
+McUint32 getFaceIndicesBaseOffset(const McUint32 faceIdx, const McUint32* faceSizes)
 {
-    uint32_t baseOffset = 0;
-    for (uint32_t f = 0; f < faceIdx; ++f) {
+    McUint32 baseOffset = 0;
+    for (McUint32 f = 0; f < faceIdx; ++f) {
         baseOffset += faceSizes[f];
     }
     return baseOffset;
 };
 
 void mergeAdjacentMeshFacesByProperty(
-    std::vector<uint32_t>& meshFaceIndicesOUT,
-    std::vector<uint32_t>& meshFaceSizesOUT,
-    const std::vector<uint32_t>& meshFaces,
-    const std::vector<uint32_t>& meshFaceSizes,
-    const std::vector<uint32_t>& meshFaceAdjFace,
-    const std::vector<uint32_t>& meshFaceAdjFaceSizes,
-    const std::map<int, std::vector<uint32_t>>& tagToMeshFace,
-    const std::map<uint32_t, int>& meshFaceToTag)
+    std::vector<McUint32>& meshFaceIndicesOUT,
+    std::vector<McUint32>& meshFaceSizesOUT,
+    const std::vector<McUint32>& meshFaces,
+    const std::vector<McUint32>& meshFaceSizes,
+    const std::vector<McUint32>& meshFaceAdjFace,
+    const std::vector<McUint32>& meshFaceAdjFaceSizes,
+    const std::map<McInt32, std::vector<McUint32>>& tagToMeshFace,
+    const std::map<McUint32, McInt32>& meshFaceToTag)
 {
     // for each tag
-    for (std::map<int, std::vector<uint32_t>>::const_iterator iter = tagToMeshFace.cbegin(); iter != tagToMeshFace.cend(); ++iter) {
+    for (std::map<McInt32, std::vector<McUint32>>::const_iterator iter = tagToMeshFace.cbegin(); iter != tagToMeshFace.cend(); ++iter) {
 
         // NOTE: may contain faces that form disjoint patches i.e. not all faces
         // are merged into one. It is possible to create more than one new face
         // after the merging where the resulting faces after merging are not adjacent.
-        std::vector<uint32_t> meshFacesWithSameTag = iter->second; // copy!
+        std::vector<McUint32> meshFacesWithSameTag = iter->second; // copy!
 
         // merge the faces that are adjacent
-        std::vector<std::vector<uint32_t>> adjacentFaceLists; // i.e. each element is a patch/collection of adjacent faces
+        std::vector<std::vector<McUint32>> adjacentFaceLists; // i.e. each element is a patch/collection of adjacent faces
 
         do {
-            adjacentFaceLists.push_back(std::vector<uint32_t>()); // add new patch
-            std::vector<uint32_t>& curAdjFaceList = adjacentFaceLists.back();
+            adjacentFaceLists.push_back(std::vector<McUint32>()); // add new patch
+            std::vector<McUint32>& curAdjFaceList = adjacentFaceLists.back();
 
             // queue of adjacent faces
-            std::deque<uint32_t> adjFaceQueue;
+            std::deque<McUint32> adjFaceQueue;
             adjFaceQueue.push_back(meshFacesWithSameTag.back()); // start with any
             meshFacesWithSameTag.pop_back();
             do {
-                uint32_t cur = adjFaceQueue.front();
+                McUint32 cur = adjFaceQueue.front();
                 adjFaceQueue.pop_front();
-                const int numAdjFaces = meshFaceAdjFaceSizes[cur];
-                const int ccFaceAdjFacesBaseOffset = getAdjFacesBaseOffset(cur, meshFaceAdjFaceSizes.data());
+                const McInt32 numAdjFaces = meshFaceAdjFaceSizes[cur];
+                const McInt32 ccFaceAdjFacesBaseOffset = getAdjFacesBaseOffset(cur, meshFaceAdjFaceSizes.data());
 
                 curAdjFaceList.push_back(cur);
 
                 // for each adjacent face of current face
-                for (int i = 0; i < numAdjFaces; ++i) {
-                    const uint32_t adjFaceID = meshFaceAdjFace[(size_t)ccFaceAdjFacesBaseOffset + i];
+                for (McInt32 i = 0; i < numAdjFaces; ++i) {
+                    const McUint32 adjFaceID = meshFaceAdjFace[(size_t)ccFaceAdjFacesBaseOffset + i];
 
-                    std::vector<uint32_t>::const_iterator curAdjFaceListIter = std::find(curAdjFaceList.cbegin(), curAdjFaceList.cend(), adjFaceID);
+                    std::vector<McUint32>::const_iterator curAdjFaceListIter = std::find(curAdjFaceList.cbegin(), curAdjFaceList.cend(), adjFaceID);
                     bool alreadyAddedToCurAdjFaceList = (curAdjFaceListIter != curAdjFaceList.cend());
 
                     if (!alreadyAddedToCurAdjFaceList) {
 
                         // does the adjacent face share a Tag..?
-                        std::vector<uint32_t>::const_iterator fiter = std::find(iter->second.cbegin(), iter->second.cend(), adjFaceID);
+                        std::vector<McUint32>::const_iterator fiter = std::find(iter->second.cbegin(), iter->second.cend(), adjFaceID);
                         bool haveSharedTag = (fiter != iter->second.cend());
 
                         if (haveSharedTag) {
 
-                            std::deque<uint32_t>::const_iterator queueIter = std::find(adjFaceQueue.cbegin(), adjFaceQueue.cend(), adjFaceID);
+                            std::deque<McUint32>::const_iterator queueIter = std::find(adjFaceQueue.cbegin(), adjFaceQueue.cend(), adjFaceID);
                             bool alreadyAddedToAdjFaceQueue = (queueIter != adjFaceQueue.end());
                             if (!alreadyAddedToAdjFaceQueue) {
                                 adjFaceQueue.push_back(adjFaceID); // add it!
 
-                                std::vector<uint32_t>::iterator facesWithSharedTagIter = std::find(meshFacesWithSameTag.begin(), meshFacesWithSameTag.end(), adjFaceID);
+                                std::vector<McUint32>::iterator facesWithSharedTagIter = std::find(meshFacesWithSameTag.begin(), meshFacesWithSameTag.end(), adjFaceID);
                                 if (facesWithSharedTagIter != meshFacesWithSameTag.cend()) {
                                     meshFacesWithSameTag.erase(facesWithSharedTagIter); // remove since we have now associated with patch.
                                 }
@@ -472,35 +663,35 @@ void mergeAdjacentMeshFacesByProperty(
             } while (!adjFaceQueue.empty());
         } while (!meshFacesWithSameTag.empty());
 
-        for (std::vector<std::vector<uint32_t>>::const_iterator adjacentFaceListsIter = adjacentFaceLists.cbegin();
+        for (std::vector<std::vector<McUint32>>::const_iterator adjacentFaceListsIter = adjacentFaceLists.cbegin();
              adjacentFaceListsIter != adjacentFaceLists.cend();
              ++adjacentFaceListsIter) {
 
             // Unordered list of halfedges which define the boundary of our new
             // face
-            std::vector<std::pair<int, int>> halfedgePool;
+            std::vector<std::pair<McInt32, McInt32>> halfedgePool;
 
-            for (int f = 0; f < (int)adjacentFaceListsIter->size(); ++f) {
+            for (McInt32 f = 0; f < (McInt32)adjacentFaceListsIter->size(); ++f) {
 
-                const uint32_t meshFaceID = adjacentFaceListsIter->at(f);
-                const uint32_t meshFaceVertexCount = meshFaceSizes[meshFaceID];
-                const uint32_t baseIdx = getFaceIndicesBaseOffset(meshFaceID, meshFaceSizes.data());
-                const int numFaceEdges = (int)meshFaceVertexCount; // NOTE: a polygon has the same number of vertices as its edges.
+                const McUint32 meshFaceID = adjacentFaceListsIter->at(f);
+                const McUint32 meshFaceVertexCount = meshFaceSizes[meshFaceID];
+                const McUint32 baseIdx = getFaceIndicesBaseOffset(meshFaceID, meshFaceSizes.data());
+                const McInt32 numFaceEdges = (McInt32)meshFaceVertexCount; // NOTE: a polygon has the same number of vertices as its edges.
 
                 // for each edge of face
-                for (int faceEdgeID = 0; faceEdgeID < numFaceEdges; ++faceEdgeID) {
+                for (McInt32 faceEdgeID = 0; faceEdgeID < numFaceEdges; ++faceEdgeID) {
 
-                    const int srcIdx = faceEdgeID;
-                    const int tgtIdx = (faceEdgeID + 1) % meshFaceVertexCount;
-                    const uint32_t srcVertexIdx = meshFaces[(size_t)baseIdx + srcIdx];
-                    const uint32_t tgtVertexIdx = meshFaces[(size_t)baseIdx + tgtIdx];
+                    const McInt32 srcIdx = faceEdgeID;
+                    const McInt32 tgtIdx = (faceEdgeID + 1) % meshFaceVertexCount;
+                    const McUint32 srcVertexIdx = meshFaces[(size_t)baseIdx + srcIdx];
+                    const McUint32 tgtVertexIdx = meshFaces[(size_t)baseIdx + tgtIdx];
 
-                    std::vector<std::pair<int, int>>::iterator fiter = std::find_if(
+                    std::vector<std::pair<McInt32, McInt32>>::iterator fiter = std::find_if(
                         halfedgePool.begin(),
                         halfedgePool.end(),
-                        [&](const std::pair<int, int>& elem) {
-                            return ((uint32_t)elem.first == srcVertexIdx && (uint32_t)elem.second == tgtVertexIdx) || //
-                                ((uint32_t)elem.second == srcVertexIdx && (uint32_t)elem.first == tgtVertexIdx);
+                        [&](const std::pair<McInt32, McInt32>& elem) {
+                            return ((McUint32)elem.first == srcVertexIdx && (McUint32)elem.second == tgtVertexIdx) || //
+                                ((McUint32)elem.second == srcVertexIdx && (McUint32)elem.first == tgtVertexIdx);
                         });
 
                     const bool opposite_halfedge_exists = (fiter != halfedgePool.cend());
@@ -513,17 +704,17 @@ void mergeAdjacentMeshFacesByProperty(
                 }
             }
 
-            std::map<int, std::vector<int>> vertexToHalfedges;
+            std::map<McInt32, std::vector<McInt32>> vertexToHalfedges;
 
-            for (int i = 0; i < (int)halfedgePool.size(); ++i) {
-                std::pair<int, int> halfedge = halfedgePool[i];
+            for (McInt32 i = 0; i < (McInt32)halfedgePool.size(); ++i) {
+                std::pair<McInt32, McInt32> halfedge = halfedgePool[i];
                 vertexToHalfedges[halfedge.first].push_back(i);
                 vertexToHalfedges[halfedge.second].push_back(i);
             }
 
-            std::vector<uint32_t> polygon;
-            std::map<int, std::vector<int>>::const_iterator cur;
-            std::map<int, std::vector<int>>::const_iterator next = vertexToHalfedges.cbegin(); // could start from any
+            std::vector<McUint32> polygon;
+            std::map<McInt32, std::vector<McInt32>>::const_iterator cur;
+            std::map<McInt32, std::vector<McInt32>>::const_iterator next = vertexToHalfedges.cbegin(); // could start from any
 
             do {
                 cur = next;
@@ -531,13 +722,13 @@ void mergeAdjacentMeshFacesByProperty(
                 polygon.push_back(cur->first);
 
                 // find next (pick the halfedge whose "source" is the current vertex)
-                std::vector<int> halfedges = cur->second;
+                std::vector<McInt32> halfedges = cur->second;
 
-                for (int i = 0; i < 2; ++i) {
-                    std::pair<int, int> edge = halfedgePool[halfedges[i]];
-                    if (edge.first == cur->first && std::find(polygon.cbegin(), polygon.cend(), (uint32_t)edge.second) == polygon.cend()) {
+                for (McInt32 i = 0; i < 2; ++i) {
+                    std::pair<McInt32, McInt32> edge = halfedgePool[halfedges[i]];
+                    if (edge.first == cur->first && std::find(polygon.cbegin(), polygon.cend(), (McUint32)edge.second) == polygon.cend()) {
                         next = vertexToHalfedges.find(edge.second);
-                        my_assert(next != vertexToHalfedges.cend());
+                        assert(next != vertexToHalfedges.cend());
                         break;
                     }
                 }
@@ -545,19 +736,19 @@ void mergeAdjacentMeshFacesByProperty(
             } while (next != vertexToHalfedges.cend());
 
             meshFaceIndicesOUT.insert(meshFaceIndicesOUT.end(), polygon.cbegin(), polygon.cend());
-            meshFaceSizesOUT.push_back((uint32_t)polygon.size());
+            meshFaceSizesOUT.push_back((McUint32)polygon.size());
         }
     }
 
     // Now we add the untagged faces into the new mesh (the ones which did not need merging)
 
-    for (int meshFaceID = 0; meshFaceID < (int)meshFaceSizes.size(); ++meshFaceID) {
+    for (McInt32 meshFaceID = 0; meshFaceID < (McInt32)meshFaceSizes.size(); ++meshFaceID) {
         bool faceWasMerged = meshFaceToTag.find(meshFaceID) != meshFaceToTag.cend();
         if (!faceWasMerged) {
-            const uint32_t baseIdx = getFaceIndicesBaseOffset(meshFaceID, meshFaceSizes.data());
-            const uint32_t meshFaceVertexCount = meshFaceSizes[meshFaceID];
+            const McUint32 baseIdx = getFaceIndicesBaseOffset(meshFaceID, meshFaceSizes.data());
+            const McUint32 meshFaceVertexCount = meshFaceSizes[meshFaceID];
 
-            for (int i = 0; i < (int)meshFaceVertexCount; ++i) {
+            for (McInt32 i = 0; i < (McInt32)meshFaceVertexCount; ++i) {
                 meshFaceIndicesOUT.push_back(meshFaces[(size_t)baseIdx + i]);
             }
 

@@ -1,19 +1,28 @@
-Permission to use this software is governed by two licensing options which are mutually exclusive:
+# LICENSING
 
-(A) Open source GNU General Public License ("GPL"); a copy of which you should have recieved. 
-	- see also: <http://www.gnu.org/licenses/>
-	
-(B) Commercial license, which can be purchased from the owner.
+MCUT is available under an [Open Source](https://opensource.org/) license as well as a commercial license. If you want to use MCUT under the free-of-charge Open Source license then you simply have to comply to its terms. Otherwise you will need to buy a commercial license. These options protect the project's commercial value and thus make it possible for the author(s) to guarantee long term support, maintenance and further development of the code for the benefit of the project and its users.
 
-    The commercial license option is for users that wish to use MCUT in 
-    their products for comercial purposes but do not wish to release their 
-    software under the GPL. 
+## Open Source License
 
-    For more information, email "floyd.m.chitalu@gmail.com".
+The Open Source license is the GNU [Lesser General Public License, Version 3](https://www.gnu.org/licenses/lgpl-3.0.en.html) (LGPL), which is allows developers to easily build on top of MCUT. 
 
-These options protect the project's commercial value and thus make it possible for the 
-author to guarantee long term support, maintenance and further development of the 
-code for the benefit of the project and its users.
+In general, users of code that is licensed under LGPL must:
 
-This software is also partly based on "CDT" (C++ library for constrained Delaunay triangulation): https://github.com/artem-ogre/CDT
-CDT files that were originally under the MPL-2.0 are dual licensed under the MPL-2.0 and the GNU General Public License (GPL) licenses.
+* Include a copy of the full license text and the original copyright notice
+* Make available the source updates when distributing a derivative work based on the licensed sofware
+* License any derivative works of the sofware under the same or later version of the LGPL or GPL as described above
+
+In sum, the LGPL license gives you the right to use and copy the source code of MCUT freely. It is also possible to modify the MCUT code under the condition that the resulting modifications are released as source code under LGPL with any binary distribution of your software that uses these LGPL parts. 
+
+## Commercial License
+
+The commercial license option is for users that wish to use MCUT in their products for commercial purposes but do not wish to release their software under the LGPL. You can buy a commercial license from [CutDigital Enterprise](contact@cut-digital.com). The commercial offer is adapted based on company size (number of employees).
+
+## Third-party attributions 
+
+MCUT is based part on CDT (a C++ library for constrained Delaunay triangulation):
+* Copyright © 2019 Leica Geosystems Technology AB
+* Copyright © The CDT Contributors
+* Licensed under the MPL-2.0 license.
+* https://github.com/artem-ogre/CDT
+* https://www.mozilla.org/en-US/MPL/2.0/FAQ/

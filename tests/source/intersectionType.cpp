@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2021-2023 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
+ * 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
+ *  
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
  *
- * NOTE: This file is licensed under GPL-3.0-or-later (default).
- * A commercial license can be purchased from Floyd M. Chitalu.
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
  *
- * License details:
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
  *
- * (A)  GNU General Public License ("GPL"); a copy of which you should have
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
  *
- * The commercial license options is for users that wish to use MCUT in
- * their products for comercial purposes but do not wish to release their
- * software products under the GPL license.
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * Author(s)     : Floyd M. Chitalu
- */
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
  /*
  This test creates multiple contexts that run in parallel.
@@ -34,18 +47,18 @@
 #include <vector>
 
 struct Mesh {
-    std::vector<McDouble> vertices;
-    std::vector<McUint32>  faceIndices;
-    std::vector<McUint32> faceSizes;
-    McUint32 numVertices;
-    McUint32 numFaces;
+	std::vector<McDouble> vertices = {};
+	std::vector<McUint32> faceIndices = {};
+	std::vector<McUint32> faceSizes = {};
+    McUint32 numVertices=0;
+    McUint32 numFaces=0;
 };
 
 struct IntersectionType {
-    McContext context;
+    McContext context = MC_NULL_HANDLE;
 
-    Mesh srcMesh;
-    Mesh cutMesh;    
+    Mesh srcMesh = {};
+	Mesh cutMesh = {};
 };
 
 UTEST_F_SETUP(IntersectionType)
@@ -68,7 +81,7 @@ UTEST_F(IntersectionType, defaultValue)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     // we have not yet called the dispatch function to the value should be undefined i.e. MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM
@@ -84,11 +97,11 @@ Mesh makeCube(McDouble halfExtent, McDouble translX, McDouble translY, McDouble 
     m.numFaces = 6;
     std::vector<McDouble>& verts = m.vertices;
 
-    verts.resize(m.numVertices*3); 
+    verts.resize((McSize)m.numVertices*3); 
 
     // front 
 
-    int i = 0;
+    McInt32 i = 0;
     // v0 - bottom left
     verts[i++] = -h; // x
     verts[i++] = -h; // y
@@ -131,15 +144,15 @@ Mesh makeCube(McDouble halfExtent, McDouble translX, McDouble translY, McDouble 
     verts[i++] = h; // y
     verts[i++] = -h; // z
 
-    for (int j = 0; j < 8; ++j)
+    for (McInt32 j = 0; j < 8; ++j)
     {
-        verts[j * 3 + 0] += translX;
-        verts[j * 3 + 1] += translY;
-        verts[j * 3 + 2] += translZ;
+		verts[(McSize)j * 3 + 0] += translX;
+		verts[(McSize)j * 3 + 1] += translY;
+		verts[(McSize)j * 3 + 2] += translZ;
     }
 
     std::vector<McIndex>& faces = m.faceIndices;
-    faces.resize(m.numFaces *4);
+	faces.resize((McSize)m.numFaces * 4);
 
     i = 0;
     // front
@@ -179,7 +192,7 @@ Mesh makeCube(McDouble halfExtent, McDouble translX, McDouble translY, McDouble 
     faces[i++] = 1;
 
     m.faceSizes.resize(m.numFaces);
-    for (int j = 0; j < m.numFaces; ++j)
+    for (McUint32 j = 0; j < m.numFaces; ++j)
     {
         m.faceSizes[j] = 4;
     }
@@ -196,9 +209,9 @@ Mesh makeQuad_xz(
     m.numFaces = 1;
     std::vector<McDouble>& verts = m.vertices;
 
-    verts.resize(m.numVertices * 3);
+    verts.resize((McSize)m.numVertices * 3);
 
-    int i = 0;
+    McInt32 i = 0;
 
     verts[i++] = -h; // x
     verts[i++] = 0; // y
@@ -216,15 +229,15 @@ Mesh makeQuad_xz(
     verts[i++] = 0; // y
     verts[i++] = -h; // z
 
-    for (int j = 0; j < 4; ++j)
+    for (McInt32 j = 0; j < 4; ++j)
     {
-        verts[j * 3 + 0] += translX;
-        verts[j * 3 + 1] += translY;
-        verts[j * 3 + 2] += translZ;
+		verts[(McSize)j * 3 + 0] += translX;
+		verts[(McSize)j * 3 + 1] += translY;
+		verts[(McSize)j * 3 + 2] += translZ;
     }
 
     std::vector<McIndex>& faces = m.faceIndices;
-    faces.resize(m.numFaces * 4);
+	faces.resize((McSize)m.numFaces * 4);
 
     i = 0;
     // front
@@ -234,7 +247,7 @@ Mesh makeQuad_xz(
     faces[i++] = 3;
 
     m.faceSizes.resize(m.numFaces);
-    for (int j = 0; j < m.numFaces; ++j)
+	for(McUint32 j = 0; j < m.numFaces; ++j)
     {
         m.faceSizes[j] = 4;
     }
@@ -251,9 +264,9 @@ Mesh makeQuad_xy(
     m.numFaces = 1;
     std::vector<McDouble>& verts = m.vertices;
 
-    verts.resize(m.numVertices * 3);
+    verts.resize((McSize)m.numVertices * 3);
 
-    int i = 0;
+    McInt32 i = 0;
 
     verts[i++] = -h; // x
     verts[i++] = h; // y
@@ -271,15 +284,15 @@ Mesh makeQuad_xy(
     verts[i++] = -h; // y
     verts[i++] = 0; // z
 
-    for (int j = 0; j < 4; ++j)
+    for (McInt32 j = 0; j < 4; ++j)
     {
-        verts[j * 3 + 0] += translX;
-        verts[j * 3 + 1] += translY;
-        verts[j * 3 + 2] += translZ;
+		verts[(McSize)j * 3 + 0] += translX;
+		verts[(McSize)j * 3 + 1] += translY;
+		verts[(McSize)j * 3 + 2] += translZ;
     }
 
     std::vector<McIndex>& faces = m.faceIndices;
-    faces.resize(m.numFaces * 4);
+	faces.resize((McSize)m.numFaces * 4);
 
     i = 0;
     // front
@@ -289,7 +302,7 @@ Mesh makeQuad_xy(
     faces[i++] = 3;
 
     m.faceSizes.resize(m.numFaces);
-    for (int j = 0; j < m.numFaces; ++j)
+	for(McUint32 j = 0; j < m.numFaces; ++j)
     {
         m.faceSizes[j] = 4;
     }
@@ -325,7 +338,7 @@ UTEST_F(IntersectionType, watertightCutMeshInsideWatertightSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
@@ -359,7 +372,7 @@ UTEST_F(IntersectionType, watertightSourceMeshInsideWatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
@@ -393,7 +406,7 @@ UTEST_F(IntersectionType, separatedWatertightSourceMeshAndWatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -427,7 +440,7 @@ UTEST_F(IntersectionType, stdIntersectionWatertightSourceMeshAndWatertightCutMes
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -461,7 +474,7 @@ UTEST_F(IntersectionType, stdIntersectionWatertightSourceMeshAndWatertightCutMes
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -498,7 +511,7 @@ UTEST_F(IntersectionType, separatedWatertightSourceMeshAndOpenCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -532,7 +545,7 @@ UTEST_F(IntersectionType, openCutMeshInsideWatertightSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
@@ -566,7 +579,7 @@ UTEST_F(IntersectionType, openCutMeshIntersectsWatertightSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -600,7 +613,7 @@ UTEST_F(IntersectionType, watertightCutMeshIntersectsOpenSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);
@@ -634,7 +647,7 @@ UTEST_F(IntersectionType, openSourceMeshInsidewatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
@@ -668,7 +681,7 @@ UTEST_F(IntersectionType, separatedOpenSourceMeshAndWatertightCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -707,7 +720,7 @@ UTEST_F(IntersectionType, separatedOpenSourceMeshAndOpenCutMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -741,7 +754,7 @@ UTEST_F(IntersectionType, openCutMeshIntersectsOpenSourceMesh)
 
     ASSERT_EQ(bytes, sizeof(McDispatchIntersectionType));
 
-    McDispatchIntersectionType value;
+    McDispatchIntersectionType value = (McDispatchIntersectionType)0;
     ASSERT_EQ(mcGetInfo(utest_fixture->context, MC_CONTEXT_DISPATCH_INTERSECTION_TYPE, bytes, &value, 0), MC_NO_ERROR);
 
     ASSERT_EQ(value, McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_STANDARD);

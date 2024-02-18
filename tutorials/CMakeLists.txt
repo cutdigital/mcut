@@ -1,44 +1,35 @@
-#
-# Copyright (c) 2021-2022 Floyd M. Chitalu.
-# All rights reserved.
-# 
-# NOTE: This file is licensed under GPL-3.0-or-later (default). 
-# A commercial license can be purchased from Floyd M. Chitalu. 
-#  
-# License details:
-# 
-# (A)  GNU General Public License ("GPL"); a copy of which you should have 
-#      recieved with this file.
-# 	    - see also: <http://www.gnu.org/licenses/>
-# (B)  Commercial license.
-#      - email: floyd.m.chitalu@gmail.com
-# 
-# The commercial license options is for users that wish to use MCUT in 
-# their products for comercial purposes but do not wish to release their 
-# software products under the GPL license. 
-# 
-# Author(s)     : Floyd M. Chitalu
-#
-
-cmake_minimum_required(VERSION 3.1)
 project(mcut_tutorials)
 
-#add_subdirectory(BasicGuiApp)
-add_subdirectory(BasicCmdLineApp)
-add_subdirectory(HelloWorld)
-add_subdirectory(TextureCoordinates)
-add_subdirectory(VertexNormals)
-add_subdirectory(FaceNormals)
-add_subdirectory(CSGBoolean)
-add_subdirectory(AdjacentFaces)
-add_subdirectory(Triangulation)
-add_subdirectory(TriangulatedFaceMaps)
-add_subdirectory(EventCallback)
-add_subdirectory(MultipleContextsInParallel)
-add_subdirectory(ReversedConnectedComponentFaces)
-add_subdirectory(PlanarSectioning)
-add_subdirectory(QuerySeamVerticesUnsorted)
-add_subdirectory(QuerySeamVerticesSorted)
-add_subdirectory(InOutQuery)
+function(create_tutorial_target tutorial_name)
+    add_executable(${tutorial_name} "${CMAKE_CURRENT_SOURCE_DIR}/${tutorial_name}/${tutorial_name}.cpp")
+    target_link_libraries(${tutorial_name} mcut mio)
+    target_include_directories(${tutorial_name} PRIVATE ${MCUT_INCLUDE_DIR}  ${mio_include_dir})
+    target_compile_definitions(${tutorial_name} PRIVATE -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/${tutorial_name}/data" -DOUTPUT_DIR="${CMAKE_CURRENT_BINARY_DIR}")
+    target_compile_options(${tutorial_name} PRIVATE ${compilation_flags})
+    target_compile_definitions(${tutorial_name} PRIVATE ${preprocessor_defs})
+endfunction()
+
+create_tutorial_target(AdjacentFaces)
+create_tutorial_target(FaceNormals)
+create_tutorial_target(VertexNormals)
+create_tutorial_target(TextureCoordinates) # untested
+create_tutorial_target(BasicCmdLineApp) 
+create_tutorial_target(HelloWorld)
+create_tutorial_target(CSGBoolean)
+create_tutorial_target(Triangulation)
+create_tutorial_target(TriangulatedFaceMaps)
+create_tutorial_target(EventCallback) 
+create_tutorial_target(ReversedConnectedComponentFaces)
+create_tutorial_target(QuerySeamVerticesUnsorted)
+create_tutorial_target(QuerySeamVerticesSorted)
+create_tutorial_target(MultipleContextsInParallel)
+create_tutorial_target(PlanarSectioning)
+create_tutorial_target(InOutQuery)
+
+#
+# TODO
+#
+#add_subdirectory(ConnectedComponentProperties)
+#add_subdirectory(EnableDebugMode)
 
 

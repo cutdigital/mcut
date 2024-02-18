@@ -1,31 +1,45 @@
-/**
- * Copyright (c) 2021-2022 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
  * 
- * NOTE: This file is licensed under GPL-3.0-or-later (default). 
- * A commercial license can be purchased from Floyd M. Chitalu. 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
  *  
- * License details:
- * 
- * (A)  GNU General Public License ("GPL"); a copy of which you should have 
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
- * 
- * The commercial license options is for users that wish to use MCUT in 
- * their products for comercial purposes but do not wish to release their 
- * software products under the GPL license. 
- * 
- * Author(s)     : Floyd M. Chitalu
- */
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
+ *
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
+ *
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
+ *
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
+ *
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #include "utest.h"
 #include <mcut/mcut.h>
+#include "mio/mio.h"
+
 #include <string>
 #include <vector>
 
-#include "off.h"
 
 #ifdef _WIN32
 #pragma warning(disable : 26812) // Unscoped enums from mcut.h
@@ -35,17 +49,33 @@ struct SeamConnectedComponent {
     std::vector<McConnectedComponent> connComps_ = {};
     McContext context_ = MC_NULL_HANDLE;
 
-    float* pSrcMeshVertices = NULL;
-    uint32_t* pSrcMeshFaceIndices = NULL;
-    uint32_t* pSrcMeshFaceSizes = NULL;
-    uint32_t numSrcMeshVertices = 0;
-    uint32_t numSrcMeshFaces = 0;
+    MioMesh srcMesh = {
+		nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+		0, // numVertices
+		0, // numNormals
+		0, // numTexCoords
+		0, // numFaces
+	};
 
-    float* pCutMeshVertices = NULL;
-    uint32_t* pCutMeshFaceIndices = NULL;
-    uint32_t* pCutMeshFaceSizes = NULL;
-    uint32_t numCutMeshVertices = 0;
-    uint32_t numCutMeshFaces = 0;
+    MioMesh cutMesh = {
+		nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+		0, // numVertices
+		0, // numNormals
+		0, // numTexCoords
+		0, // numFaces
+	};
 };
 
 UTEST_F_SETUP(SeamConnectedComponent)
@@ -53,18 +83,6 @@ UTEST_F_SETUP(SeamConnectedComponent)
     McResult err = mcCreateContext(&utest_fixture->context_, 0);
     EXPECT_TRUE(utest_fixture->context_ != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
-
-    utest_fixture->pSrcMeshVertices = nullptr;
-    utest_fixture->pSrcMeshFaceIndices = nullptr;
-    utest_fixture->pSrcMeshFaceSizes = nullptr;
-    utest_fixture->numSrcMeshVertices = 0;
-    utest_fixture->numSrcMeshFaces = 0;
-
-    utest_fixture->pCutMeshVertices = nullptr;
-    utest_fixture->pCutMeshFaceIndices = nullptr;
-    utest_fixture->pCutMeshFaceSizes = nullptr;
-    utest_fixture->numCutMeshVertices = 0;
-    utest_fixture->numCutMeshFaces = 0;
 }
 
 UTEST_F_TEARDOWN(SeamConnectedComponent)
@@ -72,147 +90,142 @@ UTEST_F_TEARDOWN(SeamConnectedComponent)
     if (utest_fixture->connComps_.size() > 0) {
         EXPECT_EQ(mcReleaseConnectedComponents(
                       utest_fixture->context_,
-                      (uint32_t)utest_fixture->connComps_.size(),
+                      (McUint32)utest_fixture->connComps_.size(),
                       utest_fixture->connComps_.data()),
             MC_NO_ERROR);
     }
 
     EXPECT_EQ(mcReleaseContext(utest_fixture->context_), MC_NO_ERROR);
 
-    if (utest_fixture->pSrcMeshVertices)
-        free(utest_fixture->pSrcMeshVertices);
-
-    if (utest_fixture->pSrcMeshFaceIndices)
-        free(utest_fixture->pSrcMeshFaceIndices);
-
-    if (utest_fixture->pSrcMeshFaceSizes)
-        free(utest_fixture->pSrcMeshFaceSizes);
-
-    if (utest_fixture->pCutMeshVertices)
-        free(utest_fixture->pCutMeshVertices);
-
-    if (utest_fixture->pCutMeshFaceIndices)
-        free(utest_fixture->pCutMeshFaceIndices);
-
-    if (utest_fixture->pCutMeshFaceSizes)
-        free(utest_fixture->pCutMeshFaceSizes);
+    mioFreeMesh(&utest_fixture->srcMesh);
+    mioFreeMesh(&utest_fixture->cutMesh);
 }
 
 UTEST_F(SeamConnectedComponent, queryVertices)
 {
     // partial cut intersection between a cube and a quad
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off";
+    //
+    // read-in the source-mesh from file
+    //
 
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off").c_str(),
+                &utest_fixture->srcMesh.pVertices,
+                &utest_fixture->srcMesh.pFaceVertexIndices,
+                &utest_fixture->srcMesh.pFaceSizes,
+                &utest_fixture->srcMesh.numVertices,
+                &utest_fixture->srcMesh.numFaces);
 
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    //
+    // read-in the cut-mesh from file
+    //
 
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh013.off";
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/cut-mesh013.off").c_str(),
+                &utest_fixture->cutMesh.pVertices,
+                &utest_fixture->cutMesh.pFaceVertexIndices,
+                &utest_fixture->cutMesh.pFaceSizes,
+                &utest_fixture->cutMesh.numVertices,
+                &utest_fixture->cutMesh.numFaces);
 
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
 
     ASSERT_EQ(mcDispatch(
-                  utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
+                    utest_fixture->context_,
+                    MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
+                    // source mesh
+                    utest_fixture->srcMesh.pVertices,
+                    utest_fixture->srcMesh.pFaceVertexIndices,
+                    utest_fixture->srcMesh.pFaceSizes,
+                    utest_fixture->srcMesh.numVertices,
+                    utest_fixture->srcMesh.numFaces,
+                    // cut mesh
+                    utest_fixture->cutMesh.pVertices,
+                    utest_fixture->cutMesh.pFaceVertexIndices,
+                    utest_fixture->cutMesh.pFaceSizes,
+                    utest_fixture->cutMesh.numVertices,
+                    utest_fixture->cutMesh.numFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, 0, NULL, &numConnComps), MC_NO_ERROR);
     // NOTE: there can only be a seamed mesh whose origin/parent is the cut-mesh in this test
     // a seam conn-comp whose origin is the cut-mesh is guarranteed to exist if the src-mesh is water-tight.
     // More generally, a seamed mesh is guarranteed to exist if and only if discovered seams/cut-paths are either 1) "circular" (loop) or 2) "linear"
     // which means that they sever/partition the respective origin (src-mesh or cut-mesh)
-    ASSERT_EQ(numConnComps, uint32_t(1));
+    ASSERT_EQ(numConnComps, McUint32(1));
 
     utest_fixture->connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
-    for (int c = 0; c < (int)utest_fixture->connComps_.size(); ++c) {
+    for (McInt32 c = 0; c < (McInt32)utest_fixture->connComps_.size(); ++c) {
         McConnectedComponent cc = utest_fixture->connComps_[c]; // connected compoenent id
 
         // indices of the vertices which define the seam
         McSize connCompSeamVertexIndicesBytes = 0;
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, 0, NULL, &connCompSeamVertexIndicesBytes), MC_NO_ERROR);
 
-        std::vector<uint32_t> seamVertexIndices;
-        seamVertexIndices.resize(connCompSeamVertexIndicesBytes / sizeof(uint32_t));
+        std::vector<McUint32> seamVertexIndices;
+        seamVertexIndices.resize(connCompSeamVertexIndicesBytes / sizeof(McUint32));
         ASSERT_EQ(mcGetConnectedComponentData(utest_fixture->context_, cc, MC_CONNECTED_COMPONENT_DATA_SEAM_VERTEX, connCompSeamVertexIndicesBytes, seamVertexIndices.data(), NULL), MC_NO_ERROR);
 
-        for (int i = 0; i < (int)seamVertexIndices.size(); ++i) {
-            ASSERT_GE((uint32_t)seamVertexIndices[i], (uint32_t)0);
+        for (McInt32 i = 0; i < (McInt32)seamVertexIndices.size(); ++i) {
+            ASSERT_GE((McUint32)seamVertexIndices[i], (McUint32)0);
         }
 
-        ASSERT_EQ((uint32_t)seamVertexIndices.size(), 4u); // specifc to benchmark meshes used (see setup function).
+        ASSERT_EQ((McUint32)seamVertexIndices.size(), 4u); // specifc to benchmark meshes used (see setup function).
     }
 }
 
 UTEST_F(SeamConnectedComponent, queryOriginPartialCut)
 {
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off";
+    //
+    // read-in the source-mesh from file
+    //
 
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off").c_str(),
+                &utest_fixture->srcMesh.pVertices,
+                &utest_fixture->srcMesh.pFaceVertexIndices,
+                &utest_fixture->srcMesh.pFaceSizes,
+                &utest_fixture->srcMesh.numVertices,
+                &utest_fixture->srcMesh.numFaces);
 
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
+    //
+    // read-in the cut-mesh from file
+    //
 
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh013.off";
-
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/cut-mesh013.off").c_str(),
+                &utest_fixture->cutMesh.pVertices,
+                &utest_fixture->cutMesh.pFaceVertexIndices,
+                &utest_fixture->cutMesh.pFaceSizes,
+                &utest_fixture->cutMesh.numVertices,
+                &utest_fixture->cutMesh.numFaces);
 
     ASSERT_EQ(mcDispatch(
-                  utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
+                    utest_fixture->context_,
+                    MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
+                    // source mesh
+                    utest_fixture->srcMesh.pVertices,
+                    utest_fixture->srcMesh.pFaceVertexIndices,
+                    utest_fixture->srcMesh.pFaceSizes,
+                    utest_fixture->srcMesh.numVertices,
+                    utest_fixture->srcMesh.numFaces,
+                    // cut mesh
+                    utest_fixture->cutMesh.pVertices,
+                    utest_fixture->cutMesh.pFaceVertexIndices,
+                    utest_fixture->cutMesh.pFaceSizes,
+                    utest_fixture->cutMesh.numVertices,
+                    utest_fixture->cutMesh.numFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, 0, NULL, &numConnComps), MC_NO_ERROR);
-    ASSERT_EQ(uint32_t(1), numConnComps);
+    ASSERT_EQ(McUint32(1), numConnComps);
 
     utest_fixture->connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
     McConnectedComponent cc = utest_fixture->connComps_[0]; // connected compoenent id
 
@@ -224,56 +237,57 @@ UTEST_F(SeamConnectedComponent, queryOriginPartialCut)
 
 UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
 {
-    // complete cut: cube and quad with two polygons
-    //mySetup("src-mesh014.off", "cut-mesh014.off");
+    //
+    // read-in the source-mesh from file
+    //
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off").c_str(),
+                &utest_fixture->srcMesh.pVertices,
+                &utest_fixture->srcMesh.pFaceVertexIndices,
+                &utest_fixture->srcMesh.pFaceSizes,
+                &utest_fixture->srcMesh.numVertices,
+                &utest_fixture->srcMesh.numFaces);
 
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+    //
+    // read-in the cut-mesh from file
+    //
 
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
-
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
-
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off").c_str(),
+                &utest_fixture->cutMesh.pVertices,
+                &utest_fixture->cutMesh.pFaceVertexIndices,
+                &utest_fixture->cutMesh.pFaceSizes,
+                &utest_fixture->cutMesh.numVertices,
+                &utest_fixture->cutMesh.numFaces);
 
     ASSERT_EQ(mcDispatch(
-                  utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
+                utest_fixture->context_,
+                MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
+                // source mesh
+                utest_fixture->srcMesh.pVertices,
+                utest_fixture->srcMesh.pFaceVertexIndices,
+                utest_fixture->srcMesh.pFaceSizes,
+                utest_fixture->srcMesh.numVertices,
+                utest_fixture->srcMesh.numFaces,
+                // cut mesh
+                utest_fixture->cutMesh.pVertices,
+                utest_fixture->cutMesh.pFaceVertexIndices,
+                utest_fixture->cutMesh.pFaceSizes,
+                utest_fixture->cutMesh.numVertices,
+                utest_fixture->cutMesh.numFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 2u);
 
     utest_fixture->connComps_.resize(numConnComps);
 
-    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (uint32_t)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
+    ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, (McUint32)utest_fixture->connComps_.size(), utest_fixture->connComps_.data(), NULL), MC_NO_ERROR);
 
     bool foundSeamedMeshFromSrcMesh = false;
     bool foundSeamedMeshFromCutMesh = false;
-    for (int i = 0; i < (int)utest_fixture->connComps_.size(); ++i) {
+    for (McInt32 i = 0; i < (McInt32)utest_fixture->connComps_.size(); ++i) {
         McConnectedComponent cc = utest_fixture->connComps_[i]; // connected compoenent id
 
         McSeamOrigin orig = McSeamOrigin::MC_SEAM_ORIGIN_ALL;
@@ -293,45 +307,46 @@ UTEST_F(SeamConnectedComponent, queryConnectedComponentType_CompleteCut)
 
 UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_CompleteCut)
 {
-    // complete cut: cube and quad with two polygons
-    //mySetup("src-mesh014.off", "cut-mesh014.off");
+    //
+    // read-in the source-mesh from file
+    //
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off";
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/src-mesh014.off").c_str(),
+                &utest_fixture->srcMesh.pVertices,
+                &utest_fixture->srcMesh.pFaceVertexIndices,
+                &utest_fixture->srcMesh.pFaceSizes,
+                &utest_fixture->srcMesh.numVertices,
+                &utest_fixture->srcMesh.numFaces);
 
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+    //
+    // read-in the cut-mesh from file
+    //
 
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
-
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off";
-
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/cut-mesh014.off").c_str(),
+                &utest_fixture->cutMesh.pVertices,
+                &utest_fixture->cutMesh.pFaceVertexIndices,
+                &utest_fixture->cutMesh.pFaceSizes,
+                &utest_fixture->cutMesh.numVertices,
+                &utest_fixture->cutMesh.numFaces);
 
     ASSERT_EQ(mcDispatch(
-                  utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
+                    utest_fixture->context_,
+                    MC_DISPATCH_VERTEX_ARRAY_DOUBLE,
+                    // source mesh
+                    utest_fixture->srcMesh.pVertices,
+                    utest_fixture->srcMesh.pFaceVertexIndices,
+                    utest_fixture->srcMesh.pFaceSizes,
+                    utest_fixture->srcMesh.numVertices,
+                    utest_fixture->srcMesh.numFaces,
+                    // cut mesh
+                    utest_fixture->cutMesh.pVertices,
+                    utest_fixture->cutMesh.pFaceVertexIndices,
+                    utest_fixture->cutMesh.pFaceSizes,
+                    utest_fixture->cutMesh.numVertices,
+                    utest_fixture->cutMesh.numFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_SEAM, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 2u);
@@ -339,44 +354,46 @@ UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_CompleteCut)
 
 UTEST_F(SeamConnectedComponent, dispatchRequireThroughCuts_PartialCut)
 {
-    //mySetup("src-mesh013.off", "cut-mesh013.off");
+    //
+    // read-in the source-mesh from file
+    //
 
-    const std::string srcMeshPath = std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off";
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/src-mesh013.off").c_str(),
+                &utest_fixture->srcMesh.pVertices,
+                &utest_fixture->srcMesh.pFaceVertexIndices,
+                &utest_fixture->srcMesh.pFaceSizes,
+                &utest_fixture->srcMesh.numVertices,
+                &utest_fixture->srcMesh.numFaces);
 
-    readOFF(srcMeshPath.c_str(), &utest_fixture->pSrcMeshVertices, &utest_fixture->pSrcMeshFaceIndices, &utest_fixture->pSrcMeshFaceSizes, &utest_fixture->numSrcMeshVertices, &utest_fixture->numSrcMeshFaces);
+    //
+    // read-in the cut-mesh from file
+    //
 
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pSrcMeshVertices != nullptr);
-    ASSERT_GT((int)utest_fixture->numSrcMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numSrcMeshFaces, 0);
-
-    const std::string cutMeshPath = std::string(MESHES_DIR) + "/benchmarks/cut-mesh013.off";
-
-    readOFF(cutMeshPath.c_str(), &utest_fixture->pCutMeshVertices, &utest_fixture->pCutMeshFaceIndices, &utest_fixture->pCutMeshFaceSizes, &utest_fixture->numCutMeshVertices, &utest_fixture->numCutMeshFaces);
-
-    ASSERT_TRUE(utest_fixture->pCutMeshVertices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceIndices != nullptr);
-    ASSERT_TRUE(utest_fixture->pCutMeshFaceSizes != nullptr);
-    ASSERT_GT((int)utest_fixture->numCutMeshVertices, 2);
-    ASSERT_GT((int)utest_fixture->numCutMeshFaces, 0);
+    mioReadOFF((std::string(MESHES_DIR) + "/benchmarks/cut-mesh013.off").c_str(),
+                &utest_fixture->cutMesh.pVertices,
+                &utest_fixture->cutMesh.pFaceVertexIndices,
+                &utest_fixture->cutMesh.pFaceSizes,
+                &utest_fixture->cutMesh.numVertices,
+                &utest_fixture->cutMesh.numFaces);
 
     ASSERT_EQ(mcDispatch(
-                  utest_fixture->context_,
-                  MC_DISPATCH_VERTEX_ARRAY_FLOAT | MC_DISPATCH_REQUIRE_THROUGH_CUTS,
-                  utest_fixture->pSrcMeshVertices,
-                  utest_fixture->pSrcMeshFaceIndices,
-                  utest_fixture->pSrcMeshFaceSizes,
-                  utest_fixture->numSrcMeshVertices,
-                  utest_fixture->numSrcMeshFaces,
-                  utest_fixture->pCutMeshVertices,
-                  utest_fixture->pCutMeshFaceIndices,
-                  utest_fixture->pCutMeshFaceSizes,
-                  utest_fixture->numCutMeshVertices,
-                  utest_fixture->numCutMeshFaces),
+                    utest_fixture->context_,
+                    MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_REQUIRE_THROUGH_CUTS,
+                    // source mesh
+                    utest_fixture->srcMesh.pVertices,
+                    utest_fixture->srcMesh.pFaceVertexIndices,
+                    utest_fixture->srcMesh.pFaceSizes,
+                    utest_fixture->srcMesh.numVertices,
+                    utest_fixture->srcMesh.numFaces,
+                    // cut mesh
+                    utest_fixture->cutMesh.pVertices,
+                    utest_fixture->cutMesh.pFaceVertexIndices,
+                    utest_fixture->cutMesh.pFaceSizes,
+                    utest_fixture->cutMesh.numVertices,
+                    utest_fixture->cutMesh.numFaces),
         MC_NO_ERROR);
 
-    uint32_t numConnComps = 0;
+    McUint32 numConnComps = 0;
 
     ASSERT_EQ(mcGetConnectedComponents(utest_fixture->context_, MC_CONNECTED_COMPONENT_TYPE_ALL, 0, NULL, &numConnComps), MC_NO_ERROR);
     ASSERT_EQ(numConnComps, 2u); // there should be no connected components besides inputs

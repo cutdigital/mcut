@@ -1,3 +1,38 @@
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
+ * 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
+ *  
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
+ *
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
+ *
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
+ *
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
+ *
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
+
 #include "mcut/internal/frontend.h"
 
 #include "mcut/internal/bvh.h"
@@ -868,10 +903,25 @@ void resolve_floating_polygons(
             } // while (fp_edge_pair_priority_queue.size() > 0 && successivelyPartitionedOriginFaceWithCurrentEdgePair == false) {
 
             if (!haveSegmentOnFP) {
-                // OH OH!
-                // You have encountered an extremely rare problem case.
-                // Email the developers (there is a solution but it requires numerical perturbation on "fpSegment").
-                throw std::logic_error("Floating-polygon partitioning step could not find a usable fpSegment");
+                // Your input meshes have been found to be in a problematic configuration for which a (clear and robust) 
+                // solution is unknown. 
+				std::string user_msg = "Floating-polygon Partitioning algorithm could not find a usable fpSegment\n";
+				if(detected_floating_polygons.size() > 1)
+				{
+					std::string workaround_msg =
+						"\t WORKAROUND: Consider mesh-refinement around face f" +
+						std::to_string((unsigned int)parent_face) + " in " +
+						(parent_face_from_source_hmesh ? "source" : "cut") + "-mesh";
+					user_msg.append(workaround_msg);
+
+                    // There might be a solution to this issue but finding it would require significant time.
+                    // GIST: You have a polygon P (i.e. "parent_face"). And inside (the area) of P are child polygons 'c' that
+                    // where produced as a result of P slicing some solid volume (e.g. sphere or torus). In the simplest case there is
+                    // only one child (imagine a plane slicing a sphere). However, in the more general (and hence more complex) case, the are two or more.
+                    // The problem to solve is that of determining the polyline that runs from one edge in P to another 
+                    // (different) edge of P, while also plassing through the area of each child polygon 'c'.
+				}
+				throw std::logic_error(user_msg);
             }
 
             // :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -2730,7 +2780,6 @@ extern "C" void preproc(
     const McUint32 numConnectedComponentsCreatedDefault = 2; // source-mesh and cut-mesh (potentially modified due to poly partitioning)
 
     const bool haveStandardIntersection = numConnectedComponentsCreated > numConnectedComponentsCreatedDefault;
-    const bool haveNoIntersection = numConnectedComponentsCreated == numConnectedComponentsCreatedDefault;
     
     if (dispatchFlags & MC_DISPATCH_INCLUDE_INTERSECTION_TYPE) // only determine the intersection-type if the user requested for it.
     {
@@ -2747,7 +2796,7 @@ extern "C" void preproc(
         }
         else
         {
-            MCUT_ASSERT(haveNoIntersection); // we are dealing with the case where there exists no intersection of the input surfaces
+            MCUT_ASSERT(numConnectedComponentsCreated == numConnectedComponentsCreatedDefault); // we are dealing with the case where there exists no intersection of the input surfaces
 
             check_and_store_input_mesh_intersection_type(
                 context_ptr, //

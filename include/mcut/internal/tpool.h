@@ -1,24 +1,37 @@
-/**
- * Copyright (c) 2021-2022 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
+ * 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
+ *  
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
  *
- * NOTE: This file is licensed under GPL-3.0-or-later (default).
- * A commercial license can be purchased from Floyd M. Chitalu.
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
  *
- * License details:
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
  *
- * (A)  GNU General Public License ("GPL"); a copy of which you should have
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
  *
- * The commercial license options is for users that wish to use MCUT in
- * their products for comercial purposes but do not wish to release their
- * software products under the GPL license.
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * Author(s)     : Floyd M. Chitalu
- */
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #ifndef MCUT_SCHEDULER_H_
 #define MCUT_SCHEDULER_H_
@@ -490,7 +503,7 @@ void parallel_for(
         min_per_thread);
 
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+	futures.resize((std::size_t)num_threads - 1);
     InputStorageIteratorType block_start = first;
 
     for (uint32_t i = 0; i < (num_threads - 1); ++i) {
@@ -599,7 +612,7 @@ void parallel_partial_sum(thread_pool& pool, Iterator first, Iterator last)
     std::vector<std::future<value_type>> previous_end_values;
     previous_end_values.reserve(num_threads - 1);
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+	futures.resize((std::size_t)num_threads - 1);
 
     Iterator block_start = first;
 
@@ -676,7 +689,7 @@ Iterator parallel_find(thread_pool& pool, Iterator first, Iterator last, MatchTy
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+	futures.resize((std::size_t)num_threads - 1);
 
     {
         Iterator block_start = first;
@@ -754,7 +767,7 @@ Iterator parallel_find_in_map_by_key(thread_pool& pool, Iterator first, Iterator
 
     {
         std::vector<std::future<void>> futures;
-        futures.resize(num_threads - 1);
+		futures.resize((std::size_t)num_threads - 1);
 
         Iterator block_start = first;
         for (unsigned long i = 0; i < (num_threads - 1); ++i) {
@@ -833,7 +846,7 @@ Iterator parallel_find_if(thread_pool& pool, Iterator first, Iterator last, Unar
     std::promise<Iterator> result;
     std::atomic<bool> done_flag(false);
     std::vector<std::future<void>> futures;
-    futures.resize(num_threads - 1);
+    futures.resize((std::size_t)num_threads - 1);
 
     Iterator block_start = first;
     for (uint32_t i = 0; i < (num_threads - 1); ++i) {

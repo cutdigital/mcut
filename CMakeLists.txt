@@ -1,26 +1,4 @@
 #
-# Copyright (c) 2021-2022 Floyd M. Chitalu.
-# All rights reserved.
-# 
-# NOTE: This file is licensed under GPL-3.0-or-later (default). 
-# A commercial license can be purchased from Floyd M. Chitalu. 
-#  
-# License details:
-# 
-# (A)  GNU General Public License ("GPL"); a copy of which you should have 
-#      recieved with this file.
-# 	    - see also: <http://www.gnu.org/licenses/>
-# (B)  Commercial license.
-#      - email: floyd.m.chitalu@gmail.com
-# 
-# The commercial license options is for users that wish to use MCUT in 
-# their products for comercial purposes but do not wish to release their 
-# software products under the GPL license. 
-# 
-# Author(s)     : Floyd M. Chitalu
-#
-############################################################################################
-#
 # You can configure MCUT with the following CMake options:
 #
 #	MCUT_BUILD_AS_SHARED_LIB [default=ON] - Build MCUT as a shared/dynamic library (.so/.dll).
@@ -233,57 +211,29 @@ if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
 	endif()
 
 	FetchContent_Populate(
-		libigl
-		GIT_REPOSITORY 			https://github.com/libigl/libigl.git
-		GIT_TAG       	v2.3.0
-		GIT_PROGRESS TRUE
+		mio
+		GIT_REPOSITORY 			https://github.com/cutdigital/mio.git
+		GIT_TAG main
 	)
 
-	#set(libigl_include_dir ${CMAKE_BINARY_DIR}/libigl-src/include)
-	set(libigl_include_dir ${libigl_SOURCE_DIR}/include)
+	set(mio_include_dir ${mio_SOURCE_DIR}/include)
 
-	set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Default version of Eigen used by libigl.")
+	add_subdirectory(${mio_SOURCE_DIR} build)
 
-	# used by tests & tutorials
-	#download_project(PROJ                eigen
-	#				 GIT_REPOSITORY      https://gitlab.com/libeigen/eigen.git
-	#				 GIT_TAG             ${LIBIGL_EIGEN_VERSION}
-	#				 ${UPDATE_DISCONNECTED_IF_AVAILABLE}
-	#)
-	FetchContent_Declare(
-		eigen
-		GIT_REPOSITORY 			https://gitlab.com/libeigen/eigen.git
-		GIT_TAG       	${LIBIGL_EIGEN_VERSION}
-		GIT_SHALLOW TRUE
-  		GIT_PROGRESS TRUE
-	)
+	#
+	# tests
+	#
+	if(MCUT_BUILD_TESTS)
+		add_subdirectory(tests)
+	endif()
 
-	set(EIGEN_BUILD_DOC OFF)
-	# note: To disable eigen tests,
-	# you should put this code in a add_subdirectory to avoid to change
-	# BUILD_TESTING for your own project too since variables are directory
-	# scoped
-	set(BUILD_TESTING OFF)
-	set(EIGEN_BUILD_PKGCONFIG OFF)
-	set( OFF)
-	FetchContent_MakeAvailable(eigen)
+	#
+	# tutorials
+	#
+	if(MCUT_BUILD_TUTORIALS)
+		add_subdirectory(tutorials)
+	endif()
 
-	#set(eigen_include_dir ${CMAKE_BINARY_DIR}/eigen-src)
-	set(eigen_include_dir ${eigen_SOURCE_DIR})
-endif()
-
-#
-# tests
-#
-if(MCUT_BUILD_TESTS)
-	add_subdirectory(tests)
-endif()
-
-#
-# tutorials
-#
-if(MCUT_BUILD_TUTORIALS)
-	add_subdirectory(tutorials)
 endif()
 
 #

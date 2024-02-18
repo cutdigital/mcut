@@ -1,26 +1,47 @@
-/**
- * Copyright (c) 2021-2023 Floyd M. Chitalu.
- * All rights reserved.
+/***************************************************************************
+ *  This file is part of the MCUT project, which is comprised of a library 
+ *  for surface mesh cutting, example programs and test programs.
+ * 
+ *  Copyright (C) 2024 CutDigital Enterprise Ltd
+ *  
+ *  MCUT is dual-licensed software that is available under an Open Source 
+ *  license as well as a commercial license. The Open Source license is the 
+ *  GNU Lesser General Public License v3+ (LGPL). The commercial license 
+ *  option is for users that wish to use MCUT in their products for commercial 
+ *  purposes but do not wish to release their software under the LGPL. 
+ *  Email <contact@cut-digital.com> for further information.
  *
- * NOTE: This file is licensed under GPL-3.0-or-later (default).
- * A commercial license can be purchased from Floyd M. Chitalu.
+ *  You may not use this file except in compliance with the License. A copy of 
+ *  the Open Source license can be obtained from
  *
- * License details:
+ *      https://www.gnu.org/licenses/lgpl-3.0.en.html.
  *
- * (A)  GNU General Public License ("GPL"); a copy of which you should have
- *      recieved with this file.
- * 	    - see also: <http://www.gnu.org/licenses/>
- * (B)  Commercial license.
- *      - email: floyd.m.chitalu@gmail.com
+ *  For your convenience, a copy of this License has been included in this
+ *  repository.
  *
- * The commercial license options is for users that wish to use MCUT in
- * their products for comercial purposes but do not wish to release their
- * software products under the GPL license.
+ *  MCUT is distributed in the hope that it will be useful, but THE SOFTWARE IS 
+ *  PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ *  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR 
+ *  A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+ *  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF 
+ *  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * Author(s)     : Floyd M. Chitalu
- */
+ *  MultipleContextsInParallel.cpp
+ *
+ *  \brief:
+ *  This tutorial shows how to setup MCUT to run with multiple contexts in 
+ *  parallel. This allows users to dispatch multiple cutting tasks in parallel.
+ *
+ * Author(s):
+ *
+ *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
+ *
+ **************************************************************************/
 
 #include "mcut/mcut.h"
+#include "mio/mio.h"
+
 #include <chrono>
 #include <cstring>
 #include <inttypes.h> // PRId64
@@ -38,22 +59,6 @@ void MCAPI_PTR mcDebugOutputCALLBACK(McDebugSource source,
     size_t length,
     const char* message,
     const void* userParam);
-
-void readOFF(
-    const char* fpath,
-    double** pVertices,
-    unsigned int** pFaceIndices,
-    unsigned int** pFaceSizes,
-    unsigned int* numVertices,
-    unsigned int* numFaces);
-
-void writeOFF(
-    const char* fpath,
-    const double* pVertices,
-    const McUint32* pFaceIndices,
-    const McUint32* pFaceSizes,
-    const McUint32 numVertices,
-    const McUint32 numFaces);
 
 struct Timer {
     std::string m_name;
@@ -78,41 +83,50 @@ int main()
 {
     Timer scoped_timer_main_fn("main-function");
 
-    double* srcMeshVertices = NULL;
-    McUint32* srcMeshFaceIndices = NULL;
-    McUint32* srcMeshFaceSizes = NULL;
-    McUint32 srcMeshNumFaces = 0;
-    McUint32 srcMeshNumVertices = 0;
+    MioMesh srcMesh = {
+		nullptr, // pVertices
+		nullptr, // pNormals
+		nullptr, // pTexCoords
+		nullptr, // pFaceSizes
+		nullptr, // pFaceVertexIndices
+		nullptr, // pFaceVertexTexCoordIndices
+		nullptr, // pFaceVertexNormalIndices
+		0, // numVertices
+		0, // numNormals
+		0, // numTexCoords
+		0, // numFaces
+	};
 
-    double* cutMeshVertices = NULL;
-    McUint32* cutMeshFaceIndices = NULL;
-    McUint32* cutMeshFaceSizes = NULL;
-    McUint32 cutMeshNumFaces = 0;
-    McUint32 cutMeshNumVertices = 0;
+	MioMesh cutMesh = srcMesh;
 
-    McResult api_err = MC_NO_ERROR;
+    McResult status = MC_NO_ERROR;
 
     std::vector<McContext> contexts_array;
 
     {
         Timer scoped_timer("init-function");
 
-        const char* srcMeshFilePath = DATA_DIR "/source-mesh.off";
-        const char* cutMeshFilePath = DATA_DIR "/cut-mesh.off";
+        //
+	// read-in the source-mesh from file
+	//
 
-        printf(">> source-mesh file: %s\n", srcMeshFilePath);
-        printf(">> cut-mesh file: %s\n", cutMeshFilePath);
+	mioReadOFF(DATA_DIR "/source-mesh.off",
+			   &srcMesh.pVertices,
+			   &srcMesh.pFaceVertexIndices,
+               &srcMesh.pFaceSizes,
+			   &srcMesh.numVertices,
+			   &srcMesh.numFaces);
 
-        // load meshes
-        // -----------
+	//
+	// read-in the cut-mesh from file
+	//
 
-        readOFF(srcMeshFilePath, &srcMeshVertices, &srcMeshFaceIndices, &srcMeshFaceSizes, &srcMeshNumVertices, &srcMeshNumFaces);
-
-        printf(">> src-mesh vertices=%u faces=%u\n", srcMeshNumVertices, srcMeshNumFaces);
-
-        readOFF(cutMeshFilePath, &cutMeshVertices, &cutMeshFaceIndices, &cutMeshFaceSizes, &cutMeshNumVertices, &cutMeshNumFaces);
-
-        printf(">> cut-mesh vertices=%u faces=%u\n", cutMeshNumVertices, cutMeshNumFaces);
+	mioReadOFF(DATA_DIR "/cut-mesh.off",
+			   &cutMesh.pVertices,
+			   &cutMesh.pFaceVertexIndices,
+               &cutMesh.pFaceSizes,
+			   &cutMesh.numVertices,
+			   &cutMesh.numFaces);
 
         printf("\n>> Create MCUT contexts\n");
 
@@ -123,37 +137,38 @@ int main()
 
         for (McUint32 i = 0; i < num_contexts_to_create; ++i) {
 
-            api_err = mcCreateContext(&contexts_array[i], MC_DEBUG | MC_OUT_OF_ORDER_EXEC_MODE_ENABLE);
+            status = mcCreateContext(&contexts_array[i], MC_DEBUG | MC_OUT_OF_ORDER_EXEC_MODE_ENABLE);
 
-            if (api_err != MC_NO_ERROR) {
-                printf("mcCreateContext failed (err=%d)", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                printf("mcCreateContext failed (err=%d)", (int)status);
                 exit(1);
             }
 
+            //
             // config debug output
-            // -------------------------------------------------------------------------
+            // 
 
             McFlags contextFlags = MC_NULL_HANDLE;
 
-            api_err = mcGetInfo(contexts_array[i], MC_CONTEXT_FLAGS, sizeof(McFlags), &contextFlags, nullptr);
+            status = mcGetInfo(contexts_array[i], MC_CONTEXT_FLAGS, sizeof(McFlags), &contextFlags, nullptr);
 
-            if (api_err != MC_NO_ERROR) {
-                printf("1:mcGetInfo(MC_CONTEXT_FLAGS) failed (err=%d)", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                printf("1:mcGetInfo(MC_CONTEXT_FLAGS) failed (err=%d)", (int)status);
                 exit(1);
             }
 
             if (contextFlags & MC_DEBUG) {
-                api_err = mcDebugMessageCallback(contexts_array[i], mcDebugOutputCALLBACK, nullptr);
+                status = mcDebugMessageCallback(contexts_array[i], mcDebugOutputCALLBACK, nullptr);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcDebugMessageCallback failed (err=%d)", (int)api_err);
+                if (status != MC_NO_ERROR) {
+                    printf("mcDebugMessageCallback failed (err=%d)", (int)status);
                     exit(1);
                 }
 
-                api_err = mcDebugMessageControl(contexts_array[i], McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, true);
+                status = mcDebugMessageControl(contexts_array[i], McDebugSource::MC_DEBUG_SOURCE_ALL, McDebugType::MC_DEBUG_TYPE_ALL, McDebugSeverity::MC_DEBUG_SEVERITY_ALL, true);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcDebugMessageControl failed (err=%d)", (int)api_err);
+                if (status != MC_NO_ERROR) {
+                    printf("mcDebugMessageControl failed (err=%d)", (int)status);
                     exit(1);
                 }
             }
@@ -164,8 +179,9 @@ int main()
 
     const McUint32 num_contexts = (McUint32)contexts_array.size();
 
+    //
     // do the cutting
-    // -------------------------------------------------------------------------
+    // 
 
     std::vector<std::vector<McConnectedComponent>> per_context_connected_components(num_contexts);
 
@@ -177,34 +193,34 @@ int main()
 
         auto schedule_dispatch_call = [&](McContext context, std::vector<McEvent>& emittedEvents, McUint32& numConnComps) {
 
-            api_err = mcEnqueueDispatch(
+            status = mcEnqueueDispatch(
                 context,
                 MC_DISPATCH_VERTEX_ARRAY_DOUBLE | MC_DISPATCH_ENFORCE_GENERAL_POSITION,
                 // source mesh
-                (const McVoid*)srcMeshVertices,
-                (const McUint32*)srcMeshFaceIndices,
-                (const McUint32*)srcMeshFaceSizes,
-                (McUint32)srcMeshNumVertices,
-                (McUint32)srcMeshNumFaces,
+                srcMesh.pVertices,
+                srcMesh.pFaceVertexIndices,
+                srcMesh.pFaceSizes,
+                srcMesh.numVertices,
+                srcMesh.numFaces,
                 // cut mesh
-                (const McVoid*)cutMeshVertices,
-                (const McUint32*)cutMeshFaceIndices,
-                (const McUint32*)cutMeshFaceSizes,
-                (McUint32)cutMeshNumVertices,
-                (McUint32)cutMeshNumFaces,
+                cutMesh.pVertices,
+                cutMesh.pFaceVertexIndices,
+                cutMesh.pFaceSizes,
+                cutMesh.numVertices,
+                cutMesh.numFaces,
                 // events to wait for
                 0,
                 NULL,
                 // emitted event
                 &emittedEvents[0]);
 
-            if (api_err != MC_NO_ERROR) {
-                printf("mcEnqueueDispatch failed (err=%d)\n", (int)api_err);
-                return api_err;
+            if (status != MC_NO_ERROR) {
+                printf("mcEnqueueDispatch failed (err=%d)\n", (int)status);
+                return status;
             }
 
             // query for all available connected components:
-            api_err = mcEnqueueGetConnectedComponents(
+            status = mcEnqueueGetConnectedComponents(
                 context,
                 MC_CONNECTED_COMPONENT_TYPE_ALL,
                 0, NULL,
@@ -213,9 +229,9 @@ int main()
                 &emittedEvents[0], // NOTE: MCUT make an internal copy of this handle (i.e. its value)
                 &emittedEvents[1]);
 
-            if (api_err != MC_NO_ERROR) {
-                printf("mcEnqueueGetConnectedComponents failed (err=%d)\n", (int)api_err);
-                return api_err;
+            if (status != MC_NO_ERROR) {
+                printf("mcEnqueueGetConnectedComponents failed (err=%d)\n", (int)status);
+                return status;
             }
 
             return MC_NO_ERROR;
@@ -230,10 +246,10 @@ int main()
 
             per_context_dispatch_events[i].resize(2); // there are two enqueue commands in "schedule_dispatch_call"
 
-            api_err = schedule_dispatch_call(contexts_array[i], per_context_dispatch_events[i], per_context_CC_count_array[i]);
+            status = schedule_dispatch_call(contexts_array[i], per_context_dispatch_events[i], per_context_CC_count_array[i]);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "schedule_dispatch_call failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "schedule_dispatch_call failed (err=%d)\n", (int)status);
                 exit(1);
             }
         }
@@ -245,6 +261,7 @@ int main()
         //
         // **Join**
         //
+
         {
             std::vector<McEvent> dispatch_events_array; // collection of all events into one list
 
@@ -256,12 +273,24 @@ int main()
                     per_context_dispatch_events[i].cend());
             }
 
-            api_err = mcWaitForEvents((McUint32)dispatch_events_array.size(), &dispatch_events_array[0]);
+            // wait for all events
+            status = mcWaitForEvents((McUint32)dispatch_events_array.size(), &dispatch_events_array[0]);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "mcWaitForEvents failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "mcWaitForEvents failed (err=%d)\n", (int)status);
                 exit(1);
             }
+
+            //
+            // We no longer need the mem of input meshes, so we can free it!
+            //
+            //  CAUTION: Make sure that all dispatch functions that refer
+            //  to user allocated memory (like input-mesh pointers) have completed 
+            //  before freeing this memory. Thus, the earliest we can call "mioFreeMesh"
+            //  is after waiting for the dispatch functions to finish with "mcWaitForEvents"
+            //
+            mioFreeMesh(&srcMesh);
+            mioFreeMesh(&cutMesh);
 
             // check for any runtime errors and request the connected components
 
@@ -271,10 +300,10 @@ int main()
 
                     McResult schedule_dispatch_call_fn_status = MC_NO_ERROR;
 
-                    api_err = mcGetEventInfo(per_context_dispatch_events[i][j], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &schedule_dispatch_call_fn_status, NULL);
+                    status = mcGetEventInfo(per_context_dispatch_events[i][j], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &schedule_dispatch_call_fn_status, NULL);
 
-                    if (api_err != MC_NO_ERROR) {
-                        fprintf(stderr, "1:mcGetEventInfo(dispatchEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)api_err);
+                    if (status != MC_NO_ERROR) {
+                        fprintf(stderr, "1:mcGetEventInfo(dispatchEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)status);
                         exit(1);
                     }
 
@@ -288,35 +317,36 @@ int main()
 
                 if (num_connected_components == 0) {
                     printf("context %p has no connected components\n", contexts_array[i]);
-                    return api_err;
+                    return status;
                 }
 
                 per_context_connected_components[i].resize(num_connected_components);
 
-                api_err = mcGetConnectedComponents( // NOTE: blocking call because we need the result immediately (see below)
+                status = mcGetConnectedComponents( // NOTE: blocking call because we need the result immediately (see below)
                     contexts_array[i],
                     MC_CONNECTED_COMPONENT_TYPE_ALL,
                     num_connected_components,
                     &per_context_connected_components[i][0],
                     NULL);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcGetConnectedComponents failed (err=%d)\n", (int)api_err);
-                    return api_err;
+                if (status != MC_NO_ERROR) {
+                    printf("mcGetConnectedComponents failed (err=%d)\n", (int)status);
+                    return status;
                 }
             }
 
-            api_err = mcReleaseEvents((McUint32)dispatch_events_array.size(), &dispatch_events_array[0]);
+            status = mcReleaseEvents((McUint32)dispatch_events_array.size(), &dispatch_events_array[0]);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)status);
                 exit(1);
             }
         }
     }
 
-    // Request connected component data size in bytes
-    // -------------------------------------------------------------------------
+    //
+    // Request connected component data [size] in bytes so that we can allocate memory
+    // 
 
     std::vector< // context
         std::vector< // cc
@@ -338,6 +368,7 @@ int main()
                                                    std::vector<std::vector<McEvent>>& per_cc_event_waitlist,
                                                    std::vector<McSize>& per_cc_vertices_bytes,
                                                    std::vector<McSize>& per_cc_triangles_bytes) {
+
             const McUint32 num_connected_components = (McUint32)context_connected_components.size();
 
             for (McUint32 i = 0; i < num_connected_components; ++i) {
@@ -352,7 +383,7 @@ int main()
                 McSize& cc_triangles_bytes = per_cc_triangles_bytes[i];
 
                 cc_vertices_bytes = 0;
-                McResult api_err = mcEnqueueGetConnectedComponentData(
+                McResult status = mcEnqueueGetConnectedComponentData(
                     context,
                     connCompId,
                     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE,
@@ -361,13 +392,13 @@ int main()
                     0, NULL,
                     &cc_events[0]);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE) failed (err=%d)\n", (int)api_err);
-                    return api_err;
+                if (status != MC_NO_ERROR) {
+                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE) failed (err=%d)\n", (int)status);
+                    return status;
                 }
 
                 cc_triangles_bytes = 0;
-                api_err = mcEnqueueGetConnectedComponentData(
+                status = mcEnqueueGetConnectedComponentData(
                     context,
                     connCompId,
                     MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION,
@@ -375,9 +406,9 @@ int main()
                     &cc_triangles_bytes, 0, NULL,
                     &cc_events[1]);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION) failed (err=%d)\n", (int)api_err);
-                    return api_err;
+                if (status != MC_NO_ERROR) {
+                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION) failed (err=%d)\n", (int)status);
+                    return status;
                 }
             }
 
@@ -401,23 +432,24 @@ int main()
             per_context_per_cc_vertices_bytes[i].resize(num_connected_components);
             per_context_per_cc_triangles_bytes[i].resize(num_connected_components);
 
-            api_err = schedule_cc_data_bytesize_query(
+            status = schedule_cc_data_bytesize_query(
                 contexts_array[i],
                 per_context_connected_components[i],
                 per_context_per_cc_event_waitlist[i],
                 per_context_per_cc_vertices_bytes[i],
                 per_context_per_cc_triangles_bytes[i]);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "schedule_dispatch_call failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "schedule_dispatch_call failed (err=%d)\n", (int)status);
                 exit(1);
             }
         }
 
         // ** Can do something else here while events are running
 
+        //
         // wait for events
-        // -------------------------------------------------------------------------
+        // 
 
         {
             std::vector<McEvent> bytes_size_query_events_array; // collection of all events into one list
@@ -434,10 +466,10 @@ int main()
                 }
             }
 
-            api_err = mcWaitForEvents((McUint32)bytes_size_query_events_array.size(), &bytes_size_query_events_array[0]);
+            status = mcWaitForEvents((McUint32)bytes_size_query_events_array.size(), &bytes_size_query_events_array[0]);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "mcWaitForEvents failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "mcWaitForEvents failed (err=%d)\n", (int)status);
                 exit(1);
             }
 
@@ -455,10 +487,10 @@ int main()
                     for (McUint32 k = 0; k < num_events; ++k) {
 
                         McResult schedule_cc_data_bytesize_query_fn_status = MC_NO_ERROR;
-                         api_err = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &schedule_cc_data_bytesize_query_fn_status, NULL);
+                         status = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &schedule_cc_data_bytesize_query_fn_status, NULL);
 
-                        if (api_err != MC_NO_ERROR) {
-                            fprintf(stderr, "1:mcGetEventInfo(dispatchEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)api_err);
+                        if (status != MC_NO_ERROR) {
+                            fprintf(stderr, "1:mcGetEventInfo(dispatchEvent, MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)status);
                             exit(1);
                         }
 
@@ -470,17 +502,18 @@ int main()
                 }
             }
 
-            api_err = mcReleaseEvents((McUint32)bytes_size_query_events_array.size(), &bytes_size_query_events_array[0]);
+            status = mcReleaseEvents((McUint32)bytes_size_query_events_array.size(), &bytes_size_query_events_array[0]);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)status);
                 exit(1);
             }
         }
     }
 
+    //
     // Query connected component data now we know the amount of bytes to allocate
-    // -------------------------------------------------------------------------
+    // 
 
     std::vector< // context
         std::vector< // cc
@@ -517,7 +550,7 @@ int main()
                 std::vector<McDouble>& cc_vertices_array = per_cc_vertices_array[i];
                 std::vector<McUint32>& cc_triangles_array = per_cc_triangles_array[i];
 
-                McResult api_err = mcEnqueueGetConnectedComponentData(
+                McResult status = mcEnqueueGetConnectedComponentData(
                     context,
                     connCompId,
                     MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE,
@@ -526,12 +559,12 @@ int main()
                     0, NULL,
                     &cc_events[0]);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE) failed (err=%d)\n", (int)api_err);
-                    return api_err;
+                if (status != MC_NO_ERROR) {
+                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_VERTEX_DOUBLE) failed (err=%d)\n", (int)status);
+                    return status;
                 }
 
-                api_err = mcEnqueueGetConnectedComponentData(
+                status = mcEnqueueGetConnectedComponentData(
                     context,
                     connCompId,
                     MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION,
@@ -539,9 +572,9 @@ int main()
                     NULL, 0, NULL,
                     &cc_events[1]);
 
-                if (api_err != MC_NO_ERROR) {
-                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION) failed (err=%d)\n", (int)api_err);
-                    return api_err;
+                if (status != MC_NO_ERROR) {
+                    printf("mcGetConnectedComponentData(MC_CONNECTED_COMPONENT_DATA_FACE_TRIANGULATION) failed (err=%d)\n", (int)status);
+                    return status;
                 }
             }
 
@@ -589,8 +622,9 @@ int main()
 
         // ** Can do something else here while events are running
 
+        //
         // wait for events (join)
-        // -------------------------------------------------------------------------
+        // 
         std::vector<McEvent> data_query_events_array; // collection of all events into one list
 
         for (McUint32 i = 0; i < num_contexts; ++i) {
@@ -604,10 +638,10 @@ int main()
             }
         }
 
-        api_err = mcWaitForEvents((McUint32)data_query_events_array.size(), &data_query_events_array[0]);
+        status = mcWaitForEvents((McUint32)data_query_events_array.size(), &data_query_events_array[0]);
 
-        if (api_err != MC_NO_ERROR) {
-            fprintf(stderr, "mcWaitForEvents failed (err=%d)\n", (int)api_err);
+        if (status != MC_NO_ERROR) {
+            fprintf(stderr, "mcWaitForEvents failed (err=%d)\n", (int)status);
             exit(1);
         }
 
@@ -625,10 +659,10 @@ int main()
                 for (McUint32 k = 0; k < num_events; ++k) {
 
                     McResult exec_status = MC_NO_ERROR;
-                    api_err = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &exec_status, NULL);
+                    status = mcGetEventInfo(per_context_per_cc_event_waitlist[i][j][k], MC_EVENT_RUNTIME_EXECUTION_STATUS, sizeof(McResult), &exec_status, NULL);
 
-                    if (api_err != MC_NO_ERROR) {
-                        fprintf(stderr, "mcGetEventInfo(MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)api_err);
+                    if (status != MC_NO_ERROR) {
+                        fprintf(stderr, "mcGetEventInfo(MC_EVENT_RUNTIME_EXECUTION_STATUS...) failed (err=%d)\n", (int)status);
                         exit(1);
                     }
 
@@ -640,16 +674,17 @@ int main()
             }
         }
 
-        api_err = mcReleaseEvents((McUint32)data_query_events_array.size(), &data_query_events_array[0]);
+        status = mcReleaseEvents((McUint32)data_query_events_array.size(), &data_query_events_array[0]);
 
-        if (api_err != MC_NO_ERROR) {
-            fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)api_err);
+        if (status != MC_NO_ERROR) {
+            fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)status);
             exit(1);
         }
     }
 
+    //
     // Write the connected components to file
-    // -------------------------------------------------------------------------
+    // 
     {
         Timer scoped_timer("save-files");
 
@@ -661,23 +696,36 @@ int main()
 
                 const std::vector<McDouble>& vertex_array = per_context_per_cc_vertices_array[i][j];
                 const std::vector<McUint32>& triangles_array = per_context_per_cc_triangles_array[i][j];
-                std::vector<McUint32> face_sizes(triangles_array.size() / 3, 3); // required by "writeOFF"
+                std::vector<McUint32> face_sizes(triangles_array.size() / 3, 3); // required by "mioWriteOBJ"
+
+                //
+                // save connected component (mesh) to an .obj file
+                // 
 
                 char fnameBuf[256];
-                sprintf(fnameBuf, "ctxt%d-cc%d.obj", i, j);
+                sprintf(fnameBuf, "ctxt%d-conncomp%d.obj", i, j);
+                std::string fpath(OUTPUT_DIR "/" + std::string(fnameBuf));
 
-                writeOFF(fnameBuf,
-                    vertex_array.data(),
-                    (McUint32*)triangles_array.data(),
-                    (McUint32*)face_sizes.data(),
-                    (McUint32)vertex_array.size() / 3,
-                    (McUint32)triangles_array.size() / 3);
+                mioWriteOBJ(
+                    fpath.c_str(), 
+                    (McDouble*)vertex_array.data(), 
+                    nullptr, // pNormals
+                    nullptr, // pTexCoords
+                    face_sizes.data(), 
+                    (McUint32*)triangles_array.data(), 
+                    nullptr, // pFaceVertexTexCoordIndices
+                    nullptr, // pFaceVertexNormalIndices 
+                    vertex_array.size()/3, 
+                    0, // numNormals 
+                    0, // numTexCoords
+                    (McUint32)face_sizes.size());
             }
         }
     }
-
+    
+    //
     // Tear down contexts
-    // -------------------------------------------------------------------------
+    // 
 
     {
         Timer scoped_timer("teardown");
@@ -686,19 +734,23 @@ int main()
 
             McContext context = contexts_array[i];
 
+            //
             // destroy internal data associated with each connected component
-            api_err = mcReleaseConnectedComponents(context, (McUint32)per_context_connected_components[i].size(), per_context_connected_components[i].data());
+            //
+            status = mcReleaseConnectedComponents(context, (McUint32)per_context_connected_components[i].size(), per_context_connected_components[i].data());
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "mcReleaseEvents failed (err=%d)\n", (int)status);
                 exit(1);
             }
 
+            //
             // destroy context
-            api_err = mcReleaseContext(context);
+            //
+            status = mcReleaseContext(context);
 
-            if (api_err != MC_NO_ERROR) {
-                fprintf(stderr, "mcReleaseContext failed (err=%d)\n", (int)api_err);
+            if (status != MC_NO_ERROR) {
+                fprintf(stderr, "mcReleaseContext failed (err=%d)\n", (int)status);
                 exit(1);
             }
         }
@@ -727,7 +779,9 @@ void MCAPI_PTR mcDebugOutputCALLBACK(McDebugSource source,
     case MC_DEBUG_SOURCE_KERNEL:
         debug_src = "KERNEL";
         break;
-    case MC_DEBUG_SOURCE_ALL:
+    case MC_DEBUG_SOURCE_FRONTEND:
+        debug_src = "FRONTEND";
+    case MC_DEBUG_SOURCE_ALL:case MC_DEBUG_SOURCE_IGNORE:
         break;
     }
     std::string debug_type;
@@ -739,10 +793,9 @@ void MCAPI_PTR mcDebugOutputCALLBACK(McDebugSource source,
         debug_type = "DEPRECATION";
         break;
     case MC_DEBUG_TYPE_OTHER:
-        // printf("Type: Other");
         debug_type = "OTHER";
         break;
-    case MC_DEBUG_TYPE_ALL:
+    case MC_DEBUG_TYPE_ALL:case MC_DEBUG_TYPE_IGNORE:
         break;
     }
 
@@ -791,258 +844,4 @@ void mcCheckError_(McResult err, const char* file, int line)
     if (err) {
         std::cout << error << " | " << file << " (" << line << ")" << std::endl;
     }
-}
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#if defined(_WIN32)
-
-// https://stackoverflow.com/questions/735126/are-there-alternate-implementations-of-gnu-getline-interface/735472#735472
-/* Modifications, public domain as well, by Antti Haapala, 11/10/17
-- Switched to getc on 5/23/19 */
-#include <errno.h>
-#include <stdint.h>
-
-// if typedef doesn't exist (msvc, blah)
-typedef intptr_t ssize_t;
-
-ssize_t getline(char** lineptr, size_t* n, FILE* stream)
-{
-    size_t pos;
-    int c;
-
-    if (lineptr == NULL || stream == NULL || n == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    c = getc(stream);
-    if (c == EOF) {
-        return -1;
-    }
-
-    if (*lineptr == NULL) {
-        *lineptr = (char*)malloc(128);
-        if (*lineptr == NULL) {
-            return -1;
-        }
-        *n = 128;
-    }
-
-    pos = 0;
-    while (c != EOF) {
-        if (pos + 1 >= *n) {
-            size_t new_size = *n + (*n >> 2);
-            if (new_size < 128) {
-                new_size = 128;
-            }
-            char* new_ptr = (char*)realloc(*lineptr, new_size);
-            if (new_ptr == NULL) {
-                return -1;
-            }
-            *n = new_size;
-            *lineptr = new_ptr;
-        }
-
-        ((unsigned char*)(*lineptr))[pos++] = (unsigned char)c;
-        if (c == '\n') {
-            break;
-        }
-        c = getc(stream);
-    }
-
-    (*lineptr)[pos] = '\0';
-    return pos;
-}
-#endif // #if defined (_WIN32)
-
-bool readLine(FILE* file, char** lineBuf, size_t* len)
-{
-    while (getline(lineBuf, len, file)) {
-        if (strlen(*lineBuf) > 1 && (*lineBuf)[0] != '#') {
-            return true;
-        }
-    }
-    return false;
-}
-
-void readOFF(
-    const char* fpath,
-    double** pVertices,
-    unsigned int** pFaceIndices,
-    unsigned int** pFaceSizes,
-    unsigned int* numVertices,
-    unsigned int* numFaces)
-{
-    // using "rb" instead of "r" to prevent linefeed conversion
-    // See: https://stackoverflow.com/questions/27530636/read-text-file-in-c-with-fopen-without-linefeed-conversion
-    FILE* file = fopen(fpath, "rb");
-
-    if (file == NULL) {
-        fprintf(stderr, "error: failed to open `%s`", fpath);
-        exit(1);
-    }
-
-    char* lineBuf = NULL;
-    size_t lineBufLen = 0;
-    bool lineOk = true;
-    int i = 0;
-
-    // file header
-    lineOk = readLine(file, &lineBuf, &lineBufLen);
-
-    if (!lineOk) {
-        fprintf(stderr, "error: .off file header not found\n");
-        exit(1);
-    }
-
-    if (strstr(lineBuf, "OFF") == NULL) {
-        fprintf(stderr, "error: unrecognised .off file header\n");
-        exit(1);
-    }
-
-    // #vertices, #faces, #edges
-    lineOk = readLine(file, &lineBuf, &lineBufLen);
-
-    if (!lineOk) {
-        fprintf(stderr, "error: .off element count not found\n");
-        exit(1);
-    }
-
-    int nedges = 0;
-    sscanf(lineBuf, "%d %d %d", numVertices, numFaces, &nedges);
-    *pVertices = (double*)malloc(sizeof(double) * (*numVertices) * 3);
-    *pFaceSizes = (unsigned int*)malloc(sizeof(unsigned int) * (*numFaces));
-
-    // vertices
-    for (i = 0; i < (double)(*numVertices); ++i) {
-        lineOk = readLine(file, &lineBuf, &lineBufLen);
-
-        if (!lineOk) {
-            fprintf(stderr, "error: .off vertex not found\n");
-            exit(1);
-        }
-
-        double x, y, z;
-        sscanf(lineBuf, "%lf %lf %lf", &x, &y, &z);
-
-        (*pVertices)[(i * 3) + 0] = x;
-        (*pVertices)[(i * 3) + 1] = y;
-        (*pVertices)[(i * 3) + 2] = z;
-    }
-#if _WIN64
-    __int64 facesStartOffset = _ftelli64(file);
-#else
-    long int facesStartOffset = ftell(file);
-#endif
-    int numFaceIndices = 0;
-
-    // faces
-    for (i = 0; i < (int)(*numFaces); ++i) {
-        lineOk = readLine(file, &lineBuf, &lineBufLen);
-
-        if (!lineOk) {
-            fprintf(stderr, "error: .off file face not found\n");
-            exit(1);
-        }
-
-        int n; // number of vertices in face
-        sscanf(lineBuf, "%d", &n);
-
-        if (n < 3) {
-            fprintf(stderr, "error: invalid vertex count in file %d\n", n);
-            exit(1);
-        }
-
-        (*pFaceSizes)[i] = n;
-        numFaceIndices += n;
-    }
-
-    (*pFaceIndices) = (unsigned int*)malloc(sizeof(unsigned int) * numFaceIndices);
-
-#if _WIN64
-    int err = _fseeki64(file, facesStartOffset, SEEK_SET);
-#else
-    int err = fseek(file, facesStartOffset, SEEK_SET);
-#endif
-    if (err != 0) {
-        fprintf(stderr, "error: fseek failed\n");
-        exit(1);
-    }
-
-    int indexOffset = 0;
-    for (i = 0; i < (int)(*numFaces); ++i) {
-
-        lineOk = readLine(file, &lineBuf, &lineBufLen);
-
-        if (!lineOk) {
-            fprintf(stderr, "error: .off file face not found\n");
-            exit(1);
-        }
-
-        int n; // number of vertices in face
-        sscanf(lineBuf, "%d", &n);
-
-        char* lineBufShifted = lineBuf;
-        int j = 0;
-
-        while (j < n) { // parse remaining numbers on lineBuf
-            lineBufShifted = strstr(lineBufShifted, " ") + 1; // start of next number
-
-            int val;
-            sscanf(lineBufShifted, "%d", &val);
-
-            (*pFaceIndices)[indexOffset + j] = val;
-            j++;
-        }
-
-        indexOffset += n;
-    }
-
-    free(lineBuf);
-
-    fclose(file);
-}
-
-void writeOFF(
-    const char* fpath,
-    const double* pVertices,
-    const McUint32* pFaceIndices,
-    const McUint32* pFaceSizes,
-    const McUint32 numVertices,
-    const McUint32 numFaces)
-{
-    fprintf(stdout, "write: %s\n", fpath);
-
-    FILE* file = fopen(fpath, "w");
-
-    if (file == NULL) {
-        fprintf(stderr, "error: failed to open `%s`", fpath);
-        exit(1);
-    }
-
-    fprintf(file, "OFF\n");
-    fprintf(file, "%d %d %d\n", numVertices, numFaces, 0 /*numEdges*/);
-    int i;
-    for (i = 0; i < (int)numVertices; ++i) {
-        const double* vptr = pVertices + (i * 3);
-        fprintf(file, "%f %f %f\n", vptr[0], vptr[1], vptr[2]);
-    }
-
-    int faceBaseOffset = 0;
-    for (i = 0; i < (int)numFaces; ++i) {
-        McUint32 faceVertexCount = pFaceSizes[i];
-        fprintf(file, "%d", (int)faceVertexCount);
-        int j;
-        for (j = 0; j < (int)faceVertexCount; ++j) {
-            const McUint32* fptr = pFaceIndices + faceBaseOffset + j;
-            fprintf(file, " %d", *fptr);
-        }
-        fprintf(file, "\n");
-        faceBaseOffset += faceVertexCount;
-    }
-
-    fclose(file);
 }
