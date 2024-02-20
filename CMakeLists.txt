@@ -260,18 +260,18 @@ if(MCUT_BUILD_AS_SHARED_LIB)
 	# dynamic libs
 	#
 
-	install(TARGETS ${mpn_shared_lib_name}
+	install(TARGETS ${target_name}
 			LIBRARY
-			DESTINATION lib/shared
+			DESTINATION lib/
 			COMPONENT dynamic_libraries)
 else()
 	#
 	# static libs
 	#
 	
-	install(TARGETS ${mpn_static_lib_name}
+	install(TARGETS ${target_name}
 			ARCHIVE
-			DESTINATION lib/static
+			DESTINATION lib/
 			COMPONENT static_libraries)
 endif()
 
