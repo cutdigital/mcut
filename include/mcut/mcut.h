@@ -1019,6 +1019,15 @@ extern MCAPI_ATTR McResult MCAPI_CALL mcDispatch(
     uint32_t numCutMeshVertices,
     uint32_t numCutMeshFaces);
 
+/**
+ * @brief This function behaves similerly to ::mcEnqueueDispatch except that only one input mesh is provided by the user
+ * together with two other parameters that specify a plane. This plane is used to slice the given mesh completely.
+ * 
+ * @param[in] pNormalVector A non-zero vector the specifies the normal of the slicing plane.
+ * @param[in] sectionOffset A value between zero and one, which specifies the relative position of the plane along, where this position is constrained to be along the a line segment whose direction is the same as that of the given normal vector. 
+ A value of zero corresponds to the start point of the line segment, which is the position of the mesh vertex whose projection-onto/dot-product-with the given normal is closest to negative infinity.
+ A value of one corresponds to the end point of the line segment, which is the position of the mesh vertex whose projection-onto/dot-product-with the given normal is closest to positive infinity.
+ */
 extern MCAPI_ATTR McResult MCAPI_CALL mcEnqueueDispatchPlanarSection(
     const McContext context,
     McFlags dispatchFlags,
