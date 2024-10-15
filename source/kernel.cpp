@@ -3390,7 +3390,25 @@ void dispatch(output_t& output, const input_t& input)
         const fd_t cm_face = cutpath_edge_creation_info_iter->first.second;
         MCUT_ASSERT(!ps_is_cutmesh_face(sm_face, sm_face_count));
         const std::vector<vd_t>& intersection_test_ivtx_list = cutpath_edge_creation_info_iter->second;
-        MCUT_ASSERT((int)intersection_test_ivtx_list.size() >= 2); // edge-case scenario: an edge intersects with another edge exactly
+#if 0
+		MCUT_ASSERT_CRITICAL((int)intersection_test_ivtx_list.size() >=
+							 2); // edge-case scenario: an edge intersects with another edge exactly
+#else
+		if((int)intersection_test_ivtx_list.size() < 2)
+		{
+            // We enter this if all tests and measure have failed to detect general position violation
+			lg.set_reason_for_failure("cannot resolve intersection. attempt perturbation.");
+			if(input.enforce_general_position)
+			{
+				output.status = status_t::GENERAL_POSITION_VIOLATION;
+			}
+			else
+			{
+				output.status = status_t::INVALID_MESH_INTERSECTION;
+			}
+			return;
+		}
+#endif
         const uint32_t new_ivertices_count = (uint32_t)intersection_test_ivtx_list.size();
 
         if (new_ivertices_count == 2) { // one edge

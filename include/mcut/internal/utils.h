@@ -58,16 +58,35 @@ typedef char couldnt_parse_cxx_standard[-1]; ///< Error: couldn't parse standard
 #define MCUT_DEBUG_BUILD 1
 #endif
 
-// debug macros
-#if defined(MCUT_DEBUG_BUILD)
+
 //
 // MCUT_DEBUG_BREAKPOINT
 //
 #if defined(MCUT_BUILD_WINDOWS)
-#define MCUT_DEBUG_BREAKPOINT_() __debugbreak()
+#	define MCUT_DEBUG_BREAKPOINT_() __debugbreak()
 #else // #if defined(MCUT_BUILD_WINDOWS)
-#define MCUT_DEBUG_BREAKPOINT_() std::abort()
+#	define MCUT_DEBUG_BREAKPOINT_() std::abort()
 #endif // #if defined(MCUT_BUILD_WINDOWS)
+
+// assertion macro that is also run during release build
+#define MCUT_ASSERT_CRITICAL(a)                                                                             \
+	do                                                                                             \
+	{                                                                                              \
+		if(false == (a))                                                                           \
+		{                                                                                          \
+			std::fprintf(stderr,                                                                   \
+						 "Logic error: %s, "                                                  \
+						 "%d at \'%s\'\n",                                                         \
+						 __FILE__,                                                                 \
+						 __LINE__,                                                                 \
+						 MCUT_MAKE_STRING_(a));                                                    \
+			MCUT_DEBUG_BREAKPOINT_();                                                              \
+		}                                                                                          \
+	} while(0)
+
+// debug macros
+#if defined(MCUT_DEBUG_BUILD)
+
 
 //
 // MCUT_ASSERT
