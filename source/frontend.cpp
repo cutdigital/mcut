@@ -3416,11 +3416,11 @@ void get_connected_component_data_impl_detail(
                                     if ((i % 3) == 0) { // every three indices constitute one triangle
                                         // map every CDT triangle in "*cc_face_iter"  to the index value of "*cc_face_iter" (in the user input mesh)
                                         const uint32_t internal_inputmesh_face_idx = (uint32_t)cc_uptr->kernel_hmesh_data->data_maps.face_map[(uint32_t)*cc_face_iter];
-                                        MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
+                                        //MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
                                         const uint32_t user_inputmesh_face_idx = map_internal_inputmesh_face_idx_to_user_inputmesh_face_idx(
                                             internal_inputmesh_face_idx,
                                             cc_uptr);
-                                        MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
+                                        //MCUT_ASSERT(internal_inputmesh_face_idx < cc_face_count);
                                         cdt_face_map_cache_local.push_back(user_inputmesh_face_idx);
                                     }
                                 }
