@@ -610,7 +610,12 @@ void wait_for_events_impl(
         } else {
             if (event_ptr->m_future.valid()) {
 
-                event_ptr->m_future.wait(); // block until event task is finished
+                /*while(event_ptr->m_command_exec_status != McEventCommandExecStatus::MC_COMPLETE)
+					std::this_thread::yield();*/
+
+                // block until event task is finished
+				event_ptr->m_future.wait();
+
 
                 runtimeStatusFromAllPrecedingEvents = (McResult)event_ptr->m_runtime_exec_status.load();
                 if (runtimeStatusFromAllPrecedingEvents != McResult::MC_NO_ERROR) {

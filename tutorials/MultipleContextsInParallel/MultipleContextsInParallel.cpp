@@ -110,7 +110,7 @@ int main()
 	// read-in the source-mesh from file
 	//
 
-	mioReadOFF(DATA_DIR "/source-mesh.off",
+	mioReadOFF(DATA_DIR "/cube.off",
 			   &srcMesh.pVertices,
 			   &srcMesh.pFaceVertexIndices,
                &srcMesh.pFaceSizes,
@@ -121,7 +121,7 @@ int main()
 	// read-in the cut-mesh from file
 	//
 
-	mioReadOFF(DATA_DIR "/cut-mesh.off",
+	mioReadOFF(DATA_DIR "/cube.off",
 			   &cutMesh.pVertices,
 			   &cutMesh.pFaceVertexIndices,
                &cutMesh.pFaceSizes,
@@ -131,13 +131,13 @@ int main()
         printf("\n>> Create MCUT contexts\n");
 
         const McUint32 num_system_threads = std::thread::hardware_concurrency();
-        const McUint32 num_contexts_to_create = num_system_threads / 2; // since we are using "MC_OUT_OF_ORDER_EXEC_MODE_ENABLE"
+        const McUint32 num_contexts_to_create = num_system_threads / 1; // since we are using "MC_OUT_OF_ORDER_EXEC_MODE_ENABLE"
 
         contexts_array.resize(num_contexts_to_create);
 
         for (McUint32 i = 0; i < num_contexts_to_create; ++i) {
 
-            status = mcCreateContext(&contexts_array[i], MC_DEBUG | MC_OUT_OF_ORDER_EXEC_MODE_ENABLE);
+            status = mcCreateContext(&contexts_array[i], /*MC_DEBUG |*/ MC_OUT_OF_ORDER_EXEC_MODE_ENABLE);
 
             if (status != MC_NO_ERROR) {
                 printf("mcCreateContext failed (err=%d)", (int)status);

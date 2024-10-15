@@ -487,7 +487,11 @@ struct context_t {
 private:
     std::atomic<bool> m_done; // are we finished with the context (i.e. indicate to shutdown threadpool and freeup respective resourses)
     // the work-queues associated with each API (device) thread
-    std::vector<thread_safe_queue<function_wrapper>> m_queues;
+	#if 0
+    std::vector<thread_safe_queue<function_wrapper>> m_queues; // NOTE: UNUSED BECAUSE of bug
+    #else
+	thread_safe_queue<function_wrapper> m_queue;
+    #endif
     // Master/Manager thread(s) which are responsible for running the API calls.
     // Also called "device" threads.
     // When a user of MCUT calls one of the APIs (e.g. mcEnqueueDispatch) the task
@@ -538,10 +542,18 @@ private:
             // We try_pop() first in case the task "producer" (API/device/manager) thread
             // already invoked cond_var.notify_one() of "m_queues[thread_id]""
             // BEFORE current thread first-entered this function.
+            #if 0
             if (!m_queues[thread_id].try_pop(task)) {
                 // there is no work, so thread will wait until user thread gives it some work to do.
                 m_queues[thread_id].wait_and_pop(task);
             }
+            #else
+			if(!m_queue.try_pop(task))
+			{
+				// there is no work, so thread will wait until user thread gives it some work to do.
+				m_queue.wait_and_pop(task);
+			}
+            #endif
 
             if (m_done) { // are we finished?
                 break; // quit to free up resources.
@@ -579,13 +591,23 @@ public:
 
         try {
             const uint32_t manager_thread_count = (flags & MC_OUT_OF_ORDER_EXEC_MODE_ENABLE) ? 2 : 1;
-
+            #if 0
             m_queues = std::vector<thread_safe_queue<function_wrapper>>(manager_thread_count);
-
             for (uint32_t i = 0; i < manager_thread_count; ++i) {
                 m_queues[i].set_done_ptr(&m_done);
                 m_api_threads.push_back(std::thread(&context_t::api_thread_main, this, i));
             }
+            #else
+            //m_queue;
+			for(uint32_t i = 0; i < manager_thread_count; ++i)
+			{
+				m_queue.set_done_ptr(&m_done);
+				m_api_threads.push_back(std::thread(&context_t::api_thread_main, this, i));
+			}
+            #endif
+
+
+            
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
             // create the pool of compute threads. These are the worker threads that
             // can be tasked with work from any manager-thread. Thus, manager threads
@@ -616,7 +638,11 @@ public:
         m_compute_threadpool.reset(); // wake-up and destroy the helper/worker threads
 #endif
         for (int i = (int)m_api_threads.size() - 1; i >= 0; --i) {
+            #if 0
             m_queues[i].disrupt_wait_for_data(); // wake up device thread from sleeping
+            #else
+			m_queue.disrupt_wait_for_data(); // wake up device thread from sleeping
+            #endif
             if (m_api_threads[i].joinable()) { // if not already joined/shutdown
                 m_api_threads[i].join(); // wait for it to finish 
             }
@@ -719,6 +745,7 @@ public:
         // local copy that will be captured by-value (client application is permitted to re-use the memory pointed to by "pEventWaitList")
         const std::vector<McEvent> event_waitlist(pEventWaitList, pEventWaitList + numEventsInWaitlist);
 
+#if 0
         //
         // Determine which manager thread to assign the task to
         //
@@ -770,7 +797,7 @@ public:
                 responsible_thread_id = 0; // just pick thread 0
             }
         }
-
+#endif
         //
         // Package-up the task as a synchronised operation that will wait for
         // other tasks in the event_waitlist, compute the operation, and finally update
@@ -828,10 +855,17 @@ public:
             });
 
         event_ptr->m_future = task.get_future(); // the future we can later wait on via mcWaitForEVents
+#	if 0
         event_ptr->m_responsible_thread_id = responsible_thread_id;
+#	else
+		event_ptr->m_responsible_thread_id = -1; // unused
+#endif
 
+        #if 0
         m_queues[responsible_thread_id].push(std::move(task)); // enqueue task to be executed when responsible API thread is free
-
+        #else
+		m_queue.push(std::move(task)); // enqueue task to be executed when responsible API thread is free
+        #endif
         return event_ptr->m_user_handle;
     }
 
