@@ -286,6 +286,13 @@ struct connected_component_t {
     // ]
     //
     std::vector<uint32_t> seam_vertex_sequence_array_cache;
+    //
+    // The multiplier is a value that is used to convert between native user coordinates 
+    // and rational integer coordinates. Each connected component has such a value, which
+    // we determine from the two respective input meshes from which the connected component 
+    // came from. Refer to the "preproc" function for more detail on how it is computed. 
+    //
+	double multiplier;
 };
 
 // struct representing a fragment

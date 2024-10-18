@@ -77,14 +77,14 @@ unsigned int clz(unsigned int x) // stub
 // next power of two from x
 int next_power_of_two(int x)
 {
-    x--;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    x++;
-    return x;
+	x--;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	x |= x >> 32;
+	return x;
 }
 
 // check if "x" is a power of two
@@ -248,7 +248,8 @@ void build_oibvh(
 
                 bounding_box_t<vec3>& bbox = face_bboxes[faceIdx];
 
-                if (slightEnlargmentEps > double(0.0)) {
+                if(slightEnlargmentEps > scalar_t(0.0))
+				{
                     bbox.enlarge(slightEnlargmentEps);
                 }
 

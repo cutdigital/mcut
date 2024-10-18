@@ -39,25 +39,30 @@
 #include <tuple> // std::make_tuple std::get<>
 
 
-    double square_root(const double& number)
+    scalar_t square_root(const scalar_t& number, double multiplier=1.0)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::sqrt(number);
 #else
-        arbitrary_precision_number_t out(number);
-        mpfr_sqrt(out.get_mpfr_handle(), number.get_mpfr_handle(), arbitrary_precision_number_t::get_default_rounding_mode());
-        return out;
+		const double dequantized = scalar_t::dequantize(number, multiplier); // to native user coordinates/from rational coordinates
+		const double sqrt_val = std::sqrt(dequantized);
+		const scalar_t quantized = scalar_t::quantize(sqrt_val, multiplier); // to rational coordinates
+		return quantized;
 #endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
-    double absolute_value(const double& number)
+    scalar_t absolute_value(const scalar_t& number)
     {
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::fabs(number);
+#else
+		return scalar_t::abs(number);
+#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
     }
 
-    sign_t sign(const double& number)
+    sign_t sign(const scalar_t& number)
     {
-        int s = (double(0) < number) - (number < double(0));
+		int s = (scalar_t(0) < number) - (number < scalar_t(0));
         sign_t result = sign_t::ZERO;
         if (s > 0) {
             result = sign_t::POSITIVE;
@@ -70,7 +75,7 @@
 
     std::ostream& operator<<(std::ostream& os, const vec3& v)
     {
-        return os << static_cast<double>(v.x()) << ", " << static_cast<double>(v.y()) << ", " << static_cast<double>(v.z());
+        return os << static_cast<scalar_t>(v.x()) << ", " << static_cast<scalar_t>(v.y()) << ", " << static_cast<scalar_t>(v.z());
     }
 
     bool operator==(const vec3& a, const vec3& b)
@@ -86,22 +91,22 @@
             a.x() * b.y() - a.y() * b.x());
     }
 
-    double orient2d(const vec2& pa, const vec2& pb, const vec2& pc)
+    scalar_t orient2d(const vec2& pa, const vec2& pb, const vec2& pc)
     {
-        const double pa_[2] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()) };
-        const double pb_[2] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()) };
-        const double pc_[2] = { static_cast<double>(pc.x()), static_cast<double>(pc.y()) };
+		const scalar_t pa_[2] = {static_cast<scalar_t>(pa.x()), static_cast<scalar_t>(pa.y())};
+		const scalar_t pb_[2] = {static_cast<scalar_t>(pb.x()), static_cast<scalar_t>(pb.y())};
+		const scalar_t pc_[2] = {static_cast<scalar_t>(pc.x()), static_cast<scalar_t>(pc.y())};
 
         return ::orient2d(pa_, pb_, pc_); // shewchuk predicate
     }
 
-    double orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
+    scalar_t orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
         const vec3& pd)
     {
-        const double pa_[3] = { static_cast<double>(pa.x()), static_cast<double>(pa.y()), static_cast<double>(pa.z()) };
-        const double pb_[3] = { static_cast<double>(pb.x()), static_cast<double>(pb.y()), static_cast<double>(pb.z()) };
-        const double pc_[3] = { static_cast<double>(pc.x()), static_cast<double>(pc.y()), static_cast<double>(pc.z()) };
-        const double pd_[3] = { static_cast<double>(pd.x()), static_cast<double>(pd.y()), static_cast<double>(pd.z()) };
+        const scalar_t pa_[3] = { static_cast<scalar_t>(pa.x()), static_cast<scalar_t>(pa.y()), static_cast<scalar_t>(pa.z()) };
+        const scalar_t pb_[3] = { static_cast<scalar_t>(pb.x()), static_cast<scalar_t>(pb.y()), static_cast<scalar_t>(pb.z()) };
+        const scalar_t pc_[3] = { static_cast<scalar_t>(pc.x()), static_cast<scalar_t>(pc.y()), static_cast<scalar_t>(pc.z()) };
+        const scalar_t pd_[3] = { static_cast<scalar_t>(pd.x()), static_cast<scalar_t>(pd.y()), static_cast<scalar_t>(pd.z()) };
 
         return ::orient3d(pa_, pb_, pc_, pd_); // shewchuk predicate
     }
@@ -117,7 +122,7 @@
     }
 #endif
 
-    int compute_polygon_plane_coefficients(vec3& normal, double& d_coeff,
+    int compute_polygon_plane_coefficients(vec3& normal, scalar_t& d_coeff,
         const vec3* polygon_vertices, const int polygon_vertex_count)
     {
         // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
@@ -132,8 +137,8 @@
 
         d_coeff = dot_product(polygon_vertices[0], normal);
 
-        double largest_component(0.0);
-        double tmp(0.0);
+        scalar_t largest_component(0.0);
+        scalar_t tmp(0.0);
         int largest_component_idx = 0;
 
         for (int i = 0; i < 3; ++i) {
@@ -155,36 +160,36 @@
     // 'r' : The(second) r endpoint is on the plane (but not 'p').
     // '0' : The segment lies strictly to one side or the other of the plane.
     // '1': The segment intersects the plane, and none of {p, q, r} hold.
-    char compute_segment_plane_intersection(vec3& p, const vec3& normal, const double& d_coeff,
+    char compute_segment_plane_intersection(vec3& p, const vec3& normal, const scalar_t& d_coeff,
         const vec3& q, const vec3& r)
     {
 
         // vec3 planeNormal;
-        // double planeDCoeff;
+        // scalar_t planeDCoeff;
         // planeNormalLargestComponent = compute_polygon_plane_coefficients(planeNormal, planeDCoeff, polygonVertices,
         // polygonVertexCount);
 
-        double num = d_coeff - dot_product(q, normal);
+        scalar_t num = d_coeff - dot_product(q, normal);
         const vec3 rq = (r - q);
-        double denom = dot_product(rq, normal);
+        scalar_t denom = dot_product(rq, normal);
 
-        if (denom == double(0.0) /* Segment is parallel to plane.*/) {
-            if (num == double(0.0)) { // 'q' is on plane.
+        if (denom == scalar_t(0.0) /* Segment is parallel to plane.*/) {
+            if (num == scalar_t(0.0)) { // 'q' is on plane.
                 return 'p'; // The segment lies wholly within the plane
             } else {
                 return '0';
             }
         }
 
-        double t = num / denom;
+        scalar_t t = num / denom;
 
         for (int i = 0; i < 3; ++i) {
             p[i] = q[i] + t * (r[i] - q[i]);
         }
 
-        if ((double(0.0) < t) && (t < double(1.0))) {
+        if ((scalar_t(0.0) < t) && (t < scalar_t(1.0))) {
             return '1'; // The segment intersects the plane, and none of {p, q, r} hold
-        } else if (num == double(0.0)) // t==0
+        } else if (num == scalar_t(0.0)) // t==0
         {
             return 'q'; // The (first) q endpoint is on the plane (but not 'p').
         } else if (num == denom) // t==1
@@ -223,12 +228,12 @@
         i = 0;
         j = i + 1;
         k = j + 1;
-        std::vector<std::tuple<int, int, int, double>> non_colinear_triplets;
+        std::vector<std::tuple<int, int, int, scalar_t>> non_colinear_triplets;
 
         for (; i < polygon_vertex_count; ++i) {
             for (; j < polygon_vertex_count; ++j) {
                 for (; k < polygon_vertex_count; ++k) {
-                    double predRes;
+                    scalar_t predRes;
                     if (!collinear(x[i], x[j], x[k], predRes)) {
                         non_colinear_triplets.emplace_back(std::make_tuple(i, j, k, predRes));
                     }
@@ -237,11 +242,11 @@
         }
 
         std::sort(non_colinear_triplets.begin(), non_colinear_triplets.end(),
-            [](const std::tuple<int, int, int, double>& a, const std::tuple<int, int, int, double>& b) {
+            [](const std::tuple<int, int, int, scalar_t>& a, const std::tuple<int, int, int, scalar_t>& b) {
                 return std::fabs(std::get<3>(a)) > std::fabs(std::get<3>(b));
             });
 
-        std::tuple<int, int, int, double> best_triplet = non_colinear_triplets.front(); // maximising non-colinearity
+        std::tuple<int, int, int, scalar_t> best_triplet = non_colinear_triplets.front(); // maximising non-colinearity
 
         i = std::get<0>(best_triplet);
         j = std::get<1>(best_triplet);
@@ -271,16 +276,16 @@
             }
         }
 
-        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+        scalar_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        scalar_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-        if (qRes == double(0.0) && rRes == double(0.0)) {
+        if (qRes == scalar_t(0.0) && rRes == scalar_t(0.0)) {
             return 'p';
-        } else if (qRes == double(0.0)) {
+        } else if (qRes == scalar_t(0.0)) {
             return 'q';
-        } else if (rRes == double(0.0)) {
+        } else if (rRes == scalar_t(0.0)) {
             return 'r';
-        } else if ((rRes < double(0.0) && qRes < double(0.0)) || (rRes > double(0.0) && qRes > double(0.0))) {
+        } else if ((rRes < scalar_t(0.0) && qRes < scalar_t(0.0)) || (rRes > scalar_t(0.0) && qRes > scalar_t(0.0))) {
             return '0';
         } else {
             return '1';
@@ -307,21 +312,21 @@
             }
         }
 
-        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+        scalar_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        scalar_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-        if (qRes == double(0.0) && rRes == double(0.0)) {
+        if (qRes == scalar_t(0.0) && rRes == scalar_t(0.0)) {
             // both points used to define line lie on plane therefore we have an in-plane intersection
             // or the polygon is a degenerate triangle
             return 'p';
         } else {
-            if ((rRes < double(0.0) && qRes < double(0.0)) || (rRes > double(0.0) && qRes > double(0.0))) { // both points used to define line lie on same side of plane
+            if ((rRes < scalar_t(0.0) && qRes < scalar_t(0.0)) || (rRes > scalar_t(0.0) && qRes > scalar_t(0.0))) { // both points used to define line lie on same side of plane
                 // check if line is parallel to plane
-                // const double num = polygon_plane_d_coeff - dot_product(q, polygon_plane_normal);
+                // const scalar_t num = polygon_plane_d_coeff - dot_product(q, polygon_plane_normal);
                 const vec3 rq = (r - q);
-                const double denom = dot_product(rq, polygon_plane_normal);
+                const scalar_t denom = dot_product(rq, polygon_plane_normal);
 
-                if (denom == double(0.0) /* Segment is parallel to plane.*/) {
+                if (denom == scalar_t(0.0) /* Segment is parallel to plane.*/) {
                     // MCUT_ASSERT(num != 0.0); // implies 'q' is on plane (see: "compute_segment_plane_intersection(...)")
                     // but we have already established that q and r are on same side.
                     return '0';
@@ -354,7 +359,7 @@
         const vec3& q, const vec3& r,
         const std::vector<vec3>& polygon_vertices, const int polygon_normal_max_comp,
         const vec3& polygon_plane_normal,
-        const double& polygon_plane_d_coeff)
+        const scalar_t& polygon_plane_d_coeff)
     {
 
         const int polygon_vertex_count = (int)polygon_vertices.size();
@@ -371,19 +376,19 @@
             }
         }
 
-        double qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
-        double rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
+        scalar_t qRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], q);
+        scalar_t rRes = orient3d(polygon_vertices[i], polygon_vertices[j], polygon_vertices[k], r);
 
-        if (qRes == double(0.) && rRes == double(0.)) {
+        if (qRes == scalar_t(0.) && rRes == scalar_t(0.)) {
             return 'p'; // both points used to define line lie on plane therefore we have an in-plane intersection
         } else {
 
-            const double num = polygon_plane_d_coeff - dot_product(q, polygon_plane_normal);
+            const scalar_t num = polygon_plane_d_coeff - dot_product(q, polygon_plane_normal);
             const vec3 rq = (r - q);
-            const double denom = dot_product(rq, polygon_plane_normal);
+            const scalar_t denom = dot_product(rq, polygon_plane_normal);
 
-            if ((rRes < double(0.) && qRes < double(0.)) || (rRes > double(0.) && qRes > double(0.))) { // both q an r are on same side of plane
-                if (denom == double(0.) /* line is parallel to plane.*/) {
+            if ((rRes < scalar_t(0.) && qRes < scalar_t(0.)) || (rRes > scalar_t(0.) && qRes > scalar_t(0.))) { // both q an r are on same side of plane
+                if (denom == scalar_t(0.) /* line is parallel to plane.*/) {
                     return '0';
                 }
             }
@@ -391,7 +396,7 @@
             // q and r are on difference sides of the plane, therefore we have an intersection
 
             // compute the intersection point
-            const double t = num / denom;
+            const scalar_t t = num / denom;
 
             for (int it = 0; it < 3; ++it) {
                 p[it] = q[it] + t * (r[it] - q[it]);
@@ -415,15 +420,15 @@
 #if 0 // Algorithm 1 in :
       // https://pdf.sciencedirectassets.com/271512/1-s2.0-S0925772100X00545/1-s2.0-S0925772101000128/main.pdf?X-Amz-Security-Token=IQoJb3JpZ2luX2VjEAEaCXVzLWVhc3QtMSJHMEUCIBr6Fu%2F%2FtscErn%2Fl4pn2UGNA45sAw9vggQscK7Tnl0ssAiEAzfnyy4B4%2BXkZp8xcEk7utDBrxgmGyH7pyqk0efKOUEoq%2BgMIKhAEGgwwNTkwMDM1NDY4NjUiDHQT4kOfk4%2B6kBB0xCrXAzd8SWlnELJbM5l93HSvv4nUgtO85%2FGyx5%2BOoHmYoUuVwJjCXChmLJmlz%2BxYUQE%2Fr8vQa2hPlUEPfiTVGgoHaK8NkSMP6LRs%2F3WjyZ9OxzHbqSwZixNceW34OAkq0E1QgYLdGVjpPKxNK1haXDfBTMN6bF2IOU9dKi9wTv3uTlep0kHDa1BNNl6M6yZk5QlF2bPF9XmNjjZCpFQLhr%2BPoHo%2Bx4xy39aH8hCkkTqGdy2KrKGN6lv0%2FduIaItyZfqalYS%2BwW6cll2F5G11g0tSu7yKu6mug94LUTzsRmzD0UhzeGl2WV6Ev2qhw26mwFEKgnTMqGst8XAHjFjjAQyMzXNHCQqNBRIevHIzVWuUY4QZMylSRsodo0dfwwCFhzl0%2BJA1ZXb0%2BoyB8c11meQBO8FpMSshngNcbiAYUtIOFcHNCTCUMk0JPOZ%2FxvANsopnivbrPARL71zU4PaTujg5jfC2zoO6ZDUL8E6Vn%2BNtfb%2BuQV7DwtIH51Bv%2F%2F1m6h5mjbpRiGYcH%2F5SDD%2Fk%2BpHfKRQzKu7jJc%2B0XO0bQvoLSrAte0Qk10PwOvDl5jMIMdmxTBDDiDGErRykYxMQhq5EwjyiWPXzM3ll9uK59Vy0bAEj5Qemj5by1jCDht6IBjqlAV4okAPQO5wWdWojCYeKvluKfXCvudrUxrLhsxb7%2BTZNMODTG%2Fn%2Fbw875Yr6fOQ42u40pOsnPB%2FTP3cWwjiB%2BEHzDqN8AhCVQyoedw7QrU3OBWlSl6lB%2BGLAVqrhcizgFUiM2nj3HaVP2m7S%2FXqpv%2FoWlEXt4gR8iI9XsIlh6L6SBE22FqbsU5ewCxXaqip19VXhAGnlvjTihXUg6yZGWhExHj%2BKcA%3D%3D&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20210814T103958Z&X-Amz-SignedHeaders=host&X-Amz-Expires=300&X-Amz-Credential=ASIAQ3PHCVTY3PPQSW2L%2F20210814%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=94403dce5c12ede9507e9612c000db5772607e59a2134d30d4e5b44212056dc7&hash=cada083b165f9786e6042e21d3d22147ec08b1e2c8fa2572ceeb2445cb5e730a&host=68042c943591013ac2b2430a89b270f6af2c76d8dfd086a07176afe7c76c2c61&pii=S0925772101000128&tid=spdf-f9e7c4b7-808d-4a8e-a474-6430ff687798&sid=8dddff5b32fff2499908bf6501965aec3d0fgxrqb&type=client
 
-            const double zero(0.0);
+            const scalar_t zero(0.0);
             int i = 0;
             int k = 0;
 
-            double f = zero;
-            double u1 = 0.0;
-            double v1 = 0.0;
-            double u2 = 0.0;
-            double v2 = 0.0;
+            scalar_t f = zero;
+            scalar_t u1 = 0.0;
+            scalar_t v1 = 0.0;
+            scalar_t u2 = 0.0;
+            scalar_t v2 = 0.0;
             const int n = polygon_vertex_count;
             for (i = 0; i < n; ++i)
             {
@@ -505,9 +510,9 @@
         // This is done for pedagogical clarity.
         for (int i = 0; i < polygon_vertex_count; i++) {
             for (int d = 0; d < 2; d++) {
-                const double& a = polygon_vertices[i][d];
-                const double& b = q[d];
-                double& c = vertices[i][d];
+                const scalar_t& a = polygon_vertices[i][d];
+                const scalar_t& b = q[d];
+                scalar_t& c = vertices[i][d];
                 c = a - b;
             }
         }
@@ -519,7 +524,7 @@
         for (int i = 0; i < polygon_vertex_count; i++) {
 
             /* First check if q = (0, 0) is a vertex. */
-            if (vertices[i].x() == double(0.) && vertices[i].y() == double(0.)) {
+            if (vertices[i].x() == scalar_t(0.) && vertices[i].y() == scalar_t(0.)) {
                 return 'v';
             }
 
@@ -529,19 +534,19 @@
 
             // Rstrad is TRUE iff one endpoint of e is strictly above the x axis and the other is not (i.e., the other is on
             // or below)
-            bool Rstrad = (vertices[i].y() > double(0.)) != (vertices[il].y() > double(0.));
-            bool Lstrad = (vertices[i].y() < double(0.)) != (vertices[il].y() < double(0.));
+            bool Rstrad = (vertices[i].y() > scalar_t(0.)) != (vertices[il].y() > scalar_t(0.));
+            bool Lstrad = (vertices[i].y() < scalar_t(0.)) != (vertices[il].y() < scalar_t(0.));
 
             if (Rstrad || Lstrad) {
                 /* Compute intersection of e with x axis. */
 
                 // The computation of x is needed whenever either of these straddle variables is TRUE, which
                 // only excludes edges passing through q = (0, 0) (and incidentally protects against division by 0).
-                double x = (vertices[i].x() * vertices[il].y() - vertices[il].x() * vertices[i].y()) / (vertices[il].y() - vertices[i].y());
-                if (Rstrad && x > double(0.)) {
+                scalar_t x = (vertices[i].x() * vertices[il].y() - vertices[il].x() * vertices[i].y()) / (vertices[il].y() - vertices[i].y());
+                if (Rstrad && x > scalar_t(0.)) {
                     Rcross++;
                 }
-                if (Lstrad && x < double(0.)) {
+                if (Lstrad && x < scalar_t(0.)) {
                     Lcross++;
                 }
             } /* end straddle computation*/
@@ -565,10 +570,10 @@
     // a matrix P that will project any 3D vertex to 2D by removing the 3D component that
     // corresponds to the largest component of the normal..
     // https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d/2672702#2672702
-    matrix_t<double> calculate_projection_matrix(const vec3& polygon_normal,
+    matrix_t<scalar_t> calculate_projection_matrix(const vec3& polygon_normal,
         const int polygon_normal_largest_component)
     {
-        MCUT_ASSERT(squared_length(polygon_normal) > double(0.0));
+        MCUT_ASSERT(squared_length(polygon_normal) > scalar_t(0.0));
         MCUT_ASSERT(polygon_normal_largest_component >= 0);
         MCUT_ASSERT(polygon_normal_largest_component <= 2);
 
@@ -576,21 +581,21 @@
         const vec3 a = normalize(polygon_normal);
         // unit length basis vector corresponding to the largest component of the normal vector
         const vec3 b = [&]() {
-            vec3 x(double(0.0));
+            vec3 x(scalar_t(0.0));
             const sign_t s = sign(polygon_normal[polygon_normal_largest_component]);
             MCUT_ASSERT(s != sign_t::ZERO); // implies that the normal vector has a magnitude of zero
             // The largest component of the normal is the one we will "remove"
             // NOTE: we multiple by the sign here to ensure that "a_plus_b" below is not zero when a == b
-            x[polygon_normal_largest_component] = double((1.0) * static_cast<long double>(s));
+            x[polygon_normal_largest_component] = scalar_t((1.0) * static_cast<long scalar_t>(s));
             return x;
         }();
 
-        matrix_t<double> I(3, 3); // 3x3 identity with reflection
+        matrix_t<scalar_t> I(3, 3); // 3x3 identity with reflection
         I(0, 0) = 1.0;
         I(1, 1) = -1.0;
         I(2, 2) = 1.0;
 
-        matrix_t<double> R = I;
+        matrix_t<scalar_t> R = I;
 
         // NOTE: While this will map vectors a to b, it can add a lot of unnecessary "twist".
         // For example, if a=b=e_{z} this formula will produce a 180-degree rotation about the z-axis rather
@@ -598,13 +603,13 @@
         if ((a[0] != b[0]) || (a[1] != b[1]) || (a[2] != b[2])) // a != b
         {
             const vec3 a_plus_b = a + b;
-            const double a_dot_b = dot_product(a, b);
+            const scalar_t a_dot_b = dot_product(a, b);
 
             // this will never be zero because we set 'b' as the canonical basis vector
             // that has the largest projection onto the normal
-            MCUT_ASSERT(a_dot_b != double(0.0));
+            MCUT_ASSERT(a_dot_b != scalar_t(0.0));
 
-            const matrix_t<double> outer = outer_product(a_plus_b, a_plus_b);
+            const matrix_t<scalar_t> outer = outer_product(a_plus_b, a_plus_b);
 
             // compute the 3x3 rotation matrix R to orient the polygon into the canonical axes "i" and "j",
             //  where "i" and "j" != "polygon_normal_largest_component"
@@ -613,7 +618,7 @@
 
         // compute the 2x3 selector matrix K to select the polygon-vertex components that correspond
         // to canonical axes "i" and "j".
-        matrix_t<double> K = matrix_t<double>(2, 3);
+        matrix_t<scalar_t> K = matrix_t<scalar_t>(2, 3);
 
         if (polygon_normal_largest_component == 0) // project by removing x-component
         {
@@ -683,7 +688,7 @@
 
 #if 1
         // 3x3 matrix for projecting a point to 2D
-        matrix_t<double> P = calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
+        matrix_t<scalar_t> P = calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
         for (int i = 0; i < polygon_vertex_count; ++i) { // for each vertex
             const vec3& x = polygon_vertices[i];
             out[i] = P * x; // vertex in xz plane
@@ -723,7 +728,7 @@
     }
 #endif
 
-        const matrix_t<double> P = calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
+        const matrix_t<scalar_t> P = calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
 
         pp = P * p;
 
@@ -769,12 +774,12 @@
     bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
         const vec3& pd)
     {
-        const double val = orient3d(pa, pb, pc, pd);
-        // typedef std::numeric_limits<double> dbl;
-
-        // double d = 3.14159265358979;
+        const scalar_t val = orient3d(pa, pb, pc, pd);
+        // typedef std::numeric_limits<scalar_t> dbl;
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+        // scalar_t d = 3.14159265358979;
         // std::cout.precision(dbl::max_digits10);
-        // std::cout << "value=" << (double)val << std::endl;
+        // std::cout << "value=" << (scalar_t)val << std::endl;
 
         // NOTE: thresholds are chosen based on benchmark meshes that are used for testing.
         // It is extremely difficult to get this right because of intermediate conversions
@@ -782,18 +787,21 @@
         // Thus, general advise is for user to ensure that the input polygons are really
         // co-planer. It might be possible for MCUT to help here (see eps used during poly
         // partitioning).
-        return absolute_value(val) <= double(4e-7);
+        return absolute_value(val) <= scalar_t(4e-7);
+        #else
+		return absolute_value(val);
+        #endif
     }
 
-    bool collinear(const vec2& a, const vec2& b, const vec2& c, double& predResult)
+    bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult)
     {
         predResult = orient2d(a, b, c);
-        return predResult == double(0.);
+		return predResult == scalar_t(0.);
     }
 
     bool collinear(const vec2& a, const vec2& b, const vec2& c)
     {
-        return orient2d(a, b, c) == double(0.);
+		return orient2d(a, b, c) == scalar_t(0.);
     }
 
     char Parallellnt(const vec2& a, const vec2& b, const vec2& c, const vec2& d, vec2& p)
@@ -827,10 +835,10 @@
 
     char compute_segment_intersection(
         const vec2& a, const vec2& b, const vec2& c, 
-        const vec2& d, vec2& p, double& s, double& t)
+        const vec2& d, vec2& p, scalar_t& s, scalar_t& t)
     {
-        // double s, t; /* The two parameters of the parametric eqns. */
-        double num, denom; /* Numerator and denominator of equations. */
+        // scalar_t s, t; /* The two parameters of the parametric eqns. */
+        scalar_t num, denom; /* Numerator and denominator of equations. */
         char code = '?'; /* Return char characterizing intersection.*/
 
         denom = a[0] * (d[1] - c[1]) + //
@@ -839,7 +847,7 @@
             c[0] * (a[1] - b[1]);
 
         /* If denom is zero, then segments are parallel: handle separately. */
-        if (denom == double(0.0)) {
+        if (denom == scalar_t(0.0)) {
             return Parallellnt(a, b, c, d, p);
         }
 
@@ -847,7 +855,7 @@
             c[0] * (a[1] - d[1]) + //
             d[0] * (c[1] - a[1]);
 
-        if ((num == double(0.0)) || (num == denom)) {
+        if ((num == scalar_t(0.0)) || (num == denom)) {
             code = 'v';
         }
 
@@ -857,15 +865,15 @@
             b[0] * (a[1] - c[1]) + //
             c[0] * (b[1] - a[1]));
 
-        if ((num == double(0.0)) || (num == denom)) {
+        if ((num == scalar_t(0.0)) || (num == denom)) {
             code = 'v';
         }
 
         t = num / denom;
 
-        if ((double(0.0) < s) && (s < double(1.0)) && (double(0.0) < t) && (t < double(1.0))) {
+        if ((scalar_t(0.0) < s) && (s < scalar_t(1.0)) && (scalar_t(0.0) < t) && (t < scalar_t(1.0))) {
             code = '1';
-        } else if ((double(0.0) > s) || (s > double(1.0)) || (double(0.0) > t) || (t > double(1.0))) {
+        } else if ((scalar_t(0.0) > s) || (s > scalar_t(1.0)) || (scalar_t(0.0) > t) || (t > scalar_t(1.0))) {
             code = '0';
         }
 

@@ -57,12 +57,17 @@ bool client_input_arrays_to_hmesh(
     std::shared_ptr<context_t>& context_ptr,
     McFlags dispatchFlags,
     hmesh_t& halfedgeMesh,
+#if 0
     double& bboxDiagonal,
+#endif
     const void* pVertices,
     const McUint32* pFaceIndices,
     const McUint32* pFaceSizes,
     const McUint32 numVertices,
     const McUint32 numFaces,
+    const double multiplier,
+	const vec3 srcmesh_cutmesh_com,
+	const vec3 pre_quantization_translation,
     const vec3* perturbation = NULL)
 {
     SCOPED_TIMER(__FUNCTION__);
@@ -80,16 +85,40 @@ bool client_input_arrays_to_hmesh(
 
         // for each input mesh-vertex
         for (McUint32 i = 0; i < numVertices; ++i) {
-            const float& x = vptr[(i * 3) + 0];
-            const float& y = vptr[(i * 3) + 1];
-            const float& z = vptr[(i * 3) + 2];
+			const float& x =
+				vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0] + pre_quantization_translation[0];
+			const float& y =
+				vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1] + pre_quantization_translation[1];
+			const float& z =
+				vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2] + pre_quantization_translation[2];
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			vec3 quantized_vertex(
+				quantize(x, multiplier), 
+                quantize(y, multiplier), 
+                quantize(z, multiplier));
 
+			if(perturbation != NULL && squared_length(*perturbation) > 0)
+			{
+				for(int j = 0; j < 3; ++j)
+				{
+					if((*perturbation)[i] != 0)
+					{
+						quantized_vertex[j] += quantize((*perturbation)[i], multiplier); // perturb
+					}
+
+                    quantized_vertex[j] -= quantize(srcmesh_cutmesh_com[i], multiplier); // recentre to origin
+				}
+			}
+
+
+			vd_t vd = halfedgeMesh.add_vertex(quantized_vertex);
+#else
             // insert our vertex into halfedge mesh
             vd_t vd = halfedgeMesh.add_vertex(
                 double(x) + (perturbation != NULL ? (*perturbation).x() : double(0.)),
                 double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
                 double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
-
+#endif
             MCUT_ASSERT(vd != hmesh_t::null_vertex() && (McUint32)vd < numVertices);
         }
     }
@@ -99,22 +128,46 @@ bool client_input_arrays_to_hmesh(
 
         // for each input mesh-vertex
         for (McUint32 i = 0; i < numVertices; ++i) {
-            const double& x = vptr[(i * 3) + 0];
-            const double& y = vptr[(i * 3) + 1];
-            const double& z = vptr[(i * 3) + 2];
+			const double& x =
+				vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0] + pre_quantization_translation[0];
+			const double& y =
+				vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1] + pre_quantization_translation[1];
+			const double& z =
+				vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2] + pre_quantization_translation[2];
 
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+            vec3 quantized_vertex(
+                quantize(x, multiplier), 
+                quantize(y, multiplier), 
+                quantize(z, multiplier));
+			
+            if(perturbation != NULL && squared_length(*perturbation) > 0)
+			{
+				for(int j=0;j<3;++j)
+				{
+					if((*perturbation)[i] != 0)
+					{
+						quantized_vertex[j] += quantize((*perturbation)[i], multiplier);
+					}
+				}
+			}
+
+
+            vd_t vd = halfedgeMesh.add_vertex(quantized_vertex);
+#else
             // insert our vertex into halfedge mesh
             vd_t vd = halfedgeMesh.add_vertex(
                 double(x) + (perturbation != NULL ? (*perturbation).x() : double(0.)),
                 double(y) + (perturbation != NULL ? (*perturbation).y() : double(0.)),
                 double(z) + (perturbation != NULL ? (*perturbation).z() : double(0.)));
-
+#endif
             MCUT_ASSERT(vd != hmesh_t::null_vertex() && (McUint32)vd < numVertices);
         }
     }
 
     TIMESTACK_POP(); // TIMESTACK_PUSH("add vertices");
 
+#if 0
     // compute the mesh bounding box while we are at it (for numerical perturbation)
     vec3 bboxMin(1e10);
     vec3 bboxMax(-1e10);
@@ -127,6 +180,7 @@ bool client_input_arrays_to_hmesh(
     }
     bboxDiagonal = length(bboxMax - bboxMin);
     TIMESTACK_POP(); // TIMESTACK_PUSH("create bbox");
+#endif
 
     TIMESTACK_PUSH("create faces");
 
@@ -1726,6 +1780,132 @@ void check_and_store_input_mesh_intersection_type(
     MCUT_ASSERT(context_ptr->get_most_recent_dispatch_intersection_type() != McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_MAX_ENUM);
 }
 
+bool calculate_vertex_parameters(double& quantization_multiplier, 
+    // vector to place all coordinates (or srcmesh and cutmesh) into the positive quadrant such that they all have positive numbers as coordinates.
+    vec3& pre_quantization_translation,
+    // centre of mass
+	vec3& srcmesh_cutmesh_com,
+    vec3& srcmesh_bboxmin,
+									   vec3& srcmesh_bboxmax,
+									   vec3& cutmesh_bboxmin,
+									   vec3& cutmesh_bboxmax,
+    McFlags dispatchFlags,
+										 const void* pSrcMeshVertices,
+										 McUint32 numSrcMeshVertices,
+										 const void* pCutMeshVertices,
+										 McUint32 numCutMeshVertices) { 
+    MCUT_ASSERT(numSrcMeshVertices >= 3);
+    MCUT_ASSERT(numCutMeshVertices>=3);
+
+    
+	pre_quantization_translation = vec3(0.0);
+
+    auto get_bbox = [](vec3& bboxmin,
+					   vec3& bboxmax,
+						vec3& com,
+					   McFlags dispatchFlags, const void* pVertices, McUint32 numVertices) {
+
+		 bboxmin = (std::numeric_limits<double>::max());
+		 bboxmax = (std::numeric_limits<double>::lowest());
+		 com = vec3(0.0);
+
+		// did the user provide vertex arrays of 32-bit floats...?
+		if(dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT)
+		{
+			const float* vptr = reinterpret_cast<const float*>(pVertices);
+
+			// for each input mesh-vertex
+			for(McUint32 i = 0; i < numVertices; ++i)
+			{
+				const float* p = vptr + (i * 3);
+
+				for(auto i = 0; i < 3; ++i)
+				{
+					bboxmax[i] = std::max(static_cast<float>(bboxmax[i]), p[i]);
+					bboxmin[i] = std::min(static_cast<float>(bboxmin[i]), p[i]);
+					com[i] += p[i];
+				}
+			}
+		}
+		// did the user provide vertex arrays of 64-bit double...?
+		else if(dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_DOUBLE)
+		{
+			const double* vptr = reinterpret_cast<const double*>(pVertices);
+
+			// for each input mesh-vertex
+			for(McUint32 i = 0; i < numVertices; ++i)
+			{
+				const double* p = vptr + (i * 3);
+
+				for(auto i = 0; i < 3; ++i)
+				{
+					bboxmax[i] = std::max(static_cast<double>(bboxmax[i]), p[i]);
+					bboxmin[i] = std::min(static_cast<double>(bboxmin[i]), p[i]);
+					com[i] += p[i];
+				}
+			}
+		}
+
+        com = com / scalar_t(numVertices);
+	};
+
+    vec3 srcmesh_com(0.0);
+	get_bbox(srcmesh_bboxmin,
+			 srcmesh_bboxmax,
+			 srcmesh_com, dispatchFlags,
+			 pSrcMeshVertices,
+			 numSrcMeshVertices);
+	vec3 cutmesh_com(0.0);
+	get_bbox(cutmesh_bboxmin,
+			 cutmesh_bboxmax,
+			 cutmesh_com,dispatchFlags,
+			 pCutMeshVertices,
+			 numCutMeshVertices);
+
+    srcmesh_cutmesh_com = (srcmesh_com + cutmesh_com) / scalar_t(2.0);
+
+    // global bounding box 
+    vec3 srcmesh_cutmesh_bboxmin = compwise_min(srcmesh_bboxmin, cutmesh_bboxmin);
+	vec3 srcmesh_cutmesh_bboxmax = compwise_max(srcmesh_bboxmax, cutmesh_bboxmax);
+
+    vec3 offset_from_origin = vec3(1.0, 1.0, 1.0); // ensure that when meshes are place into positive quadrant, no vertex coincides with the origin.
+    vec3 to_positive_quadrant = (srcmesh_cutmesh_com - srcmesh_cutmesh_bboxmin);
+
+    pre_quantization_translation = to_positive_quadrant + offset_from_origin;
+
+    double max_coord = std::numeric_limits<double>::lowest();
+	double min_coord = std::numeric_limits<double>::max();
+
+    for (int i=0; i <3;++i)
+    {
+		min_coord = min(srcmesh_cutmesh_bboxmin[0],
+						min(srcmesh_cutmesh_bboxmin[1], srcmesh_cutmesh_bboxmin[2]));
+		max_coord = max(srcmesh_cutmesh_bboxmax[0],
+						max(srcmesh_cutmesh_bboxmax[1], srcmesh_cutmesh_bboxmax[2]));
+    }
+
+    double M = std::max(std::abs(min_coord), std::abs(max_coord));
+
+    auto is_pow2=[](uint64_t x)
+	{
+		return (x != 0) && !(x & (x - 1));
+	};
+
+    auto next_pow2 = [](uint64_t x) {
+		x |= x >> 1;
+		x |= x >> 2;
+		x |= x >> 4;
+		x |= x >> 8;
+		x |= x >> 16;
+		x |= x >> 32;
+		return x;
+	};
+
+	// As a micro optimization, we actually increase M to the next power-of-two because then "M * 2^b" is exact in floating-point
+	double M_np2 = is_pow2(M) ? M : next_pow2(M); //std::bit_ceil((unsigned long long)M);
+
+    quantization_multiplier = M_np2;
+}
 
 extern "C" void preproc(
     std::shared_ptr<context_t> context_ptr,
@@ -1741,10 +1921,45 @@ extern "C" void preproc(
     McUint32 numCutMeshVertices,
     McUint32 numCutMeshFaces) noexcept(false)
 {
-    std::shared_ptr<hmesh_t> source_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t);
-    double source_hmesh_aabb_diag(0.0);
+    ///
+   
+    double multiplier = 1; 
+	vec3 srcmesh_bboxmin(std::numeric_limits<double>::max());
+	vec3 srcmesh_bboxmax(std::numeric_limits<double>::lowest());
+	vec3 cutmesh_bboxmin(std::numeric_limits<double>::max());
+	vec3 cutmesh_bboxmax(std::numeric_limits<double>::lowest());
+	vec3 srcmesh_cutmesh_com(0.0); // used to recentre input native user coordinates around the origin
+	vec3 pre_quantization_translation(0.0); // used to shift recentred native user coordinates into the positive quadrant of 3D space
+		// centre of mass
+    if (false == calculate_vertex_parameters(multiplier,
+												  pre_quantization_translation,
+												  srcmesh_cutmesh_com,
+											srcmesh_bboxmin,
+											srcmesh_bboxmax,
+											cutmesh_bboxmin,
+											cutmesh_bboxmax,
+            dispatchFlags, pSrcMeshVertices, numSrcMeshVertices, pCutMeshVertices, numCutMeshVertices))
+    {
+		throw std::invalid_argument("invalid vertex arrays");
+    }
 
-    if (false == client_input_arrays_to_hmesh(context_ptr, dispatchFlags, *source_hmesh.get(), source_hmesh_aabb_diag, pSrcMeshVertices, pSrcMeshFaceIndices, pSrcMeshFaceSizes, numSrcMeshVertices, numSrcMeshFaces)) {
+    ///
+
+    std::shared_ptr<hmesh_t> source_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t);
+	scalar_t source_hmesh_aabb_diag = length(srcmesh_bboxmax - srcmesh_bboxmin, 1);
+
+    if(false == client_input_arrays_to_hmesh(context_ptr,
+											 dispatchFlags,
+											 *source_hmesh.get(),
+											 pSrcMeshVertices,
+											 pSrcMeshFaceIndices,
+											 pSrcMeshFaceSizes,
+											 numSrcMeshVertices,
+											 numSrcMeshFaces,
+											 multiplier,
+											  srcmesh_cutmesh_com,
+											  pre_quantization_translation))
+	{
         throw std::invalid_argument("invalid source-mesh arrays");
     }
 
@@ -1841,7 +2056,7 @@ extern "C" void preproc(
         until all connected components (that are created during the current mcDispatch call) are destroyed.
         Thus, each such connected component will maintain its own (reference counted) pointer.
 
-        These variables are used when populating client output arrays during �mcGetConnectedComponentData�.
+        These variables are used when populating client output arrays during mcGetConnectedComponentData.
         One example of this usage is when the client requests a connected component�s face map. In the cases
         where polygon partitioning occurs during the respective mcDispatch call then some of these shared_ptrs like
         �source_hmesh_child_to_usermesh_birth_face� will be used to generate the correct mapping from
@@ -1877,7 +2092,7 @@ extern "C" void preproc(
     output_t kernel_output;
 
     std::shared_ptr<hmesh_t> cut_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t); // halfedge representation of the cut-mesh
-    double cut_hmesh_aabb_diag(0.0);
+    scalar_t cut_hmesh_aabb_diag = length(cutmesh_bboxmax-cutmesh_bboxmin,1); // in native user coordinates
 
 #if defined(USE_OIBVH)
     std::vector<bounding_box_t<vec3>> cut_hmesh_BVH_aabb_array;
@@ -1899,10 +2114,10 @@ extern "C" void preproc(
 
     int cut_mesh_perturbation_count = 0; // number of times we have perturbed the cut mesh
     int kernel_invocation_counter = -1; // number of times we have called the internal dispatch/intersect function
-    double relative_perturbation_constant = 0.0; // i.e. relative to the bbox diagonal length
+    double relative_perturbation_constant = 0.0; // i.e. relative to the bbox diagonal length (in native user coordinates)
     // the (translation) vector to hold the values with which we will
     // carry out numerical perturbation of the cutting surface
-    vec3 perturbation(0.0, 0.0, 0.0);
+    vec3 perturbation(0.0, 0.0, 0.0); // in native user coordinates
 
     // RESOLVE mesh intersections
     // ::::::::::::::::::::::::::
@@ -1957,7 +2172,7 @@ extern "C" void preproc(
             // not intersect at all, which means we need to perturb again.
             kernel_input.general_position_enforcement_count = cut_mesh_perturbation_count;
 
-            MCUT_ASSERT(relative_perturbation_constant != double(0.0));
+            MCUT_ASSERT(relative_perturbation_constant != scalar_t(0.0));
 
             static thread_local std::default_random_engine random_engine(1);
             static thread_local std::mt19937 mersenne_twister_generator(random_engine());
@@ -1982,11 +2197,24 @@ extern "C" void preproc(
             // "pCutMeshFaces" are simply the user provided faces
             // We must also use the newly added vertices (coords) due to polygon partitioning as "unperturbed" values
             // This will require some intricate mapping
-            if (false == client_input_arrays_to_hmesh(context_ptr, dispatchFlags, *cut_hmesh.get(), cut_hmesh_aabb_diag, pCutMeshVertices, pCutMeshFaceIndices, pCutMeshFaceSizes, numCutMeshVertices, numCutMeshFaces, ((cut_mesh_perturbation_count == 0) ? NULL : &perturbation))) {
+			if(false == client_input_arrays_to_hmesh(
+							context_ptr,
+							dispatchFlags,
+							*cut_hmesh.get(),
+							pCutMeshVertices,
+							pCutMeshFaceIndices,
+							pCutMeshFaceSizes,
+							numCutMeshVertices,
+							numCutMeshFaces,
+							multiplier,
+							srcmesh_cutmesh_com,
+							pre_quantization_translation,
+							((cut_mesh_perturbation_count == 0) ? NULL : &perturbation)))
+			{
                 throw std::invalid_argument("invalid cut-mesh arrays");
             }
 
-            /*const*/ double perturbation_scalar = cut_hmesh_aabb_diag;
+            /*const*/ scalar_t perturbation_scalar = cut_hmesh_aabb_diag; // in native user coordinates
             if (dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE) {
                 perturbation_scalar = 1.0;
             }

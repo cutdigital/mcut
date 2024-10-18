@@ -722,9 +722,9 @@ void generate_supertriangle_from_mesh_vertices(
     const vec3 n = normalize(vec3(pNormalVector[0], pNormalVector[1], pNormalVector[2]));
 
     // minimum projection of mesh vertices along the normal vector
-    double proj_min = 1e10;
+	scalar_t proj_min = 1e10;
     // maximum projection of mesh vertices along the normal vector
-    double proj_max = -proj_min;
+	scalar_t proj_max = -proj_min;
 
     // mesh bbox extents
     vec3 bbox_min(1e10);
@@ -745,7 +745,7 @@ void generate_supertriangle_from_mesh_vertices(
 
         for (uint32_t j = 0; j < 3; ++j) { // for each component
 
-            double coord;
+            scalar_t coord;
             const McChar* const srcptr = vptr + (j * flt_size);
 
             if (have_double) {
@@ -762,7 +762,7 @@ void generate_supertriangle_from_mesh_vertices(
             coords[j] = coord;
         }
         mean = mean + coords;
-        const double dot = dot_product(n, coords);
+		const scalar_t dot = dot_product(n, coords);
 
         if (dot < proj_min) {
             most_min_vertex_pos = coords;
@@ -776,25 +776,25 @@ void generate_supertriangle_from_mesh_vertices(
     }
     mean = mean / numMeshVertices;
     // length of bounding box diagonal
-    const double bbox_diag = length(bbox_max - bbox_min);
+	const scalar_t bbox_diag = length(bbox_max - bbox_min);
     // length from vertex with most-minimum projection to vertex with most-maximum projection
-    const double max_span = length(most_max_vertex_pos - most_min_vertex_pos);
+	const scalar_t max_span = length(most_max_vertex_pos - most_min_vertex_pos);
     // parameter indicating distance along the span from vertex with most-minimum projection to vertex with most-maximum projection
-    const double alpha = clamp(sectionOffset, eps, 1.0 - eps);
+	const scalar_t alpha = clamp(sectionOffset, eps, 1.0 - eps);
     // actual distance along the span from vertex with most-minimum projection to vertex with most-maximum projection
-    const double shiftby = (alpha * max_span);
+	const scalar_t shiftby = (alpha * max_span);
 
     const vec3 centroid = most_min_vertex_pos + (n * shiftby);
 
     // absolute value of the largest component of the normal vector
-    double max_normal_comp_val_abs = -1e10;
+	scalar_t max_normal_comp_val_abs = -1e10;
     // index of the largest component of the normal vector
     uint32_t max_normal_comp_idx = 0;
 
     for (uint32_t i = 0; i < 3; ++i) {
 
-        const double comp = n[i];
-        const double comp_abs = std::fabs(comp);
+        const scalar_t comp = n[i];
+		const scalar_t comp_abs = std::fabs(comp);
 
         if (comp_abs > max_normal_comp_val_abs) {
             max_normal_comp_idx = i;
@@ -812,7 +812,7 @@ void generate_supertriangle_from_mesh_vertices(
     const vec3 u = cross_product(n, w);
     const vec3 v = cross_product(n, u);
 
-    const double mean_dot_n = dot_product(mean, n);
+    const scalar_t mean_dot_n = dot_product(mean, n);
     vec3 mean_on_plane = mean - n * mean_dot_n;
 
     vec3 uv_pos = normalize((u + v));
@@ -1059,7 +1059,7 @@ void triangulate_face(
 
     {
         vec3 cc_face_normal_vector;
-        double cc_face_plane_eq_dparam; //
+		scalar_t cc_face_plane_eq_dparam; //
         const int largest_component_of_normal = compute_polygon_plane_coefficients(
             cc_face_normal_vector,
             cc_face_plane_eq_dparam,
@@ -1073,7 +1073,7 @@ void triangulate_face(
         // is CW (negative) or CCW (positive)
         //
 
-        double signed_area = 0;
+        scalar_t signed_area = 0;
 
         for (uint32_t i = 0; i < cc_face_vcount - 2; ++i) {
             vec2 cur = cc_face_vcoords2d[i];
@@ -1245,11 +1245,12 @@ void triangulate_face(
     //
 
     // Find the duplicates (if any)
-    const cdt::duplicates_info_t duplicates_info_pre = cdt::find_duplicates<double>(
+	const cdt::duplicates_info_t duplicates_info_pre =
+		cdt::find_duplicates<scalar_t>(
         cc_face_vcoords2d.cbegin(),
         cc_face_vcoords2d.cend(),
-        cdt::get_x_coord_vec2d<double>,
-        cdt::get_y_coord_vec2d<double>);
+									   cdt::get_x_coord_vec2d<scalar_t>,
+									   cdt::get_y_coord_vec2d<scalar_t>);
 
     // number of duplicate vertices (if any)
     const uint32_t duplicate_vcount = (uint32_t)duplicates_info_pre.duplicates.size();
@@ -1326,11 +1327,12 @@ void triangulate_face(
                 // positive-value if three points are in CCW order (sign_t::ON_POSITIVE_SIDE)
                 // negative-value if three points are in CW order (sign_t::ON_NEGATIVE_SIDE)
                 // zero if collinear (sign_t::ON_ORIENTED_BOUNDARY)
-                const double orient2d_res = orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
+				const scalar_t orient2d_res =
+					orient2d(perturbed_dvertex_coords, next_vtx_coords, prev_vtx_coords);
                 const sign_t orient2d_sgn = sign(orient2d_res);
 
-                const double to_prev_sqr_len = squared_length(to_prev);
-                const double to_next_sqr_len = squared_length(to_next);
+                const scalar_t to_prev_sqr_len = squared_length(to_prev);
+				const scalar_t to_next_sqr_len = squared_length(to_next);
 
                 //
                 // Now we must determine which side is the perturbation_vector must be
@@ -1357,7 +1359,7 @@ void triangulate_face(
                 // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
                 // that this threshold is too "small" a number for us to be able to reliably compute
                 // stuff with the result of "orient2d()" that is near this threshold.
-                const double errbound = 1e-2;
+				const scalar_t errbound = 1e-2;
 
                 // We use "errbound", rather than "orient2d_res", to determine if the incident edges
                 // are parallel to give us sufficient room of numerical-precision to reliably compute
@@ -1402,7 +1404,7 @@ void triangulate_face(
                 //
 
                 // largest squared length between any two vertices in "cc_face_iter"
-                double largest_sqrd_length = -1.0;
+				scalar_t largest_sqrd_length = -1.0;
 
                 for (uint32_t i = 0; i < cc_face_vcount; ++i) {
 
@@ -1416,7 +1418,7 @@ void triangulate_face(
 
                         const vec2& b = SAFE_ACCESS(cc_face_vcoords2d, j);
 
-                        const double sqrd_length = squared_length(b - a);
+                        const scalar_t sqrd_length = squared_length(b - a);
                         largest_sqrd_length = std::max(sqrd_length, largest_sqrd_length);
                     }
                 }
@@ -1426,7 +1428,7 @@ void triangulate_face(
                 // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
                 //
 
-                const double shift_len = std::sqrt(largest_sqrd_length);
+                const scalar_t shift_len = std::sqrt(largest_sqrd_length);
                 const vec2 shift = perturbation_dir * shift_len;
 
                 vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
