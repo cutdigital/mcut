@@ -794,8 +794,11 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
 
         const scalar_t comp = n[i];
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+		const scalar_t comp_abs = absolute_value(comp);
+#else
 		const scalar_t comp_abs = std::fabs(comp);
-
+#endif
         if (comp_abs > max_normal_comp_val_abs) {
             max_normal_comp_idx = i;
             max_normal_comp_val_abs = comp_abs;
@@ -817,9 +820,11 @@ void generate_supertriangle_from_mesh_vertices(
 
     vec3 uv_pos = normalize((u + v));
     vec3 uv_neg = normalize((u - v));
-    vec3 vertex0 = mean_on_plane + uv_pos * (bbox_diag * 2);
-    vec3 vertex1 = mean_on_plane + uv_neg * (bbox_diag * 2);
-    vec3 vertex2 = mean_on_plane - (normalize(uv_pos + uv_neg) * (bbox_diag * 2)); // supertriangle_origin + (u * bbox_diag * 4);
+	vec3 vertex0 = mean_on_plane + uv_pos * (bbox_diag * scalar_t(2.0));
+	vec3 vertex1 = mean_on_plane + uv_neg * (bbox_diag * scalar_t(2.0));
+	vec3 vertex2 = mean_on_plane -
+				   (normalize(uv_pos + uv_neg) *
+					(bbox_diag * scalar_t(2.0))); // supertriangle_origin + (u * bbox_diag * 4);
 
     supertriangle_vertices.resize(9 * flt_size);
 
@@ -827,9 +832,18 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
         void* dst = supertriangle_vertices.data() + (counter * flt_size);
         if (have_double) {
-            memcpy(dst, &vertex0[i], flt_size);
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			double tmp = (double)vertex0[i].get_d();
+#else
+			double tmp = (double)vertex0[i];
+#endif
+			memcpy(dst, &tmp, flt_size);
         } else {
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			float tmp = (float)vertex0[i].get_d();
+#else
             float tmp = (float)vertex0[i];
+#endif
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -839,9 +853,18 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
         void* dst = supertriangle_vertices.data() + (counter * flt_size);
         if (have_double) {
-            memcpy(dst, &vertex1[i], flt_size);
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			double tmp = (double)vertex1[i].get_d();
+#else
+			double tmp = (double)vertex1[i];
+#endif
+			memcpy(dst, &tmp, flt_size);
         } else {
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			float tmp = (float)vertex1[i].get_d();
+#else
             float tmp = (float)vertex1[i];
+#endif
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -851,9 +874,18 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
         void* dst = supertriangle_vertices.data() + (counter * flt_size);
         if (have_double) {
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			double tmp = (double)vertex2[i].get_d();
+#else
+			double tmp = (double)vertex2[i];
+#endif
             memcpy(dst, &vertex2[i], flt_size);
         } else {
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+			float tmp = (float)vertex2[i].get_d();
+#else
             float tmp = (float)vertex2[i];
+#endif
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -1359,7 +1391,7 @@ void triangulate_face(
                 // whose magnitude is lower than the threshold "orient2d_ccwerrboundA". It follows
                 // that this threshold is too "small" a number for us to be able to reliably compute
                 // stuff with the result of "orient2d()" that is near this threshold.
-				const scalar_t errbound = 1e-2;
+				const double errbound = 1e-2;
 
                 // We use "errbound", rather than "orient2d_res", to determine if the incident edges
                 // are parallel to give us sufficient room of numerical-precision to reliably compute
@@ -1369,8 +1401,13 @@ void triangulate_face(
                 // (within some threshold) to the edges being parallel, can induce unpredicatable
                 // numerical instabilities, where the mean-vector will be too close to the zero-vector
                 // and can complicate the task of perturbation.
-                const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
 
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS // I think this can be made exact (i.e. without "errbound")
+				const bool incident_edges_are_parallel =
+					absolute_value(orient2d_res) <= absolute_value(scalar_t::quantize(errbound, multiplier));
+#else
+                const bool incident_edges_are_parallel = std::fabs(orient2d_res) <= std::fabs(errbound);
+#endif
                 if (incident_edges_are_parallel) {
                     //
                     // pick the shortest of the two incident edges and compute the
@@ -1427,8 +1464,11 @@ void triangulate_face(
                 // construct the segment with-which will will find the closest
                 // intersection point from "perturbed_dvertex_coords" to "perturbed_dvertex_coords + perturbation_dir*std::sqrt(largest_sqrd_length)"";
                 //
-
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+				const scalar_t shift_len = square_root(largest_sqrd_length, multiplier);
+#else
                 const scalar_t shift_len = std::sqrt(largest_sqrd_length);
+#endif
                 const vec2 shift = perturbation_dir * shift_len;
 
                 vec2 intersection_point_on_edge = perturbed_dvertex_coords + shift; // some location potentially outside of polygon
@@ -1443,7 +1483,7 @@ void triangulate_face(
 
                     // test segment against all edges to find closest intersection point
 
-                    double segment_min_tval = 1.0;
+                    scalar_t segment_min_tval = 1.0;
 
                     // for each edge of face to be triangulated (number of vertices == number of edges)
                     for (std::uint32_t i = 0; i < cc_face_vcount; ++i) {
@@ -1458,8 +1498,8 @@ void triangulate_face(
                         const vec2& edge_start_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_start_idx);
                         const vec2& edge_end_coords = SAFE_ACCESS(cc_face_vcoords2d, edge_end_idx);
 
-                        double segment_tval; // parameter along segment
-                        double edge_tval; // parameter along current edge
+                        scalar_t segment_tval; // parameter along segment
+						scalar_t edge_tval; // parameter along current edge
                         vec2 ipoint; // intersection point between segment and current edge
 
                         const char result = compute_segment_intersection(
@@ -1477,12 +1517,14 @@ void triangulate_face(
                             // pick the closest vertex of edge and compute "segment_tval" as a ratio of vector length
 
                             // length from segment start to the start of edge
-                            const double sqr_dist_to_edge_start = squared_length(edge_start_coords - segment.start);
+							const scalar_t sqr_dist_to_edge_start =
+								squared_length(edge_start_coords - segment.start);
                             // length from segment start to the end of edge
-                            const double sqr_dist_to_edge_end = squared_length(edge_end_coords - segment.start);
+							const scalar_t sqr_dist_to_edge_end =
+								squared_length(edge_end_coords - segment.start);
 
                             // length from start of segment to either start of edge or end of edge (depending on which is closer)
-                            double sqr_dist_to_closest = sqr_dist_to_edge_start;
+							scalar_t sqr_dist_to_closest = sqr_dist_to_edge_start;
                             const vec2* ipoint_ptr = &edge_start_coords;
 
                             if (sqr_dist_to_edge_start > sqr_dist_to_edge_end) {
@@ -1491,8 +1533,11 @@ void triangulate_face(
                             }
 
                             // ratio along segment
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+							segment_tval = square_root(sqr_dist_to_closest, multiplier) / shift_len;
+#else
                             segment_tval = std::sqrt(sqr_dist_to_closest) / shift_len;
-
+#endif
                             if (segment_min_tval > segment_tval) {
                                 segment_min_tval = segment_tval;
                                 intersection_point_on_edge = *ipoint_ptr; // closest point
@@ -1500,7 +1545,9 @@ void triangulate_face(
                         }
                     }
 
-                    MCUT_ASSERT(segment_min_tval <= 1.0); // ... because we started from max length between any two vertices
+                    MCUT_ASSERT(
+						segment_min_tval <=
+						scalar_t::one()); // ... because we started from max length between any two vertices
                 }
 
                 // Shortened perturbation vector: shortening from the vector that is as long as the
@@ -1508,9 +1555,12 @@ void triangulate_face(
                 // from "perturbed_dvertex_coords" and upto the boundary-point of the "cc_face_iter", along
                 // "perturbation_vector" and passing through the interior of "cc_face_iter")
                 const vec2 revised_perturbation_vector = (intersection_point_on_edge - perturbed_dvertex_coords);
-                const double revised_perturbation_len = length(revised_perturbation_vector);
-
-                const double scale = (errbound * revised_perturbation_len);
+				const scalar_t revised_perturbation_len = length(revised_perturbation_vector);
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+                const scalar_t scale = (scalar_t::quantize(errbound,multiplier) * revised_perturbation_len);
+#else
+				const scalar_t scale = (errbound * revised_perturbation_len);
+#endif
                 // The translation by which we perturb "perturbed_dvertex_coords"
                 //
                 // NOTE: since "perturbation_vector" was constructed from "to_prev" and "to_next",
@@ -1929,7 +1979,12 @@ void get_connected_component_data_impl_detail(
 
                         // for each component of coordinate
                         for (int i = 0; i < 3; ++i) {
-                            const float val = static_cast<float>(coords[i]);
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+							const float val = static_cast<float>( scalar_t::dequantize(coords[i],multiplier));
+#else
+							const float val = static_cast<float>(coords[i]);
+#endif
+                            
                             *(casted_ptr + elem_offset) = val;
                             elem_offset += 1;
                         }

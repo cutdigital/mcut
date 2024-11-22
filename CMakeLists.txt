@@ -7,7 +7,7 @@
 #	MCUT_BUILD_TUTORIALS [default=OFF] - Build tutorials
 #	MCUT_BUILD_WITH_COMPUTE_HELPER_THREADPOOL [default=ON] - Build as configurable multi-threaded library
 #   MCUT_BUILD_WITH_API_EVENT_LOGGING [default=OFF] - Build with logging functionality which dumps event creation and destruction notices to the console
-#   MCUT_WITH_ARBITRARY_PRECISION_NUMBERS [default=OFF] - Build with exact number representations, which means that mcut can recieve, return and internally compute intyersections with an exact number representation.
+#   MCUT_WITH_ARBITRARY_PRECISION_NUMBERS [default=ON] - Build with exact number representations, which means that mcut can recieve, return and internally compute intyersections with an exact number representation.
 #
 # This script will define the following CMake cache variables:
 #
@@ -98,7 +98,7 @@ if (MCUT_TOPLEVEL_PROJECT AND NOT MCUT_BUILD_TUTORIALS)
 	option(MCUT_BUILD_TUTORIALS "Configure to build MCUT tutorials" ON)
 endif()
 option(MCUT_BUILD_WITH_API_EVENT_LOGGING "Configure to build MCUT with event logging to console" OFF)
-
+option(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS "Configure to build with arbitrary precision numbers" ON)
 #
 # machine-precision-numbers library targets
 #
@@ -115,6 +115,9 @@ list(APPEND include_dirs  ${MCUT_INCLUDE_DIR})
 list(APPEND compilation_flags "")
 if(MCUT_BUILD_AS_SHARED_LIB)
 	list(APPEND preprocessor_defs -DMCUT_SHARED_LIB=1)
+endif()
+if(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+	list(APPEND preprocessor_defs -DMCUT_WITH_ARBITRARY_PRECISION_NUMBERS=1)
 endif()
 
 find_package(Threads REQUIRED)

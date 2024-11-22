@@ -67,6 +67,16 @@ public:
 
 	virtual ~rational_number() { }
 
+    inline static rational_number zero() 
+	{
+		return rational_number::zero();
+	}
+
+    inline static rational_number one() 
+	{
+		return rational_number(1.0);
+	}
+
 	explicit operator double() const
 	{
 		return this->get_d();
@@ -115,7 +125,7 @@ public:
 
 	static rational_number abs(rational_number _a)
 	{
-		if(_a < rational_number(0))
+		if(_a < rational_number::zero())
 		{
 			auto copy = _a;
 			copy.negate();
@@ -143,12 +153,12 @@ public:
     static rational_number quantize(const double& d /*double prec value*/,
 									   const double& m /*multiplier*/)
 	{
-		assert(d<=m);
-		assert(m != 0);
+		MCUT_ASSERT(d<=m);
+		MCUT_ASSERT(m != 0);
 
 		if(d == 0)
 		{
-			return rational_number(0);
+			return rational_number::zero();
         }
 		
         //  map all into normalized range [-1, 1]^3.
@@ -162,7 +172,7 @@ public:
 	static double dequantize(const rational_number& i /*rational*/,
 								 const double& m /*multiplier*/)
 	{
-		if(i == 0)
+		if(i == rational_number::zero())
 		{
 			return (0.0);
 		}
@@ -513,7 +523,7 @@ private:
     std::vector<T> m_entries;
 };
 
-extern scalar_t square_root(const scalar_t& number);
+extern scalar_t square_root(const scalar_t& number, double multiplier=1);
 extern scalar_t absolute_value(const scalar_t& number);
 extern sign_t sign(const scalar_t& number);
 extern std::ostream& operator<<(std::ostream& os, const vec3& v);

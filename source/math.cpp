@@ -243,7 +243,11 @@
 
         std::sort(non_colinear_triplets.begin(), non_colinear_triplets.end(),
             [](const std::tuple<int, int, int, scalar_t>& a, const std::tuple<int, int, int, scalar_t>& b) {
+#if 1 // work with double or rational_number
+				return absolute_value(std::get<3>(a)) > absolute_value(std::get<3>(b));
+#else
                 return std::fabs(std::get<3>(a)) > std::fabs(std::get<3>(b));
+#endif
             });
 
         std::tuple<int, int, int, scalar_t> best_triplet = non_colinear_triplets.front(); // maximising non-colinearity
@@ -586,7 +590,7 @@
             MCUT_ASSERT(s != sign_t::ZERO); // implies that the normal vector has a magnitude of zero
             // The largest component of the normal is the one we will "remove"
             // NOTE: we multiple by the sign here to ensure that "a_plus_b" below is not zero when a == b
-            x[polygon_normal_largest_component] = scalar_t((1.0) * static_cast<long scalar_t>(s));
+            x[polygon_normal_largest_component] = scalar_t((1.0) * static_cast<double>(s));
             return x;
         }();
 
@@ -693,7 +697,7 @@
             const vec3& x = polygon_vertices[i];
             out[i] = P * x; // vertex in xz plane
         }
-#else // This code is not reliable because it shadow-projects a polygons which can skew computations
+#else // This code is not reliable because it shadow-projects a polygons which can skew computations 
         for (int i = 0; i < polygon_vertex_count; ++i) { // for each vertex
             vec2& Tp = out[i];
             int k = 0;
