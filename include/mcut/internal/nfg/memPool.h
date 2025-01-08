@@ -198,19 +198,62 @@ inline IN_pool::IN_pool(IN_pool&& p) noexcept
 //    If V==0 use standard free()
 //    else if V==N release a block is the corresponding IN_pool
 
+
+//#	ifdef _MSC_VER
+//#		include <intrin.h>
+//#		define __builtin_popcount __popcnt
+//
+//unsigned int __inline my_msvc_clz_fn(unsigned int value)
+//{
+//	unsigned long leading_zero = 0;
+//
+//	if(_BitScanReverse(&leading_zero, value))
+//	{
+//		return 31 - leading_zero;
+//	}
+//	else
+//	{
+//		// Same remarks as above
+//		return 32;
+//	}
+//}
+//
+//#	endif
+//
+//#	ifndef CHAR_BIT
+//#		define CHAR_BIT 8
+//#	endif
+//
+//// count leading zeros in 32 bit bitfield
+//unsigned int my_countl_zero(unsigned int x) // stub
+//{
+//#		ifdef _MSC_VER
+//	return my_msvc_clz_fn(x);
+//#		else
+//	return __builtin_clz(x); 
+//#		endif
+//}
+
+
 class MultiPool {
 	std::vector<IN_pool> IN_pools;
 	uint32_t max_block_size;
 
 	IN_pool& pickPoolFromSize(uint32_t bs) {
+#if 0
+#if 0 // my modification
+		auto cz = my_countl_zero(bs);
+#else // original code (require c++20)
 		auto cz = std::countl_zero(bs - 1);
+#endif
 		cz = (cz == 32) ? (31) : (cz);
 		return IN_pools[31 - cz];
-
-		//// FOR COMPILERS THAT DO NOT SUPPORT C++20 REPLACE THE ABOVE WITH THE FOLLOWING
-		//std::vector<IN_pool>::iterator i = IN_pools.begin();
-		//while ((*i).blockSize() < bs) i++;
-		//return *i;
+#else
+		// FOR COMPILERS THAT DO NOT SUPPORT C++20 REPLACE THE ABOVE WITH THE FOLLOWING
+		std::vector<IN_pool>::iterator i = IN_pools.begin();
+		while ((*i).blockSize() < bs) i++;
+		return *i;
+#endif
 	}
 
 public:

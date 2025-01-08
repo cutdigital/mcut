@@ -46,6 +46,9 @@
 #pragma warning(disable : 26812)
 #endif
 
+thread_local MultiPool expansionObject::mempool = MultiPool(2048, 64);
+thread_local MultiPool nfgMemoryPool;
+
 MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags)
 {
     McResult return_value = McResult::MC_NO_ERROR;

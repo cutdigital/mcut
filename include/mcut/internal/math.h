@@ -69,7 +69,7 @@ public:
 
     inline static rational_number zero() 
 	{
-		return rational_number::zero();
+		return rational_number(0.0);
 	}
 
     inline static rational_number one() 
@@ -120,7 +120,7 @@ public:
 	}
 
     //
-    // statis member functions
+    // static member functions
     //
 
 	static rational_number abs(rational_number _a)
@@ -153,7 +153,7 @@ public:
     static rational_number quantize(const double& d /*double prec value*/,
 									   const double& m /*multiplier*/)
 	{
-		MCUT_ASSERT(d<=m);
+		MCUT_ASSERT(std::abs(d)<=m);
 		MCUT_ASSERT(m != 0);
 
 		if(d == 0)
@@ -181,7 +181,7 @@ public:
 		const auto n = i / rational_number(1 << 26);
 		// from normalized range [-1, 1]^3 to actual/user coord value
 		const auto d = n * rational_number(m);
-		const double result = d.get_d();
+		const double result = d.get_d(); // NOTE: truncated
 		return result;
 	}
 };
@@ -523,7 +523,27 @@ private:
     std::vector<T> m_entries;
 };
 
-extern scalar_t square_root(const scalar_t& number, double multiplier=1);
+template <typename T >
+T square_root(const T& number, double multiplier = 1)
+{
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+		return std::sqrt(number);
+#else
+	const double dequantized = scalar_t::dequantize(
+		number, multiplier); // to native user coordinates/from rational coordinates
+	const double sqrt_val = std::sqrt(dequantized);
+	const scalar_t quantized =
+		scalar_t::quantize(sqrt_val, multiplier); // to rational coordinates
+	return quantized;
+#endif // #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
+}
+
+template <>
+inline double square_root(const double& x, double multiplier)
+{
+	return std::sqrt(x);
+}
+
 extern scalar_t absolute_value(const scalar_t& number);
 extern sign_t sign(const scalar_t& number);
 extern std::ostream& operator<<(std::ostream& os, const vec3& v);
@@ -580,9 +600,9 @@ vec3_<T> compwise_max(const vec3_<T>& a, const vec3_<T>& b)
 extern vec3 cross_product(const vec3& a, const vec3& b);
 
 template <typename vector_type>
-scalar_t dot_product(const vector_type& a, const vector_type& b)
+typename vector_type::element_type dot_product(const vector_type& a, const vector_type& b)
 {
-    scalar_t out(0.0);
+	typename vector_type::element_type out(0.0);
     for (int i = 0; i < vector_type::cardinality(); ++i) {
         out += (a[i] * b[i]);
     }
@@ -623,13 +643,13 @@ matrix_t<typename vector_type::element_type> outer_product(const vector_type& a,
 }
 
 template <typename vector_type>
-scalar_t squared_length(const vector_type& v)
+typename vector_type::element_type squared_length(const vector_type& v)
 {
     return dot_product(v, v);
 }
 
 template <typename vector_type>
-scalar_t length(const vector_type& v, double multiplier=1.0)
+typename vector_type::element_type length(const vector_type& v, double multiplier = 1.0)
 {
 	return square_root(squared_length(v), multiplier);
 }
@@ -726,6 +746,12 @@ bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
 bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult);
 
 bool collinear(const vec2& a, const vec2& b, const vec2& c);
+
+char Parallellntd(const vec2_<double>& a,
+				 const vec2_<double>& b,
+				 const vec2_<double>& c,
+				 const vec2_<double>& d,
+				 vec2_<double>& p);
 
 /*
 Compute the intersection of two line segments. Can also be used to calculate where the respective lines intersect.
@@ -876,6 +902,17 @@ orient3d(const scalar_t* pa, const scalar_t* pb, const scalar_t* pc, const scala
 	return adx * (bdy * cdz - bdz * cdy) + bdx * (cdy * adz - cdz * ady) +
 		   cdx * (ady * bdz - adz * bdy);
 }
+
+static double orient2d(const vec2_<double>& pa, const vec2_<double>& pb, const vec2_<double>& pc)
+{
+	const double pa_[2] = {pa.x(), pa.y()};
+	const double pb_[2] = {pb.x(), pb.y()};
+	const double pc_[2] = {pc.x(), pc.y()};
+
+	return ::orient2d(pa_, pb_, pc_); // shewchuk predicate
+}
 #endif
+
+
 
 #endif // MCUT_MATH_H_

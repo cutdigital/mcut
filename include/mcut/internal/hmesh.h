@@ -309,7 +309,7 @@ public:
 
     vertex_descriptor_t add_vertex(const vec3& point);
 
-    vertex_descriptor_t add_vertex(const double& x, const double& y, const double& z);
+    vertex_descriptor_t add_vertex(const scalar_t& x, const scalar_t& y, const scalar_t& z);
     // adds an edges into the mesh data structure, creating incident halfedges, and returns the
     // halfedge whole target is "v1"
     halfedge_descriptor_t add_edge(const vertex_descriptor_t v0, const vertex_descriptor_t v1);

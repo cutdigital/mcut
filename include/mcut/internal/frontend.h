@@ -963,7 +963,8 @@ extern "C" void triangulate_face(
     const uint32_t cc_face_vcount,
     const std::vector<vertex_descriptor_t>&cc_face_vertices,
     const hmesh_t & cc,
-    const fd_t cc_face_iter);
+	const fd_t cc_face_iter,
+	const double multiplier);
 
 // list of contexts created by client/user
 extern "C" threadsafe_list<std::shared_ptr<context_t>> g_contexts;

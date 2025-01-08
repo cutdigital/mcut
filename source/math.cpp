@@ -39,7 +39,7 @@
 #include <tuple> // std::make_tuple std::get<>
 
 
-    scalar_t square_root(const scalar_t& number, double multiplier=1.0)
+    scalar_t square_root(const scalar_t& number, double multiplier)
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::sqrt(number);
@@ -808,6 +808,8 @@
 		return orient2d(a, b, c) == scalar_t(0.);
     }
 
+    
+
     char Parallellnt(const vec2& a, const vec2& b, const vec2& c, const vec2& d, vec2& p)
     {
         if (!collinear(a, b, c)) {
@@ -835,6 +837,27 @@
         }
 
         return '0';
+    }
+
+    char Parallellntd(const vec2_<double>& a,
+					 const vec2_<double>& b,
+					 const vec2_<double>& c,
+					 const vec2_<double>& d,
+					 vec2_<double>& p)
+	{
+		vec2 p_;
+		auto result = Parallellnt(  vec2(a.x(), a.y()),
+						               vec2(b.x(), b.y()),
+						               vec2(c.x(), c.y()),
+						               vec2(d.x(), d.y()), p_);
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+		p[0] = p_.x().get_d();
+		p[1] = p_.y().get_d();
+#else
+		p[0] = p_.x(); 
+        p[1] = p_.y();
+#endif
+		return result;
     }
 
     char compute_segment_intersection(

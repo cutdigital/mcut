@@ -41,37 +41,40 @@
 #include <queue>
 
 #ifdef _MSC_VER
-#include <intrin.h>
-#define __builtin_popcount __popcnt
+#	include <intrin.h>
+#	define __builtin_popcount __popcnt
 
 // https://stackoverflow.com/questions/355967/how-to-use-msvc-intrinsics-to-get-the-equivalent-of-this-gcc-code
 unsigned int __inline clz_(unsigned int value)
 {
-    unsigned long leading_zero = 0;
+	unsigned long leading_zero = 0;
 
-    if (_BitScanReverse(&leading_zero, value)) {
-        return 31 - leading_zero;
-    } else {
-        // Same remarks as above
-        return 32;
-    }
+	if(_BitScanReverse(&leading_zero, value))
+	{
+		return 31 - leading_zero;
+	}
+	else
+	{
+		// Same remarks as above
+		return 32;
+	}
 }
 
 #endif
 
 #ifndef CHAR_BIT
-#define CHAR_BIT 8
+#	define CHAR_BIT 8
 #endif
 
 #if defined(USE_OIBVH)
 // count leading zeros in 32 bit bitfield
 unsigned int clz(unsigned int x) // stub
 {
-#ifdef _MSC_VER
-    return clz_(x);
-#else
-    return __builtin_clz(x); // only tested with gcc!!!
-#endif
+#	ifdef _MSC_VER
+	return clz_(x);
+#	else
+	return __builtin_clz(x); // only tested with gcc!!!
+#	endif
 }
 
 // next power of two from x
@@ -221,7 +224,8 @@ void build_oibvh(
     std::vector<bounding_box_t<vec3>>& bvhAABBs,
     std::vector<fd_t>& bvhLeafNodeFaces,
     std::vector<bounding_box_t<vec3>>& face_bboxes,
-    const double& slightEnlargmentEps)
+    const double& slightEnlargmentEps, // in native user coordinates
+    const double multiplier)
 {
     SCOPED_TIMER(__FUNCTION__);
 
@@ -248,9 +252,10 @@ void build_oibvh(
 
                 bounding_box_t<vec3>& bbox = face_bboxes[faceIdx];
 
-                if(slightEnlargmentEps > scalar_t(0.0))
+                if(slightEnlargmentEps >
+				   0.0)
 				{
-                    bbox.enlarge(slightEnlargmentEps);
+					bbox.enlarge(scalar_t::quantize(slightEnlargmentEps, multiplier));
                 }
 
                 // calculate bbox center
@@ -280,7 +285,8 @@ void build_oibvh(
         bounding_box_t<vec3>& bbox = face_bboxes[faceIdx];
 
         if (slightEnlargmentEps > double(0.0)) {
-            bbox.enlarge(slightEnlargmentEps);
+            //bbox.enlarge(slightEnlargmentEps);
+			bbox.enlarge(scalar_t::quantize(slightEnlargmentEps, multiplier));
         }
 
         // calculate bbox center
@@ -335,12 +341,23 @@ void build_oibvh(
                 const vec3& face_aabb_centre = SAFE_ACCESS(face_bbox_centers, faceIdx);
                 const vec3 offset = face_aabb_centre - meshBbox.minimum();
                 const vec3 dims = meshBbox.maximum() - meshBbox.minimum();
-
+#		if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+				const auto normalized_x = (offset.x() / dims.x()).get_d();
+				MCUT_ASSERT(normalized_x >= 0. && normalized_x <= 1.);
+				const auto normalized_y = (offset.y() / dims.y()).get_d();
+				MCUT_ASSERT(normalized_y >= 0. && normalized_y <= 1.);
+				const auto normalized_z = (offset.z() / dims.z()).get_d();
+				MCUT_ASSERT(normalized_z >= 0. && normalized_z <= 1.);
+				const unsigned int mortion_code =
+					morton3D(static_cast<float>(normalized_x), // no need to dequantized since value is normalized anyway
+							 static_cast<float>(normalized_y),
+							 static_cast<float>(normalized_z));
+#else
                 const unsigned int mortion_code = morton3D(
                     static_cast<float>(offset.x() / dims.x()),
                     static_cast<float>(offset.y() / dims.y()),
                     static_cast<float>(offset.z() / dims.z()));
-
+#endif
                 const uint32_t idx = (uint32_t)std::distance(mesh.faces_begin(), f); // NOTE: mesh.faces_begin() may not be the actual beginning internally
                 bvhLeafNodeDescriptors[idx].first = *f;
                 bvhLeafNodeDescriptors[idx].second = mortion_code;

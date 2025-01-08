@@ -122,7 +122,8 @@ extern void build_oibvh(
     std::vector<bounding_box_t<vec3>>& bvhAABBs,
     std::vector<fd_t>& bvhLeafNodeFaces,
     std::vector<bounding_box_t<vec3>>& face_bboxes,
-	const scalar_t& slightEnlargmentEps = scalar_t(0.0));
+	const double& slightEnlargmentEps=0.0, // in native user coordinates
+	const double multiplier=1.);
 
 extern void intersectOIBVHs(
     std::map<fd_t, std::vector<fd_t>>& ps_face_to_potentially_intersecting_others,

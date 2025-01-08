@@ -340,7 +340,7 @@ inline void setFPUModeToRoundNEAR() { fesetround(FE_TONEAREST); }
 	class expansionObject
 	{
 	public:
-		inline static thread_local MultiPool mempool = MultiPool(2048, 64);
+		/*inline*/ static thread_local MultiPool mempool/* = MultiPool(2048, 64)*/; // initialized/declared in mcut.cpp
 
 		static void Quick_Two_Sum(const double a, const double b, double& x, double& y) { x = a + b; y = b - (x - a); }
 
@@ -523,8 +523,11 @@ inline void setFPUModeToRoundNEAR() { fesetround(FE_TONEAREST); }
 
 	// Preallocates memory for bignaturals having at most 32 limbs.
 	// Larger numbers will use the standard heap.
+	#if 1
+	extern thread_local MultiPool nfgMemoryPool; // initialized/declared in mcut.cpp
+	#else // original code
 	inline static thread_local MultiPool nfgMemoryPool;
-
+	#endif
 	// A bignatural is an arbitrarily large non-negative integer.
 	// It is made of a sequence of digits in base 2^32.
 	// Leading zero-digits are not allowed.

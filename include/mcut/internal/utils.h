@@ -142,6 +142,8 @@ static inline int wrap_integer(int x, const int lo, const int hi)
     return lo + (x - lo) % range_size;
 }
 
+
+
 class logger_t {
 
     std::stringstream m_buffer;

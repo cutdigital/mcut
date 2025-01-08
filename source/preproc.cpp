@@ -112,8 +112,7 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 							scalar_t::quantize((*perturbation)[i].get_d(), multiplier); // perturb
 					}
 
-					quantized_vertex[j] -= scalar_t::quantize(srcmesh_cutmesh_com[i].get_d(),
-															  multiplier); // recentre to origin
+					//quantized_vertex[j] -= scalar_t::quantize(srcmesh_cutmesh_com[i].get_d(), multiplier); // recentre to origin
 				}
 			}
 
@@ -1822,7 +1821,8 @@ scalar_t computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
 						 num_vertices_around_face,
 						 vertices_around_face,
 						 *mesh.get(),
-						 face_descr);
+						 face_descr,
+						 multiplier);
 
 		std::vector<McUint32>
 			cdt_global; // triangulation indices of face (indices refer to "mesh" vertex array)
@@ -2103,7 +2103,7 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 
 bool calculate_vertex_parameters(
 	double& quantization_multiplier,
-	// vector to place all coordinates (or srcmesh and cutmesh) into the positive quadrant such that they all have positive numbers as coordinates.
+	// vector to place all coordinates (of srcmesh and cutmesh) into the positive quadrant such that they all have positive numbers as coordinates.
 	vec3& pre_quantization_translation,
 	// centre of mass
 	vec3& srcmesh_cutmesh_com,
@@ -2138,9 +2138,9 @@ bool calculate_vertex_parameters(
 			const float* vptr = reinterpret_cast<const float*>(pVertices);
 
 			// for each input mesh-vertex
-			for(McUint32 i = 0; i < numVertices; ++i)
+			for(McUint32 v = 0; v < numVertices; ++v)
 			{
-				const float* p = vptr + (i * 3);
+				const float* p = vptr + (v * 3);
 
 				for(auto i = 0; i < 3; ++i)
 				{
@@ -2242,6 +2242,8 @@ bool calculate_vertex_parameters(
 	const scalar_t M_np2 = is_pow2(M_) ? M_ : next_pow2(M_); 
 
 	quantization_multiplier = (double)M_np2;
+
+	return true;
 }
 
 extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
@@ -2430,7 +2432,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
         Thus, each such connected component will maintain its own (reference counted) pointer.
 
         These variables are used when populating client output arrays during mcGetConnectedComponentData.
-        One example of this usage is when the client requests a connected component�s face map. In the cases
+        One example of this usage is when the client requests a connected component's face map. In the cases
         where polygon partitioning occurs during the respective mcDispatch call then some of these shared_ptrs like
         �source_hmesh_child_to_usermesh_birth_face� will be used to generate the correct mapping from
         the faces of the connected component  to the
@@ -2468,8 +2470,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 	std::shared_ptr<hmesh_t> cut_hmesh =
 		std::shared_ptr<hmesh_t>(new hmesh_t); // halfedge representation of the cut-mesh
-	scalar_t cut_hmesh_aabb_diag =
-		length(cutmesh_bboxmax - cutmesh_bboxmin, 1); // in native user coordinates
+	double cut_hmesh_aabb_diag =
+		length(cutmesh_bboxmax - cutmesh_bboxmin, 1).get_d(); // in native user coordinates
 
 #if defined(USE_OIBVH)
 	std::vector<bounding_box_t<vec3>> cut_hmesh_BVH_aabb_array;
@@ -2494,7 +2496,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 	int cut_mesh_perturbation_count = 0; // number of times we have perturbed the cut mesh
 	int kernel_invocation_counter =
 		-1; // number of times we have called the internal dispatch/intersect function
-	scalar_t relative_perturbation_constant =
+	double relative_perturbation_constant =
 		0.0; // i.e. relative to the bbox diagonal length (in native user coordinates)
 	// the (translation) vector to hold the values with which we will
 	// carry out numerical perturbation of the cutting surface
@@ -2570,7 +2572,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 			// not intersect at all, which means we need to perturb again.
 			kernel_input.general_position_enforcement_count = cut_mesh_perturbation_count;
 
-			MCUT_ASSERT(relative_perturbation_constant != scalar_t(0.0));
+			MCUT_ASSERT(relative_perturbation_constant !=  (0.0));
 
 			static thread_local std::default_random_engine random_engine(1);
 			static thread_local std::mt19937 mersenne_twister_generator(random_engine());
@@ -2579,7 +2581,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 			for(int i = 0; i < 3; ++i)
 			{
-				perturbation[i] = scalar_t(uniform_distribution(mersenne_twister_generator)) *
+				perturbation[i] =  (uniform_distribution(mersenne_twister_generator)) *
 								  relative_perturbation_constant;
 			}
 
@@ -2618,7 +2620,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 				throw std::invalid_argument("invalid cut-mesh arrays");
 			}
 
-			/*const*/ scalar_t perturbation_scalar =
+			/*const*/ double perturbation_scalar =
 				cut_hmesh_aabb_diag; // in native user coordinates
 			if(dispatchFlags & MC_DISPATCH_ENFORCE_GENERAL_POSITION_ABSOLUTE)
 			{
@@ -2627,7 +2629,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 			relative_perturbation_constant =
 				perturbation_scalar *
-				scalar_t(context_ptr->get_general_position_enforcement_constant());
+				 (context_ptr->get_general_position_enforcement_constant());
 
 			kernel_input.cut_mesh = cut_hmesh;
 
