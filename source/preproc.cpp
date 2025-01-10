@@ -404,7 +404,7 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 			McUint32 idx = ((McUint32*)pFaceIndices)[faceSizeOffset + j];
 
 			if(idx >= numVertices)
-			{
+			{ 
 
 				context_ptr->dbg_cb(MC_DEBUG_SOURCE_API,
 									MC_DEBUG_TYPE_ERROR,

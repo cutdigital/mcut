@@ -129,14 +129,23 @@
     {
         // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
         normal = vec3(0.0);
-		/*int crossprods = 0;*/
+		//int crossprods = 0;
         for (int i = 1; i < polygon_vertex_count - 1; ++i) {
-			normal = normal +
+            auto cross = cross_product( polygon_vertices[i] - polygon_vertices[0],
+                                        polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0]);
+            if(squared_length(cross) > scalar_t::zero())
+            {
+                normal = normal +
 					 normalize( cross_product(polygon_vertices[i] - polygon_vertices[0],
 												  polygon_vertices[(i + 1) % polygon_vertex_count] -
 													  polygon_vertices[0]) , multiplier);
-			/*crossprods++;*/
+                    //crossprods++;
+            }
+			
+			
         }
+
+        
 
         /*normal = normal / (double)(crossprods);*/ // mean
 

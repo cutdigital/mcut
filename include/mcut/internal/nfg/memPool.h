@@ -207,7 +207,14 @@ public:
 
 	void release(uint32_t* s)
 	{
+#if 1 // my modification
+		uint32_t index = last++;
+		if(index<size){
+			stack[index] = s;
+		}
+#else // original code
 		stack[last++] = s;
+#endif
 	}
 
 	uint32_t blockSize() const

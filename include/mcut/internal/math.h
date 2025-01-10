@@ -605,7 +605,7 @@ vec3_<T> compwise_max(const vec3_<T>& a, const vec3_<T>& b)
 }
 
 template <typename vector_type>
-typename vector_type cross_product(const vector_type& a, const vector_type& b)
+vector_type cross_product(const vector_type& a, const vector_type& b)
 { 
     return vector_type( a.y() * b.z() - a.z() * b.y(),
 				        a.z() * b.x() - a.x() * b.z(),
@@ -665,7 +665,8 @@ template <typename vector_type>
 typename vector_type::element_type length(const vector_type& v, double multiplier = 1.0)
 {
 	MCUT_ASSERT(false);
-	return vector_type::element_type(); // no-op
+    typename vector_type::element_type foo;
+	return foo; // no-op
 }
 template <>
 inline scalar_t length(const vec3_<scalar_t>& v, double multiplier)

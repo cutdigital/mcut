@@ -342,11 +342,11 @@ void build_oibvh(
                 const vec3 offset = face_aabb_centre - meshBbox.minimum();
                 const vec3 dims = meshBbox.maximum() - meshBbox.minimum();
 #		if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-				const auto normalized_x = (offset.x() / dims.x()).get_d();
+				const auto normalized_x = dims.x() > scalar_t::zero() ? (offset.x() / dims.x()).get_d() : 0.;
 				MCUT_ASSERT(normalized_x >= 0. && normalized_x <= 1.);
-				const auto normalized_y = (offset.y() / dims.y()).get_d();
+				const auto normalized_y = dims.y() > scalar_t::zero() ? (offset.y() / dims.y()).get_d() : 0.;
 				MCUT_ASSERT(normalized_y >= 0. && normalized_y <= 1.);
-				const auto normalized_z = (offset.z() / dims.z()).get_d();
+				const auto normalized_z = dims.z() > scalar_t::zero() ? (offset.z() / dims.z()).get_d() : 0.;
 				MCUT_ASSERT(normalized_z >= 0. && normalized_z <= 1.);
 				const unsigned int mortion_code =
 					morton3D(static_cast<float>(normalized_x), // no need to dequantized since value is normalized anyway
