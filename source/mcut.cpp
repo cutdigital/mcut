@@ -49,6 +49,16 @@
 thread_local MultiPool expansionObject::mempool = MultiPool(2048, 64);
 thread_local MultiPool nfgMemoryPool;
 
+std::once_flag initFPU_flag;
+
+void thread_init_floating_point_unit()
+{
+	std::call_once(initFPU_flag, []() {
+		std::cout << "Calling 'initFPU()'\n";
+		initFPU();
+	});
+}
+
 MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags contextFlags)
 {
     McResult return_value = McResult::MC_NO_ERROR;
@@ -69,6 +79,8 @@ MCAPI_ATTR McResult MCAPI_CALL mcCreateContext(McContext* pOutContext, McFlags c
     if (return_value != McResult::MC_NO_ERROR) {
         std::fprintf(stderr, "%s(...) -> %s\n", __FUNCTION__, per_thread_api_log_str.c_str());
     }
+
+    thread_init_floating_point_unit();
 
     return return_value;
 }

@@ -83,13 +83,13 @@
         return (a.x() == b.x()) && (a.y() == b.y()) && (a.z() == b.z());
     }
 
-    vec3 cross_product(const vec3& a, const vec3& b)
+    /*vec3 cross_product(const vec3& a, const vec3& b)
     {
         return vec3(
             a.y() * b.z() - a.z() * b.y(),
             a.z() * b.x() - a.x() * b.z(),
             a.x() * b.y() - a.y() * b.x());
-    }
+    }*/
 
     scalar_t orient2d(const vec2& pa, const vec2& pb, const vec2& pc)
     {
@@ -123,13 +123,22 @@
 #endif
 
     int compute_polygon_plane_coefficients(vec3& normal, scalar_t& d_coeff,
-        const vec3* polygon_vertices, const int polygon_vertex_count)
+										   const vec3* polygon_vertices,
+										   const int polygon_vertex_count,
+										   const double multiplier)
     {
         // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
         normal = vec3(0.0);
-        for (int i = 0; i < polygon_vertex_count - 1; ++i) {
-            normal = normal + cross_product(polygon_vertices[i] - polygon_vertices[0], polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0]);
+		/*int crossprods = 0;*/
+        for (int i = 1; i < polygon_vertex_count - 1; ++i) {
+			normal = normal +
+					 normalize( cross_product(polygon_vertices[i] - polygon_vertices[0],
+												  polygon_vertices[(i + 1) % polygon_vertex_count] -
+													  polygon_vertices[0]) , multiplier);
+			/*crossprods++;*/
         }
+
+        /*normal = normal / (double)(crossprods);*/ // mean
 
         // In our calculations we need the normal be be of unit length so that the d-coeff
         // represents the distance of the plane from the origin
@@ -202,13 +211,15 @@
 
     bool determine_three_noncollinear_vertices(int& i, int& j, int& k, const std::vector<vec3>& polygon_vertices,
 
-        const vec3& polygon_normal, const int polygon_normal_largest_component)
+        const vec3& polygon_normal,
+											   const int polygon_normal_largest_component,
+											   const double multiplier)
     {
         const int polygon_vertex_count = (int)polygon_vertices.size();
         MCUT_ASSERT(polygon_vertex_count >= 3);
 
         std::vector<vec2> x;
-        project_to_2d(x, polygon_vertices, polygon_normal, polygon_normal_largest_component);
+        project_to_2d(x, polygon_vertices, polygon_normal, polygon_normal_largest_component, multiplier);
         MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
 
         /*
@@ -262,7 +273,8 @@
     char compute_segment_plane_intersection_type(const vec3& q, const vec3& r,
         const std::vector<vec3>& polygon_vertices,
         const vec3& polygon_normal,
-        const int polygon_normal_largest_component)
+												 const int polygon_normal_largest_component,
+												 const double multiplier)
     {
         // TODO: we could also return i,j and k so that "determine_three_noncollinear_vertices" is not called multiple times,
         // which we do to determine the type of intersection and the actual intersection point
@@ -273,7 +285,7 @@
         int k = 2;
         if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
             bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_normal,
-                polygon_normal_largest_component);
+                polygon_normal_largest_component, multiplier);
 
             if (!b) {
                 return '0'; // all polygon points are collinear
@@ -300,7 +312,8 @@
         const std::vector<vec3>& polygon_vertices,
 
         const int polygon_normal_max_comp,
-        const vec3& polygon_plane_normal)
+        const vec3& polygon_plane_normal,
+													  const double multiplier)
     {
         const int polygon_vertex_count = (int)polygon_vertices.size();
         // ... any three vertices that are not collinear
@@ -309,7 +322,8 @@
         int k = 2;
         if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
             bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_plane_normal,
-                polygon_normal_max_comp);
+														   polygon_normal_max_comp,
+														   multiplier);
 
             if (!b) {
                 return '0'; // all polygon points are collinear
@@ -363,7 +377,7 @@
         const vec3& q, const vec3& r,
         const std::vector<vec3>& polygon_vertices, const int polygon_normal_max_comp,
         const vec3& polygon_plane_normal,
-        const scalar_t& polygon_plane_d_coeff)
+        const scalar_t& polygon_plane_d_coeff, const double multiplier)
     {
 
         const int polygon_vertex_count = (int)polygon_vertices.size();
@@ -373,7 +387,8 @@
         int k = 2;
         if (polygon_vertex_count > 3) { // case where we'd have the possibility of noncollinearity
             bool b = determine_three_noncollinear_vertices(i, j, k, polygon_vertices, polygon_plane_normal,
-                polygon_normal_max_comp);
+														   polygon_normal_max_comp,
+														   multiplier);
 
             if (!b) {
                 return '0'; // all polygon points are collinear
@@ -575,14 +590,14 @@
     // corresponds to the largest component of the normal..
     // https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d/2672702#2672702
     matrix_t<scalar_t> calculate_projection_matrix(const vec3& polygon_normal,
-        const int polygon_normal_largest_component)
+        const int polygon_normal_largest_component, double multiplier)
     {
         MCUT_ASSERT(squared_length(polygon_normal) > scalar_t(0.0));
         MCUT_ASSERT(polygon_normal_largest_component >= 0);
         MCUT_ASSERT(polygon_normal_largest_component <= 2);
 
         // unit length normal vector of polygon
-        const vec3 a = normalize(polygon_normal);
+		const vec3 a = normalize(polygon_normal, multiplier);
         // unit length basis vector corresponding to the largest component of the normal vector
         const vec3 b = [&]() {
             vec3 x(scalar_t(0.0));
@@ -659,32 +674,32 @@
         return K * R;
     }
 
-    // https://answers.unity.com/questions/1522620/converting-a-3d-polygon-into-a-2d-polygon.html
-    void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices, const vec3& polygon_normal)
-    {
-        const uint32_t N = (uint32_t)polygon_vertices.size();
-        out.resize(N);
+  //  // https://answers.unity.com/questions/1522620/converting-a-3d-polygon-into-a-2d-polygon.html
+  //  void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices, const vec3& polygon_normal, const double multiplier)
+  //  {
+  //      const uint32_t N = (uint32_t)polygon_vertices.size();
+  //      out.resize(N);
 
-        const vec3 normal = normalize(polygon_normal);
+  //      const vec3 normal = normalize(polygon_normal, multiplier);
 
-        // first unit vector on plane (rotation by 90 degrees)
-        vec3 u(-normal.y(), normal.x(), normal.z());
-        vec3 v = normalize(cross_product(u, normal));
+  //      // first unit vector on plane (rotation by 90 degrees)
+  //      vec3 u(-normal.y(), normal.x(), normal.z());
+		//vec3 v = normalize(cross_product(u, normal), multiplier);
 
-        for(uint32_t i =0; i < N; ++i)
-        {
-            const vec3 point = polygon_vertices[i];
-            const vec2 projected(
-                dot_product(point, u),
-                dot_product(point, v)
-            );
+  //      for(uint32_t i =0; i < N; ++i)
+  //      {
+  //          const vec3 point = polygon_vertices[i];
+  //          const vec2 projected(
+  //              dot_product(point, u),
+  //              dot_product(point, v)
+  //          );
 
-            out[i] = projected;
-        }
-    }
+  //          out[i] = projected;
+  //      }
+  //  }
 
     void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
-        const vec3& polygon_normal, const int polygon_normal_largest_component)
+        const vec3& polygon_normal, const int polygon_normal_largest_component, const double multiplier)
     {
         const int polygon_vertex_count = (int)polygon_vertices.size();
         out.clear();
@@ -692,7 +707,8 @@
 
 #if 1
         // 3x3 matrix for projecting a point to 2D
-        matrix_t<scalar_t> P = calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
+		matrix_t<scalar_t> P = calculate_projection_matrix(
+			polygon_normal, polygon_normal_largest_component, multiplier);
         for (int i = 0; i < polygon_vertex_count; ++i) { // for each vertex
             const vec3& x = polygon_vertices[i];
             out[i] = P * x; // vertex in xz plane
@@ -714,7 +730,9 @@
 
     // TODO: update this function to use "project_to_2d" for projection step
     char compute_point_in_polygon_test(const vec3& p, const std::vector<vec3>& polygon_vertices,
-        const vec3& polygon_normal, const int polygon_normal_largest_component)
+									   const vec3& polygon_normal,
+									   const int polygon_normal_largest_component,
+									   const double multiplier)
     {
         const int polygon_vertex_count = (int)polygon_vertices.size();
         /* Project out coordinate m in both p and the triangular face */
@@ -732,7 +750,8 @@
     }
 #endif
 
-        const matrix_t<scalar_t> P = calculate_projection_matrix(polygon_normal, polygon_normal_largest_component);
+        const matrix_t<scalar_t> P = calculate_projection_matrix(
+			polygon_normal, polygon_normal_largest_component, multiplier);
 
         pp = P * p;
 

@@ -33,13 +33,6 @@
  *
  **************************************************************************/
 
-#include "mcut/internal/frontend.h"
-#include "mcut/internal/preproc.h"
-
-#include "mcut/internal/hmesh.h"
-#include "mcut/internal/math.h"
-#include "mcut/internal/utils.h"
-
 #include <algorithm>
 #include <array>
 #include <fstream>
@@ -51,6 +44,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
+
+#include "mcut/internal/frontend.h"
+#include "mcut/internal/preproc.h"
+
+#include "mcut/internal/hmesh.h"
+#include "mcut/internal/math.h"
+#include "mcut/internal/utils.h"
+
+
 
 #include "mcut/internal/cdt/cdt.h"
 #include "mcut/internal/timer.h"
@@ -719,33 +721,34 @@ void generate_supertriangle_from_mesh_vertices(
     // size (number of bytes) of input floating point type
     const std::size_t flt_size = (have_double ? sizeof(double) : sizeof(float));
     // normalized input normal vector
-    const vec3 n = normalize(vec3(pNormalVector[0], pNormalVector[1], pNormalVector[2]));
+	const vec3_<double> n =
+		normalize(vec3_<double>(pNormalVector[0], pNormalVector[1], pNormalVector[2]));
 
     // minimum projection of mesh vertices along the normal vector
-	scalar_t proj_min = 1e10;
+	double proj_min = 1e10;
     // maximum projection of mesh vertices along the normal vector
-	scalar_t proj_max = -proj_min;
+	double proj_max = -proj_min;
 
     // mesh bbox extents
-    vec3 bbox_min(1e10);
-    vec3 bbox_max(-1e10);
+	vec3_<double> bbox_min(1e10);
+	vec3_<double> bbox_max(-1e10);
 
-    vec3 mean(0.0);
+    vec3_<double> mean(0.0);
 
     // mesh-vertex with the most-minimum projection onto the normal vector
-    vec3 most_min_vertex_pos;
+	vec3_<double> most_min_vertex_pos;
     // mesh-vertex with the most-maximum projection onto the normal vector
-    vec3 most_max_vertex_pos;
+	vec3_<double> most_max_vertex_pos;
 
     for (uint32_t i = 0; i < numMeshVertices; ++i) { // for each vertex
 
         // input (raw) pointer in bytes
         const McChar* vptr = ((McChar*)pMeshVertices) + (i * flt_size * 3);
-        vec3 coords; // coordinates of current vertex
+		vec3_<double> coords; // coordinates of current vertex
 
         for (uint32_t j = 0; j < 3; ++j) { // for each component
 
-            scalar_t coord;
+            double coord;
             const McChar* const srcptr = vptr + (j * flt_size);
 
             if (have_double) {
@@ -762,7 +765,7 @@ void generate_supertriangle_from_mesh_vertices(
             coords[j] = coord;
         }
         mean = mean + coords;
-		const scalar_t dot = dot_product(n, coords);
+		const double dot = dot_product(n, coords);
 
         if (dot < proj_min) {
             most_min_vertex_pos = coords;
@@ -776,55 +779,56 @@ void generate_supertriangle_from_mesh_vertices(
     }
     mean = mean / numMeshVertices;
     // length of bounding box diagonal
-	const scalar_t bbox_diag = length(bbox_max - bbox_min);
+	const double bbox_diag = length(bbox_max - bbox_min);
     // length from vertex with most-minimum projection to vertex with most-maximum projection
-	const scalar_t max_span = length(most_max_vertex_pos - most_min_vertex_pos);
+	const double max_span = length(most_max_vertex_pos - most_min_vertex_pos);
     // parameter indicating distance along the span from vertex with most-minimum projection to vertex with most-maximum projection
-	const scalar_t alpha = clamp(sectionOffset, eps, 1.0 - eps);
+	const double alpha = clamp(sectionOffset, eps, 1.0 - eps);
     // actual distance along the span from vertex with most-minimum projection to vertex with most-maximum projection
-	const scalar_t shiftby = (alpha * max_span);
+	const double shiftby = (alpha * max_span);
 
-    const vec3 centroid = most_min_vertex_pos + (n * shiftby);
+    const vec3_<double> centroid = most_min_vertex_pos + (n * shiftby);
 
     // absolute value of the largest component of the normal vector
-	scalar_t max_normal_comp_val_abs = -1e10;
+	double max_normal_comp_val_abs = -1e10;
     // index of the largest component of the normal vector
     uint32_t max_normal_comp_idx = 0;
 
     for (uint32_t i = 0; i < 3; ++i) {
 
-        const scalar_t comp = n[i];
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-		const scalar_t comp_abs = absolute_value(comp);
-#else
-		const scalar_t comp_abs = std::fabs(comp);
-#endif
+        const double comp = n[i];
+//#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+		//const double comp_abs = absolute_value(comp);
+//#else
+		const double comp_abs = std::abs(comp);
+//#endif
         if (comp_abs > max_normal_comp_val_abs) {
             max_normal_comp_idx = i;
             max_normal_comp_val_abs = comp_abs;
         }
     }
 
-    vec3 w(0.0);
+    vec3_<double> w(0.0);
     w[max_normal_comp_idx] = 1.0;
     if (w == n) {
         w[max_normal_comp_idx] = 0.0;
         w[(max_normal_comp_idx + 1) % 3] = 1.0;
     }
 
-    const vec3 u = cross_product(n, w);
-    const vec3 v = cross_product(n, u);
+    const vec3_<double> u = cross_product(n, w);
+	const vec3_<double> v = cross_product(n, u);
 
-    const scalar_t mean_dot_n = dot_product(mean, n);
-    vec3 mean_on_plane = mean - n * mean_dot_n;
+    const double mean_dot_n = dot_product(mean, n);
+	vec3_<double> mean_on_plane = mean - n * mean_dot_n;
 
-    vec3 uv_pos = normalize((u + v));
-    vec3 uv_neg = normalize((u - v));
-	vec3 vertex0 = mean_on_plane + uv_pos * (bbox_diag * scalar_t(2.0));
-	vec3 vertex1 = mean_on_plane + uv_neg * (bbox_diag * scalar_t(2.0));
-	vec3 vertex2 = mean_on_plane -
+    vec3_<double> uv_pos = normalize((u + v));
+	vec3_<double> uv_neg = normalize((u - v));
+	vec3_<double> vertex0 = mean_on_plane + uv_pos * (bbox_diag * double(2.0));
+	vec3_<double> vertex1 = mean_on_plane + uv_neg * (bbox_diag * double(2.0));
+	vec3_<double> vertex2 =
+		mean_on_plane -
 				   (normalize(uv_pos + uv_neg) *
-					(bbox_diag * scalar_t(2.0))); // supertriangle_origin + (u * bbox_diag * 4);
+						 (bbox_diag * double(2.0))); // supertriangle_origin + (u * bbox_diag * 4);
 
     supertriangle_vertices.resize(9 * flt_size);
 
@@ -832,18 +836,10 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
         void* dst = supertriangle_vertices.data() + (counter * flt_size);
         if (have_double) {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			double tmp = (double)vertex0[i].get_d();
-#else
-			double tmp = (double)vertex0[i];
-#endif
+			double tmp = vertex0[i];
 			memcpy(dst, &tmp, flt_size);
         } else {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			float tmp = (float)vertex0[i].get_d();
-#else
             float tmp = (float)vertex0[i];
-#endif
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -853,18 +849,14 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
         void* dst = supertriangle_vertices.data() + (counter * flt_size);
         if (have_double) {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			double tmp = (double)vertex1[i].get_d();
-#else
+
 			double tmp = (double)vertex1[i];
-#endif
+
 			memcpy(dst, &tmp, flt_size);
         } else {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			float tmp = (float)vertex1[i].get_d();
-#else
+
             float tmp = (float)vertex1[i];
-#endif
+
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -874,18 +866,14 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
         void* dst = supertriangle_vertices.data() + (counter * flt_size);
         if (have_double) {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			double tmp = (double)vertex2[i].get_d();
-#else
+
 			double tmp = (double)vertex2[i];
-#endif
+
             memcpy(dst, &tmp, flt_size);
         } else {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			float tmp = (float)vertex2[i].get_d();
-#else
+
             float tmp = (float)vertex2[i];
-#endif
+
             memcpy(dst, &tmp, flt_size);
         }
         counter++;
@@ -1098,9 +1086,9 @@ void triangulate_face(
             cc_face_normal_vector,
             cc_face_plane_eq_dparam,
             cc_face_vcoords3d.data(),
-            (int)cc_face_vcount);
+            (int)cc_face_vcount, multiplier);
 
-        project_to_2d(cc_face_vcoords2d_, cc_face_vcoords3d, cc_face_normal_vector, largest_component_of_normal);
+        project_to_2d(cc_face_vcoords2d_, cc_face_vcoords3d, cc_face_normal_vector, largest_component_of_normal, multiplier);
 
 #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		for(auto v2d_iter = 0; v2d_iter < cc_face_vcoords2d_.size(); ++v2d_iter)
@@ -2190,15 +2178,9 @@ void get_connected_component_data_impl_detail(
                 throw std::invalid_argument("invalid number of bytes");
             }
             
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			((McDouble*)pMem)[0] = cc_uptr->perturbation_vector[0].get_d();
-			((McDouble*)pMem)[1] = cc_uptr->perturbation_vector[1].get_d();
-			((McDouble*)pMem)[2] = cc_uptr->perturbation_vector[2].get_d();
-#else
             ((McDouble*)pMem)[0] = cc_uptr->perturbation_vector[0];
             ((McDouble*)pMem)[1] = cc_uptr->perturbation_vector[1];
             ((McDouble*)pMem)[2] = cc_uptr->perturbation_vector[2];
-#endif
         }
     } break;
     case MC_CONNECTED_COMPONENT_DATA_FACE: {

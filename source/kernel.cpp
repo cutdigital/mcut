@@ -2213,7 +2213,8 @@ void dispatch(output_t& output, const input_t& input)
                     tested_face_plane_normal,
                     tested_face_plane_param_d,
                     tested_face_vertices.data(),
-                    (int)tested_face_vertices.size());
+                    (int)tested_face_vertices.size(),
+                    input.multiplier);
 
                 if(squared_length(tested_face_plane_normal) == scalar_t(0))
 				{
@@ -2481,12 +2482,13 @@ void dispatch(output_t& output, const input_t& input)
 
                     vec3 intersection_point(0., 0., 0.); // the intersection point to be computed
 
+                    
                     char segment_intersection_type = compute_segment_plane_intersection_type( // exact**
                         tested_edge_h0_source_vertex,
                         tested_edge_h0_target_vertex,
                         tested_face_vertices,
                         tested_face_plane_normal,
-                        tested_face_plane_normal_max_comp);
+                        tested_face_plane_normal_max_comp, input.multiplier);
 
                     bool have_plane_intersection = (segment_intersection_type != '0'); // any intersection !
 
@@ -2508,7 +2510,8 @@ void dispatch(output_t& output, const input_t& input)
                                     point,
                                     tested_face_vertices,
                                     tested_face_plane_normal,
-                                    tested_face_plane_normal_max_comp);
+																  tested_face_plane_normal_max_comp,
+																  input.multiplier);
                                 if (result == 'i' || (result == 'v' || result == 'e')) {
                                     violatedGP = true;
                                     break;
@@ -2544,9 +2547,21 @@ void dispatch(output_t& output, const input_t& input)
                             // #if 1
                             tested_face_plane_normal,
                             // #else
-                            tested_face_plane_normal_max_comp
+                            tested_face_plane_normal_max_comp,
                             // #endif
+														  input.multiplier
                         );
+
+                        /*{
+							auto x = scalar_t::dequantize(intersection_point.x(),
+														  input.multiplier);
+							auto y = scalar_t::dequantize(intersection_point.y(),
+														  input.multiplier);
+							auto z = scalar_t::dequantize(intersection_point.z(),
+														  input.multiplier);
+
+							printf("%f %f %f\n", x, y, z);
+						}*/
 
                         if (in_poly_test_intersection_type == 'v' || in_poly_test_intersection_type == 'e') {
                             status_t okay_status = status_t::SUCCESS;
@@ -3529,7 +3544,8 @@ void dispatch(output_t& output, const input_t& input)
                             midpoint,
                             shared_face_vertices,
                             shared_face_plane_normal,
-                            shared_face_normal_max_comp);
+                            shared_face_normal_max_comp,
+														  input.multiplier);
 
                         if (in_poly_test_intersection_type == 'i') {
                             const int idx = (int)std::distance(shared_faces.cbegin(), sf_iter);

@@ -134,11 +134,11 @@ endif()
 
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-	list(APPEND compilation_flags -Wall -Wextra)
+	list(APPEND compilation_flags -Wall -Wextra -frounding-math)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 	list(APPEND compilation_flags w3 -diag-disable:remark)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	list(APPEND compilation_flags /W4 /wd26812 /bigobj)
+	list(APPEND compilation_flags /W4 /wd26812 /bigobj /fp:strict)
 	list(APPEND preprocessor_defs -D_CRT_SECURE_NO_WARNINGS)
 endif()
 

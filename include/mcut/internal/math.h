@@ -176,12 +176,18 @@ public:
 		{
 			return (0.0);
 		}
-
+		//std::cout << i << std::endl;
 		// from integer range [-2^26, 2^26]^3 to normalized range [-1, 1]^3
+		MCUT_ASSERT(i <= rational_number(1 << 26));
 		const auto n = i / rational_number(1 << 26);
+		//std::cout << n.get_dec_str() << std::endl;
+		//auto nv = n.get_d();
 		// from normalized range [-1, 1]^3 to actual/user coord value
 		const auto d = n * rational_number(m);
 		const double result = d.get_d(); // NOTE: truncated
+
+        MCUT_ASSERT(result <= m);
+
 		return result;
 	}
 };
@@ -531,6 +537,7 @@ T square_root(const T& number, double multiplier = 1)
 #else
 	const double dequantized = scalar_t::dequantize(
 		number, multiplier); // to native user coordinates/from rational coordinates
+	
 	const double sqrt_val = std::sqrt(dequantized);
 	const scalar_t quantized =
 		scalar_t::quantize(sqrt_val, multiplier); // to rational coordinates
@@ -597,7 +604,13 @@ vec3_<T> compwise_max(const vec3_<T>& a, const vec3_<T>& b)
     return vec3_<T>(max(a.x(), b.x()), max(a.y(), b.y()), max(a.z(), b.z()));
 }
 
-extern vec3 cross_product(const vec3& a, const vec3& b);
+template <typename vector_type>
+typename vector_type cross_product(const vector_type& a, const vector_type& b)
+{ 
+    return vector_type( a.y() * b.z() - a.z() * b.y(),
+				        a.z() * b.x() - a.x() * b.z(),
+				        a.x() * b.y() - a.y() * b.x());
+}
 
 template <typename vector_type>
 typename vector_type::element_type dot_product(const vector_type& a, const vector_type& b)
@@ -647,17 +660,38 @@ typename vector_type::element_type squared_length(const vector_type& v)
 {
     return dot_product(v, v);
 }
+#	if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+template <typename vector_type>
+typename vector_type::element_type length(const vector_type& v, double multiplier = 1.0)
+{
+	MCUT_ASSERT(false);
+	return vector_type::element_type(); // no-op
+}
+template <>
+inline scalar_t length(const vec3_<scalar_t>& v, double multiplier)
+{
+	return std::sqrt(squared_length(v).get_d());
+	//square_root(squared_length(v).get_d(), multiplier);
+}
 
+template <>
+inline double length(const vec3_<double>& v, double multiplier)
+{
+	return square_root(squared_length(v), multiplier);
+}
+
+#else
 template <typename vector_type>
 typename vector_type::element_type length(const vector_type& v, double multiplier = 1.0)
 {
 	return square_root(squared_length(v), multiplier);
 }
+#endif
 
 template <typename vector_type>
-vector_type normalize(const vector_type& v)
+vector_type normalize(const vector_type& v, double multiplier = 1.0)
 {
-    return v / length(v);
+	return v / length(v, multiplier);
 }
 
 scalar_t orient2d(const vec2& pa, const vec2& pb, const vec2& pc);
@@ -667,7 +701,9 @@ scalar_t orient3d(const vec3& pa, const vec3& pb, const vec3& pc,
 // Compute a polygon's plane coefficients (i.e. normal and d parameters).
 // The computed normal is not normalized. This function returns the largest component of the normal.
 int compute_polygon_plane_coefficients(vec3& normal, scalar_t& d_coeff,
-    const vec3* polygon_vertices, const int polygon_vertex_count);
+									   const vec3* polygon_vertices,
+									   const int polygon_vertex_count,
+									   const double multiplier);
 
 // Compute the intersection point between a line (not a segment) and a plane defined by a polygon.
 //
@@ -712,7 +748,9 @@ char compute_segment_plane_intersection(vec3& p, const vec3& normal, const scala
 // '1': The segment intersects the plane, and none of {p, q, r} hold.
 char compute_segment_plane_intersection_type(const vec3& q, const vec3& r,
     const std::vector<vec3>& polygon_vertices,
-    const vec3& polygon_normal, const int polygon_normal_largest_component);
+											 const vec3& polygon_normal,
+											 const int polygon_normal_largest_component,
+											 const double multiplier);
 
 // Test if a point 'q' (in 2D) lies inside or outside a given polygon (count the number ray crossings).
 //
@@ -721,7 +759,8 @@ char compute_segment_plane_intersection_type(const vec3& q, const vec3& r,
 // 'o': q is strictly exterior (outside).
 // 'e': q is on an edge, but not an endpoint.
 // 'v': q is a vertex.
-char compute_point_in_polygon_test(const vec2& q, const std::vector<vec2>& polygon_vertices);
+char compute_point_in_polygon_test(const vec2& q,
+								   const std::vector<vec2>& polygon_vertices);
 
 // Test if a point 'q' (in 3D) lies inside or outside a given polygon (count the number ray crossings).
 //
@@ -731,14 +770,17 @@ char compute_point_in_polygon_test(const vec2& q, const std::vector<vec2>& polyg
 // 'e': q is on an edge, but not an endpoint.
 // 'v': q is a vertex.
 char compute_point_in_polygon_test(const vec3& p, const std::vector<vec3>& polygon_vertices,
-    const vec3& polygon_normal, const int polygon_normal_largest_component);
+    const vec3& polygon_normal, const int polygon_normal_largest_component, const double multiplier);
 
 // project a 3d polygon to 3d by eliminating the largest component of its normal
 void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
-    const vec3& polygon_normal, const int polygon_normal_largest_component);
+				   const vec3& polygon_normal,
+				   const int polygon_normal_largest_component,
+				   const double multiplier);
 
-void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
-    const vec3& polygon_normal);
+//void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vertices,
+//				   const vec3& polygon_normal,
+//				   const double multiplier);
 
 bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
     const vec3& pd);

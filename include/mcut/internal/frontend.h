@@ -267,7 +267,7 @@ struct connected_component_t {
     bool face_adjacent_faces_size_cache_initialized = false;
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     // non-zero if origin source and cut-mesh where perturbed
-    vec3 perturbation_vector = vec3(0.0);
+	vec3_<double> perturbation_vector = vec3_<double>(0.0);
     //
     // An array storing the lists of vertices that define seams/intersection 
     // contours along the cut path of a CC. We need this cache because it will be 

@@ -327,9 +327,10 @@ public:
     tasks and waits for the pool threads to finish.
 */
     template <typename FunctionType>
-    std::future<typename std::result_of<FunctionType()>::type> submit(uint32_t worker_thread_id, FunctionType f)
+	std::future<typename std::result_of<FunctionType()>::type> submit(uint32_t worker_thread_id,
+																		  FunctionType f)
     {
-        typedef typename std::result_of<FunctionType()>::type result_type;
+		typedef typename std::result_of<FunctionType()>::type result_type;
 
         std::packaged_task<result_type()> task(std::move(f));
         std::future<result_type> res(task.get_future());

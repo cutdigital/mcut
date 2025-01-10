@@ -32,6 +32,9 @@
  *    Floyd M. Chitalu    CutDigital Enterprise Ltd.
  *
  **************************************************************************/
+#include <numeric> // std::partial_sum
+#include <queue>
+#include <random> // for numerical perturbation
 
 #include "mcut/internal/frontend.h"
 
@@ -42,9 +45,7 @@
 #include "mcut/internal/timer.h"
 #include "mcut/internal/utils.h"
 
-#include <numeric> // std::partial_sum
-#include <queue>
-#include <random> // for numerical perturbation
+
 
 // If the inputs are found to not be in general position, then we perturb the
 // cut-mesh by this constant (scaled by bbox diag times a random variable [0.1-1.0]).
@@ -65,9 +66,9 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 								  const McUint32 numVertices,
 								  const McUint32 numFaces,
 								  const double multiplier,
-								  const vec3 srcmesh_cutmesh_com,
-								  const vec3 pre_quantization_translation,
-								  const vec3* perturbation = NULL)
+								  const vec3_<double> srcmesh_cutmesh_com,
+								  const vec3_<double> pre_quantization_translation,
+								  const vec3_<double>* perturbation = NULL)
 {
 	SCOPED_TIMER(__FUNCTION__);
 
@@ -92,24 +93,22 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 		{
 			
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			const float& x =
-				vptr[(i * 3) + 0] - (srcmesh_cutmesh_com[0] + pre_quantization_translation[0]).get_d();
-			const float& y = vptr[(i * 3) + 1] -
-							 (srcmesh_cutmesh_com[1] + pre_quantization_translation[1]).get_d();
-			const float& z = vptr[(i * 3) + 2] -
-							 (srcmesh_cutmesh_com[2] + pre_quantization_translation[2]).get_d();
+			const float& x = (vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0]) + pre_quantization_translation[0];
+			const float& y = (vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1]) + pre_quantization_translation[1];
+			const float& z = (vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
 			vec3 quantized_vertex(scalar_t::quantize(x, multiplier),
 								  scalar_t::quantize(y, multiplier),
 								  scalar_t::quantize(z, multiplier));
 
-			if(perturbation != NULL && squared_length(*perturbation) > scalar_t::zero())
+			
+			if(perturbation != NULL && squared_length(*perturbation) > 0)
 			{
 				for(int j = 0; j < 3; ++j)
 				{
-					if((*perturbation)[i] != scalar_t::zero())
+					if((*perturbation)[j] != 0)
 					{
 						quantized_vertex[j] +=
-							scalar_t::quantize((*perturbation)[i].get_d(), multiplier); // perturb
+							scalar_t::quantize((*perturbation)[j], multiplier); // perturb
 					}
 
 					//quantized_vertex[j] -= scalar_t::quantize(srcmesh_cutmesh_com[i].get_d(), multiplier); // recentre to origin
@@ -119,11 +118,11 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 			vd_t vd = halfedgeMesh.add_vertex(quantized_vertex);
 #else
 			const float& x =
-				vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0] + pre_quantization_translation[0];
+				(vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0]) + pre_quantization_translation[0];
 			const float& y =
-				vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1] + pre_quantization_translation[1];
+				(vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1]) + pre_quantization_translation[1];
 			const float& z =
-				vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2] + pre_quantization_translation[2];
+				(vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
 			// insert our vertex into halfedge mesh
 			vd_t vd = halfedgeMesh.add_vertex(
 				double(x) + (perturbation != NULL ? (*perturbation).x() : double(0.)),
@@ -141,23 +140,23 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 		// for each input mesh-vertex
 		for(McUint32 i = 0; i < numVertices; ++i)
 		{
-			const double& x = vptr[(i * 3) + 0] - (srcmesh_cutmesh_com[0] + pre_quantization_translation[0]).get_d();
-			const double& y = vptr[(i * 3) + 1] - (srcmesh_cutmesh_com[1] + pre_quantization_translation[1]).get_d();
-			const double& z = vptr[(i * 3) + 2] - (srcmesh_cutmesh_com[2] + pre_quantization_translation[2]).get_d();
+			const double& x = (vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0]) + pre_quantization_translation[0];
+			const double& y = (vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1]) + pre_quantization_translation[1];
+			const double& z = (vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 			vec3 quantized_vertex(scalar_t::quantize(x, multiplier),
 								  scalar_t::quantize(y, multiplier),
 								  scalar_t::quantize(z, multiplier));
 
-			if(perturbation != NULL && squared_length(*perturbation) > scalar_t::zero())
+			if(perturbation != NULL && squared_length(*perturbation) > 0)
 			{
 				for(int j = 0; j < 3; ++j)
 				{
-					if((*perturbation)[i] != scalar_t::zero())
+					if((*perturbation)[j] != 0)
 					{
 						quantized_vertex[j] +=
-							scalar_t::quantize((*perturbation)[i].get_d(), multiplier);
+							scalar_t::quantize((*perturbation)[j], multiplier);
 					}
 				}
 			}
@@ -644,7 +643,8 @@ void resolve_floating_polygons(
 	std::unordered_map<fd_t /*child face*/, fd_t /*parent face in the [user-provided] cut mesh*/>&
 		cut_hmesh_child_to_usermesh_birth_face,
 	std::unordered_map<vd_t, vec3>& source_hmesh_new_poly_partition_vertices,
-	std::unordered_map<vd_t, vec3>& cut_hmesh_new_poly_partition_vertices)
+	std::unordered_map<vd_t, vec3>& cut_hmesh_new_poly_partition_vertices,
+	const double multiplier)
 {
 	for(std::map<fd_t, std::vector<floating_polygon_info_t>>::const_iterator
 			detected_floating_polygons_iter = detected_floating_polygons.cbegin();
@@ -722,7 +722,7 @@ void resolve_floating_polygons(
 			project_to_2d(floating_poly_vertices_2d,
 						  fpi.polygon_vertices,
 						  fpi.polygon_normal,
-						  fpi.polygon_normal_largest_component);
+						  fpi.polygon_normal_largest_component,multiplier);
 
 			// face to be (potentially) partitioned
 			// NOTE: This "origin_face" variable refer's to face that [may] actually be a child face that was created (in a previous iteration)
@@ -820,7 +820,8 @@ void resolve_floating_polygons(
 					project_to_2d(face_vertex_coords_2d,
 								  face_vertex_coords_3d,
 								  fpi.polygon_normal,
-								  fpi.polygon_normal_largest_component);
+								  fpi.polygon_normal_largest_component,
+						multiplier);
 
 					const int face_edge_count =
 						(int)face_vertex_descriptors.size(); // num edges == num verts
@@ -884,7 +885,8 @@ void resolve_floating_polygons(
 							{
 								const char ret = compute_point_in_polygon_test(
 									SAFE_ACCESS(floating_poly_vertices_2d, fpVertIter),
-									face_vertex_coords_2d);
+									face_vertex_coords_2d
+									);
 								if(ret == 'i')
 								{ // check if strictly interior
 									face_containing_floating_poly = *it;
@@ -961,7 +963,7 @@ void resolve_floating_polygons(
 			project_to_2d(origin_face_vertices_2d,
 						  origin_face_vertices_3d,
 						  fpi.polygon_normal,
-						  fpi.polygon_normal_largest_component);
+						  fpi.polygon_normal_largest_component, multiplier);
 
 			// ROUGH STEPS TO COMPUTE THE LINE THAT WILL BE USED TO PARTITION origin_face
 			// 1. pick two edges in the floating polygon
@@ -2104,13 +2106,13 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 bool calculate_vertex_parameters(
 	double& quantization_multiplier,
 	// vector to place all coordinates (of srcmesh and cutmesh) into the positive quadrant such that they all have positive numbers as coordinates.
-	vec3& pre_quantization_translation,
+	vec3_<double>& pre_quantization_translation,
 	// centre of mass
-	vec3& srcmesh_cutmesh_com,
-	vec3& srcmesh_bboxmin,
-	vec3& srcmesh_bboxmax,
-	vec3& cutmesh_bboxmin,
-	vec3& cutmesh_bboxmax,
+	vec3_<double>& srcmesh_cutmesh_com,
+	vec3_<double>& srcmesh_bboxmin,
+	vec3_<double>& srcmesh_bboxmax,
+	vec3_<double>& cutmesh_bboxmin,
+	vec3_<double>& cutmesh_bboxmax,
 	McFlags dispatchFlags,
 	const void* pSrcMeshVertices,
 	McUint32 numSrcMeshVertices,
@@ -2120,17 +2122,17 @@ bool calculate_vertex_parameters(
 	MCUT_ASSERT(numSrcMeshVertices >= 3);
 	MCUT_ASSERT(numCutMeshVertices >= 3);
 
-	pre_quantization_translation = vec3(0.0);
+	pre_quantization_translation = vec3_<double>(0.0);
 
-	auto get_bbox = [](vec3& bboxmin,
-					   vec3& bboxmax,
-					   vec3& com,
+	auto get_bbox = [](vec3_<double>& bboxmin,
+					   vec3_<double>& bboxmax,
+					   vec3_<double>& com,
 					   McFlags dispatchFlags,
 					   const void* pVertices,
 					   McUint32 numVertices) {
-		bboxmin = vec3(std::numeric_limits<double>::max());
-		bboxmax = vec3(std::numeric_limits<double>::lowest());
-		com = vec3(0.0);
+		bboxmin = vec3_<double>(std::numeric_limits<double>::max());
+		bboxmax = vec3_<double>(std::numeric_limits<double>::lowest());
+		com = vec3_<double>(0.0);
 
 		// did the user provide vertex arrays of 32-bit floats...?
 		if(dispatchFlags & MC_DISPATCH_VERTEX_ARRAY_FLOAT)
@@ -2145,13 +2147,13 @@ bool calculate_vertex_parameters(
 				for(auto i = 0; i < 3; ++i)
 				{
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-					bboxmax[i] = max(bboxmax[i], scalar_t((double)p[i]));
-					bboxmin[i] = min(bboxmin[i], scalar_t((double)p[i]));
+					bboxmax[i] = max(bboxmax[i],  ((double)p[i]));
+					bboxmin[i] = min(bboxmin[i],  ((double)p[i]));
 #else
 					bboxmax[i] = std::max(static_cast<float>(bboxmax[i]), p[i]);
 					bboxmin[i] = std::min(static_cast<float>(bboxmin[i]), p[i]);
 #endif
-					com[i] += scalar_t(p[i]);
+					com[i] +=  double(p[i]);
 				}
 			}
 		}
@@ -2168,28 +2170,28 @@ bool calculate_vertex_parameters(
 				for(auto i = 0; i < 3; ++i)
 				{
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-					bboxmax[i] = max(bboxmax[i], scalar_t(p[i]));
-					bboxmin[i] = min(bboxmin[i], scalar_t(p[i]));
+					bboxmax[i] = max(bboxmax[i],  (p[i]));
+					bboxmin[i] = min(bboxmin[i],  (p[i]));
 #else
 					bboxmax[i] = std::max(static_cast<double>(bboxmax[i]), p[i]);
 					bboxmin[i] = std::min(static_cast<double>(bboxmin[i]), p[i]);
 #endif
-					com[i] += scalar_t(p[i]);
+					com[i] +=  (p[i]);
 				}
 			}
 		}
 
-		com = com / scalar_t(numVertices);
+		com = com / double(numVertices);
 	};
 
-	vec3 srcmesh_com(0.0);
+	vec3_<double> srcmesh_com(0.0);
 	get_bbox(srcmesh_bboxmin,
 			 srcmesh_bboxmax,
 			 srcmesh_com,
 			 dispatchFlags,
 			 pSrcMeshVertices,
 			 numSrcMeshVertices);
-	vec3 cutmesh_com(0.0);
+	vec3_<double> cutmesh_com(0.0);
 	get_bbox(cutmesh_bboxmin,
 			 cutmesh_bboxmax,
 			 cutmesh_com,
@@ -2197,49 +2199,53 @@ bool calculate_vertex_parameters(
 			 pCutMeshVertices,
 			 numCutMeshVertices);
 
-	srcmesh_cutmesh_com = (srcmesh_com + cutmesh_com) / scalar_t(2.0); // mean
+	srcmesh_cutmesh_com = (srcmesh_com + cutmesh_com) /  (2.0); // mean
 
 	// global bounding box
-	vec3 srcmesh_cutmesh_bboxmin = compwise_min(srcmesh_bboxmin, cutmesh_bboxmin);
-	vec3 srcmesh_cutmesh_bboxmax = compwise_max(srcmesh_bboxmax, cutmesh_bboxmax);
+	vec3_<double> srcmesh_cutmesh_bboxmin = compwise_min(srcmesh_bboxmin, cutmesh_bboxmin);
+	vec3_<double> srcmesh_cutmesh_bboxmax = compwise_max(srcmesh_bboxmax, cutmesh_bboxmax);
 
-	vec3 offset_from_origin = vec3(
+	vec3_<double> offset_from_origin = vec3_<double>(
 		1.0,
 		1.0,
 		1.0); // ensure that when meshes are place into positive quadrant, no vertex coincides with the origin.
-	vec3 to_positive_quadrant = (srcmesh_cutmesh_com - srcmesh_cutmesh_bboxmin);
+	vec3_<double> to_positive_quadrant = (srcmesh_cutmesh_com - srcmesh_cutmesh_bboxmin);
 
 	pre_quantization_translation = to_positive_quadrant + offset_from_origin;
 
-	scalar_t max_coord = std::numeric_limits<double>::lowest();
-	scalar_t min_coord = std::numeric_limits<double>::max();
+	double max_coord = std::numeric_limits<double>::lowest();
+	double min_coord = std::numeric_limits<double>::max();
 
 	for(int i = 0; i < 3; ++i)
 	{
-		min_coord = min(srcmesh_cutmesh_bboxmin[0],
-						min(srcmesh_cutmesh_bboxmin[1], srcmesh_cutmesh_bboxmin[2]));
-		max_coord = max(srcmesh_cutmesh_bboxmax[0],
-						max(srcmesh_cutmesh_bboxmax[1], srcmesh_cutmesh_bboxmax[2]));
+		min_coord = std::min(srcmesh_cutmesh_bboxmin[0],
+							 std::min(srcmesh_cutmesh_bboxmin[1], srcmesh_cutmesh_bboxmin[2]));
+		max_coord = std::max(srcmesh_cutmesh_bboxmax[0],
+							 std::max(srcmesh_cutmesh_bboxmax[1], srcmesh_cutmesh_bboxmax[2]));
 	}
 
-	const scalar_t M = max(absolute_value(min_coord), absolute_value(max_coord));
+	const double M = std::max(std::abs(min_coord), std::abs(max_coord));
 
 	auto is_pow2 = [](uint64_t x) { return (x != 0) && !(x & (x - 1)); };
 
 	auto next_pow2 = [](uint64_t x) {
+		x--;
 		x |= x >> 1;
 		x |= x >> 2;
 		x |= x >> 4;
 		x |= x >> 8;
 		x |= x >> 16;
 		x |= x >> 32;
+		x++;
 		return x;
 	};
 
-	// As a micro optimization, we actually increase M to the next power-of-two because then "M * 2^b" is exact in floating-point
-	// the "M + scalar_t(0.5)" is just to ensure that we dont loose information by casting to int
-	const auto M_ = (uint64_t)(M + scalar_t(0.5)).get_d();
-	const scalar_t M_np2 = is_pow2(M_) ? M_ : next_pow2(M_); 
+	// As a micro optimization, we actually increase M to the next power-of-two because then "M * 2^b" is exact in floating-point.
+	// the "M + 0.5" is just to ensure that we dont loose information by casting to int. 
+	// The "+ 1" to cater to instances where "(uint64_t)(M + 0.5)" is a power-of-two: Here numerical perturbation will lead to 
+	// some vertex coordinates being larger than "(uint64_t)(M + 0.5)". Therefore we add 1 to cover even instances that involve perturbation.
+	const auto M_ = (uint64_t)(M + 0.5) + 1;
+	const auto M_np2 = is_pow2(M_+1) ? M_ : next_pow2(M_); 
 
 	quantization_multiplier = (double)M_np2;
 
@@ -2262,13 +2268,13 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 	///
 
 	double multiplier = 1;
-	vec3 srcmesh_bboxmin(std::numeric_limits<double>::max());
-	vec3 srcmesh_bboxmax(std::numeric_limits<double>::lowest());
-	vec3 cutmesh_bboxmin(std::numeric_limits<double>::max());
-	vec3 cutmesh_bboxmax(std::numeric_limits<double>::lowest());
-	vec3 srcmesh_cutmesh_com(
+	vec3_<double> srcmesh_bboxmin(std::numeric_limits<double>::max());
+	vec3_<double> srcmesh_bboxmax(std::numeric_limits<double>::lowest());
+	vec3_<double> cutmesh_bboxmin(std::numeric_limits<double>::max());
+	vec3_<double> cutmesh_bboxmax(std::numeric_limits<double>::lowest());
+	vec3_<double> srcmesh_cutmesh_com(
 		0.0); // used to recentre input native user coordinates around the origin
-	vec3 pre_quantization_translation(
+	vec3_<double> pre_quantization_translation(
 		0.0); // used to shift recentred native user coordinates into the positive quadrant of 3D space
 		// centre of mass
 	if(false == calculate_vertex_parameters(multiplier,
@@ -2290,7 +2296,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 	///
 
 	std::shared_ptr<hmesh_t> source_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t);
-	scalar_t source_hmesh_aabb_diag = length(srcmesh_bboxmax - srcmesh_bboxmin, 1);
+	double source_hmesh_aabb_diag = length(srcmesh_bboxmax - srcmesh_bboxmin, 1);
 
 	if(false == client_input_arrays_to_hmesh(context_ptr,
 											 dispatchFlags,
@@ -2301,8 +2307,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 											 numSrcMeshVertices,
 											 numSrcMeshFaces,
 											 multiplier,
-											 srcmesh_cutmesh_com,
-											 pre_quantization_translation))
+											 vec3_<double>(0.0) /*srcmesh_cutmesh_com*/,
+											 vec3_<double>(0.0)/*pre_quantization_translation*/))
 	{
 		throw std::invalid_argument("invalid source-mesh arrays");
 	}
@@ -2315,7 +2321,9 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 	bool sm_is_watertight = false;
 	bool cm_is_watertight = false;
 
-	input_t kernel_input; // kernel/backend inpout
+	input_t kernel_input; // kernel/backend input
+
+	kernel_input.multiplier = multiplier;
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 	kernel_input.scheduler = &context_ptr->get_shared_compute_threadpool();
@@ -2470,8 +2478,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 	std::shared_ptr<hmesh_t> cut_hmesh =
 		std::shared_ptr<hmesh_t>(new hmesh_t); // halfedge representation of the cut-mesh
-	double cut_hmesh_aabb_diag =
-		length(cutmesh_bboxmax - cutmesh_bboxmin, 1).get_d(); // in native user coordinates
+	double cut_hmesh_aabb_diag = length(cutmesh_bboxmax - cutmesh_bboxmin, 1); // in native user coordinates
 
 #if defined(USE_OIBVH)
 	std::vector<bounding_box_t<vec3>> cut_hmesh_BVH_aabb_array;
@@ -2500,7 +2507,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 		0.0; // i.e. relative to the bbox diagonal length (in native user coordinates)
 	// the (translation) vector to hold the values with which we will
 	// carry out numerical perturbation of the cutting surface
-	vec3 perturbation(0.0, 0.0, 0.0); // in native user coordinates
+	vec3_<double> perturbation(0.0, 0.0, 0.0); // in native user coordinates
 
 	// RESOLVE mesh intersections
 	// ::::::::::::::::::::::::::
@@ -2613,8 +2620,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 							numCutMeshVertices,
 							numCutMeshFaces,
 							multiplier,
-							srcmesh_cutmesh_com,
-							pre_quantization_translation,
+							vec3_<double>(0.0) /*srcmesh_cutmesh_com*/,
+							vec3_<double>(0.0) /*pre_quantization_translation*/,
 							((cut_mesh_perturbation_count == 0) ? NULL : &perturbation)))
 			{
 				throw std::invalid_argument("invalid cut-mesh arrays");
@@ -2675,7 +2682,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 									  source_hmesh_child_to_usermesh_birth_face.get()[0],
 									  cut_hmesh_child_to_usermesh_birth_face,
 									  source_hmesh_new_poly_partition_vertices.get()[0],
-									  cut_hmesh_new_poly_partition_vertices);
+									  cut_hmesh_new_poly_partition_vertices,
+									  multiplier);
 
 			// ::::::::::::::::::::::::::::::::::::::::::::
 			// rebuild the BVH of "parent_face_hmesh_ptr" again
