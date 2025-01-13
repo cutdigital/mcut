@@ -2051,8 +2051,10 @@ void get_connected_component_data_impl_detail(
                         for (int i = 0; i < 3; ++i) {
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 							
-							const float val = static_cast<float>(
-								scalar_t::dequantize(coords[i], cc_uptr->multiplier));
+							const float val = static_cast<float>(scalar_t::dequantize(
+												  coords[i], cc_uptr->multiplier)) +
+											  cc_uptr->srcmesh_cutmesh_com[i] -
+											  cc_uptr->pre_quantization_translation[i];
 #else
 							const float val = static_cast<float>(coords[i]);
 #endif
@@ -2133,7 +2135,16 @@ void get_connected_component_data_impl_detail(
 
                         // for each component of coordinate
                         for (int i = 0; i < 3; ++i) {
+#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+							const double val =
+								scalar_t::dequantize(coords[i], cc_uptr->multiplier) +
+								cc_uptr->srcmesh_cutmesh_com[i] -
+								cc_uptr->pre_quantization_translation[i];
+#else
+
                             const double val = static_cast<double>(coords[i]);
+							 
+#endif
                             *(casted_ptr + elem_offset) = val;
                             elem_offset += 1;
                         }

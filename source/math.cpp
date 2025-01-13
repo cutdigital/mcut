@@ -131,18 +131,37 @@
         normal = vec3(0.0);
 		//int crossprods = 0;
         for (int i = 1; i < polygon_vertex_count - 1; ++i) {
-            auto cross = cross_product( polygon_vertices[i] - polygon_vertices[0],
-                                        polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0]);
-            if(squared_length(cross) > scalar_t::zero())
-            {
+#if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
                 normal = normal +
 					 normalize( cross_product(polygon_vertices[i] - polygon_vertices[0],
 												  polygon_vertices[(i + 1) % polygon_vertex_count] -
 													  polygon_vertices[0]) , multiplier);
-                    //crossprods++;
-            }
+#else
+			auto vec0 = polygon_vertices[i] - polygon_vertices[0];
 			
+			auto vec1 = polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0];
 			
+			if(squared_length(vec0) > scalar_t::zero() && squared_length(vec1) > scalar_t::zero())
+			{
+				vec3_<double> vec0_(scalar_t::dequantize(vec0[0], multiplier),
+									scalar_t::dequantize(vec0[1], multiplier),
+									scalar_t::dequantize(vec0[2], multiplier));
+				vec3_<double> vec1_(scalar_t::dequantize(vec1[0], multiplier),
+									scalar_t::dequantize(vec1[1], multiplier),
+									scalar_t::dequantize(vec1[2], multiplier));
+
+				auto cross_ = cross_product(vec0_, vec1_);
+				if(squared_length(cross_) > 0.)
+				{
+					auto cross_n = normalize(cross_);
+					vec3 cross = vec3(scalar_t::quantize(cross_n[0], multiplier),
+									  scalar_t::quantize(cross_n[1], multiplier),
+									  scalar_t::quantize(cross_n[2], multiplier));
+					normal = normal + cross;
+					break;
+				}
+			}
+#endif
         }
 
         
@@ -227,9 +246,47 @@
         const int polygon_vertex_count = (int)polygon_vertices.size();
         MCUT_ASSERT(polygon_vertex_count >= 3);
 
+        /*{ 
+            std::ofstream f("poly.obj");
+
+            for(int v = 0; v < polygon_vertices.size(); ++v)
+			{
+				f << "v " << scalar_t::dequantize(polygon_vertices[v][0], multiplier) << " "
+				  << scalar_t::dequantize(polygon_vertices[v][1], multiplier) << " "
+				  << scalar_t::dequantize(polygon_vertices[v][2], multiplier) << std::endl;
+			}
+
+            f << "f ";
+			for(int v = 0; v < polygon_vertices.size(); ++v)
+			{
+				f << v << " ";
+			}
+			f << std::endl;
+			f.close();
+        }*/
+
         std::vector<vec2> x;
         project_to_2d(x, polygon_vertices, polygon_normal, polygon_normal_largest_component, multiplier);
         MCUT_ASSERT(x.size() == (size_t)polygon_vertex_count);
+
+        /*{
+			std::ofstream f("poly2.obj");
+
+			for(int v = 0; v < x.size(); ++v)
+			{
+				f << "v " << scalar_t::dequantize(x[v][0], multiplier) << " "
+				  << scalar_t::dequantize(x[v][1], multiplier) << " "
+				  << 0 << std::endl;
+			}
+
+			f << "f ";
+			for(int v = 0; v < x.size(); ++v)
+			{
+				f << v << " ";
+			}
+			f << std::endl;
+			f.close();
+		}*/
 
         /*
             NOTE: We cannot just use _any_/the first result of "colinear(x[i], x[j], x[k])" which returns true since
@@ -245,17 +302,20 @@
         */
 
         // get any three vertices that are not collinear
-        i = 0;
+        /*i = 0;
         j = i + 1;
-        k = j + 1;
+        k = j + 1;*/
         std::vector<std::tuple<int, int, int, scalar_t>> non_colinear_triplets;
 
-        for (; i < polygon_vertex_count; ++i) {
-            for (; j < polygon_vertex_count; ++j) {
-                for (; k < polygon_vertex_count; ++k) {
+        for (int i_=0; i_ < polygon_vertex_count; ++i_) 
+        {
+            for (int j_=i_+1; j_ < polygon_vertex_count; ++j_) {
+				for(int k_ = j_ + 1; k_ < polygon_vertex_count; ++k_)
+				{
                     scalar_t predRes;
-                    if (!collinear(x[i], x[j], x[k], predRes)) {
-                        non_colinear_triplets.emplace_back(std::make_tuple(i, j, k, predRes));
+					//std::cout << "i=" << i_ << " j=" << j_ << " k="<<k_ << std::endl;
+                    if (!collinear(x[i_], x[j_], x[k_], predRes)) {
+                        non_colinear_triplets.emplace_back(std::make_tuple(i_, j_, k_, predRes));
                     }
                 }
             }

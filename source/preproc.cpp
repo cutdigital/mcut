@@ -1015,7 +1015,7 @@ void resolve_floating_polygons(
 
 			// NOTE: using max (i.e. < operator) lead to floating point precision issues on
 			// test 40. The only solution to which is exact arithmetic. However, since we still
-			// want MCUT to work even if the user only has fixed precision numbers.
+			// want MCUT to work even if the user only has fixed precision numbers (outdated).
 			// We pick edges based on this which are closest. No worries about colinear edges
 			// because they will be detected later and skipped!
 			auto fp_max_dist_predicate = [&](std::pair<int, int> edgePairA,
@@ -1079,14 +1079,16 @@ void resolve_floating_polygons(
 						it != polyVerts.cend();
 						++it)
 					{
-
+						// TODO: call "collinear" with vec3_<double> not vec3. That is the only way to 
+						// get a reliable measure because with double everything is in the same space/units 
+						// (lengths areas etc).
 						bool are_collinear = collinear(segStart, segEnd, (*it), predResult);
 						// last ditch attempt to prevent the possibility of creating a partitioning
 						// edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
 						// see: test41
-						const scalar_t epsilon = 1e-6;
+						const double epsilon = 1e-6;
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-						if(are_collinear || (!are_collinear && epsilon > absolute_value(predResult)))
+						if(are_collinear || epsilon > scalar_t::dequantize(absolute_value(predResult),multiplier))
 #else
 						if(are_collinear || (!are_collinear && epsilon > std::fabs(predResult)))
 #endif
@@ -2213,6 +2215,20 @@ bool calculate_vertex_parameters(
 
 	pre_quantization_translation = to_positive_quadrant + offset_from_origin;
 
+	//
+	// update bboxes and coms
+	//
+	srcmesh_com = srcmesh_com + pre_quantization_translation;
+	cutmesh_com = cutmesh_com + pre_quantization_translation;
+	srcmesh_cutmesh_com = srcmesh_cutmesh_com + pre_quantization_translation;
+	srcmesh_bboxmin = srcmesh_bboxmin + pre_quantization_translation;
+	srcmesh_bboxmax = srcmesh_bboxmax + pre_quantization_translation;
+	cutmesh_bboxmin = cutmesh_bboxmin + pre_quantization_translation;
+	cutmesh_bboxmax = cutmesh_bboxmax + pre_quantization_translation;
+	srcmesh_cutmesh_bboxmin = srcmesh_cutmesh_bboxmin + pre_quantization_translation;
+	srcmesh_cutmesh_bboxmax = srcmesh_cutmesh_bboxmax + pre_quantization_translation;
+
+
 	double max_coord = std::numeric_limits<double>::lowest();
 	double min_coord = std::numeric_limits<double>::max();
 
@@ -2307,8 +2323,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 											 numSrcMeshVertices,
 											 numSrcMeshFaces,
 											 multiplier,
-											 vec3_<double>(0.0) /*srcmesh_cutmesh_com*/,
-											 vec3_<double>(0.0)/*pre_quantization_translation*/))
+												srcmesh_cutmesh_com,
+											  pre_quantization_translation))
 	{
 		throw std::invalid_argument("invalid source-mesh arrays");
 	}
@@ -2331,12 +2347,12 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 	kernel_input.src_mesh = source_hmesh;
 
-	kernel_input.verbose = false;
+	kernel_input.verbose = true;
 	kernel_input.require_looped_cutpaths = false;
 
-	kernel_input.verbose =
-		static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) &&
-						  (context_ptr->dbgCallbackBitfieldType & MC_DEBUG_SOURCE_KERNEL));
+	//kernel_input.verbose =
+	//	static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) &&
+	//					  (context_ptr->dbgCallbackBitfieldType & MC_DEBUG_SOURCE_KERNEL));
 	kernel_input.require_looped_cutpaths =
 		static_cast<bool>(dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS);
 	kernel_input.populate_vertex_maps =
@@ -2620,8 +2636,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 							numCutMeshVertices,
 							numCutMeshFaces,
 							multiplier,
-							vec3_<double>(0.0) /*srcmesh_cutmesh_com*/,
-							vec3_<double>(0.0) /*pre_quantization_translation*/,
+							 srcmesh_cutmesh_com,
+							 pre_quantization_translation,
 							((cut_mesh_perturbation_count == 0) ? NULL : &perturbation)))
 			{
 				throw std::invalid_argument("invalid cut-mesh arrays");
@@ -3030,6 +3046,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 				asFragPtr->multiplier = multiplier;
+				asFragPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+				asFragPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 				context_ptr->connected_components.push_front(
@@ -3095,6 +3113,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 			asFragPtr->multiplier = multiplier;
+			asFragPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+			asFragPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 			context_ptr->connected_components.push_front(
@@ -3164,6 +3184,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asPatchPtr->multiplier = multiplier;
+		asPatchPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+		asPatchPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 		context_ptr->connected_components.push_front(
 			cc_ptr); // copy the connected component ptr into the context object
@@ -3229,6 +3251,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asPatchPtr->multiplier = multiplier;
+		asPatchPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+		asPatchPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 		context_ptr->connected_components.push_front(
@@ -3300,6 +3324,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asSrcMeshSeamPtr->multiplier = multiplier;
+		asSrcMeshSeamPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+		asSrcMeshSeamPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 		context_ptr->connected_components.push_front(
@@ -3365,6 +3391,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asCutMeshSeamPtr->multiplier = multiplier;
+		asCutMeshSeamPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+		asCutMeshSeamPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 		context_ptr->connected_components.push_front(
@@ -3498,6 +3526,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asCutMeshInputPtr->multiplier = multiplier;
+		asCutMeshInputPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+		asCutMeshInputPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 		context_ptr->connected_components.push_front(
@@ -3622,6 +3652,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asSrcMeshInputPtr->multiplier = multiplier;
+		asSrcMeshInputPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
+		asSrcMeshInputPtr->pre_quantization_translation = pre_quantization_translation;
 #endif
 
 		context_ptr->connected_components.push_front(

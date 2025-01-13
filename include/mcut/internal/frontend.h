@@ -286,6 +286,7 @@ struct connected_component_t {
     // ]
     //
     std::vector<uint32_t> seam_vertex_sequence_array_cache;
+#	if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
     //
     // The multiplier is a value that is used to convert between native user coordinates 
     // and rational integer coordinates. Each connected component has such a value, which
@@ -293,6 +294,11 @@ struct connected_component_t {
     // came from. Refer to the "preproc" function for more detail on how it is computed. 
     //
 	double multiplier;
+	// the vertex centre of mass computed using the srcmesh and cutmesh (in user coordinates).
+    vec3_<double> srcmesh_cutmesh_com;
+    // translation vectors that shifts recentred coordinates to the positive quadrant.
+	vec3_<double> pre_quantization_translation;
+    #endif
 };
 
 // struct representing a fragment

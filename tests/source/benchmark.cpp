@@ -103,6 +103,7 @@ UTEST_I_TEARDOWN(Benchmark)
 
 UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
 {
+	
     std::vector<std::pair<std::string, std::string>> benchmarkMeshPairs;
 
     std::stringstream ss;
@@ -138,6 +139,7 @@ UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
                     &utest_fixture->cutMesh.numVertices,
                     &utest_fixture->cutMesh.numFaces);
 
+        
         //
         // do the cutting
         // 
