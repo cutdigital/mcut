@@ -50,6 +50,19 @@
 
 #include "nfg/numerics.h" // Indirect_Predicates
 
+// Shewchuk predicates : shewchuk.c
+extern "C"
+{
+	// void exactinit();
+	double orient2d(const double* pa, const double* pb, const double* pc);
+	double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
+	double orient3dfast(const double* pa, const double* pb, const double* pc, const double* pd);
+	double incircle(const double* pa, const double* pb, const double* pc, const double* pd);
+	double insphere(
+		const double* pa, const double* pb, const double* pc, const double* pd, const double* pe);
+}
+
+
 class rational_number : public bigrational
 {
 public:
@@ -786,6 +799,21 @@ void project_to_2d(std::vector<vec2>& out, const std::vector<vec3>& polygon_vert
 bool coplaner(const vec3& pa, const vec3& pb, const vec3& pc,
     const vec3& pd);
 
+static bool collinear(const vec2_<double>& a,
+			   const vec2_<double>& b,
+			   const vec2_<double>& c,
+			   double& predResult)
+{
+	const double pa_[2] = {a.x(), a.y()};
+	const double pb_[2] = {b.x(), b.y()};
+	const double pc_[2] = {c.x(), c.y()};
+
+	predResult = orient2d(pa_, pb_, pc_); // shewchuk predicate
+
+	//predResult = orient2d(a, b, c);
+	return predResult == double(0.);
+}
+
 bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult);
 
 bool collinear(const vec2& a, const vec2& b, const vec2& c);
@@ -909,15 +937,6 @@ void make_bbox(bounding_box_t<vector_type>& bbox, const vector_type* vertices, c
     }
 }
 
-// Shewchuk predicates : shewchuk.c
-extern "C" {
-// void exactinit();
-double orient2d(const double* pa, const double* pb, const double* pc);
-double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
-double orient3dfast(const double* pa, const double* pb, const double* pc, const double* pd);
-double incircle(const double* pa, const double* pb, const double* pc, const double* pd);
-double insphere(const double* pa, const double* pb, const double* pc, const double* pd, const double* pe);
-}
 
 #	ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 static scalar_t orient2d(const scalar_t* pa, const scalar_t* pb, const scalar_t* pc)

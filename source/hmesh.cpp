@@ -1263,7 +1263,7 @@ const face_array_iterator_t hmesh_t::elements_begin_(id_<array_iterator_t<face_a
     return faces_begin(account_for_removed_elems);
 }
 
-void write_off(const char* fpath, const hmesh_t& mesh)
+void write_off(const char* fpath, const hmesh_t& mesh, const double multiplier)
 {
 
     std::ofstream outfile(fpath);
@@ -1289,7 +1289,10 @@ void write_off(const char* fpath, const hmesh_t& mesh)
     for (vertex_array_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter) {
         // const vertex_data_t& vdata = iter.second;
         const vec3& point = mesh.vertex(*iter);
-        outfile << (double)point.x() << " " << (double)point.y() << " " << (double)point.z() << "\n";
+		outfile << (double)scalar_t::dequantize(point.x(), multiplier) << " "
+				<< (double)scalar_t::dequantize(point.y(), multiplier) << " "
+				<< (double)scalar_t::dequantize(point.z(), multiplier)
+				<< "\n";
     }
 
     //

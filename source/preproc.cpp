@@ -1079,16 +1079,14 @@ void resolve_floating_polygons(
 						it != polyVerts.cend();
 						++it)
 					{
-						// TODO: call "collinear" with vec3_<double> not vec3. That is the only way to 
-						// get a reliable measure because with double everything is in the same space/units 
-						// (lengths areas etc).
+
 						bool are_collinear = collinear(segStart, segEnd, (*it), predResult);
 						// last ditch attempt to prevent the possibility of creating a partitioning
 						// edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
 						// see: test41
 						const double epsilon = 1e-6;
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-						if(are_collinear || epsilon > scalar_t::dequantize(absolute_value(predResult),multiplier))
+						if(are_collinear || (scalar_t::quantize(epsilon, multiplier) > absolute_value(predResult)))
 #else
 						if(are_collinear || (!are_collinear && epsilon > std::fabs(predResult)))
 #endif

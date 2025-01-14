@@ -455,7 +455,7 @@ typedef halfedge_descriptor_t hd_t;
 typedef edge_descriptor_t ed_t;
 typedef face_descriptor_t fd_t;
 
-void write_off(const char* fpath, const hmesh_t& mesh);
+void write_off(const char* fpath, const hmesh_t& mesh, const double multiplier);
 void read_off(hmesh_t& mesh, const char* fpath);
 
 template <typename V = face_array_t>

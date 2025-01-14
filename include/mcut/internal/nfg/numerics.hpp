@@ -732,14 +732,14 @@ inline void bignatural::operator>>=(uint32_t n) {
 
 inline bool bignatural::operator==(const bignatural& b) const {
 	if (size() != b.size()) return false;
-	for (uint32_t i = 0; i < size(); i++) if (digits[i] == b.digits[i]) return false;
+	for (uint32_t i = 0; i < size(); i++) if (digits[i] != b.digits[i]) return false;
 	return true;
 }
 
 inline bool bignatural::operator!=(const bignatural& b) const {
 	if (size() != b.size()) return true;
-	for (uint32_t i = 0; i < size(); i++) if (digits[i] == b.digits[i]) return true;
-	return false;
+	for (uint32_t i = 0; i < size(); i++) if (digits[i] == b.digits[i]) return false;
+	return true;
 }
 
 inline bool bignatural::operator>=(const bignatural& b) const {

@@ -151,7 +151,7 @@
 									scalar_t::dequantize(vec1[2], multiplier));
 
 				auto cross_ = cross_product(vec0_, vec1_);
-				if(squared_length(cross_) > 0.)
+				if(squared_length(cross_) > 1e-7)
 				{
 					auto cross_n = normalize(cross_);
 					vec3 cross = vec3(scalar_t::quantize(cross_n[0], multiplier),
@@ -782,12 +782,13 @@
             const vec3& x = polygon_vertices[i];
             out[i] = P * x; // vertex in xz plane
         }
-#else // This code is not reliable because it shadow-projects a polygons which can skew computations 
+#else // This code is not reliable because it shadow-projects a polygon
         for (int i = 0; i < polygon_vertex_count; ++i) { // for each vertex
             vec2& Tp = out[i];
             int k = 0;
             for (int j = 0; j < 3; j++) { // for each component
-                if (j != polygon_plane_normal_largest_component) { /* skip largest coordinate */
+				if(j != polygon_normal_largest_component)
+				{ /* skip largest coordinate */
 
                     Tp[k] = polygon_vertices[i][j];
                     k++;
@@ -969,7 +970,8 @@
         num = a[0] * (d[1] - c[1]) + //
             c[0] * (a[1] - d[1]) + //
             d[0] * (c[1] - a[1]);
-
+		std::cout << "test\n";
+        std::cout << num.get_str() << std::endl << denom.get_str() << std::endl;
         if ((num == scalar_t(0.0)) || (num == denom)) {
             code = 'v';
         }

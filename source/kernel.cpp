@@ -157,7 +157,7 @@ bool inline ps_is_cutmesh_face(const fd_t& ps_fd, const int sm_face_count)
     return ((int)ps_fd) >= sm_face_count;
 }
 
-void dump_mesh(const hmesh_t& mesh, const char* fbasename)
+void dump_mesh(const hmesh_t& mesh, const char* fbasename, const double multiplier)
 {
     const std::string name = std::string(fbasename) + ".off";
 
@@ -184,7 +184,7 @@ void dump_mesh(const hmesh_t& mesh, const char* fbasename)
         }
     }
 
-    write_off(name.c_str(), mesh);
+    write_off(name.c_str(), mesh, multiplier);
 }
 
 #if 0
@@ -1576,8 +1576,8 @@ void dispatch(output_t& output, const input_t& input)
     const hmesh_t& cs = (*input.cut_mesh);
 
     if (input.verbose) {
-        dump_mesh(sm, "src-mesh");
-        dump_mesh(cs, "cut-mesh");
+		dump_mesh(sm, "src-mesh", input.multiplier);
+		dump_mesh(cs, "cut-mesh", input.multiplier);
     }
 
     const int sm_vtx_cnt = sm.number_of_vertices();
@@ -1736,7 +1736,7 @@ void dispatch(output_t& output, const input_t& input)
     // cs_to_ps_vtx.clear();
 
     if (input.verbose) {
-        dump_mesh(ps, "polygon-soup");
+		dump_mesh(ps, "polygon-soup", input.multiplier);
     }
 
     const int ps_vtx_cnt = ps.number_of_vertices();
@@ -3236,7 +3236,11 @@ void dispatch(output_t& output, const input_t& input)
     }
 
     if (input.verbose) {
-        dump_mesh(m0, "m0.v"); // containing only vertices (polygon soup vertices and newly computed intersection points)
+		dump_mesh(
+			m0,
+			"m0.v",
+			input
+				.multiplier); // containing only vertices (polygon soup vertices and newly computed intersection points)
     }
 
     if (partial_cut_detected) {
@@ -3594,7 +3598,7 @@ void dispatch(output_t& output, const input_t& input)
     // intersecting faces in the polygon-soup ("ps").
 
     if (input.verbose) {
-        dump_mesh(m0, "m0.v.e"); // containing only vertices & edges
+		dump_mesh(m0, "m0.v.e", input.multiplier); // containing only vertices & edges
     }
 
     const uint32_t m0_num_cutpath_edges = (uint32_t)m0_cutpath_edges.size();
@@ -6332,7 +6336,9 @@ void dispatch(output_t& output, const input_t& input)
             output.seamed_src_mesh->data_maps = std::move(separated_src_mesh_fragments.begin()->second.front().second.data_maps);
 
             if (input.verbose) {
-                dump_mesh(output.seamed_src_mesh->mesh.get()[0], "src-mesh-traced-poly");
+				dump_mesh(output.seamed_src_mesh->mesh.get()[0],
+						  "src-mesh-traced-poly",
+						  input.multiplier);
             }
         }
     } // if (input.include_seam_srcmesh) {
@@ -6382,7 +6388,8 @@ void dispatch(output_t& output, const input_t& input)
                 output.seamed_cut_mesh->data_maps = std::move(separated_cut_mesh_fragments.begin()->second.front().second.data_maps);
 
                 if (input.verbose) {
-                    dump_mesh(output.seamed_cut_mesh->mesh.get()[0], "cut-mesh-traced-poly");
+					dump_mesh(
+						output.seamed_cut_mesh->mesh.get()[0], "cut-mesh-traced-poly", input.multiplier);
                 }
             }
         }
@@ -7755,7 +7762,11 @@ void dispatch(output_t& output, const input_t& input)
             // is empty before calling "extract_connected_components"
             MCUT_ASSERT(mesh_data.size() == 1);
             if (input.verbose) {
-                dump_mesh(mesh_data.front().first.get()[0], ("fragment.unsealed." + std::to_string(cc_id) + "." + to_string(mesh_data.front().second.location)).c_str());
+				dump_mesh(mesh_data.front().first.get()[0],
+						  ("fragment.unsealed." + std::to_string(cc_id) + "." +
+						   to_string(mesh_data.front().second.location))
+							  .c_str(),
+						  input.multiplier);
             }
             std::pair<std::shared_ptr<hmesh_t>, connected_component_info_t>& md = mesh_data.front();
             std::shared_ptr<output_mesh_info_t> omi = std::shared_ptr<output_mesh_info_t>(new output_mesh_info_t);
@@ -9167,7 +9178,11 @@ void dispatch(output_t& output, const input_t& input)
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 
             if (input.verbose) {
-                dump_mesh(patch_mesh.get()[0], ("patch" + std::to_string(cur_patch_idx) + "." + to_string(patch_location) + "." + cs_patch_descriptor_str).c_str());
+				dump_mesh(patch_mesh.get()[0],
+						  ("patch" + std::to_string(cur_patch_idx) + "." +
+						   to_string(patch_location) + "." + cs_patch_descriptor_str)
+							  .c_str(),
+						  input.multiplier);
             }
 
             std::shared_ptr<output_mesh_info_t> omi = std::shared_ptr<output_mesh_info_t>(new output_mesh_info_t);
@@ -10700,7 +10715,12 @@ void dispatch(output_t& output, const input_t& input)
 
                 if (input.verbose) {
                     // const int idx = (int)std::distance(cc_instances.begin(), cc_instance_iter);
-                    dump_mesh(cc_instance.first.get()[0], (std::string("cc") + std::to_string(idx++) + "." + to_string(cc_instance.second.location) + "." + to_string(patchLocation)).c_str());
+					dump_mesh(cc_instance.first.get()[0],
+							  (std::string("cc") + std::to_string(idx++) + "." +
+							   to_string(cc_instance.second.location) + "." +
+							   to_string(patchLocation))
+								  .c_str(),
+							  input.multiplier);
                 }
 
                 std::shared_ptr<output_mesh_info_t> omi = std::shared_ptr<output_mesh_info_t>(new output_mesh_info_t);
