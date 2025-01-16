@@ -4145,7 +4145,7 @@ void dispatch(output_t& output, const input_t& input)
                 if (prev_edge == hmesh_t::null_edge() || fpi.polygon_vertices.size() < cutpath_sequence.size()) {
                     const std::vector<ed_t>& evec = SAFE_ACCESS(ivtx_to_cp_edges, cur->first);
                     std::vector<ed_t>::const_iterator fiter = std::find_if(evec.cbegin(), evec.cend(), [&](const ed_t& e) { return e != prev_edge; });
-
+					MCUT_ASSERT(fiter != evec.cend());
                     ed_t edge = *fiter;
                     vd_t next_vertex = m0.vertex(edge, 0);
 

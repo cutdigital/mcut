@@ -103,7 +103,11 @@ UTEST_I_TEARDOWN(Benchmark)
 
 UTEST_I(Benchmark, inputID, NUMBER_OF_BENCHMARKS)
 {
-	
+	/*if(utest_fixture->benchmarkIndex == 42 || utest_fixture->benchmarkIndex == 42)
+    {
+		return;
+    }*/
+
     std::vector<std::pair<std::string, std::string>> benchmarkMeshPairs;
 
     std::stringstream ss;

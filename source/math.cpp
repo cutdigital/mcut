@@ -970,8 +970,8 @@
         num = a[0] * (d[1] - c[1]) + //
             c[0] * (a[1] - d[1]) + //
             d[0] * (c[1] - a[1]);
-		std::cout << "test\n";
-        std::cout << num.get_str() << std::endl << denom.get_str() << std::endl;
+		//std::cout << "test\n";
+        //std::cout << num.get_str() << std::endl << denom.get_str() << std::endl;
         if ((num == scalar_t(0.0)) || (num == denom)) {
             code = 'v';
         }

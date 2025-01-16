@@ -301,12 +301,17 @@ void build_oibvh(
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
+#if 1
         std::mutex bbox_expansion_mtx;
-        auto fn_compute_mesh_bbox = [&](vertex_array_iterator_t block_start_, vertex_array_iterator_t block_end_) {
+		auto fn_compute_mesh_bbox = [&](std::vector<bounding_box_t<vec3>>::const_iterator block_start_,
+				std::vector<bounding_box_t<vec3>>::const_iterator block_end_) {
             bounding_box_t<vec3> meshBbox_local;
-            for (vertex_array_iterator_t v = block_start_; v != block_end_; ++v) {
-                const vec3& coords = mesh.vertex(*v);
-                meshBbox_local.expand(coords);
+				for(std::vector<bounding_box_t<vec3>>::const_iterator v = block_start_;
+					v != block_end_;
+					++v)
+			{
+                //const vec3& coords = mesh.vertex(*v);
+				meshBbox_local.expand(*v /*coords*/);
             }
 
             std::lock_guard<std::mutex> lock(bbox_expansion_mtx);
@@ -314,10 +319,26 @@ void build_oibvh(
         };
 
         parallel_for(
-            pool,
-            mesh.vertices_begin(),
-            mesh.vertices_end(),
+            pool, face_bboxes.cbegin()/*mesh.vertices_begin()*/,
+					 face_bboxes.cend()/*mesh.vertices_end()*/,
             fn_compute_mesh_bbox);
+#else
+		std::mutex bbox_expansion_mtx;
+		auto fn_compute_mesh_bbox = [&](vertex_array_iterator_t block_start_,
+										vertex_array_iterator_t block_end_) {
+			bounding_box_t<vec3> meshBbox_local;
+			for(vertex_array_iterator_t v = block_start_; v != block_end_; ++v)
+			{
+				const vec3& coords = mesh.vertex(*v);
+				meshBbox_local.expand(coords);
+			}
+
+			std::lock_guard<std::mutex> lock(bbox_expansion_mtx);
+			meshBbox.expand(meshBbox_local);
+		};
+
+		parallel_for(pool, mesh.vertices_begin(), mesh.vertices_end(), fn_compute_mesh_bbox);
+#endif
     }
 #else
     // for each vertex in mesh

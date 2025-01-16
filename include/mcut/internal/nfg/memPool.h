@@ -250,6 +250,24 @@ inline IN_pool::IN_pool(IN_pool&& p) noexcept
 //    If V==0 use standard free()
 //    else if V==N release a block is the corresponding IN_pool
 
+#if 1
+#include <type_traits>
+template <typename T>
+ int CountLeadingZeros(const T& DATA)
+{
+	T MASK{1};
+	int BITSN{sizeof(T) * CHAR_BIT}, LEADINGN{0};
+	MASK <<= BITSN - 1;
+	for(int I = BITSN; I > 0; I--, LEADINGN++, MASK >>= 1)
+	{
+		if(DATA & MASK)
+		{
+			break;
+		}
+	}
+	return LEADINGN;
+}
+#endif
 class MultiPool
 {
 	std::vector<IN_pool> IN_pools;
@@ -257,16 +275,22 @@ class MultiPool
 
 	IN_pool& pickPoolFromSize(uint32_t bs)
 	{
-		#if 0
+#if 0
 		auto cz = std::countl_zero(bs - 1);
 		cz = (cz == 32) ? (31) : (cz);
 		return IN_pools[31 - cz];
-		#else
+#else
+#if 0
+		auto cz = CountLeadingZeros(bs - 1);
+		cz = (cz == 32) ? (31) : (cz);
+		return IN_pools[31 - cz];
+#else
 		//// FOR COMPILERS THAT DO NOT SUPPORT C++20 REPLACE THE ABOVE WITH THE FOLLOWING
 		std::vector<IN_pool>::iterator i = IN_pools.begin();
 		while ((*i).blockSize() < bs) i++;
 		return *i;
-		#endif
+#endif
+#endif
 	}
 
 public:

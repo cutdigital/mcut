@@ -81,7 +81,7 @@ UTEST_F(DegenerateInput, edgeEdgeIntersection)
         MC_INVALID_OPERATION);
 }
 
-#if 0
+#if 1
 // An intersection between two triangles where a vertex from the cut-mesh triangle
 // lies on the src-mesh triangle. (This will only work with exact arith)
 UTEST_F(DegenerateInput, faceVertexIntersection)
