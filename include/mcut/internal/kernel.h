@@ -132,8 +132,8 @@ struct input_t {
     // extracting edge-face intersection pairs
     const std::map<fd_t, std::vector<fd_t>>* ps_face_to_potentially_intersecting_others = nullptr;
 #if defined(USE_OIBVH)
-    const std::vector<bounding_box_t<vec3>>* source_hmesh_face_aabb_array_ptr = nullptr;
-    const std::vector<bounding_box_t<vec3>>* cut_hmesh_face_aabb_array_ptr = nullptr;
+    const std::vector<bounding_box_t<vec3_<double>>>* source_hmesh_face_aabb_array_ptr = nullptr;
+    const std::vector<bounding_box_t<vec3_<double>>>* cut_hmesh_face_aabb_array_ptr = nullptr;
 #else
     BoundingVolumeHierarchy* source_hmesh_BVH;
     BoundingVolumeHierarchy* cut_hmesh_BVH;

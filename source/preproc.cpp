@@ -151,9 +151,10 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 			const double z = (z_ - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
 
 #if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			vec3 quantized_vertex(scalar_t::quantize(x, multiplier),
-								  scalar_t::quantize(y, multiplier),
-								  scalar_t::quantize(z, multiplier));
+			vec3 quantized_vertex;
+			quantized_vertex[0] = scalar_t::quantize(x, multiplier);
+			quantized_vertex[1] = scalar_t::quantize(y, multiplier),
+			quantized_vertex[2] = scalar_t::quantize(z, multiplier);
 
 			if(perturbation != NULL && squared_length(*perturbation) > 0)
 			{
@@ -1989,8 +1990,8 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 												  const std::shared_ptr<hmesh_t>& cut_hmesh,
 												  const bool sm_is_watertight,
 												  const bool cm_is_watertight,
-												  const bounding_box_t<vec3>& sm_aabb,
-												  const bounding_box_t<vec3>& cm_aabb,
+												  const bounding_box_t<vec3_<double>>& sm_aabb,
+												  const bounding_box_t<vec3_<double>>& cm_aabb,
 												  const double multiplier)
 {
 	const scalar_t windingNumberEps = 1e-7;
@@ -2436,9 +2437,9 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 						"Build source-mesh BVH");
 
 #if defined(USE_OIBVH)
-	std::vector<bounding_box_t<vec3>> source_hmesh_BVH_aabb_array;
+	std::vector<bounding_box_t<vec3_<double>>> source_hmesh_BVH_aabb_array;
 	std::vector<fd_t> source_hmesh_BVH_leafdata_array;
-	std::vector<bounding_box_t<vec3>> source_hmesh_face_aabb_array;
+	std::vector<bounding_box_t<vec3_<double>>> source_hmesh_face_aabb_array;
 	build_oibvh(
 #	if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 		context_ptr->get_shared_compute_threadpool(),
@@ -2446,7 +2447,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 		*source_hmesh.get(),
 		source_hmesh_BVH_aabb_array,
 		source_hmesh_BVH_leafdata_array,
-		source_hmesh_face_aabb_array);
+		source_hmesh_face_aabb_array, 0.0, multiplier);
 #else
 	BoundingVolumeHierarchy source_hmesh_BVH;
 	source_hmesh_BVH.buildTree(source_hmesh);
@@ -2504,9 +2505,9 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 	double cut_hmesh_aabb_diag = length(cutmesh_bboxmax - cutmesh_bboxmin, 1); // in native user coordinates
 
 #if defined(USE_OIBVH)
-	std::vector<bounding_box_t<vec3>> cut_hmesh_BVH_aabb_array;
+	std::vector<bounding_box_t<vec3_<double>>> cut_hmesh_BVH_aabb_array;
 	std::vector<fd_t> cut_hmesh_BVH_leafdata_array;
-	std::vector<bounding_box_t<vec3>> cut_hmesh_face_face_aabb_array;
+	std::vector<bounding_box_t<vec3_<double>>> cut_hmesh_face_face_aabb_array;
 #else
 	BoundingVolumeHierarchy cut_hmesh_BVH; // built later (see below)
 #endif
@@ -2676,7 +2677,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 					cut_hmesh_BVH_aabb_array,
 					cut_hmesh_BVH_leafdata_array,
 					cut_hmesh_face_face_aabb_array,
-					relative_perturbation_constant);
+					relative_perturbation_constant, multiplier);
 #else
 				cut_hmesh_BVH.buildTree(cut_hmesh, relative_perturbation_constant);
 #endif
@@ -2723,7 +2724,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 					*source_hmesh.get(),
 					source_hmesh_BVH_aabb_array,
 					source_hmesh_BVH_leafdata_array,
-					source_hmesh_face_aabb_array);
+					source_hmesh_face_aabb_array,0.0, multiplier);
 #else
 				source_hmesh_BVH.buildTree(source_hmesh);
 #endif
@@ -2742,7 +2743,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 					cut_hmesh_BVH_aabb_array,
 					cut_hmesh_BVH_leafdata_array,
 					cut_hmesh_face_face_aabb_array,
-					relative_perturbation_constant);
+					relative_perturbation_constant, multiplier);
 #else
 				cut_hmesh_BVH.buildTree(cut_hmesh, relative_perturbation_constant);
 #endif

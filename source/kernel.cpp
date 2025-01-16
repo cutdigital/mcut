@@ -50,8 +50,6 @@
 #include "mcut/internal/timer.h"
 #include "mcut/internal/utils.h"
 
-
-
 namespace std {
 // need to declare partial and explicit specializations in every translation unit
 // that uses them (before any use that would implicitly instantiate that
@@ -1991,11 +1989,11 @@ void dispatch(output_t& output, const input_t& input)
     TIMESTACK_PUSH("Build edge bounding boxes");
 
     // http://gamma.cs.unc.edu/RTRI/i3d08_RTRI.pdf
-    std::unordered_map<ed_t, bounding_box_t<vec3>> ps_edge_to_bbox;
+    std::unordered_map<ed_t, bounding_box_t<vec3_<double>>> ps_edge_to_bbox;
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
     {
-        typedef std::unordered_map<ed_t, bounding_box_t<vec3>> OutputStorageType;
+        typedef std::unordered_map<ed_t, bounding_box_t<vec3_<double>>> OutputStorageType;
         typedef std::unordered_map<ed_t, std::vector<fd_t>>::const_iterator InputStorageIteratorType;
 
         auto fn_compute_ps_edge_bbox = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
@@ -2005,9 +2003,22 @@ void dispatch(output_t& output, const input_t& input)
                 const ed_t edge = iedge_iter->first;
                 const vd_t v0 = ps.vertex(edge, 0);
                 const vd_t v1 = ps.vertex(edge, 1);
-                bounding_box_t<vec3>& edge_bbox = ps_edge_to_bbox_local[edge];
-                edge_bbox.expand(ps.vertex(v0));
-                edge_bbox.expand(ps.vertex(v1));
+                bounding_box_t<vec3_<double>>& edge_bbox = ps_edge_to_bbox_local[edge];
+                auto v0_val = ps.vertex(v0);
+
+                edge_bbox.expand(vec3_<double>(
+                    scalar_t::dequantize(v0_val[0], input.multiplier),
+                    scalar_t::dequantize(v0_val[1], input.multiplier),
+                    scalar_t::dequantize(v0_val[2], input.multiplier)
+                ));
+
+                auto v1_val = ps.vertex(v1);
+
+                edge_bbox.expand(vec3_<double>(
+                    scalar_t::dequantize(v1_val[0], input.multiplier),
+                    scalar_t::dequantize(v1_val[1], input.multiplier),
+                    scalar_t::dequantize(v1_val[2], input.multiplier)
+                ));
             }
 
             return ps_edge_to_bbox_local;
@@ -2042,8 +2053,8 @@ void dispatch(output_t& output, const input_t& input)
         const ed_t edge = iedge_iter->first;
         const vd_t v0 = ps.vertex(edge, 0);
         const vd_t v1 = ps.vertex(edge, 1);
-        bounding_box_t<vec3>& edge_bbox = ps_edge_to_bbox[edge];
-        edge_bbox.expand(ps.vertex(v0));
+        bounding_box_t<vec3_<double>>& edge_bbox = ps_edge_to_bbox[edge];
+        edge_bbox.expand(ps.vertex(v0)); 
         edge_bbox.expand(ps.vertex(v1));
     }
 #endif // #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
@@ -2062,11 +2073,11 @@ void dispatch(output_t& output, const input_t& input)
         auto fn_compute_edgefair_pair_culling = [&](InputStorageIteratorType block_start_, InputStorageIteratorType block_end_) {
             for (std::unordered_map<ed_t, std::vector<fd_t>>::iterator iedge_iter = block_start_; iedge_iter != block_end_; iedge_iter++) {
                 const ed_t edge = iedge_iter->first;
-                const bounding_box_t<vec3>& edge_bbox = ps_edge_to_bbox[edge];
+                const bounding_box_t<vec3_<double>>& edge_bbox = ps_edge_to_bbox[edge];
                 std::vector<fd_t>& edge_ifaces = iedge_iter->second;
 
                 for (std::vector<fd_t>::iterator iface_iter = edge_ifaces.begin(); iface_iter != edge_ifaces.end(); /*increment inside loop*/) {
-                    const bounding_box_t<vec3>* iface_bbox = nullptr;
+                    const bounding_box_t<vec3_<double>>* iface_bbox = nullptr;
                     bool is_sm_face = (size_t)(*iface_iter) < (size_t)sm_face_count;
                     if (is_sm_face) {
 #if defined(USE_OIBVH)

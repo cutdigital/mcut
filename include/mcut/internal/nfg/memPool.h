@@ -251,7 +251,8 @@ inline IN_pool::IN_pool(IN_pool&& p) noexcept
 //    else if V==N release a block is the corresponding IN_pool
 
 #if 1
-#include <type_traits>
+
+#include <limits.h>//CHAR_BIT
 template <typename T>
  int CountLeadingZeros(const T& DATA)
 {

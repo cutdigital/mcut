@@ -185,7 +185,7 @@ public:
         // is too slow to reach this function i.e. that an API/context/device thread
         // waits on the condition variable AFTER the client thread calls notify_one()
         std::unique_lock<std::mutex> lock(head_mutex);
-        data_cond.notify_one();
+        data_cond.notify_all();
     }
 
     void notify_one()

@@ -36,6 +36,7 @@
 #include "utest.h"
 #include <mcut/mcut.h>
 #include <string>
+#include <thread>
 
 static void MCAPI_PTR mcDebugOutput(McDebugSource source,
 									McDebugType type,
@@ -149,12 +150,18 @@ UTEST(CreateContext, outOfOrderExec_debug)
     EXPECT_EQ(err, MC_NO_ERROR);
 }
 
+#define MCUT_WITH_ARBITRARY_PRECISION_NUMBERS 1
+
+#include "mcut/internal/math.h"
+
 UTEST(CreateContext, withOneHelper)
 {
     McContext context;
     McResult err = mcCreateContextWithHelpers(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, 1);
     EXPECT_TRUE(context != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
+
+    //std::this_thread::sleep_for(std::chrono::duration<long double, std::milli>(500));
 
     err = mcReleaseContext(context);
     EXPECT_EQ(err, MC_NO_ERROR);
@@ -167,9 +174,12 @@ UTEST(CreateContext, withTwoHelpers)
     EXPECT_TRUE(context != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
 
+    //std::this_thread::sleep_for(std::chrono::duration<long double, std::milli>(500));
+
     err = mcReleaseContext(context);
     EXPECT_EQ(err, MC_NO_ERROR);
 }
+
 
 UTEST(CreateContext, withFourHelpers)
 {
@@ -178,6 +188,9 @@ UTEST(CreateContext, withFourHelpers)
     EXPECT_TRUE(context != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
 
+    //std::this_thread::sleep_for(std::chrono::duration<long double, std::milli>(500));
+
+    
     err = mcReleaseContext(context);
     EXPECT_EQ(err, MC_NO_ERROR);
 }
@@ -188,6 +201,8 @@ UTEST(CreateContext, withOneHundredHelpers)
     McResult err = mcCreateContextWithHelpers(&context, MC_OUT_OF_ORDER_EXEC_MODE_ENABLE, 100); // capped to system thread count
     EXPECT_TRUE(context != nullptr);
     EXPECT_EQ(err, MC_NO_ERROR);
+
+    //std::this_thread::sleep_for(std::chrono::duration<long double, std::milli>(500));
 
     err = mcReleaseContext(context);
     EXPECT_EQ(err, MC_NO_ERROR);

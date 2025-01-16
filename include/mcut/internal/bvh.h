@@ -119,20 +119,20 @@ extern void build_oibvh(
     thread_pool& pool,
 #endif
     const hmesh_t& mesh,
-    std::vector<bounding_box_t<vec3>>& bvhAABBs,
+    std::vector<bounding_box_t<vec3_<double>>>& bvhAABBs,
     std::vector<fd_t>& bvhLeafNodeFaces,
-    std::vector<bounding_box_t<vec3>>& face_bboxes,
+    std::vector<bounding_box_t<vec3_<double>>>& face_bboxes,
 	const double& slightEnlargmentEps=0.0, // in native user coordinates
 	const double multiplier=1.);
 
 extern void intersectOIBVHs(
     std::map<fd_t, std::vector<fd_t>>& ps_face_to_potentially_intersecting_others,
-    const std::vector<bounding_box_t<vec3>>& srcMeshBvhAABBs,
+    const std::vector<bounding_box_t<vec3_<double>>>& srcMeshBvhAABBs,
     const std::vector<fd_t>& srcMeshBvhLeafNodeFaces,
-    const std::vector<bounding_box_t<vec3>>& cutMeshBvhAABBs,
+    const std::vector<bounding_box_t<vec3_<double>>>& cutMeshBvhAABBs,
     const std::vector<fd_t>& cutMeshBvhLeafNodeFaces);
 #else
-typedef bounding_box_t<vec3> BBox;
+typedef bounding_box_t<vec3_<double>> BBox;
 static inline BBox Union(const BBox& a, const BBox& b)
 {
     BBox out = a;
@@ -140,7 +140,7 @@ static inline BBox Union(const BBox& a, const BBox& b)
     return out;
 }
 
-static inline BBox Union(const BBox& a, const vec3& b)
+static inline BBox Union(const BBox& a, const vec3_<double>& b)
 {
     BBox out = a;
     out.expand(b);
@@ -165,8 +165,8 @@ struct BVHPrimitiveInfo {
     }
 
     int primitiveNumber;
-    vec3 centroid;
-    bounding_box_t<vec3> bounds;
+    vec3_<double> centroid;
+    bounding_box_t<vec3_<double>> bounds;
 };
 
 // Each BVHBuildNode represents a node of the BVH. All nodes store a BBox, which stores
@@ -207,7 +207,7 @@ struct BVHBuildNode {
         nPrimitives = 0;
     }
 
-    bounding_box_t<vec3> bounds;
+    bounding_box_t<vec3_<double>> bounds;
     std::shared_ptr<BVHBuildNode> children[2];
     uint32_t splitAxis, firstPrimOffset, nPrimitives;
 };
