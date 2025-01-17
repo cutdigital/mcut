@@ -1643,76 +1643,76 @@ void resolve_floating_polygons(
 }
 
 // Compute the signed solid angle subtended by triangle abc from query point.
-scalar_t calculate_signed_solid_angle(
-	const vec3& a, const vec3& b, const vec3& c, const vec3& query, const double multiplier)
+double calculate_signed_solid_angle(
+	const vec3_<double>& a, 
+	const vec3_<double>& b, const vec3_<double>& c, const vec3_<double>& query, const double multiplier)
 {
-	const vec3 qa = a - query;
-	const vec3 qb = b - query;
-	const vec3 qc = c - query;
+	const vec3_<double> qa = a - query;
+	const vec3_<double> qb = b - query;
+	const vec3_<double> qc = c - query;
 
-	const scalar_t alength = length(qa);
-	const scalar_t blength = length(qb);
-	const scalar_t clength = length(qc);
+	const double alength = length(qa);
+	const double blength = length(qb);
+	const double clength = length(qc);
 
 	// If any triangle vertices are coincident with query,
 	// query is on the surface, which we treat as no solid angle.
-	if(alength == scalar_t(0.0) || blength == scalar_t(0.0) || clength == scalar_t(0.0))
+	if(alength ==  (0.0) || blength ==  (0.0) || clength ==  (0.0))
 	{
-		return scalar_t(0.0);
+		return  (0.0);
 	}
 
-	const vec3 qa_normalized = qa / alength;
-	const vec3 qb_normalized = qb / blength;
-	const vec3 qc_normalized = qc / clength;
+	const vec3_<double> qa_normalized = qa / alength;
+	const vec3_<double> qb_normalized = qb / blength;
+	const vec3_<double> qc_normalized = qc / clength;
 
 	// equivalent to dot(qa,cross(qb,qc)),
-	const scalar_t numerator = dot_product(
+	const double numerator = dot_product(
 		qa_normalized, cross_product(qb_normalized - qa_normalized, qc_normalized - qa_normalized));
 
 	// If numerator is 0, regardless of denominator, query is on the
 	// surface, which we treat as no solid angle.
-	if(numerator == scalar_t(0.0))
-	{
-		return scalar_t(0.0);
+	if(numerator ==  (0.0))
+	{ 
+		return  (0.0);
 	}
 
-	const scalar_t denominator = scalar_t(1.0) + dot_product(qa_normalized, qb_normalized) +
+	const double denominator =  (1.0) + dot_product(qa_normalized, qb_normalized) +
 							   dot_product(qa_normalized, qc_normalized) +
 							   dot_product(qb_normalized, qc_normalized);
 
-	const scalar_t pi = 3.14159265358979323846;
+	const double pi = 3.14159265358979323846;
 
 	// dividing by 2*pi instead of 4*pi because there was a 2 out front
 	// see eq. 5 in https://igl.ethz.ch/projects/winding-number/robust-inside-outside-segmentation-using-generalized-winding-numbers-siggraph-2013-compressed-jacobson-et-al.pdf
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-	// we dequantize so that we call atan2 with native user coordinates
-	return std::atan2(scalar_t::dequantize(numerator, multiplier),
-					  scalar_t::dequantize(denominator, multiplier)) /
-		   (scalar_t(2) * pi).get_d();
-#else
+
 	return std::atan2(numerator, denominator) / (2. * pi);
-#endif
+
 }
 
 // Compute the signed solid angle subtended by quad abcd from query point.
 // based on libigl impl
-scalar_t calculate_signed_solid_angle(
-	const vec3& a, const vec3& b, const vec3& c, const vec3& d, const vec3& query, const double multiplier)
+double calculate_signed_solid_angle(
+	const vec3_<double>& a, 
+	const vec3_<double>& b, 
+	const vec3_<double>& c, 
+	const vec3_<double>& d, 
+	const vec3_<double>& query, const double multiplier)
 {
-	const scalar_t pi = 3.14159265358979323846;
+	const double pi = 3.14159265358979323846;
 	// Make a, b, c, and d relative to query
-	vec3 v[4] = {a - query, b - query, c - query, d - query};
+	vec3_<double> v[4] = {a - query, b - query, c - query, d - query};
 
-	const scalar_t lengths[4] = {length(v[0]), length(v[1]), length(v[2]), length(v[3])};
+	const double lengths[4] = {length(v[0]), length(v[1]), length(v[2]), length(v[3])};
 
 	// If any quad vertices are coincident with query,
 	// query is on the surface, which we treat as no solid angle.
 	// We could add the contribution from the non-planar part,
 	// but in the context of a mesh, we'd still miss some, like
 	// we do in the triangle case.
-	if(lengths[0] == scalar_t(0) || lengths[1] == scalar_t(0) || lengths[2] == scalar_t(0) ||
-	   lengths[3] == scalar_t(0))
-		return scalar_t(0);
+	if(lengths[0] ==  (0) || lengths[1] ==  (0) || lengths[2] ==  (0) ||
+	   lengths[3] ==  (0))
+		return  (0);
 
 	// Normalize the vectors
 	v[0] = v[0] / lengths[0];
@@ -1726,91 +1726,78 @@ scalar_t calculate_signed_solid_angle(
 	// query is (approximately) inside, so the choice of triangulation matters.
 	// Otherwise, the triangulation doesn't matter.
 
-	const vec3 diag02 = v[2] - v[0];
-	const vec3 diag13 = v[3] - v[1];
-	const vec3 v01 = v[1] - v[0];
-	const vec3 v23 = v[3] - v[2];
+	const auto diag02 = v[2] - v[0];
+	const auto diag13 = v[3] - v[1];
+	const auto v01 = v[1] - v[0];
+	const auto v23 = v[3] - v[2];
 
-	scalar_t bary[4];
+	double bary[4];
 	bary[0] = dot_product(v[3], cross_product(v23, diag13));
 	bary[1] = -dot_product(v[2], cross_product(v23, diag02));
 	bary[2] = -dot_product(v[1], cross_product(v01, diag13));
 	bary[3] = dot_product(v[0], cross_product(v01, diag02));
 
-	const scalar_t dot01 = dot_product(v[0], v[1]);
-	const scalar_t dot12 = dot_product(v[1], v[2]);
-	const scalar_t dot23 = dot_product(v[2], v[3]);
-	const scalar_t dot30 = dot_product(v[3], v[0]);
+	const double dot01 = dot_product(v[0], v[1]);
+	const double dot12 = dot_product(v[1], v[2]);
+	const double dot23 = dot_product(v[2], v[3]);
+	const double dot30 = dot_product(v[3], v[0]);
 
-	scalar_t omega = scalar_t(0);
+	double omega =  (0);
 
 	// Equation of a bilinear patch in barycentric coordinates of its
 	// tetrahedron is x0*x2 = x1*x3.  Less is one side; greater is other.
 	if(bary[0] * bary[2] < bary[1] * bary[3])
 	{
 		// Split 0-2: triangles 0,1,2 and 0,2,3
-		const scalar_t numerator012 = bary[3];
-		const scalar_t numerator023 = bary[1];
-		const scalar_t dot02 = dot_product(v[0], v[2]);
+		const double numerator012 = bary[3];
+		const double numerator023 = bary[1];
+		const double dot02 = dot_product(v[0], v[2]);
 
 		// If numerator is 0, regardless of denominator, query is on the
 		// surface, which we treat as no solid angle.
-		if(numerator012 != scalar_t(0))
+		if(numerator012 !=  (0))
 		{
-			const scalar_t denominator012 = scalar_t(1) + dot01 + dot12 + dot02;
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			omega = std::atan2(
-				scalar_t::dequantize(numerator012, multiplier), 
-				scalar_t::dequantize(denominator012, multiplier));
-#else
+			const double denominator012 =  (1) + dot01 + dot12 + dot02;
+
 			omega = std::atan2(numerator012, denominator012);
-#endif
+
 		}
-		if(numerator023 != scalar_t(0))
+		if(numerator023 !=  (0))
 		{
-			const scalar_t denominator023 = scalar_t(1) + dot02 + dot23 + dot30;
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			omega = std::atan2(scalar_t::dequantize(numerator023, multiplier),
-							   scalar_t::dequantize(denominator023, multiplier));
-#else
+			const double denominator023 =  (1) + dot02 + dot23 + dot30;
+
 			omega += std::atan2(numerator023, denominator023);
-#endif
+
 		}
 	}
 	else
 	{
 		// Split 1-3: triangles 0,1,3 and 1,2,3
-		const scalar_t numerator013 = -bary[2];
-		const scalar_t numerator123 = -bary[0];
-		const scalar_t dot13 = dot_product(v[1], v[3]);
+		const double numerator013 = -bary[2];
+		const double numerator123 = -bary[0];
+		const double dot13 = dot_product(v[1], v[3]);
 
 		// If numerator is 0, regardless of denominator, query is on the
 		// surface, which we treat as no solid angle.
-		if(numerator013 != scalar_t(0))
+		if(numerator013 !=  (0))
 		{
-			const scalar_t denominator013 = scalar_t(1) + dot01 + dot13 + dot30;
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			omega = std::atan2(scalar_t::dequantize(numerator013, multiplier),
-							   scalar_t::dequantize(denominator013, multiplier));
-#else
+			const double denominator013 =  (1) + dot01 + dot13 + dot30;
+
 			omega = std::atan2(numerator013, denominator013);
-#endif
+
 		}
-		if(numerator123 != scalar_t(0))
+		if(numerator123 !=  (0))
 		{
-			const scalar_t denominator123 = scalar_t(1) + dot12 + dot23 + dot13;
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			omega = std::atan2(scalar_t::dequantize(numerator123, multiplier),
-							   scalar_t::dequantize(denominator123, multiplier));
-#else
+			const double denominator123 =  (1) + dot12 + dot23 + dot13;
+
 			omega += std::atan2(numerator123, denominator123);
-#endif
+
 		}
 	}
-	return /*double(2) **/ omega / (scalar_t(2.)* pi);
+	return /*double(2) **/ omega / ( (2.)* pi);
 }
 
-scalar_t computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
+double computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
 								  const vec3& queryPoint,
 								  const std::shared_ptr<hmesh_t>& mesh,
 								  const face_descriptor_t face_descr,
@@ -1820,7 +1807,14 @@ scalar_t computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
 		mesh->get_vertices_around_face(face_descr);
 	const McUint32 num_vertices_around_face = (McUint32)vertices_around_face.size();
 
-	scalar_t windingNumber = 0;
+	double windingNumber = 0;
+
+	auto to_vec3d = [&](const vec3& v) -> vec3_<double> {
+		return vec3_<double>(
+			scalar_t::dequantize(v[0], multiplier),
+			scalar_t::dequantize(v[1], multiplier),
+			scalar_t::dequantize(v[2], multiplier));
+	};
 
 	if(num_vertices_around_face > 4)
 	{
@@ -1858,30 +1852,34 @@ scalar_t computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
 			const vertex_descriptor_t idx1 = vertex_descriptor_t(cdt_global[(i * 3) + 1]);
 			const vertex_descriptor_t idx2 = vertex_descriptor_t(cdt_global[(i * 3) + 2]);
 
-			const scalar_t solidAngle = calculate_signed_solid_angle(
-				mesh->vertex(idx0), mesh->vertex(idx1), mesh->vertex(idx2), queryPoint, multiplier);
+			const double solidAngle = calculate_signed_solid_angle(
+				to_vec3d(mesh->vertex(idx0)), 
+				to_vec3d(mesh->vertex(idx1)), 
+				to_vec3d(mesh->vertex(idx2)), 
+				to_vec3d(queryPoint), 
+				multiplier);
 			windingNumber += solidAngle;
 		}
 	}
 	else if(num_vertices_around_face == 4) // face is a quad
 	{
-		const scalar_t solidAngle =
-			calculate_signed_solid_angle(mesh->vertex(vertices_around_face[0]),
-										 mesh->vertex(vertices_around_face[1]),
-										 mesh->vertex(vertices_around_face[2]),
-										 mesh->vertex(vertices_around_face[3]),
-										 queryPoint,
+		const double solidAngle =
+			calculate_signed_solid_angle(to_vec3d(mesh->vertex(vertices_around_face[0])),
+										 to_vec3d(mesh->vertex(vertices_around_face[1])),
+										 to_vec3d(mesh->vertex(vertices_around_face[2])),
+										 to_vec3d(mesh->vertex(vertices_around_face[3])),
+										 to_vec3d(queryPoint),
 										 multiplier);
 
 		windingNumber += solidAngle;
 	}
 	else // face is a triangle
 	{
-		const scalar_t solidAngle =
-			calculate_signed_solid_angle(mesh->vertex(vertices_around_face[0]),
-										 mesh->vertex(vertices_around_face[1]),
-										 mesh->vertex(vertices_around_face[2]),
-										 queryPoint,
+		const double solidAngle =
+			calculate_signed_solid_angle(to_vec3d(mesh->vertex(vertices_around_face[0])),
+										 to_vec3d(mesh->vertex(vertices_around_face[1])),
+										 to_vec3d(mesh->vertex(vertices_around_face[2])),
+										 to_vec3d(queryPoint),
 										 multiplier);
 
 		windingNumber += solidAngle;
@@ -1890,12 +1888,12 @@ scalar_t computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
 	return windingNumber;
 }
 
-scalar_t getWindingNumber(std::shared_ptr<context_t> context_ptr,
+double getWindingNumber(std::shared_ptr<context_t> context_ptr,
 						const vec3& queryPoint,
 						const std::shared_ptr<hmesh_t>& mesh,
 						  const double multiplier)
 {
-	scalar_t windingNumber = 0;
+	double windingNumber = 0;
 
 #if defined(MCUT_WITH_COMPUTE_HELPER_THREADPOOL)
 	{
@@ -1904,7 +1902,7 @@ scalar_t getWindingNumber(std::shared_ptr<context_t> context_ptr,
 
 		auto fn_compute_winding_number = [&](face_array_iterator_t block_start_,
 											 face_array_iterator_t block_end_) {
-			scalar_t wn = 0; // local winding number computed by current thread
+			double wn = 0; // local winding number computed by current thread
 
 			for(face_array_iterator_t face_iter = block_start_; face_iter != block_end_;
 				++face_iter)
@@ -1912,11 +1910,8 @@ scalar_t getWindingNumber(std::shared_ptr<context_t> context_ptr,
 				const face_descriptor_t descr = *face_iter;
 				wn += computeWindingNumberOnFace(context_ptr, queryPoint, mesh, descr, multiplier);
 			}
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-			mc_atomic_fetch_add(&gWindingNumber, wn.get_d());
-#else
+
 			mc_atomic_fetch_add(&gWindingNumber, wn);
-#endif
 		};
 
 		parallel_for(context_ptr->get_shared_compute_threadpool(),
@@ -1994,7 +1989,7 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 												  const bounding_box_t<vec3_<double>>& cm_aabb,
 												  const double multiplier)
 {
-	const scalar_t windingNumberEps = 1e-7;
+	const double windingNumberEps = 1e-7;
 
 	if((sm_is_watertight == false && cm_is_watertight == false) ||
 	   intersect_bounding_boxes(sm_aabb, cm_aabb) == false)
@@ -2008,8 +2003,8 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 		//
 		// we test first against the mesh with the larger AABB (heuristic to potentially make the query faster)
 		//
-		const scalar_t sm_aabb_diag = squared_length(sm_aabb.maximum() - sm_aabb.minimum());
-		const scalar_t cm_aabb_diag = squared_length(cm_aabb.maximum() - cm_aabb.minimum());
+		const double sm_aabb_diag = squared_length(sm_aabb.maximum() - sm_aabb.minimum());
+		const double cm_aabb_diag = squared_length(cm_aabb.maximum() - cm_aabb.minimum());
 		const bool sm_larger_than_cm = sm_aabb_diag > cm_aabb_diag;
 		// mesh with larger bounding box
 		const std::shared_ptr<hmesh_t>& meshA = sm_larger_than_cm ? source_hmesh : cut_hmesh;
@@ -2022,10 +2017,10 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 		// pick any point in meshB (we chose the 1st)
 		const vec3& meshBQueryPoint = meshB->vertex(vertex_descriptor_t(0));
 
-		const scalar_t meshBQueryPointWindingNumber =
+		const double meshBQueryPointWindingNumber =
 			getWindingNumber(context_ptr, meshBQueryPoint, meshA, multiplier);
 
-		if(absolute_value(scalar_t(1.0) - meshBQueryPointWindingNumber) <
+		if(std::abs((1.0) - meshBQueryPointWindingNumber) <
 		   windingNumberEps) // is it inside?
 		{
 			const McDispatchIntersectionType itype =
@@ -2036,15 +2031,15 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 		}
 		else
 		{
-			MCUT_ASSERT(absolute_value(scalar_t(1.0) - meshBQueryPointWindingNumber) >=
+			MCUT_ASSERT(std::abs( (1.0) - meshBQueryPointWindingNumber) >=
 						windingNumberEps); // outside meshA
 
 			const vec3& meshAQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
 
-			const scalar_t meshAQueryPointWindingNumber =
+			const double meshAQueryPointWindingNumber =
 				getWindingNumber(context_ptr, meshAQueryPoint, meshB, multiplier);
 
-			if(absolute_value(scalar_t(1.0) - meshAQueryPointWindingNumber) < windingNumberEps)
+			if(std::abs( (1.0) - meshAQueryPointWindingNumber) < windingNumberEps)
 			{
 				const McDispatchIntersectionType itype =
 					sm_larger_than_cm
@@ -2055,7 +2050,7 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 			}
 			else
 			{
-				MCUT_ASSERT(absolute_value(scalar_t(1.0) - meshAQueryPointWindingNumber) >=
+				MCUT_ASSERT(std::abs( (1.0) - meshAQueryPointWindingNumber) >=
 							windingNumberEps); // outside cut-mesh
 				context_ptr->set_most_recent_dispatch_intersection_type(
 					McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -2066,17 +2061,17 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 	{
 		const vec3& cutMeshQueryPoint = cut_hmesh->vertex(vertex_descriptor_t(0));
 
-		const scalar_t cutMeshQueryPointWindingNumber =
+		const double cutMeshQueryPointWindingNumber =
 			getWindingNumber(context_ptr, cutMeshQueryPoint, source_hmesh, multiplier);
 
-		if(absolute_value(scalar_t(1.0) - cutMeshQueryPointWindingNumber) < windingNumberEps)
+		if(std::abs( (1.0) - cutMeshQueryPointWindingNumber) < windingNumberEps)
 		{
 			context_ptr->set_most_recent_dispatch_intersection_type(
 				McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_SOURCEMESH);
 		}
 		else
 		{
-			MCUT_ASSERT(absolute_value(scalar_t(1.0) - cutMeshQueryPointWindingNumber) >=
+			MCUT_ASSERT(std::abs( (1.0) - cutMeshQueryPointWindingNumber) >=
 						windingNumberEps); // outside source-mesh
 			context_ptr->set_most_recent_dispatch_intersection_type(
 				McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -2088,17 +2083,17 @@ void check_and_store_input_mesh_intersection_type(std::shared_ptr<context_t>& co
 
 		const vec3& srcMeshQueryPoint = source_hmesh->vertex(vertex_descriptor_t(0));
 
-		const scalar_t srcMeshQueryPointWindingNumber =
+		const double srcMeshQueryPointWindingNumber =
 			getWindingNumber(context_ptr, srcMeshQueryPoint, cut_hmesh, multiplier);
 
-		if(absolute_value(scalar_t(1.0) - srcMeshQueryPointWindingNumber) < windingNumberEps)
+		if(std::abs( (1.0) - srcMeshQueryPointWindingNumber) < windingNumberEps)
 		{
 			context_ptr->set_most_recent_dispatch_intersection_type(
 				McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_INSIDE_CUTMESH);
 		}
 		else
 		{
-			MCUT_ASSERT(absolute_value(scalar_t(1.0) - srcMeshQueryPointWindingNumber) >=
+			MCUT_ASSERT(std::abs( (1.0) - srcMeshQueryPointWindingNumber) >=
 						windingNumberEps); // outside cut-mesh
 			context_ptr->set_most_recent_dispatch_intersection_type(
 				McDispatchIntersectionType::MC_DISPATCH_INTERSECTION_TYPE_NONE);
@@ -2233,9 +2228,9 @@ bool calculate_vertex_parameters(
 	srcmesh_cutmesh_bboxmax = srcmesh_cutmesh_bboxmax + pre_quantization_translation;
 
 	vec3_<double> diag = srcmesh_cutmesh_bboxmax - srcmesh_cutmesh_bboxmin;
-	MCUT_ASSERT(diag[0] > 0);
-	MCUT_ASSERT(diag[1] > 0);
-	MCUT_ASSERT(diag[2] > 0);
+	MCUT_ASSERT(diag[0] >= 0);
+	MCUT_ASSERT(diag[1] >= 0);
+	MCUT_ASSERT(diag[2] >= 0);
 	/*double max_coord = std::numeric_limits<double>::lowest();
 	double min_coord = std::numeric_limits<double>::max();
 
