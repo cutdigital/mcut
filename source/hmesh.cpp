@@ -96,8 +96,10 @@ face_array_iterator_t face_array_iterator_t::cend(id_<face_array_iterator_t>)
 
 hmesh_t::hmesh_t()
 {
+    
 }
-hmesh_t::~hmesh_t() { }
+hmesh_t::~hmesh_t() { 
+}
 
 // static member functions
 // -----------------------

@@ -200,6 +200,8 @@ public:
 
 	uint32_t* alloc()
 	{
+		///printf("last=%u\n", last);
+
 		if(last == 0)
 			doubleDataArray();
 		return stack[--last];
@@ -207,7 +209,7 @@ public:
 
 	void release(uint32_t* s)
 	{
-#if 1 // my modification
+#if 0 // my modification
 		uint32_t index = last++;
 		if(index<size){
 			stack[index] = s;
@@ -311,13 +313,14 @@ public:
 		const uint32_t num_els = ((num_bytes + 3) >> 2);
 		if(num_els > max_block_size)
 		{
+			//printf("alloc'd from malloc\n");
 			uint32_t* ptr;
 			if((ptr = (uint32_t*)malloc(sizeof(uint32_t) * (num_els + 1))) == NULL)
 				return NULL;
 			ptr[0] = 0;
 			return ptr + 1;
 		}
-
+		//printf("alloc'd from pool %u\n", num_els);
 		return pickPoolFromSize(num_els).alloc();
 	}
 

@@ -689,6 +689,12 @@ inline scalar_t length(const vec3_<scalar_t>& v, double multiplier)
 }
 
 template <>
+inline double length(const vec2_<double>& v, double multiplier)
+{
+	return square_root(squared_length(v), multiplier);
+}
+
+template <>
 inline double length(const vec3_<double>& v, double multiplier)
 {
 	return square_root(squared_length(v), multiplier);

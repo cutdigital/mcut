@@ -1093,7 +1093,7 @@ void triangulate_face(
 #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		for(auto v2d_iter = 0; v2d_iter < cc_face_vcoords2d_.size(); ++v2d_iter)
 		{
-			auto& v = cc_face_vcoords2d[v2d_iter];
+			auto& v = cc_face_vcoords2d_[v2d_iter];
 			auto deq_x = scalar_t::dequantize(v[0], multiplier);
 			auto deq_y = scalar_t::dequantize(v[1], multiplier);
 			cc_face_vcoords2d.push_back(vec2_<double>(deq_x, deq_y));

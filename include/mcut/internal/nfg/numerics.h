@@ -910,11 +910,19 @@ class bignatural
 
 	inline static uint32_t* BN_ALLOC(uint32_t num_bytes)
 	{
+		#if 1 // my modification
+		return (uint32_t*)malloc(num_bytes);
+		#else
 		return (uint32_t*)nfgMemoryPool.alloc(num_bytes);
+		#endif
 	}
 	inline static void BN_FREE(uint32_t* ptr)
 	{
+		#if 1 // my modification
+		free(ptr);
+		#else
 		nfgMemoryPool.release(ptr);
+		#endif
 	}
 
 	void init(const bignatural& m);
