@@ -54,7 +54,7 @@ std::once_flag initFPU_flag;
 void thread_init_floating_point_unit()
 {
 	std::call_once(initFPU_flag, []() {
-		std::cout << "Calling 'initFPU()'\n";
+		//std::cout << "Calling 'initFPU()'\n";
 		initFPU();
 	});
 }

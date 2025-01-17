@@ -1088,14 +1088,32 @@ void triangulate_face(
             cc_face_vcoords3d.data(),
             (int)cc_face_vcount, multiplier);
 
+        if(squared_length(cc_face_normal_vector) == scalar_t::zero())
+		{
+			context_uptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL,
+								 MC_DEBUG_TYPE_OTHER,
+								 0,
+								 MC_DEBUG_SEVERITY_HIGH,
+								 "face f" + std::to_string(cc_face_iter) +
+									 " has zero area (applying pseudo triangulation)");
+			auto v0 = cc_face_vertices[0];
+			for(int tv = 1; tv < cc_face_vertices.size()-1; ++tv)
+			{
+				cc_face_triangulation.push_back(0);
+				cc_face_triangulation.push_back(tv);
+				cc_face_triangulation.push_back((tv + 1) % cc_face_vertices.size());
+			}
+			return;
+		}
+
         project_to_2d(cc_face_vcoords2d_, cc_face_vcoords3d, cc_face_normal_vector, largest_component_of_normal, multiplier);
 
 #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		for(auto v2d_iter = 0; v2d_iter < cc_face_vcoords2d_.size(); ++v2d_iter)
 		{
 			auto& v = cc_face_vcoords2d_[v2d_iter];
-			auto deq_x = scalar_t::dequantize(v[0], multiplier);
-			auto deq_y = scalar_t::dequantize(v[1], multiplier);
+			auto deq_x = v[0].get_d(); // scalar_t::dequantize(v[0], multiplier);
+			auto deq_y = v[1].get_d(); // scalar_t::dequantize(v[1], multiplier);
 			cc_face_vcoords2d.push_back(vec2_<double>(deq_x, deq_y));
 		}
 #else
