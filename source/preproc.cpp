@@ -92,7 +92,7 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 		for(McUint32 i = 0; i < numVertices; ++i)
 		{
 			
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 			const float x = (vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0]) + pre_quantization_translation[0];
 			const float y = (vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1]) + pre_quantization_translation[1];
 			const float z = (vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
@@ -150,7 +150,7 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 			const double y = (y_ - srcmesh_cutmesh_com[1]) + pre_quantization_translation[1];
 			const double z = (z_ - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 			vec3 quantized_vertex;
 			quantized_vertex[0] = scalar_t::quantize(x, multiplier);
 			quantized_vertex[1] = scalar_t::quantize(y, multiplier),
@@ -862,9 +862,9 @@ void resolve_floating_polygons(
 														  floating_poly_vertex_count];
 
 							// placeholders
-							scalar_t _1 = scalar_t::zero(); // unused
-							scalar_t _2 = scalar_t::zero(); // unused
-							vec2 _3 = scalar_t::zero(); // unused
+							scalar_t _1 (0.); // unused
+							scalar_t _2(0.); // unused
+							vec2 _3 (0.); // unused
 
 							const char res = compute_segment_intersection(
 								face_edge_v0, face_edge_v1, fp_edge_v0, fp_edge_v1, _3, _1, _2);
@@ -1092,7 +1092,7 @@ void resolve_floating_polygons(
 						// edge that more-or-less passes through a vertex (of origin-face or the floatig poly itself)
 						// see: test41
 						const double epsilon = 1e-6;
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 						if(are_collinear || (scalar_t::quantize(epsilon, multiplier) > absolute_value(predResult)))
 #else
 						if(are_collinear || (!are_collinear && epsilon > std::fabs(predResult)))
@@ -1190,8 +1190,8 @@ void resolve_floating_polygons(
 				const scalar_t garbageVal(0xdeadbeef);
 				vec2 intersectionPoint(garbageVal);
 
-				scalar_t origFaceEdgeParam = -scalar_t::one();
-				scalar_t fpEdgeParam = -scalar_t::one();
+				scalar_t origFaceEdgeParam( - 1.0);
+				scalar_t fpEdgeParam(- 1);
 
 				char intersectionResult = compute_segment_intersection(origFaceEdgeV0,
 																	   origFaceEdgeV1,
@@ -1810,10 +1810,14 @@ double computeWindingNumberOnFace(std::shared_ptr<context_t> context_ptr,
 	double windingNumber = 0;
 
 	auto to_vec3d = [&](const vec3& v) -> vec3_<double> {
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		return vec3_<double>(
 			scalar_t::dequantize(v[0], multiplier),
 			scalar_t::dequantize(v[1], multiplier),
 			scalar_t::dequantize(v[2], multiplier));
+		#else
+		return v;
+		#endif
 	};
 
 	if(num_vertices_around_face > 4)
@@ -2148,7 +2152,7 @@ bool calculate_vertex_parameters(
 
 				for(auto i = 0; i < 3; ++i)
 				{
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 					bboxmax[i] = max(bboxmax[i],  ((double)p[i]));
 					bboxmin[i] = min(bboxmin[i],  ((double)p[i]));
 #else
@@ -2171,7 +2175,7 @@ bool calculate_vertex_parameters(
 
 				for(auto i = 0; i < 3; ++i)
 				{
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 					bboxmax[i] = max(bboxmax[i],  (p[i]));
 					bboxmin[i] = min(bboxmin[i],  (p[i]));
 #else
@@ -2226,7 +2230,7 @@ bool calculate_vertex_parameters(
 	cutmesh_bboxmax = cutmesh_bboxmax + pre_quantization_translation;
 	srcmesh_cutmesh_bboxmin = srcmesh_cutmesh_bboxmin + pre_quantization_translation;
 	srcmesh_cutmesh_bboxmax = srcmesh_cutmesh_bboxmax + pre_quantization_translation;
-
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 	vec3_<double> diag = srcmesh_cutmesh_bboxmax - srcmesh_cutmesh_bboxmin;
 	MCUT_ASSERT(diag[0] >= 0);
 	MCUT_ASSERT(diag[1] >= 0);
@@ -2267,7 +2271,9 @@ bool calculate_vertex_parameters(
 	const auto M_np2 = is_pow2(M_+1) ? M_ : next_pow2(M_+1); 
 
 	quantization_multiplier = (double)M_np2;
-
+#else
+	quantization_multiplier = 1;
+#endif
 	return true;
 }
 
@@ -2709,6 +2715,8 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 			if(source_hmesh_modified)
 			{
+				write_off("mod-srcmesh.off", *source_hmesh.get(), 1);
+				write_off("mod-cutmesh.off", *cut_hmesh.get(), 1);
 #if defined(USE_OIBVH)
 				source_hmesh_BVH_aabb_array.clear();
 				source_hmesh_BVH_leafdata_array.clear();
@@ -3047,7 +3055,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 				asFragPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 				asFragPtr->multiplier = multiplier;
 				asFragPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 				asFragPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3114,7 +3122,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 			asFragPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 			asFragPtr->multiplier = multiplier;
 			asFragPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 			asFragPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3185,7 +3193,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		asPatchPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asPatchPtr->multiplier = multiplier;
 		asPatchPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 		asPatchPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3252,7 +3260,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		asPatchPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asPatchPtr->multiplier = multiplier;
 		asPatchPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 		asPatchPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3325,7 +3333,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		asSrcMeshSeamPtr->perturbation_vector = perturbation;
 
-		#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+		#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asSrcMeshSeamPtr->multiplier = multiplier;
 		asSrcMeshSeamPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 		asSrcMeshSeamPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3392,7 +3400,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		asCutMeshSeamPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asCutMeshSeamPtr->multiplier = multiplier;
 		asCutMeshSeamPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 		asCutMeshSeamPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3527,7 +3535,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		asCutMeshInputPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asCutMeshInputPtr->multiplier = multiplier;
 		asCutMeshInputPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 		asCutMeshInputPtr->pre_quantization_translation = pre_quantization_translation;
@@ -3653,7 +3661,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 		asSrcMeshInputPtr->perturbation_vector = perturbation;
 
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		asSrcMeshInputPtr->multiplier = multiplier;
 		asSrcMeshInputPtr->srcmesh_cutmesh_com = srcmesh_cutmesh_com;
 		asSrcMeshInputPtr->pre_quantization_translation = pre_quantization_translation;

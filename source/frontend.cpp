@@ -63,6 +63,7 @@ thread_local std::stack<std::unique_ptr<mini_timer>> g_thrd_loc_timerstack;
 
 thread_local std::string per_thread_api_log_str;
 
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 #if 1
 thread_local PoolAllocator<uint32_t> expansionObject::mempool =
 	PoolAllocator<uint8_t>(); //MultiPool(2048, 64);
@@ -70,6 +71,7 @@ thread_local PoolAllocator<uint32_t> nfgMemoryPool = PoolAllocator<uint8_t>();
 #else
 thread_local MultiPool expansionObject::mempool = MultiPool(2048, 64); //MultiPool(2048, 64);
 thread_local MultiPool nfgMemoryPool;
+#endif
 #endif
 
 
@@ -807,7 +809,7 @@ void generate_supertriangle_from_mesh_vertices(
     for (uint32_t i = 0; i < 3; ++i) {
 
         const double comp = n[i];
-//#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+//#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		//const double comp_abs = absolute_value(comp);
 //#else
 		const double comp_abs = std::abs(comp);
@@ -1098,7 +1100,7 @@ void triangulate_face(
             cc_face_vcoords3d.data(),
             (int)cc_face_vcount, multiplier);
 
-        if(squared_length(cc_face_normal_vector) == scalar_t::zero())
+        if(squared_length(cc_face_normal_vector) == 0.0)
 		{
 			context_uptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL,
 								 MC_DEBUG_TYPE_OTHER,
@@ -2077,7 +2079,7 @@ void get_connected_component_data_impl_detail(
 
                         // for each component of coordinate
                         for (int i = 0; i < 3; ++i) {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 							
 							const float val = static_cast<float>(scalar_t::dequantize(
 												  coords[i], cc_uptr->multiplier)) +
@@ -2163,7 +2165,7 @@ void get_connected_component_data_impl_detail(
 
                         // for each component of coordinate
                         for (int i = 0; i < 3; ++i) {
-#if MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 							const double val =
 								scalar_t::dequantize(coords[i], cc_uptr->multiplier) +
 								cc_uptr->srcmesh_cutmesh_com[i] -
@@ -3574,7 +3576,12 @@ void get_connected_component_data_impl_detail(
 											 cc_face_vertices,
 											 *(cc.get()),
 											 *cc_face_iter,
-											 cc_uptr->multiplier);
+#	ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+											 cc_uptr->multiplier
+                                #else
+                                1.0
+                            #endif
+                            );
 
                             // NOTE: "cc_face_triangulation" can be empty if the face has near-zero area
 

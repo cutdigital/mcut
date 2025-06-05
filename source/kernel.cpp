@@ -2005,20 +2005,27 @@ void dispatch(output_t& output, const input_t& input)
                 const vd_t v1 = ps.vertex(edge, 1);
                 bounding_box_t<vec3_<double>>& edge_bbox = ps_edge_to_bbox_local[edge];
                 auto v0_val = ps.vertex(v0);
-
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
                 edge_bbox.expand(vec3_<double>(
                     scalar_t::dequantize(v0_val[0], input.multiplier),
                     scalar_t::dequantize(v0_val[1], input.multiplier),
                     scalar_t::dequantize(v0_val[2], input.multiplier)
                 ));
+#else
+				edge_bbox.expand(v0_val);
+#endif
 
                 auto v1_val = ps.vertex(v1);
 
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
                 edge_bbox.expand(vec3_<double>(
                     scalar_t::dequantize(v1_val[0], input.multiplier),
                     scalar_t::dequantize(v1_val[1], input.multiplier),
                     scalar_t::dequantize(v1_val[2], input.multiplier)
                 ));
+#else
+				edge_bbox.expand(v1_val);
+#endif
             }
 
             return ps_edge_to_bbox_local;
@@ -2226,8 +2233,8 @@ void dispatch(output_t& output, const input_t& input)
                     tested_face_vertices.data(),
                     (int)tested_face_vertices.size(),
                     input.multiplier);
-
-                if(squared_length(tested_face_plane_normal) == scalar_t(0))
+				 
+                if(squared_length(tested_face_plane_normal) == scalar_t(0) || std::isnan(tested_face_plane_normal.x()) || std::isnan(tested_face_plane_normal.y()) || std::isnan(tested_face_plane_normal.z()))
 				{
                     potentially_intersecting_face_with_zero_area.store((int)tested_faces_iter->first, std::memory_order_release);
                 }

@@ -1291,10 +1291,16 @@ void write_off(const char* fpath, const hmesh_t& mesh, const double multiplier)
     for (vertex_array_iterator_t iter = mesh.vertices_begin(); iter != mesh.vertices_end(); ++iter) {
         // const vertex_data_t& vdata = iter.second;
         const vec3& point = mesh.vertex(*iter);
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 		outfile << (double)scalar_t::dequantize(point.x(), multiplier) << " "
 				<< (double)scalar_t::dequantize(point.y(), multiplier) << " "
 				<< (double)scalar_t::dequantize(point.z(), multiplier)
 				<< "\n";
+#else
+		outfile <<  point.x() << " "
+				<<  point.y() << " "
+				<<  point.z() << "\n";
+#endif
     }
 
     //

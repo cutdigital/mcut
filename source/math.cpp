@@ -91,6 +91,7 @@
             a.x() * b.y() - a.y() * b.x());
     }*/
 
+
     scalar_t orient2d(const vec2& pa, const vec2& pb, const vec2& pc)
     {
 		const scalar_t pa_[2] = {static_cast<scalar_t>(pa.x()), static_cast<scalar_t>(pa.y())};
@@ -127,20 +128,49 @@
 										   const int polygon_vertex_count,
 										   const double multiplier)
     {
-        // compute polygon normal (http://cs.haifa.ac.il/~gordon/plane.pdf)
-        normal = vec3(0.0);
-		//int crossprods = 0;
-        for (int i = 1; i < polygon_vertex_count - 1; ++i) {
+        // compute polygon normal using Newell's Formula 
+            for(size_t i = 0; i < polygon_vertex_count; ++i)
+			{
+				size_t j = (i + 1) % polygon_vertex_count;
+				const auto& current = polygon_vertices[i];
+				const auto& next = polygon_vertices[j];
+
+				normal.x() += (current.y() - next.y()) * (current.z() + next.z());
+				normal.y() += (current.z() - next.z()) * (current.x() + next.x());
+				normal.z() += (current.x() - next.x()) * (current.y() + next.y());
+			}
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
-                normal = normal +
-					 normalize( cross_product(polygon_vertices[i] - polygon_vertices[0],
-												  polygon_vertices[(i + 1) % polygon_vertex_count] -
-													  polygon_vertices[0]) , multiplier);
+			if(std::isnan(normal.x()) || std::isnan(normal.y()) || std::isnan(normal.z()) ||
+			   squared_length(normal) < 1e-9)
+			{
+                #if 0
+				{
+					std::ofstream f("bad-face.obj");
+					for(auto i = 0; i < polygon_vertex_count; ++i)
+					{
+						f << "v " << polygon_vertices[i].x() << " " << polygon_vertices[i].y()
+						  << " " << polygon_vertices[i].z() << std::endl;
+					}
+
+					f << "f ";
+					for(auto i = 0; i < polygon_vertex_count; ++i)
+					{
+						f << i + 1 << " ";
+					}
+
+					f << std::endl;
+				}
+                #endif
+				normal = vec3(0.0);
+			}
+					 
 #else
+#if 0	
+		for(int i = 1; i < polygon_vertex_count - 1; ++i)
+		{
 			auto vec0 = polygon_vertices[i] - polygon_vertices[0];
-			
+
 			auto vec1 = polygon_vertices[(i + 1) % polygon_vertex_count] - polygon_vertices[0];
-			
 			if(squared_length(vec0) > scalar_t::zero() && squared_length(vec1) > scalar_t::zero())
 			{
 				vec3_<double> vec0_(scalar_t::dequantize(vec0[0], multiplier),
@@ -161,10 +191,13 @@
 					break;
 				}
 			}
+		}
 #endif
-        }
+#endif
+        
 
         
+        normal = normalize(normal);
 
         /*normal = normal / (double)(crossprods);*/ // mean
 
@@ -885,18 +918,18 @@
 		return absolute_value(val);
         #endif
     }
-
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
     bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult)
     {
         predResult = orient2d(a, b, c);
 		return predResult == scalar_t(0.);
     }
-
+#endif
     bool collinear(const vec2& a, const vec2& b, const vec2& c)
     {
 		return orient2d(a, b, c) == scalar_t(0.);
     }
-
+    
     
 
     char Parallellnt(const vec2& a, const vec2& b, const vec2& c, const vec2& d, vec2& p)

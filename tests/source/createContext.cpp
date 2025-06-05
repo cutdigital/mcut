@@ -150,8 +150,6 @@ UTEST(CreateContext, outOfOrderExec_debug)
     EXPECT_EQ(err, MC_NO_ERROR);
 }
 
-#define MCUT_WITH_ARBITRARY_PRECISION_NUMBERS 1
-
 #include "mcut/internal/math.h"
 
 UTEST(CreateContext, withOneHelper)

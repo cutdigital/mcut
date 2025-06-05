@@ -247,12 +247,16 @@ void build_oibvh(
                 // for each vertex on face
                 for (std::vector<vd_t>::const_iterator v = vertices_on_face.cbegin(); v != vertices_on_face.cend(); ++v) {
                     const auto& vv = mesh.vertex(*v);
+#		ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
                     face_bboxes[faceIdx].expand(
                         vec3_<double>(
                         scalar_t::dequantize(vv[0], multiplier),
                         scalar_t::dequantize(vv[1], multiplier),
                         scalar_t::dequantize(vv[2], multiplier)
                     ));
+                    #else
+					face_bboxes[faceIdx].expand(vv);
+                    #endif
                 }
 
                 bounding_box_t<vec3_<double>>& bbox = face_bboxes[faceIdx];

@@ -50,19 +50,6 @@
 
 #include "nfg/numerics.h" // Indirect_Predicates
 
-// Shewchuk predicates : shewchuk.c
-extern "C"
-{
-	// void exactinit();
-	double orient2d(const double* pa, const double* pb, const double* pc);
-	double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
-	double orient3dfast(const double* pa, const double* pb, const double* pc, const double* pd);
-	double incircle(const double* pa, const double* pb, const double* pc, const double* pd);
-	double insphere(
-		const double* pa, const double* pb, const double* pc, const double* pd, const double* pe);
-}
-
-
 class rational_number : public bigrational
 {
 public:
@@ -208,6 +195,19 @@ public:
 typedef rational_number scalar_t;
 #else
 typedef double scalar_t;
+
+// Shewchuk predicates : shewchuk.c
+extern "C"
+{
+	// void exactinit();
+	double orient2d(const double* pa, const double* pb, const double* pc);
+	double orient3d(const double* pa, const double* pb, const double* pc, const double* pd);
+	double orient3dfast(const double* pa, const double* pb, const double* pc, const double* pd);
+	double incircle(const double* pa, const double* pb, const double* pc, const double* pd);
+	double insphere(
+		const double* pa, const double* pb, const double* pc, const double* pd, const double* pe);
+}
+
 #endif // MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 
 enum sign_t {
@@ -407,6 +407,10 @@ public:
     {
         return m_z;
     }
+
+    T& z() 	{
+		return m_z;
+	}
 
 protected:
     T m_z;
@@ -810,19 +814,24 @@ static bool collinear(const vec2_<double>& a,
 			   const vec2_<double>& c,
 			   double& predResult)
 {
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 	const double pa_[2] = {a.x(), a.y()};
 	const double pb_[2] = {b.x(), b.y()};
 	const double pc_[2] = {c.x(), c.y()};
 
 	predResult = orient2d(pa_, pb_, pc_); // shewchuk predicate
+    #else
+	predResult = orient2d(a, b, c);
+    #endif
 
-	//predResult = orient2d(a, b, c);
 	return predResult == double(0.);
 }
 
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
 bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult);
-
+#endif
 bool collinear(const vec2& a, const vec2& b, const vec2& c);
+
 
 char Parallellntd(const vec2_<double>& a,
 				 const vec2_<double>& b,
