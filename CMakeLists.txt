@@ -85,6 +85,13 @@ endif()
 
 include(CMakePrintHelpers) 
 
+# FetchContent added in CMake 3.11, downloads during the configure step
+include(FetchContent)
+# FetchContent_MakeAvailable was not added until CMake 3.14; use our shim
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
+	include(cmake/add_FetchContent_MakeAvailable.cmake)
+endif()
+
 #
 # User options
 #
@@ -201,18 +208,15 @@ endif()
 set (MCUT_LIB_PATH $<TARGET_FILE:mcut>  CACHE STRING "Path to the compiled MCUT library file")
 message(STATUS "[MCUT] MCUT_LIB_PATH=${MCUT_LIB_PATH}")
 
+
+
 #
 # tests, tutorials etc. are dependant on third-party libs (file loaders etc.)
 # We enable the code that is used to download those projects here:
 #
 if(${MCUT_BUILD_TESTS} OR ${MCUT_BUILD_TUTORIALS})
 
-	# FetchContent added in CMake 3.11, downloads during the configure step
-	include(FetchContent)
-	# FetchContent_MakeAvailable was not added until CMake 3.14; use our shim
-	if(${CMAKE_VERSION} VERSION_LESS 3.14)
-		include(cmake/add_FetchContent_MakeAvailable.cmake)
-	endif()
+	
 
 	FetchContent_Populate(
 		mio

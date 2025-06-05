@@ -63,6 +63,16 @@ thread_local std::stack<std::unique_ptr<mini_timer>> g_thrd_loc_timerstack;
 
 thread_local std::string per_thread_api_log_str;
 
+#if 1
+thread_local PoolAllocator<uint32_t> expansionObject::mempool =
+	PoolAllocator<uint8_t>(); //MultiPool(2048, 64);
+thread_local PoolAllocator<uint32_t> nfgMemoryPool = PoolAllocator<uint8_t>();
+#else
+thread_local MultiPool expansionObject::mempool = MultiPool(2048, 64); //MultiPool(2048, 64);
+thread_local MultiPool nfgMemoryPool;
+#endif
+
+
 threadsafe_list<std::shared_ptr<context_t>> g_contexts = {};
 threadsafe_list<std::shared_ptr<event_t>> g_events = {};
 std::atomic<std::uintptr_t> g_objects_counter; // a counter that is used to assign a unique value to e.g. a McContext handle that will be returned to the user

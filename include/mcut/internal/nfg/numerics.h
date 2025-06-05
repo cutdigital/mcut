@@ -35,7 +35,12 @@
 #ifndef NUMERICS_H
 #define NUMERICS_H
 
+#if 0
 #include "memPool.h"
+#else
+#include "mcut/internal/pool_allocator/pool_allocator.h"
+#endif
+
 #include <climits>
 #include <fenv.h>
 #include <float.h>
@@ -585,15 +590,22 @@ inline std::ostream& operator<<(std::ostream& os, const interval_number& p)
 // Allocate extra-memory
 //#define AllocDoubles(n) ((double *)malloc((n) * sizeof(double)))
 //#define FreeDoubles(p) (free(p))
+#if 0
 #define AllocDoubles(n) ((double*)expansionObject::mempool.alloc((n) * sizeof(double)))
-#define FreeDoubles(p) (expansionObject::mempool.release(p))
 
+#else
+#	define AllocDoubles(n) ((double*)expansionObject::mempool.allocate((n) * sizeof(double)))
+#	define FreeDoubles(p) (expansionObject::mempool.deallocate((uint32_t*)p))
+#endif
 // An instance of the following must be created to access functions for expansion arithmetic
 class expansionObject
 {
 public:
+#if 1
+	static thread_local PoolAllocator<uint32_t> mempool;
+#else
 	static thread_local MultiPool mempool;//	= MultiPool(2048, 64);
-
+#endif
 	static void Quick_Two_Sum(const double a, const double b, double& x, double& y)
 	{
 		x = a + b;
@@ -895,8 +907,11 @@ typedef mpq_class bigrational;
 
 // Preallocates memory for bignaturals having at most 32 limbs.
 // Larger numbers will use the standard heap.
+#if 1
+extern thread_local PoolAllocator<uint32_t> nfgMemoryPool;
+#else
 extern thread_local MultiPool nfgMemoryPool;
-
+#endif
 // A bignatural is an arbitrarily large non-negative integer.
 // It is made of a sequence of digits in base 2^32.
 // Leading zero-digits are not allowed.
@@ -910,19 +925,28 @@ class bignatural
 
 	inline static uint32_t* BN_ALLOC(uint32_t num_bytes)
 	{
-		#if 1 // my modification
+#if 1 // my modification
+#if 1
+		return (uint32_t*)nfgMemoryPool.allocate(num_bytes);
+#else
 		return (uint32_t*)malloc(num_bytes);
-		#else
+#endif
+#else
 		return (uint32_t*)nfgMemoryPool.alloc(num_bytes);
-		#endif
+#endif
 	}
 	inline static void BN_FREE(uint32_t* ptr)
 	{
-		#if 1 // my modification
+#if 1 // my modification
+#if 1
+		nfgMemoryPool.deallocate((uint32_t*)ptr);
+#else
 		free(ptr);
-		#else
+#endif
+#else
+
 		nfgMemoryPool.release(ptr);
-		#endif
+#endif
 	}
 
 	void init(const bignatural& m);

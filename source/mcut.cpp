@@ -46,8 +46,6 @@
 #pragma warning(disable : 26812)
 #endif
 
-thread_local MultiPool expansionObject::mempool = MultiPool(2048, 64);//MultiPool(2048, 64);
-thread_local MultiPool nfgMemoryPool;
 
 std::once_flag initFPU_flag;
 
