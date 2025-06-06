@@ -39,7 +39,11 @@
 #include <tuple> // std::make_tuple std::get<>
 
 
-    scalar_t square_root(const scalar_t& number, double multiplier)
+    scalar_t square_root(const scalar_t& number, double 
+        #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+        multiplier
+    #endif
+    )
     {
 #if !defined(MCUT_WITH_ARBITRARY_PRECISION_NUMBERS)
         return std::sqrt(number);
@@ -126,7 +130,11 @@
     int compute_polygon_plane_coefficients(vec3& normal, scalar_t& d_coeff,
 										   const vec3* polygon_vertices,
 										   const int polygon_vertex_count,
-										   const double multiplier)
+										   const double
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS 
+        multiplier
+    #endif
+    )
     {
         // compute polygon normal using Newell's Formula 
             for(size_t i = 0; i < polygon_vertex_count; ++i)
@@ -162,6 +170,7 @@
 				}
                 #endif
 				normal = vec3(0.0);
+				return 0;
 			}
 					 
 #else
@@ -195,9 +204,16 @@
 #endif
 #endif
         
-
+        if(squared_length(normal) == scalar_t(0))
+			{
+			return 0 ;
+			}
         
-        normal = normalize(normal);
+        normal = normalize(normal
+#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+            , multiplier
+#endif
+        );
 
         /*normal = normal / (double)(crossprods);*/ // mean
 
@@ -918,13 +934,13 @@
 		return absolute_value(val);
         #endif
     }
-#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+
     bool collinear(const vec2& a, const vec2& b, const vec2& c, scalar_t& predResult)
     {
         predResult = orient2d(a, b, c);
 		return predResult == scalar_t(0.);
     }
-#endif
+
     bool collinear(const vec2& a, const vec2& b, const vec2& c)
     {
 		return orient2d(a, b, c) == scalar_t(0.);

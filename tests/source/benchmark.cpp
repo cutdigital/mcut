@@ -94,6 +94,7 @@ UTEST_I_SETUP(Benchmark)
 UTEST_I_TEARDOWN(Benchmark)
 {
     if (utest_index < NUMBER_OF_BENCHMARKS) {
+		EXPECT_EQ(mcReleaseConnectedComponents(utest_fixture->myContext,0, NULL), MC_NO_ERROR);
         EXPECT_EQ(mcReleaseContext(utest_fixture->myContext), MC_NO_ERROR);
     }
 

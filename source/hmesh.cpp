@@ -1265,7 +1265,11 @@ const face_array_iterator_t hmesh_t::elements_begin_(id_<array_iterator_t<face_a
     return faces_begin(account_for_removed_elems);
 }
 
-void write_off(const char* fpath, const hmesh_t& mesh, const double multiplier)
+void write_off(const char* fpath, const hmesh_t& mesh, const double 
+    #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+    multiplier
+#endif
+)
 {
 
     std::ofstream outfile(fpath);

@@ -545,7 +545,11 @@ private:
     // the internal scheduling threadpool is initialised, each (device) thread is launched with this
     // function. The device thread loops indefinitely (sleeping most of the time and waking up to do 
     // work) until the context is destroyed. 
-    void api_thread_main(uint32_t thread_id)
+    void api_thread_main(uint32_t 
+        #	ifdef MCUT_WITH_API_EVENT_LOGGING
+        thread_id
+    #endif
+    )
     {
         log_msg("[MCUT] Launch API thread " << std::this_thread::get_id() << " (" << thread_id << ")");
 
@@ -871,7 +875,7 @@ public:
 #	if 0
         event_ptr->m_responsible_thread_id = responsible_thread_id;
 #	else
-		event_ptr->m_responsible_thread_id = -1; // unused
+		event_ptr->m_responsible_thread_id = -1u; // unused
 #endif
 
         #if 0

@@ -635,7 +635,7 @@ inline void bignatural::init(const bignatural& m) {
 	if (m_capacity) {
 		digits = (uint32_t*)BN_ALLOC(sizeof(uint32_t) * m_capacity);
 		#if 1
-		for(int i=0;i < m_capacity;++i)
+		for(auto i=0u;i < m_capacity;++i)
 		{
 			uint32_t &dst = digits[i];
 			const uint32_t &src = m.digits[i];

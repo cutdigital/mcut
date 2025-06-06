@@ -2234,7 +2234,11 @@ void dispatch(output_t& output, const input_t& input)
                     (int)tested_face_vertices.size(),
                     input.multiplier);
 				 
-                if(squared_length(tested_face_plane_normal) == scalar_t(0) || std::isnan(tested_face_plane_normal.x()) || std::isnan(tested_face_plane_normal.y()) || std::isnan(tested_face_plane_normal.z()))
+                if(squared_length(tested_face_plane_normal) == scalar_t(0) 
+                    #ifndef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+                    || std::isnan(tested_face_plane_normal.x()) || std::isnan(tested_face_plane_normal.y()) || std::isnan(tested_face_plane_normal.z())
+                    #endif
+                    )
 				{
                     potentially_intersecting_face_with_zero_area.store((int)tested_faces_iter->first, std::memory_order_release);
                 }

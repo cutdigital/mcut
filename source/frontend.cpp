@@ -1100,7 +1100,7 @@ void triangulate_face(
             cc_face_vcoords3d.data(),
             (int)cc_face_vcount, multiplier);
 
-        if(squared_length(cc_face_normal_vector) == 0.0)
+        if(squared_length(cc_face_normal_vector) == scalar_t(0.0))
 		{
 			context_uptr->dbg_cb(MC_DEBUG_SOURCE_KERNEL,
 								 MC_DEBUG_TYPE_OTHER,

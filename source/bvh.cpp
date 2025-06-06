@@ -225,7 +225,11 @@ void build_oibvh(
     std::vector<fd_t>& bvhLeafNodeFaces,
     std::vector<bounding_box_t<vec3_<double>>>& face_bboxes,
     const double& slightEnlargmentEps, // in native user coordinates
-    const double multiplier)
+    const double 
+    #	ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+    multiplier
+#endif
+)
 {
     SCOPED_TIMER(__FUNCTION__);
 

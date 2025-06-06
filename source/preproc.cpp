@@ -65,7 +65,11 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 								  const McUint32* pFaceSizes,
 								  const McUint32 numVertices,
 								  const McUint32 numFaces,
-								  const double multiplier,
+								  const double 
+	#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+	multiplier
+	#endif
+								  ,
 								  const vec3_<double> srcmesh_cutmesh_com,
 								  const vec3_<double> pre_quantization_translation,
 								  const vec3_<double>* perturbation = NULL)
@@ -117,12 +121,12 @@ bool client_input_arrays_to_hmesh(std::shared_ptr<context_t>& context_ptr,
 
 			vd_t vd = halfedgeMesh.add_vertex(quantized_vertex);
 #else
-			const float x =
-				(vptr[(i * 3) + 0] - srcmesh_cutmesh_com[0]) + pre_quantization_translation[0];
-			const float y =
-				(vptr[(i * 3) + 1] - srcmesh_cutmesh_com[1]) + pre_quantization_translation[1];
-			const float z =
-				(vptr[(i * 3) + 2] - srcmesh_cutmesh_com[2]) + pre_quantization_translation[2];
+			const float x = (vptr[(i * 3) + 0] - (float)srcmesh_cutmesh_com[0]) +
+							(float)pre_quantization_translation[0];
+			const float y = (vptr[(i * 3) + 1] - (float)srcmesh_cutmesh_com[1]) +
+							(float)pre_quantization_translation[1];
+			const float z = (vptr[(i * 3) + 2] - (float)srcmesh_cutmesh_com[2]) +
+							(float)pre_quantization_translation[2];
 			// insert our vertex into halfedge mesh
 			vd_t vd = halfedgeMesh.add_vertex(
 				double(x) + (perturbation != NULL ? (*perturbation).x() : double(0.)),
@@ -1645,7 +1649,11 @@ void resolve_floating_polygons(
 // Compute the signed solid angle subtended by triangle abc from query point.
 double calculate_signed_solid_angle(
 	const vec3_<double>& a, 
-	const vec3_<double>& b, const vec3_<double>& c, const vec3_<double>& query, const double multiplier)
+	const vec3_<double>& b, const vec3_<double>& c, const vec3_<double>& query, const double 
+	#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+	multiplier
+#endif
+)
 {
 	const vec3_<double> qa = a - query;
 	const vec3_<double> qb = b - query;
@@ -1697,7 +1705,11 @@ double calculate_signed_solid_angle(
 	const vec3_<double>& b, 
 	const vec3_<double>& c, 
 	const vec3_<double>& d, 
-	const vec3_<double>& query, const double multiplier)
+	const vec3_<double>& query, const double 
+	#ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
+	multiplier
+#endif
+)
 {
 	const double pi = 3.14159265358979323846;
 	// Make a, b, c, and d relative to query
@@ -2150,16 +2162,16 @@ bool calculate_vertex_parameters(
 			{
 				const float* p = vptr + (v * 3);
 
-				for(auto i = 0; i < 3; ++i)
+				for(auto j = 0; j < 3; ++j)
 				{
 #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-					bboxmax[i] = max(bboxmax[i],  ((double)p[i]));
-					bboxmin[i] = min(bboxmin[i],  ((double)p[i]));
+					bboxmax[j] = max(bboxmax[j],  ((double)p[j]));
+					bboxmin[j] = min(bboxmin[j],  ((double)p[j]));
 #else
-					bboxmax[i] = std::max(static_cast<float>(bboxmax[i]), p[i]);
-					bboxmin[i] = std::min(static_cast<float>(bboxmin[i]), p[i]);
+					bboxmax[j] = std::max(static_cast<float>(bboxmax[j]), p[j]);
+					bboxmin[j] = std::min(static_cast<float>(bboxmin[j]), p[j]);
 #endif
-					com[i] +=  double(p[i]);
+					com[j] +=  double(p[j]);
 				}
 			}
 		}
@@ -2173,16 +2185,16 @@ bool calculate_vertex_parameters(
 			{
 				const double* p = vptr + (i * 3);
 
-				for(auto i = 0; i < 3; ++i)
+				for(auto j = 0; j < 3; ++j)
 				{
 #ifdef MCUT_WITH_ARBITRARY_PRECISION_NUMBERS
-					bboxmax[i] = max(bboxmax[i],  (p[i]));
-					bboxmin[i] = min(bboxmin[i],  (p[i]));
+					bboxmax[j] = max(bboxmax[j],  (p[j]));
+					bboxmin[j] = min(bboxmin[j],  (p[j]));
 #else
-					bboxmax[i] = std::max(static_cast<double>(bboxmax[i]), p[i]);
-					bboxmin[i] = std::min(static_cast<double>(bboxmin[i]), p[i]);
+					bboxmax[j] = std::max(static_cast<double>(bboxmax[j]), p[j]);
+					bboxmin[j] = std::min(static_cast<double>(bboxmin[j]), p[j]);
 #endif
-					com[i] +=  (p[i]);
+					com[j] +=  (p[j]);
 				}
 			}
 		}
@@ -2321,7 +2333,7 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 	///
 
 	std::shared_ptr<hmesh_t> source_hmesh = std::shared_ptr<hmesh_t>(new hmesh_t);
-	double source_hmesh_aabb_diag = length(srcmesh_bboxmax - srcmesh_bboxmin, 1);
+	//double source_hmesh_aabb_diag = length(srcmesh_bboxmax - srcmesh_bboxmin, 1);
 
 	if(false == client_input_arrays_to_hmesh(context_ptr,
 											 dispatchFlags,
