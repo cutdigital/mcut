@@ -2368,12 +2368,12 @@ extern "C" void preproc(std::shared_ptr<context_t> context_ptr,
 
 	kernel_input.src_mesh = source_hmesh;
 
-	kernel_input.verbose = true;
+	kernel_input.verbose = false;
 	kernel_input.require_looped_cutpaths = false;
 
-	//kernel_input.verbose =
-	//	static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) &&
-	//					  (context_ptr->dbgCallbackBitfieldType & MC_DEBUG_SOURCE_KERNEL));
+	kernel_input.verbose =
+		static_cast<bool>((context_ptr->get_flags() & MC_DEBUG) &&
+						  (context_ptr->dbgCallbackBitfieldType & MC_DEBUG_SOURCE_KERNEL));
 	kernel_input.require_looped_cutpaths =
 		static_cast<bool>(dispatchFlags & MC_DISPATCH_REQUIRE_THROUGH_CUTS);
 	kernel_input.populate_vertex_maps =
